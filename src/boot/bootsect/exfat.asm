@@ -153,7 +153,7 @@ Main$NotFound:
 Main$Found:
     ; Now we can load all of the file data just after the boot sector, and jump to it.
     mov ebp, [si + 52]
-    mov bx, 800h
+    mov bx, 4000h
     mov es, bx
     xor bx, bx
 
@@ -163,8 +163,9 @@ Main$Loop:
     jc Main$Loop
 
     pop dx
-    push 8000h
-    ret
+    push 4000h
+    push 0
+    retf
 Main endp
 
 ;---------------------------------------------------------------------------------------------------------------------

@@ -5,7 +5,7 @@
 .x64p
 
 _TEXT16 segment use16
-org 8000h
+org 0
 
 ;---------------------------------------------------------------------------------------------------------------------
 ; PURPOSE:
@@ -19,7 +19,8 @@ org 8000h
 ;     This function does not return.
 ;---------------------------------------------------------------------------------------------------------------------
 Main proc
-    xor ax, ax
+    mov ax, cs
+    mov ds, ax
     mov es, ax
     mov byte ptr [BootBlock$BootDrive], dl
 
@@ -67,6 +68,7 @@ Main$GotMemMap:
     call Error
 
 Main$MzFound:
+    push esi
     add esi, dword ptr [esi + 3Ch]
     cmp dword ptr [esi], 4550h
     jne Main$BadSig
@@ -119,17 +121,34 @@ Main$Next:
     loop Main$Loop
 
 Main$Continue:
-    ; We're ready for protected mode + relocating ourselves.
+    ; This whole code is loaded at >64K (using CS != 0), we need to fix up the GDT, all of our other data structures,
+    ; and the far jump IP.
     cli
+
+    mov eax, cs
+    shl eax, 4
+    add esi, eax
+
+    pop ebp
+    mov ebx, offset BootBlock
+    add ebx, eax
+    add ebp, eax
+    push ebx
+    push ebp
+
+    mov ebx, eax
+    add ebx, offset _TEXT16$End
+    add [GdtBase], eax
     lgdt fword ptr [GdtSize]
 
     mov eax, cr0
     or eax, 1
     mov cr0, eax
 
-    push 8
-    push offset _TEXT16$End
-    retf
+    pushd 8
+    push ebx
+    mov bp, sp
+    jmp far32 ptr [bp]
 Main endp
 
 ;---------------------------------------------------------------------------------------------------------------------
@@ -169,9 +188,7 @@ SubsystemError db "The target subsystem in bootmgr.exe is wrong.", 0
 NoSectionError db "There are no sections in bootmgr.exe.", 0
 SectionError db "One of the bootmgr.exe sections doesn't fit inside the physical memory.", 0
 
-; We also need 16-bits and 32-bits entries, for dropping back to real mode (to read the disks using BIOS int 13h).
 GdtDescs dq 0000000000000000h, 00CF9A000000FFFFh, 00CF92000000FFFFh
-
 GdtSize dw GdtSize - GdtDescs - 1
 GdtBase dd offset GdtDescs
 
@@ -205,6 +222,8 @@ Relocate proc
     mov gs, ax
     mov ss, ax
 
+    add esp, 8
+    pop ebp
     mov ebx, esi
     movzx ecx, word ptr [ebx + 6]
     movzx eax, word ptr [ebx + 20]
@@ -227,7 +246,7 @@ Relocate$Load:
     mov ecx, dword ptr [esi + 16]
     mov edi, dword ptr [esi + 12]
     add edi, dword ptr [ebx + 52]
-    mov eax, _TEXT16$End + (_TEXTJ$End - _TEXTJ$Start)
+    mov eax, ebp
     add eax, dword ptr [esi + 20]
     mov esi, eax
     rep movsb
@@ -238,9 +257,9 @@ Relocate$Load:
     loop Relocate$Load
 
 Relocate$Transfer:
+    pop eax
     and esp, -16
     sub esp, 8
-    mov eax, offset BootBlock
     push eax
 
     mov eax, dword ptr [ebx + 40]

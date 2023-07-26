@@ -20,8 +20,8 @@
     BmInitArch();
     BmInitDisplay();
     BmInitMemory(BootBlock);
-
     AcpiInitialize();
+
     BmPut("Hello, World!\n");
 
     while (1)
