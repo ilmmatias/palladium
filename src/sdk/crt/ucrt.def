@@ -1,0 +1,5 @@
+LIBRARY ucrt
+EXPORTS
+    memcpy
+    memset
+    strlen

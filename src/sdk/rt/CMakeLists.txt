@@ -1,0 +1,11 @@
+# SPDX-FileCopyrightText: (C) 2023 yuuma03
+# SPDX-License-Identifier: BSD-3-Clause
+
+project(os/sdk/rt)
+
+set(SOURCES
+    ${SOURCES}
+    placeholder.c)
+
+include(kernel.cmake)
+include(user.cmake)
