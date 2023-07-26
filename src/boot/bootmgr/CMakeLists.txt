@@ -5,6 +5,7 @@ project(os/boot/bootmgr)
 
 if(ARCH STREQUAL "x86")
     set(SOURCES
+        ${ARCH}/bios.asm
         ${ARCH}/display.c
         ${ARCH}/init.c
         ${ARCH}/memory.c)

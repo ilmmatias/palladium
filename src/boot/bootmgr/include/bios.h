@@ -22,4 +22,6 @@ typedef struct __attribute__((packed)) {
     uint32_t UsedPages;
 } BiosMemoryRegion;
 
+void BiosCall(uint8_t Number);
+
 #endif /* _BIOS_H_ */

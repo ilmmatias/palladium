@@ -92,6 +92,9 @@ void BiPutChar(char c) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void BmInitDisplay(void) {
+    CursorX = 0;
+    CursorY = 0;
+
     if (!(SCREEN_ATTRIBUTE & 0xF0)) {
         memset(VideoMemory, 0, SCREEN_SIZE * 2);
     } else {
