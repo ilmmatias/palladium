@@ -22,6 +22,10 @@ typedef struct __attribute__((packed)) {
     uint32_t UsedPages;
 } BiosMemoryRegion;
 
-void BiosCall(uint8_t Number);
+typedef struct __attribute__((packed)) {
+    uint32_t Edi, Esi, Ebp, Esp, Ebx, Edx, Ecx, Eax, Eflags;
+} BiosRegisters;
+
+void BiosCall(uint8_t Number, BiosRegisters *Registers);
 
 #endif /* _BIOS_H_ */

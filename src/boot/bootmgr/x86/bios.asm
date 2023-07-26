@@ -10,17 +10,26 @@
 ;
 ; PARAMETERS:
 ;     Number (esp + 4) - Interrupt number.
+;     Registers (esp + 8) - I/O; State of the processor when executing the interrupt, and state after.
 ;
 ; RETURN VALUE:
 ;     None.
 ;---------------------------------------------------------------------------------------------------------------------
 _BiosCall proc
-    ; We should be in low memory, so start by overwriting the int call number up ahead.
+    ; We should be in low memory, so start by overwriting the int call number up ahead and saving the regs pointer.
     mov al, [esp + 4]
     mov [_BiosCall$Int + 1], al
+    mov eax, [esp + 8]
+    mov [_BiosCall$IoRegs], eax
 
     ; Worst case the BIOS might overwrite our GDT, so we need to save that.
     sgdt [_BiosCall$SavedGdt]
+
+    ; We'll popa on real mode, trashing all registers. Save anything the compiler expects us to not mess with.
+    push ebx
+    push esi
+    push edi
+    push ebp
 
     ; startup.com should have setup our GDT properly, so drop back to protected 16-bits mode.
     mov ax, 08h
@@ -63,10 +72,24 @@ _BiosCall$Real:
     mov gs, eax
     mov ss, eax
 
+    db 67h, 89h, 25h ; mov [_BiosCall$SavedEsp], sp
+    dd _BiosCall$SavedEsp
+    db 67h, 8Bh, 25h ; mov sp, [_BiosCall$IoRegs]
+    dd _BiosCall$IoRegs
+
+    popaw
+    popfw
+
     sti
 _BiosCall$Int:
     int 0
     cli
+
+    pushfw
+    pushaw
+
+    db 67h, 8Bh, 25h ; mov sp, [_BiosCall$SavedEsp]
+    dd _BiosCall$SavedEsp
 
     ; Restore the GDT and get right back onto pmode (no need to go to 16-bits pmode first).
     pop ebx
@@ -79,16 +102,24 @@ _BiosCall$Int:
     retf
 
 _BiosCall$End:
-    ; Restore the segments and give control back to the caller.
+    ; Restore the segments and registers, and give control back to the caller.
     mov ax, 10h
     mov ds, ax
     mov es, ax
     mov fs, ax
     mov gs, ax
     mov ss, ax
+
+    pop ebp
+    pop edi
+    pop esi
+    pop ebx
+
     ret
 
 _BiosCall$SavedGdt dq 0
+_BiosCall$SavedEsp dd 0
+_BiosCall$IoRegs dd 0
 _BiosCall endp
 
 end

@@ -17,8 +17,8 @@
  *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
 [[noreturn]] void BmMain(void *BootBlock) {
-    BmInitArch();
     BmInitDisplay();
+    BmInitArch();
     BmInitMemory(BootBlock);
     AcpiInitialize();
 

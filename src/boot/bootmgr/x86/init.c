@@ -3,6 +3,7 @@
 
 #include <bios.h>
 #include <boot.h>
+#include <string.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -17,7 +18,9 @@
  *-----------------------------------------------------------------------------------------------*/
 void BmInitArch() {
     for (int i = 0; i < 0x100; i++) {
-        BiosCall(0x13);
+        BiosRegisters Registers;
+        memset(&Registers, 0, sizeof(BiosRegisters));
+        BiosCall(0x13, &Registers);
         BmPut("Called it %d time(s).\n", i);
     }
 }
