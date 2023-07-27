@@ -80,10 +80,17 @@ _BiosCall$Real:
     popaw
     popfw
 
+    db 67h, 8Bh, 25h ; mov sp, [_BiosCall$SavedEsp]
+    dd _BiosCall$SavedEsp
+
     sti
 _BiosCall$Int:
     int 0
     cli
+
+    db 67h, 8Bh, 25h ; mov sp, [_BiosCall$IoRegs]
+    dd _BiosCall$IoRegs
+    add esp, 36
 
     pushfw
     pushaw
