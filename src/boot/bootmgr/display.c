@@ -10,13 +10,13 @@ static void PutString(const char *String) {
     }
 }
 
-static void PutHex(uint64_t Number) {
-    for (int i = 60; i >= 0; i -= 4) {
+static void PutHex(size_t Number) {
+    for (int i = (sizeof(size_t) << 3) - 4; i >= 0; i -= 4) {
         BiPutChar("0123456789ABCDEF"[(Number >> i) & 0xF]);
     }
 }
 
-static void PutDec(uint64_t Number) {
+static void PutDec(size_t Number) {
     if (Number >= 10) {
         PutDec(Number / 10);
     }
@@ -57,11 +57,11 @@ void BmPut(const char *String, ...) {
                     break;
                 }
                 case 'x': {
-                    PutHex(va_arg(Args, uint64_t));
+                    PutHex(va_arg(Args, size_t));
                     break;
                 }
                 case 'd': {
-                    PutDec(va_arg(Args, uint64_t));
+                    PutDec(va_arg(Args, size_t));
                     break;
                 }
                 default: {

@@ -20,7 +20,9 @@ _BiosCall proc
     mov al, [esp + 4]
     mov [_BiosCall$Int + 1], al
     mov eax, [esp + 8]
-    mov [_BiosCall$IoRegs], eax
+    mov [_BiosCall$InRegs], eax
+    add eax, 36
+    mov [_BiosCall$OutRegs], eax
 
     ; Worst case the BIOS might overwrite our GDT, so we need to save that.
     sgdt [_BiosCall$SavedGdt]
@@ -74,8 +76,8 @@ _BiosCall$Real:
 
     db 67h, 89h, 25h ; mov [_BiosCall$SavedEsp], sp
     dd _BiosCall$SavedEsp
-    db 67h, 8Bh, 25h ; mov sp, [_BiosCall$IoRegs]
-    dd _BiosCall$IoRegs
+    db 67h, 8Bh, 25h ; mov sp, [_BiosCall$InRegs]
+    dd _BiosCall$InRegs
 
     popaw
     popfw
@@ -88,9 +90,8 @@ _BiosCall$Int:
     int 0
     cli
 
-    db 67h, 8Bh, 25h ; mov sp, [_BiosCall$IoRegs]
-    dd _BiosCall$IoRegs
-    add esp, 36
+    db 67h, 8Bh, 25h ; mov sp, [_BiosCall$OutRegs]
+    dd _BiosCall$OutRegs
 
     pushfw
     pushaw
@@ -126,7 +127,8 @@ _BiosCall$End:
 
 _BiosCall$SavedGdt dq 0
 _BiosCall$SavedEsp dd 0
-_BiosCall$IoRegs dd 0
+_BiosCall$InRegs dd 0
+_BiosCall$OutRegs dd 0
 _BiosCall endp
 
 end
