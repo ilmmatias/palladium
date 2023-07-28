@@ -22,28 +22,90 @@ static void ScrollUp(void) {
     memset(VideoMemory + SCREEN_SIZE - SCREEN_WIDTH, 0, SCREEN_WIDTH * 2);
 }
 
-void BmSetCursor(uint16_t x, uint16_t y) {
-    CursorX = x;
-    CursorY = y;
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     Set the X and Y positions of the console cursor simultaneously.
+ *
+ * PARAMETERS:
+ *     X - New X position.
+ *     Y - New Y position.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void BmSetCursor(uint16_t X, uint16_t Y) {
+    CursorX = X;
+    CursorY = Y;
 }
 
-void BmGetCursor(uint16_t *x, uint16_t *y) {
-    *x = CursorX;
-    *y = CursorY;
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     Save the X and Y positions of the console cursor simultaneously.
+ *
+ * PARAMETERS:
+ *     X - Pointer to save location for the X position.
+ *     Y - Pointer to save location for the Y position.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void BmGetCursor(uint16_t *X, uint16_t *Y) {
+    *X = CursorX;
+    *Y = CursorY;
 }
 
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     Set only the X position of the console cursor.
+ *
+ * PARAMETERS:
+ *     X - New X position.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
 void BmSetCursorX(uint16_t x) {
     CursorX = x;
 }
 
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     Set only the Y position of the console cursor.
+ *
+ * PARAMETERS:
+ *     Y - New X position.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
 void BmSetCursorY(uint16_t y) {
     CursorY = y;
 }
 
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     Get only the X position of the console cursor.
+ *
+ * PARAMETERS:
+ *     None.
+ *
+ * RETURN VALUE:
+ *     Current X position.
+ *-----------------------------------------------------------------------------------------------*/
 uint16_t BmGetCursorX(void) {
     return CursorX;
 }
 
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     Get only the Y position of the console cursor.
+ *
+ * PARAMETERS:
+ *     None.
+ *
+ * RETURN VALUE:
+ *     Current Y position.
+ *-----------------------------------------------------------------------------------------------*/
 uint16_t BmGetCursorY(void) {
     return CursorY;
 }
@@ -58,14 +120,14 @@ uint16_t BmGetCursorY(void) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void BiPutChar(char c) {
-    if (c == '\n') {
+void BiPutChar(char Character) {
+    if (Character == '\n') {
         CursorX = 0;
         CursorY++;
-    } else if (c == '\t') {
+    } else if (Character == '\t') {
         CursorX += TAB_SIZE;
     } else {
-        VideoMemory[CursorY * SCREEN_WIDTH + CursorX] = SCREEN_ATTRIBUTE << 8 | c;
+        VideoMemory[CursorY * SCREEN_WIDTH + CursorX] = SCREEN_ATTRIBUTE << 8 | Character;
         CursorX++;
     }
 

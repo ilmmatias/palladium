@@ -3,161 +3,10 @@
 
 #include <bios.h>
 #include <boot.h>
-
-typedef struct AllocatorEntry {
-    int Used;
-    size_t Size;
-    struct AllocatorEntry *Prev, *Next;
-} AllocatorEntry;
+#include <string.h>
 
 static BiosMemoryRegion *BiosMemoryMap = NULL;
 static uint32_t BiosMemoryMapEntries = 0;
-static AllocatorEntry *AllocatorHead = NULL, *AllocatorTail = NULL;
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function splits a block of memory into two blocks, one of the required size for the
- *     allocation and one of the remaining size.
- *
- * PARAMETERS:
- *     Entry - The entry to split.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-static void SplitEntry(AllocatorEntry *Entry, size_t Size) {
-    if (Entry->Size <= Size + sizeof(AllocatorEntry)) {
-        return;
-    }
-
-    AllocatorEntry *NewEntry = (AllocatorEntry *)((uintptr_t)Entry + sizeof(AllocatorEntry) + Size);
-
-    NewEntry->Used = 0;
-    NewEntry->Size = Entry->Size - (Size + sizeof(AllocatorEntry));
-    NewEntry->Prev = Entry;
-    NewEntry->Next = NULL;
-
-    AllocatorTail = NewEntry;
-
-    Entry->Size = Size;
-    Entry->Next = NewEntry;
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function merges all contiguous free entries after and including the base entry into
- *     one entry.
- *
- * PARAMETERS:
- *     Base - The entry to start merging from.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-static void MergeEntriesForward(AllocatorEntry *Base) {
-    while (Base->Next && Base + (Base->Size << 12) == Base->Next && !Base->Next->Used) {
-        Base->Size += Base->Next->Size;
-        Base->Next = Base->Next->Next;
-
-        if (Base->Next) {
-            Base->Next->Prev = Base;
-        }
-    }
-
-    if (!Base->Next) {
-        AllocatorTail = Base;
-    }
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function merges all contiguous free entries before and including the base entry into
- *     one entry.
- *
- * PARAMETERS:
- *     Base - The entry to start merging from.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-static void MergeEntriesBackward(AllocatorEntry *Base) {
-    while (Base->Prev && Base->Prev + (Base->Prev->Size << 12) == Base && !Base->Prev->Used) {
-        Base->Prev->Size += Base->Size;
-        Base->Prev->Next = Base->Next;
-
-        if (Base->Next) {
-            Base->Next->Prev = Base->Prev;
-        }
-
-        Base = Base->Prev;
-    }
-
-    if (!Base->Prev) {
-        AllocatorHead = Base;
-    }
-
-    if (!Base->Next) {
-        AllocatorTail = Base;
-    }
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function finds a free entry of the specified size, or creates a new one using the
- *     memory map.
- *
- * PARAMETERS:
- *     Size - The size of the entry to find or create.
- *
- * RETURN VALUE:
- *     A pointer to the allocated entry, or NULL if there is no more free regions in the memory
- *     map.
- *-----------------------------------------------------------------------------------------------*/
-static AllocatorEntry *FindFreeEntry(size_t Size) {
-    AllocatorEntry *Entry = AllocatorHead;
-
-    while (Entry) {
-        if (!Entry->Used && Entry->Size >= Size) {
-            Entry->Used = 1;
-            return Entry;
-        }
-
-        Entry = Entry->Next;
-    }
-
-    uint32_t Pages = (Size + sizeof(AllocatorEntry) + 0xFFF) >> 12;
-    Size = ((Size + sizeof(AllocatorEntry) + 0xFFF) & ~0xFFF) - sizeof(AllocatorEntry);
-
-    for (uint32_t i = 0; i < BiosMemoryMapEntries; i++) {
-        BiosMemoryRegion *Region = &BiosMemoryMap[i];
-
-        if ((Region->Type == BIOS_MEMORY_REGION_TYPE_AVAILABLE ||
-                Region->Type == BIOS_MEMORY_REGION_TYPE_BOOTMANAGER) &&
-            Region->Length >= (Region->UsedPages + Pages) << 12) {
-            AllocatorEntry *Entry =
-                (AllocatorEntry *)(Region->BaseAddress + (Region->UsedPages << 12));
-
-            Entry->Used = 1;
-            Entry->Size = Size;
-            Entry->Prev = AllocatorTail;
-            Entry->Next = NULL;
-
-            if (AllocatorTail) {
-                AllocatorTail->Next = Entry;
-            } else {
-                AllocatorHead = Entry;
-            }
-
-            AllocatorTail = Entry;
-            Region->Type = BIOS_MEMORY_REGION_TYPE_BOOTMANAGER;
-            Region->UsedPages += Pages;
-
-            return Entry;
-        }
-    }
-
-    return NULL;
-}
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -172,39 +21,79 @@ static AllocatorEntry *FindFreeEntry(size_t Size) {
 void BmInitMemory(void *BootBlock) {
     BiosBootBlock *Data = (BiosBootBlock *)BootBlock;
 
+    /* We should have booted from the startup module, so it should be safe to assume that
+     * that memory map is already sane. */
     BiosMemoryMap = (BiosMemoryRegion *)(uintptr_t)Data->MemoryRegions;
     BiosMemoryMapEntries = Data->MemoryCount;
 
-    for (uint32_t i = 0; i < BiosMemoryMapEntries; i++) {
-        BiosMemoryRegion *Region = &BiosMemoryMap[i];
+    /* The startup module doesn't reserve the first 64KiB, we need to do that manually. */
+    if (BiosMemoryMap->Length > 0x10000) {
+        memcpy(BiosMemoryMap + 1,
+            BiosMemoryMap + 2,
+            (BiosMemoryMapEntries - 2) * sizeof(BiosMemoryMapEntries));
 
-        if (Region->Type == BIOS_MEMORY_REGION_TYPE_AVAILABLE) {
-            if (Region->BaseAddress == 0) {
-                Region->UsedPages = 16;
-            } else {
-                Region->UsedPages = 0;
-            }
-        }
+        BiosMemoryRegion *Region = BiosMemoryMap + 1;
+
+        Region->BaseAddress = BiosMemoryMap->BaseAddress + 0x10000;
+        Region->Length = BiosMemoryMap->Length - 0x10000;
+        Region->Type = BIOS_MEMORY_REGION_TYPE_AVAILABLE;
+
+        BiosMemoryMap->Length = 0x10000;
+        BiosMemoryMap->Type = BIOS_MEMORY_REGION_TYPE_USED;
+    } else {
+        BiosMemoryMap->Type = BIOS_MEMORY_REGION_TYPE_USED;
     }
 }
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function allocates a block of memory of the specified size.
+ *     This function allocates the specified number of pages for use by the boot manager.
  *
  * PARAMETERS:
- *     Size - The size of the block to allocate.
+ *     Pages - How many pages to allocate; The total amount of memory will be Pages * 4096.
  *
  * RETURN VALUE:
- *     A pointer to the allocated block, or NULL if there is no more free regions in the memory
- *     map.
+ *     Base address of the allocation, or NULL if there is no memory left.
  *-----------------------------------------------------------------------------------------------*/
-void *BmAllocate(size_t Size) {
-    AllocatorEntry *Entry = FindFreeEntry(Size);
+void *BmAllocatePages(uint8_t Pages) {
+    size_t Size = (size_t)Pages << 12;
 
-    if (Entry) {
-        SplitEntry(Entry, Size);
-        return Entry + 1;
+    for (uint32_t i = 0; i < BiosMemoryMapEntries; i++) {
+        BiosMemoryRegion *Region = &BiosMemoryMap[i];
+
+        if (Region->Type != BIOS_MEMORY_REGION_TYPE_AVAILABLE || Region->Length < Size) {
+            continue;
+        }
+
+        /* TODO: This is not the right way of doing this, we should use a linked list instead.
+         * We have three cases to take into consideration:
+         *     Exact match (consuming the rest of this entry); Just flip the type to USED.
+         *     End of the list; This entry becomes USED, and takes the exact size of the
+         *         allocated region; A new region is added to the end, containing the remaining
+         *         AVAILABLE memory.
+         *     Middle of the list; We need to memmove the entire list first (this is the TODO/to
+         *         optimize part), before executing the same procedure as above. */
+
+        if (Region->Length == Size) {
+            Region->Type = BIOS_MEMORY_REGION_TYPE_USED;
+            return (void *)Region->BaseAddress;
+        } else if (i != BiosMemoryMapEntries - 1) {
+            memmove(
+                Region + 2, Region + 1, (BiosMemoryMapEntries - i - 1) * sizeof(BiosMemoryRegion));
+        }
+
+        BiosMemoryRegion *NewRegion = Region + 1;
+
+        NewRegion->BaseAddress = Region->BaseAddress + Size;
+        NewRegion->Length = Region->Length - Size;
+        NewRegion->Type = BIOS_MEMORY_REGION_TYPE_AVAILABLE;
+
+        Region->Length = Size;
+        Region->Type = BIOS_MEMORY_REGION_TYPE_USED;
+
+        BiosMemoryMapEntries += 1;
+
+        return (void *)Region->BaseAddress;
     }
 
     return NULL;
@@ -212,17 +101,47 @@ void *BmAllocate(size_t Size) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function frees a block of memory.
+ *     This function returns the specified range of pages for use by the allocator.
  *
  * PARAMETERS:
- *     Base - The base address of the block to free.
+ *     Base - Base address returned by BmAllocatePages.
+ *     Pages - How many pages were originally allocated by BmAllocatePages.
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void BmFree(void *Base) {
-    AllocatorEntry *Entry = (AllocatorEntry *)Base - 1;
-    Entry->Used = 0;
-    MergeEntriesForward(Entry);
-    MergeEntriesBackward(Entry);
+void BmFreePages(void *Base, uint8_t Pages) {
+    size_t Size = (size_t)Pages << 12;
+
+    for (uint32_t i = 0; i < BiosMemoryMapEntries; i++) {
+        BiosMemoryRegion *Region = &BiosMemoryMap[i];
+
+        /* We want an exact match; You do need to pass the exact same amount of pages as you
+           did for BmAllocatePages! */
+        if (Region->Type != BIOS_MEMORY_REGION_TYPE_USED || Region->BaseAddress != (size_t)Base ||
+            Region->Length != Size) {
+            continue;
+        }
+
+        /* Merge with neighbours to decrease fragmentation; First merge forward, then backwards. */
+        Region->Type = BIOS_MEMORY_REGION_TYPE_AVAILABLE;
+
+        if (i + 1 < BiosMemoryMapEntries &&
+            BiosMemoryMap[i + 1].Type == BIOS_MEMORY_REGION_TYPE_AVAILABLE &&
+            BiosMemoryMap[i + 1].BaseAddress == Region->BaseAddress + Region->Length) {
+            Region->Length += BiosMemoryMap[i + 1].Length;
+            memcpy(
+                Region + 1, Region + 2, (BiosMemoryMapEntries - i - 2) * sizeof(BiosMemoryRegion));
+            BiosMemoryMapEntries -= 1;
+        }
+
+        if (i > 0 && BiosMemoryMap[i - 1].Type == BIOS_MEMORY_REGION_TYPE_AVAILABLE &&
+            BiosMemoryMap[i - 1].BaseAddress + BiosMemoryMap[i - 1].Length == Region->BaseAddress) {
+            BiosMemoryMap[i - 1].Length += Region->Length;
+            memcpy(Region, Region + 1, (BiosMemoryMapEntries - i - 1) * sizeof(BiosMemoryRegion));
+            BiosMemoryMapEntries -= 1;
+        }
+
+        break;
+    }
 }

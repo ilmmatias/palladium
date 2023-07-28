@@ -7,7 +7,7 @@
 #include <stdint.h>
 
 #define BIOS_MEMORY_REGION_TYPE_AVAILABLE 1
-#define BIOS_MEMORY_REGION_TYPE_BOOTMANAGER 0x1000
+#define BIOS_MEMORY_REGION_TYPE_USED 0x1000
 
 typedef struct __attribute__((packed)) {
     uint8_t BootDrive;
@@ -19,7 +19,6 @@ typedef struct __attribute__((packed)) {
     uint64_t BaseAddress;
     uint64_t Length;
     uint32_t Type;
-    uint32_t UsedPages;
 } BiosMemoryRegion;
 
 typedef struct __attribute__((packed)) {

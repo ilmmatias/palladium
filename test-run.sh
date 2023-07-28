@@ -35,7 +35,7 @@ then
     sudo mkfs.fat -F32 obj.amd64/fat32.img 1>/dev/null
     mcopy -i obj.amd64/fat32.img _root/bootmgr ::/ 1>/dev/null
     dd if=obj.x86/boot/bootsect/fat32boot.com of=obj.amd64/fat32.img seek=90 skip=90 count=422 bs=1 conv=notrunc 2>/dev/null
-    qemu-system-x86_64 -hda obj.amd64/fat32.img -no-reboot -d int
+    qemu-system-x86_64 -M smm=off -hda obj.amd64/fat32.img -no-reboot -d int
 elif [ "$1" == "exfat" ]
 then
     dd if=/dev/zero of=obj.amd64/exfat.img count=64 bs=1M 2>/dev/null
@@ -46,10 +46,10 @@ then
     sudo mount -t exfat -o loop obj.amd64/exfat.img /mnt/mount 1>/dev/null
     sudo cp _root/bootmgr /mnt/mount/bootmgr 1>/dev/null
     sudo umount /mnt/mount 1>/dev/null
-    qemu-system-x86_64 -hda obj.amd64/exfat.img -no-reboot -d int
+    qemu-system-x86_64 -M smm=off -hda obj.amd64/exfat.img -no-reboot -d int
 else
     mkisofs -R -b iso9660boot.com -no-emul-boot -o obj.amd64/iso9660.iso _root
-    qemu-system-x86_64 -cdrom obj.amd64/iso9660.iso -no-reboot -d int
+    qemu-system-x86_64 -M smm=off -cdrom obj.amd64/iso9660.iso -no-reboot -d int
 fi
 
 rm -rf _root

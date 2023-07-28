@@ -3,60 +3,6 @@
 
 ;---------------------------------------------------------------------------------------------------------------------
 ; PURPOSE:
-;     This function gets (and assumes a bit) how much contigous memory we have in the low memory.
-;     We need this when not using E820.
-;
-; PARAMETERS:
-;     None.
-;
-; RETURN VALUE:
-;     CF set if we couldn't get the memory map.
-;---------------------------------------------------------------------------------------------------------------------
-GetLowMap proc
-    push di
-    push eax
-    push edx
-    mov di, 4000h
-
-    clc
-    int 12h
-    jc GetLowMap$Fail
-
-    shl eax, 10
-    mov dword ptr es:[di], 0
-    mov dword ptr es:[di + 4], 0
-    mov dword ptr es:[di + 8], eax
-    mov dword ptr es:[di + 12], 0
-    mov dword ptr es:[di + 16], 1
-    call InsertRegion
-
-    mov edx, 100000h
-    sub edx, eax
-    ; From the end of the contig memory up to 000FFFFF we have the EBDA, reserved hardware mappings, BIOS stuff, etc.
-    mov dword ptr es:[di], eax
-    mov dword ptr es:[di + 4], 0
-    mov dword ptr es:[di + 8], edx
-    mov dword ptr es:[di + 12], 0
-    mov dword ptr es:[di + 16], 2
-    call InsertRegion
-
-    pop edx
-    pop eax
-    pop di
-    clc
-    ret
-
-GetLowMap$Fail:
-    ; I don't think we need this stc?
-    pop edx
-    pop eax
-    pop di
-    stc
-    ret
-GetLowMap endp
-
-;---------------------------------------------------------------------------------------------------------------------
-; PURPOSE:
 ;     This function tries to get the full memory map using the E820h BIOS function.
 ;
 ; PARAMETERS:
@@ -71,6 +17,12 @@ TryE820 proc
     push ecx
     push edx
     push di
+
+    mov ax, ds
+    push ax
+
+    xor ax, ax
+    mov ds, ax
 
     ; ebx = 0 means start from the top, other values are all magic to not break anything (though ecx might be
     ; ignored).
@@ -117,23 +69,99 @@ TryE820$NotAcpi3:
     jmp TryE820$Next
 
 TryE820$Done:
+    pop ax
+    mov ds, ax
+
     pop di
     pop edx
     pop ecx
     pop ebx
     pop eax
+
     clc
     ret
 
 TryE820$Fail:
+    pop ax
+    mov ds, ax
+
     pop di
     pop edx
     pop ecx
     pop ebx
     pop eax
+
     stc
     ret
 TryE820 endp
+
+;---------------------------------------------------------------------------------------------------------------------
+; PURPOSE:
+;     This function gets (and assumes a bit) how much contigous memory we have in the low memory.
+;     We need this when not using E820.
+;
+; PARAMETERS:
+;     None.
+;
+; RETURN VALUE:
+;     CF set if we couldn't get the memory map.
+;---------------------------------------------------------------------------------------------------------------------
+GetLowMap proc
+    push di
+    push eax
+    push edx
+
+    mov ax, ds
+    push ax
+
+    xor ax, ax
+    mov ds, ax
+    mov di, 4000h
+
+    clc
+    int 12h
+    jc GetLowMap$Fail
+
+    shl eax, 10
+    mov dword ptr es:[di], 0
+    mov dword ptr es:[di + 4], 0
+    mov dword ptr es:[di + 8], eax
+    mov dword ptr es:[di + 12], 0
+    mov dword ptr es:[di + 16], 1
+    call InsertRegion
+
+    mov edx, 100000h
+    sub edx, eax
+    ; From the end of the contig memory up to 000FFFFF we have the EBDA, reserved hardware mappings, BIOS stuff, etc.
+    mov dword ptr es:[di], eax
+    mov dword ptr es:[di + 4], 0
+    mov dword ptr es:[di + 8], edx
+    mov dword ptr es:[di + 12], 0
+    mov dword ptr es:[di + 16], 2
+    call InsertRegion
+
+    pop ax
+    mov ds, ax
+
+    pop edx
+    pop eax
+    pop di
+
+    clc
+    ret
+
+GetLowMap$Fail:
+    ; I don't think we need this stc?
+    pop ax
+    mov ds, ax
+
+    pop edx
+    pop eax
+    pop di
+
+    stc
+    ret
+GetLowMap endp
 
 ;---------------------------------------------------------------------------------------------------------------------
 ; PURPOSE:
@@ -152,6 +180,12 @@ TryE801 proc
     push dx
     push di
     mov di, 4000h
+
+    mov ax, ds
+    push ax
+
+    xor ax, ax
+    mov ds, ax
 
     mov ax, 0E801h
     xor bx, bx
@@ -192,20 +226,28 @@ TryE801$Continue:
     call InsertRegion
 
 TryE801$End:
+    pop ax
+    mov ds, ax
+
     pop di
     pop dx
     pop cx
     pop bx
     pop eax
+
     clc
     ret
 
 TryE801$Fail:
+    pop ax
+    mov ds, ax
+
     pop di
     pop dx
     pop cx
     pop bx
     pop eax
+
     stc
     ret
 TryE801 endp
@@ -226,6 +268,12 @@ Try88 proc
     push di
     mov di, 4000h
 
+    mov ax, ds
+    push ax
+
+    xor ax, ax
+    mov ds, ax
+
     clc
     mov ah, 88h
     jc Try88$Fail
@@ -242,14 +290,22 @@ Try88 proc
     mov dword ptr es:[di + 16], 1
     call InsertRegion
 
+    pop ax
+    mov ds, ax
+
     pop di
     pop ax
+
     clc
     ret
 
 Try88$Fail:
+    pop ax
+    mov ds, ax
+
     pop di
     pop ax
+
     stc
     ret
 Try88 endp

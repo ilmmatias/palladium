@@ -10,8 +10,8 @@
 void BmInitArch();
 
 void BmInitMemory(void *BootBlock);
-void *BmAllocate(size_t Size);
-void BmFree(void *Base);
+void *BmAllocatePages(uint8_t Pages);
+void BmFreePages(void *Base, uint8_t Pages);
 
 void BmInitDisplay();
 void BmSetCursor(uint16_t x, uint16_t y);

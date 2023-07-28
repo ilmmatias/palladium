@@ -21,12 +21,15 @@ CheckA20 proc
     push si
     push di
 
-    ; It's safe to assume ds is already 0, as that's the state we expect from the bootsector.
     mov ax, es
     push es
+    mov ax, ds
+    push ds
 
     mov ax, 0FFFFh
     mov es, ax
+    xor ax, ax
+    mov ds, ax
     mov si, 7DFEh
     mov di, 7E0Eh
 
@@ -39,6 +42,8 @@ CheckA20 proc
     jne CheckA20$Enabled
 
     pop ax
+    mov ds, ax
+    pop ax
     mov es, ax
 
     pop di
@@ -49,6 +54,8 @@ CheckA20 proc
     ret
 
 CheckA20$Enabled:
+    pop ax
+    mov ds, ax
     pop ax
     mov es, ax
 

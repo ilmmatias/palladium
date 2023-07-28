@@ -21,6 +21,7 @@ org 0
 Main proc
     mov ax, cs
     mov ds, ax
+    xor ax, ax
     mov es, ax
     mov byte ptr [BootBlock$BootDrive], dl
 
