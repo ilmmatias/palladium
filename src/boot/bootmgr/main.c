@@ -1,7 +1,6 @@
 /* SPDX-FileCopyrightText: (C) 2023 yuuma03
  * SPDX-License-Identifier: BSD-3-Clause */
 
-#include <acpi.h>
 #include <boot.h>
 
 /*-------------------------------------------------------------------------------------------------
@@ -20,7 +19,6 @@
     BmInitDisplay();
     BmInitArch();
     BmInitMemory(BootBlock);
-    AcpiInitialize();
 
     BmPut("Hello, World!\n");
 

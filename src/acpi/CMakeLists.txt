@@ -8,8 +8,4 @@ set(SOURCES
     aml/interpreter.c
     initialize.c)
 
-if(NOT ARCH STREQUAL "amd64")
-    include(boot.cmake)
-endif()
-
 include(kernel.cmake)
