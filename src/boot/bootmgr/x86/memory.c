@@ -28,7 +28,7 @@ void BmInitMemory(void *BootBlock) {
 
     /* The startup module doesn't reserve the first 64KiB, we need to do that manually. */
     if (BiosMemoryMap->Length > 0x10000) {
-        memcpy(BiosMemoryMap + 1,
+        memmove(BiosMemoryMap + 1,
             BiosMemoryMap + 2,
             (BiosMemoryMapEntries - 2) * sizeof(BiosMemoryMapEntries));
 
@@ -130,7 +130,7 @@ void BmFreePages(void *Base, uint8_t Pages) {
             BiosMemoryMap[i + 1].Type == BIOS_MEMORY_REGION_TYPE_AVAILABLE &&
             BiosMemoryMap[i + 1].BaseAddress == Region->BaseAddress + Region->Length) {
             Region->Length += BiosMemoryMap[i + 1].Length;
-            memcpy(
+            memmove(
                 Region + 1, Region + 2, (BiosMemoryMapEntries - i - 2) * sizeof(BiosMemoryRegion));
             BiosMemoryMapEntries -= 1;
         }
@@ -138,7 +138,7 @@ void BmFreePages(void *Base, uint8_t Pages) {
         if (i > 0 && BiosMemoryMap[i - 1].Type == BIOS_MEMORY_REGION_TYPE_AVAILABLE &&
             BiosMemoryMap[i - 1].BaseAddress + BiosMemoryMap[i - 1].Length == Region->BaseAddress) {
             BiosMemoryMap[i - 1].Length += Region->Length;
-            memcpy(Region, Region + 1, (BiosMemoryMapEntries - i - 1) * sizeof(BiosMemoryRegion));
+            memmove(Region, Region + 1, (BiosMemoryMapEntries - i - 1) * sizeof(BiosMemoryRegion));
             BiosMemoryMapEntries -= 1;
         }
 

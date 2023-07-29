@@ -18,7 +18,7 @@ static uint16_t CursorX = 0;
 static uint16_t CursorY = 0;
 
 static void ScrollUp(void) {
-    memcpy(VideoMemory, VideoMemory + SCREEN_WIDTH, (SCREEN_SIZE - SCREEN_WIDTH) * 2);
+    memmove(VideoMemory, VideoMemory + SCREEN_WIDTH, (SCREEN_SIZE - SCREEN_WIDTH) * 2);
     memset(VideoMemory + SCREEN_SIZE - SCREEN_WIDTH, 0, SCREEN_WIDTH * 2);
 }
 
