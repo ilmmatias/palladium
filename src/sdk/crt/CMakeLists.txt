@@ -9,12 +9,19 @@ set(SOURCES
     string/memmove.c
     string/memset.c
     string/strcat.c
+    string/strchr.c
     string/strcmp.c
     string/strcpy.c
+    string/strcspn.c
     string/strlen.c
     string/strncat.c
     string/strncmp.c
-    string/strncpy.c)
+    string/strncpy.c
+    string/strpbrk.c
+    string/strrchr.c
+    string/strspn.c
+    string/strstr.c
+    string/strtok.c)
 
 include(kernel.cmake)
 include(user.cmake)

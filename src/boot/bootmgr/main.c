@@ -21,12 +21,18 @@
     BmInitArch();
     BmInitMemory(BootBlock);
 
-    char str[50] = "Hello ";
-    char str2[50] = "World!";
-    strcat(str, str2);
-    strncat(str, " Goodbye World!", 3);
-    // Expected output is "Hello World! Go"
-    BmPut(str);
+    char input[] = "A bird came down the walk";
+    BmPut("Parsing the input string '%s'\n", input);
+    char *token = strtok(input, " ");
+    while (token) {
+        BmPut("%s\n", token);
+        token = strtok(NULL, " ");
+    }
+
+    BmPut("Contents of the input string now: '");
+    for (size_t n = 0; n < sizeof input; ++n)
+        input[n] ? BmPut("%c", input[n]) : BmPut("\\0");
+    BmPut("'");
 
     while (1)
         ;
