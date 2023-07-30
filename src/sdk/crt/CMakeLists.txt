@@ -8,7 +8,12 @@ set(SOURCES
     string/memcpy.c
     string/memmove.c
     string/memset.c
-    string/strlen.c)
+    string/strcat.c
+    string/strcmp.c
+    string/strcpy.c
+    string/strlen.c
+    string/strncat.c
+    string/strncpy.c)
 
 include(kernel.cmake)
 include(user.cmake)

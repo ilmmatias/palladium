@@ -10,11 +10,18 @@
 extern "C" {
 #endif
 
-size_t strlen(const char *s);
+char *strcpy(char *dest, const char *src);
+char *strncpy(char *dest, const char *src, size_t count);
+char *strcat(char *dest, const char *src);
+char *strncat(char *dest, const char *src, size_t count);
 
-void *memcpy(void *dest, const void *src, size_t n);
-void *memmove(void *dest, const void *src, size_t n);
-void *memset(void *s, int c, size_t n);
+size_t strlen(const char *str);
+int strcmp(const char *lhs, const char *rhs);
+int strncmp(const char *lhs, const char *rhs, size_t count);
+
+void *memcpy(void *dest, const void *src, size_t count);
+void *memmove(void *dest, const void *src, size_t count);
+void *memset(void *s, int c, size_t count);
 
 #ifdef __cplusplus
 }
