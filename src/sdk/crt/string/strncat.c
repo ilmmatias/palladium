@@ -3,7 +3,7 @@
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function implements generic code to concatenate a C string at the end of another,
- *     while assuming that the destination buffer can store at most `count` bytes.
+ *     while assuming that the destination buffer can store at most an extra `count` bytes.
  *
  * PARAMETERS:
  *     dest - Destination buffer.
@@ -17,7 +17,7 @@ char *strncat(char *dest, const char *src, size_t count) {
     char *Destination = dest;
     const char *Source = src;
 
-    while (*Destination && count--) {
+    while (*Destination) {
         Destination++;
     }
 

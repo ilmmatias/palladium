@@ -13,6 +13,7 @@ set(SOURCES
     string/strcpy.c
     string/strlen.c
     string/strncat.c
+    string/strncmp.c
     string/strncpy.c)
 
 include(kernel.cmake)

@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <boot.h>
+#include <string.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -20,7 +21,12 @@
     BmInitArch();
     BmInitMemory(BootBlock);
 
-    BmPut("Hello, World!\n");
+    char str[50] = "Hello ";
+    char str2[50] = "World!";
+    strcat(str, str2);
+    strncat(str, " Goodbye World!", 3);
+    // Expected output is "Hello World! Go"
+    BmPut(str);
 
     while (1)
         ;
