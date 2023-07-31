@@ -1,5 +1,21 @@
 LIBRARY ucrt
 EXPORTS
+    isalnum
+    isalpha
+    islower
+    isupper
+    isdigit
+    isxdigit
+    iscntrl
+    isgraph
+    isspace
+    isblank
+    isprint
+    ispunct
+
+    tolower
+    toupper
+
     strcpy
     strncpy
     strcat

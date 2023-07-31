@@ -13,6 +13,7 @@ endif()
 
 add_executable(bootmgr "kstdlib"
     ${SOURCES}
+    assert.c
     display.c
     main.c
     memory.c)

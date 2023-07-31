@@ -4,7 +4,7 @@ if [[ ! -d obj.x86 ]]
 then
     mkdir obj.x86
     cd obj.x86
-    cmake ../src -DARCH=x86
+    cmake ../src -DARCH=x86 -DCMAKE_BUILD_TYPE=Debug
 else
     cd obj.x86
 fi
@@ -16,7 +16,7 @@ if [[ ! -d obj.amd64 ]]
 then
     mkdir obj.amd64
     cd obj.amd64
-    cmake ../src -DARCH=amd64
+    cmake ../src -DARCH=amd64 -DCMAKE_BUILD_TYPE=Debug
 else
     cd obj.amd64
 fi
