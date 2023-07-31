@@ -8,4 +8,4 @@ bool __stdcall DllMain(void *hDllHandle, unsigned int dwReason, void *lpreserved
     (void)lpreserved;
     return true;
 }
-#endif
+#endif /* _DLL */

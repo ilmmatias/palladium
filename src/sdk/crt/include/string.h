@@ -8,12 +8,14 @@
 
 #ifdef __cplusplus
 extern "C" {
-#endif
+#endif /* __cplusplus */
 
 char *strcpy(char *dest, const char *src);
 char *strncpy(char *dest, const char *src, size_t count);
 char *strcat(char *dest, const char *src);
 char *strncat(char *dest, const char *src, size_t count);
+char *strdup(const char *src);
+char *strndup(const char *src, size_t size);
 
 size_t strlen(const char *str);
 int strcmp(const char *lhs, const char *rhs);
@@ -32,6 +34,6 @@ void *memset(void *s, int c, size_t count);
 
 #ifdef __cplusplus
 }
-#endif
+#endif /* __cplusplus */
 
 #endif /* STRING_H */

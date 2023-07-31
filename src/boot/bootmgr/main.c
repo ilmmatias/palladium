@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <boot.h>
+#include <stdlib.h>
 #include <string.h>
 
 /*-------------------------------------------------------------------------------------------------
@@ -21,18 +22,22 @@
     BmInitArch();
     BmInitMemory(BootBlock);
 
-    char input[] = "A bird came down the walk";
-    BmPut("Parsing the input string '%s'\n", input);
-    char *token = strtok(input, " ");
-    while (token) {
-        BmPut("%s\n", token);
-        token = strtok(NULL, " ");
-    }
+    const size_t n = 3;
 
-    BmPut("Contents of the input string now: '");
-    for (size_t n = 0; n < sizeof input; ++n)
-        input[n] ? BmPut("%c", input[n]) : BmPut("\\0");
-    BmPut("'");
+    const char *src = "Replica";
+    char *dup = strndup(src, n);
+    BmPut("strndup(\"%s\", %d) == \"%s\" (0x%x)\n", src, n, dup, dup);
+    free(dup);
+
+    src = "Hi";
+    dup = strndup(src, n);
+    BmPut("strndup(\"%s\", %d) == \"%s\" (0x%x)\n", src, n, dup, dup);
+    free(dup);
+
+    const char arr[] = {'A', 'B', 'C', 'D'};  // NB: no trailing '\0'
+    dup = strndup(arr, n);
+    BmPut("strndup({'A','B','C','D'}, %d) == \"%s\" (0x%x)\n", n, dup, dup);
+    free(dup);
 
     while (1)
         ;

@@ -26,7 +26,7 @@ function(add_executable target type)
             $<$<COMPILE_LANGUAGE:C,CXX>:-mno-sse2>)
     endif()
 
-    target_compile_options(${target} PRIVATE --target=${TARGET_${ARCH}}-w64-mingw32)
+    target_compile_options(${target} PRIVATE --target=${TARGET_${ARCH}}-w64-mingw32 -DARCH_${ARCH})
     target_link_options(${target} PRIVATE --target=${TARGET_${ARCH}}-w64-mingw32 -fuse-ld=lld)
 endfunction()
 
@@ -55,7 +55,7 @@ function(add_library target type)
             $<$<COMPILE_LANGUAGE:C,CXX>:-mno-sse2>)
     endif()
 
-    target_compile_options(${target} PRIVATE --target=${TARGET_${ARCH}}-w64-mingw32)
+    target_compile_options(${target} PRIVATE --target=${TARGET_${ARCH}}-w64-mingw32 -DARCH_${ARCH})
     target_link_options(${target} PRIVATE --target=${TARGET_${ARCH}}-w64-mingw32 -fuse-ld=lld)
 endfunction()
 

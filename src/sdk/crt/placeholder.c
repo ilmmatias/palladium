@@ -15,4 +15,4 @@ bool __stdcall CRTDLL_INIT(void *hDllHandle, unsigned int dwReason, void *lprese
     (void)lpreserved;
     return true;
 }
-#endif
+#endif /* _DLL */

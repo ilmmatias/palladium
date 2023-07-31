@@ -7,11 +7,19 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#if defined(ARCH_x86) || defined(ARCH_amd64)
+#define PAGE_SHIFT 12
+#else
+#error "Undefined ARCH for the bootmgr module!"
+#endif /* ARCH */
+
+#define PAGE_SIZE (1 << (PAGE_SHIFT))
+
 void BmInitArch();
 
 void BmInitMemory(void *BootBlock);
-void *BmAllocatePages(uint8_t Pages);
-void BmFreePages(void *Base, uint8_t Pages);
+void *BmAllocatePages(size_t Pages);
+void BmFreePages(void *Base, size_t Pages);
 
 void BmInitDisplay();
 void BmSetCursor(uint16_t x, uint16_t y);

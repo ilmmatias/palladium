@@ -14,7 +14,8 @@ endif()
 add_executable(bootmgr "kstdlib"
     ${SOURCES}
     display.c
-    main.c)
+    main.c
+    memory.c)
 
 target_include_directories(bootmgr PRIVATE include)
 target_compile_options(bootmgr PRIVATE $<$<COMPILE_LANGUAGE:C,CXX>:-ffreestanding>)

@@ -1,6 +1,21 @@
 LIBRARY ucrt
 EXPORTS
+    strcpy
+    strncpy
+    strcat
+    strncat
+
+    strlen
+    strcmp
+    strncmp
+    strchr
+    strrchr
+    strspn
+    strcspn
+    strpbrk
+    strstr
+    strtok
+
     memcpy
     memmove
     memset
-    strlen

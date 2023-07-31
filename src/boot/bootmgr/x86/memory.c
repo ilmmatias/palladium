@@ -55,8 +55,8 @@ void BmInitMemory(void *BootBlock) {
  * RETURN VALUE:
  *     Base address of the allocation, or NULL if there is no memory left.
  *-----------------------------------------------------------------------------------------------*/
-void *BmAllocatePages(uint8_t Pages) {
-    size_t Size = (size_t)Pages << 12;
+void *BmAllocatePages(size_t Pages) {
+    size_t Size = Pages << PAGE_SHIFT;
 
     for (uint32_t i = 0; i < BiosMemoryMapEntries; i++) {
         BiosMemoryRegion *Region = &BiosMemoryMap[i];
@@ -110,8 +110,8 @@ void *BmAllocatePages(uint8_t Pages) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void BmFreePages(void *Base, uint8_t Pages) {
-    size_t Size = (size_t)Pages << 12;
+void BmFreePages(void *Base, size_t Pages) {
+    size_t Size = Pages << 12;
 
     for (uint32_t i = 0; i < BiosMemoryMapEntries; i++) {
         BiosMemoryRegion *Region = &BiosMemoryMap[i];
