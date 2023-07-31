@@ -111,7 +111,7 @@ void *BmAllocatePages(size_t Pages) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void BmFreePages(void *Base, size_t Pages) {
-    size_t Size = Pages << 12;
+    size_t Size = Pages << PAGE_SHIFT;
 
     for (uint32_t i = 0; i < BiosMemoryMapEntries; i++) {
         BiosMemoryRegion *Region = &BiosMemoryMap[i];

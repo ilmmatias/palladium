@@ -15,7 +15,7 @@
  * RETURN VALUE:
  *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
-[[noreturn]] void BmMain(void* BootBlock) {
+[[noreturn]] void BmMain(void *BootBlock) {
     BmInitDisplay();
     BmInitArch();
     BmInitMemory(BootBlock);

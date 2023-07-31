@@ -20,6 +20,9 @@ else()
     enable_language(ASM C CXX RC)
 endif()
 
-add_subdirectory(acpi)
+if(NOT ARCH STREQUAL "x86")
+    add_subdirectory(acpi)
+endif()
+
 add_subdirectory(boot)
 add_subdirectory(sdk)

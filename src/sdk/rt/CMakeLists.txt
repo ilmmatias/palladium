@@ -8,4 +8,7 @@ set(SOURCES
     placeholder.c)
 
 include(kernel.cmake)
-include(user.cmake)
+
+if(NOT ARCH STREQUAL "x86")
+    include(user.cmake)
+endif()

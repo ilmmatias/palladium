@@ -110,6 +110,7 @@ static void MergeEntriesBackward(AllocatorEntry *Base) {
  *-----------------------------------------------------------------------------------------------*/
 static AllocatorEntry *FindFreeEntry(size_t Size) {
     AllocatorEntry *Entry = AllocatorHead;
+    size_t Mask = PAGE_SIZE - 1;
 
     while (Entry) {
         if (!Entry->Used && Entry->Size >= Size) {
@@ -120,7 +121,8 @@ static AllocatorEntry *FindFreeEntry(size_t Size) {
         Entry = Entry->Next;
     }
 
-    Entry = BmAllocatePages((Size + sizeof(AllocatorEntry) + 0xFFF) >> PAGE_SHIFT);
+    Entry = BmAllocatePages((Size + sizeof(AllocatorEntry) + Mask) >> PAGE_SHIFT);
+    Size = ((Size + sizeof(AllocatorEntry) + Mask) & ~Mask) - sizeof(AllocatorEntry);
 
     if (!Entry) {
         return NULL;
