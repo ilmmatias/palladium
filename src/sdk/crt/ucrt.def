@@ -16,6 +16,9 @@ EXPORTS
     strstr
     strtok
 
+    memchr
+    memcmp
+    memset
     memcpy
     memmove
-    memset
+    memccpy

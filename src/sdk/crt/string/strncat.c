@@ -21,8 +21,9 @@ char *strncat(char *dest, const char *src, size_t count) {
         Destination++;
     }
 
-    while (*Source && count--) {
+    while (*Source && count) {
         *(Destination++) = *(Source++);
+        count--;
     }
 
     if (count) {

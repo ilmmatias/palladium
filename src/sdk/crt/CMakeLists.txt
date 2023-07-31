@@ -5,6 +5,9 @@ project(os/sdk/crt)
 
 set(SOURCES
     placeholder.c
+    string/memccpy.c
+    string/memchr.c
+    string/memcmp.c
     string/memcpy.c
     string/memmove.c
     string/memset.c

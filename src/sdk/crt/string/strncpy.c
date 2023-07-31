@@ -17,8 +17,9 @@ char *strncpy(char *dest, const char *src, size_t count) {
     char *Destination = dest;
     const char *Source = src;
 
-    while (*Source && count--) {
+    while (*Source && count) {
         *(Destination++) = *(Source++);
+        count--;
     }
 
     if (count) {
