@@ -125,7 +125,7 @@ void BiPutChar(char Character) {
         CursorX = 0;
         CursorY++;
     } else if (Character == '\t') {
-        CursorX += TAB_SIZE;
+        CursorX = (CursorX + 4) & ~3;
     } else {
         VideoMemory[CursorY * SCREEN_WIDTH + CursorX] = SCREEN_ATTRIBUTE << 8 | Character;
         CursorX++;
