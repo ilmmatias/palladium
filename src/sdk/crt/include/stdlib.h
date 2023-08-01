@@ -10,6 +10,8 @@
 extern "C" {
 #endif /* __cplusplus */
 
+double atof(const char *str);
+
 void *malloc(size_t size);
 void *calloc(size_t num, size_t size);
 void free(void *ptr);

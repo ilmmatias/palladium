@@ -21,6 +21,8 @@ set(SOURCES
     ctype/tolower.c
     ctype/toupper.c
 
+    stdlib/atof.c
+
     string/memccpy.c
     string/memchr.c
     string/memcmp.c

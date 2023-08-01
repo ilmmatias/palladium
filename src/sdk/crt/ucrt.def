@@ -16,6 +16,8 @@ EXPORTS
     tolower
     toupper
 
+    atof
+
     strcpy
     strncpy
     strcat
