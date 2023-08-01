@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <boot.h>
+#include <stdlib.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -20,7 +21,17 @@
     BmInitArch();
     BmInitMemory(BootBlock);
 
-    BmPut("Hello, World!\n");
+    const char *p = "10 200000000000000000000000000000 30 -40 - 42";
+    BmPut("Parsing '%s':\n", p);
+    char *end = NULL;
+    for (unsigned long i = strtoul(p, &end, 10); p != end; i = strtoul(p, &end, 10)) {
+        char c = *end;
+        *end = 0;
+        BmPut("'%s' -> %d\n", p, i);
+        *end = c;
+        p = end;
+    }
+    BmPut("After the loop p points to '%s'\n", p);
 
     while (1)
         ;

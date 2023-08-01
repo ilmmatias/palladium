@@ -17,6 +17,16 @@ EXPORTS
     toupper
 
     atof
+    atoi
+    atol
+    atoll
+    strtol
+    strtoll
+    strtoul
+    strtoull
+    strtof
+    strtod
+    strtold
 
     strcpy
     strncpy

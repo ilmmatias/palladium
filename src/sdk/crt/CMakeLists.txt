@@ -22,6 +22,16 @@ set(SOURCES
     ctype/toupper.c
 
     stdlib/atof.c
+    stdlib/atoi.c
+    stdlib/atol.c
+    stdlib/atoll.c
+    stdlib/strtod.c
+    stdlib/strtof.c
+    stdlib/strtol.c
+    stdlib/strtold.c
+    stdlib/strtoll.c
+    stdlib/strtoul.c
+    stdlib/strtoull.c
 
     string/memccpy.c
     string/memchr.c

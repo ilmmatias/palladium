@@ -5,6 +5,6 @@
 #define MATH_H
 
 #define INFINITY (__builtin_inff())
-#define NAN (__builtin_nanf())
+#define NAN (__builtin_nanf(""))
 
 #endif /* MATH_H */
