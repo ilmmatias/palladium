@@ -153,7 +153,13 @@ double atof(const char *str) {
 
     if ((*str == 'i' || *str == 'I') && (*(str + 1) == 'n' || *(str + 1) == 'N') &&
         (*(str + 2) == 'f' || *(str + 2) == 'F')) {
-        return sign * INFINITY;
+        return sign < 0 ? -INFINITY : INFINITY;
+    }
+
+    /* TODO: We should also support quiet NaNs in the future. */
+    if ((*str == 'n' || *str == 'N') && (*(str + 1) == 'a' || *(str + 1) == 'A') &&
+        (*(str + 2) == 'n' || *(str + 2) == 'N')) {
+        return sign < 0 ? -NAN : NAN;
     }
 
     return 0.0;
