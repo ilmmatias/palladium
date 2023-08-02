@@ -27,7 +27,12 @@ function(add_executable target type)
     endif()
 
     target_compile_options(${target} PRIVATE --target=${TARGET_${ARCH}}-w64-mingw32 -DARCH_${ARCH})
-    target_link_options(${target} PRIVATE --target=${TARGET_${ARCH}}-w64-mingw32 -fuse-ld=lld)
+    target_link_options(
+    	${target}
+    	PRIVATE
+    	--target=${TARGET_${ARCH}}-w64-mingw32
+    	-fuse-ld=lld
+    	/usr/local/lib/baremetal/libclang_rt.builtins-${TARGET_${ARCH}}.a)
 endfunction()
 
 function(add_library target type)
@@ -56,7 +61,12 @@ function(add_library target type)
     endif()
 
     target_compile_options(${target} PRIVATE --target=${TARGET_${ARCH}}-w64-mingw32 -DARCH_${ARCH})
-    target_link_options(${target} PRIVATE --target=${TARGET_${ARCH}}-w64-mingw32 -fuse-ld=lld)
+    target_link_options(
+        	${target}
+        	PRIVATE
+        	--target=${TARGET_${ARCH}}-w64-mingw32
+        	-fuse-ld=lld
+        	/usr/local/lib/baremetal/libclang_rt.builtins-${TARGET_${ARCH}}.a)
 endfunction()
 
 function(add_import_library target def_file)

@@ -25,7 +25,6 @@ cmake --build . $2
 cd ..
 
 mkdir -p _root
-sudo mkdir -p /mnt/mount
 cp obj.x86/boot/bootsect/iso9660boot.com _root/iso9660boot.com
 cat obj.x86/boot/startup/startup.com obj.x86/boot/bootmgr/bootmgr.exe > _root/bootmgr
 
@@ -38,6 +37,7 @@ then
     qemu-system-x86_64 -M smm=off -hda obj.amd64/fat32.img -no-reboot -d int
 elif [ "$1" == "exfat" ]
 then
+	sudo mkdir -p /mnt/mount
     dd if=/dev/zero of=obj.amd64/exfat.img count=64 bs=1M 2>/dev/null
     sudo mkfs.exfat obj.amd64/exfat.img 1>/dev/null
     dd if=obj.x86/boot/bootsect/exfatboot.com of=obj.amd64/exfat.img seek=120 skip=120 count=392 bs=1 conv=notrunc 2>/dev/null

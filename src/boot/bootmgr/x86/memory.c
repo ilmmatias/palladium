@@ -28,7 +28,8 @@ void BmInitMemory(void *BootBlock) {
 
     /* The startup module doesn't reserve the first 64KiB, we need to do that manually. */
     if (BiosMemoryMap->Length > 0x10000) {
-        memmove(BiosMemoryMap + 1,
+        memmove(
+            BiosMemoryMap + 1,
             BiosMemoryMap + 2,
             (BiosMemoryMapEntries - 2) * sizeof(BiosMemoryMapEntries));
 

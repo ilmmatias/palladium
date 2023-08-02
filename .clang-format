@@ -1,7 +1,7 @@
 BasedOnStyle: Google
 IndentWidth: 4
 UseTab: Never
-AlignAfterOpenBracket: DontAlign
+AlignAfterOpenBracket: AlwaysBreak
 AlignConsecutiveAssignments: false
 AlignConsecutiveDeclarations: false
 AlignOperands: true

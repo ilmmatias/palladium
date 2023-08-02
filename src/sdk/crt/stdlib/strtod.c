@@ -13,7 +13,7 @@
  * RETURN VALUE:
  *     Result of the parsing if the string was a valid double, 0.0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-double strtod_hex(const char *str, double sign) {
+double __strtod_hex(const char *str, double sign) {
     double value = 0.;
     int dot = 0;
     int p = 0;
@@ -80,7 +80,7 @@ double strtod_hex(const char *str, double sign) {
  * RETURN VALUE:
  *     Result of the parsing if the string was a valid double, 0.0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-double strtod_dec(const char *str, double sign) {
+double __strtod_dec(const char *str, double sign) {
     double value = 0.;
     int dot = 0;
     int e = 0;
@@ -155,15 +155,17 @@ double strtod(const char *str, char **str_end) {
         if (!isxdigit(*(str + 2))) {
             str = start;
         } else {
-            value = strtod_hex(str + 2, sign);
+            value = __strtod_hex(str + 2, sign);
         }
     } else if (isdigit(*str)) {
-        value = strtod_dec(str, sign);
-    } else if ((*str == 'i' || *str == 'I') && (*(str + 1) == 'n' || *(str + 1) == 'N') &&
-               (*(str + 2) == 'f' || *(str + 2) == 'F')) {
+        value = __strtod_dec(str, sign);
+    } else if (
+        (*str == 'i' || *str == 'I') && (*(str + 1) == 'n' || *(str + 1) == 'N') &&
+        (*(str + 2) == 'f' || *(str + 2) == 'F')) {
         value = sign < 0 ? -INFINITY : INFINITY;
-    } else if ((*str == 'n' || *str == 'N') && (*(str + 1) == 'a' || *(str + 1) == 'A') &&
-               (*(str + 2) == 'n' || *(str + 2) == 'N')) {
+    } else if (
+        (*str == 'n' || *str == 'N') && (*(str + 1) == 'a' || *(str + 1) == 'A') &&
+        (*(str + 2) == 'n' || *(str + 2) == 'N')) {
         /* TODO: We should also support quiet NaNs in the future. */
         value = sign < 0 ? -NAN : NAN;
     } else {

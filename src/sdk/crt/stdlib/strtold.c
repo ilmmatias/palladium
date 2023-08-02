@@ -13,8 +13,8 @@
  * RETURN VALUE:
  *     Result of the parsing if the string was a valid long double, 0.0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-static long double strtold_hex(const char *str, long double sign) {
-    long double value = 0.0;
+static long double parse_hex(const char *str, long double sign) {
+    long double value = 0.L;
     int dot = 0;
     int p = 0;
 
@@ -30,7 +30,7 @@ static long double strtold_hex(const char *str, long double sign) {
             p -= 4;
         }
 
-        value *= 16.;
+        value *= 16.L;
 
         /* First two cases are aA-fF, offset by +0x0A. */
         if (islower(digit)) {
@@ -58,12 +58,12 @@ static long double strtold_hex(const char *str, long double sign) {
     }
 
     while (p > 0) {
-        value *= 16.;
+        value *= 16.L;
         p--;
     }
 
     while (p++ < 0) {
-        value *= 0.5;
+        value *= .5L;
     }
 
     return sign * value;
@@ -80,8 +80,8 @@ static long double strtold_hex(const char *str, long double sign) {
  * RETURN VALUE:
  *     Result of the parsing if the string was a valid long double, 0.0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-static long double strtold_dec(const char *str, long double sign) {
-    long double value = 0.0L;
+static long double parse_dec(const char *str, long double sign) {
+    long double value = 0.L;
     int dot = 0;
     int e = 0;
 
@@ -120,7 +120,7 @@ static long double strtold_dec(const char *str, long double sign) {
     }
 
     while (e++ < 0) {
-        value *= 0.1L;
+        value *= .1L;
     }
 
     return sign * value;
@@ -149,21 +149,23 @@ long double strtold(const char *str, char **str_end) {
         str++;
     }
 
-    long double value = 0.0L;
+    long double value = 0.L;
 
     if (*str == '0' && (*(str + 1) == 'x' || *(str + 1) == 'X')) {
         if (!isxdigit(*(str + 2))) {
             str = start;
         } else {
-            value = strtold_hex(str + 2, sign);
+            value = parse_hex(str + 2, sign);
         }
     } else if (isdigit(*str)) {
-        value = strtold_dec(str, sign);
-    } else if ((*str == 'i' || *str == 'I') && (*(str + 1) == 'n' || *(str + 1) == 'N') &&
-               (*(str + 2) == 'f' || *(str + 2) == 'F')) {
+        value = parse_dec(str, sign);
+    } else if (
+        (*str == 'i' || *str == 'I') && (*(str + 1) == 'n' || *(str + 1) == 'N') &&
+        (*(str + 2) == 'f' || *(str + 2) == 'F')) {
         value = sign < 0 ? -INFINITY : INFINITY;
-    } else if ((*str == 'n' || *str == 'N') && (*(str + 1) == 'a' || *(str + 1) == 'A') &&
-               (*(str + 2) == 'n' || *(str + 2) == 'N')) {
+    } else if (
+        (*str == 'n' || *str == 'N') && (*(str + 1) == 'a' || *(str + 1) == 'A') &&
+        (*(str + 2) == 'n' || *(str + 2) == 'N')) {
         /* TODO: We should also support quiet NaNs in the future. */
         value = sign < 0 ? -NAN : NAN;
     } else {

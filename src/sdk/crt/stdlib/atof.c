@@ -1,8 +1,8 @@
 #include <ctype.h>
 #include <math.h>
 
-double strtod_hex(const char *str, double sign);
-double strtod_dec(const char *str, double sign);
+double __strtod_hex(const char *str, double sign);
+double __strtod_dec(const char *str, double sign);
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -22,11 +22,11 @@ double atof(const char *str) {
     }
 
     if (*str == '0' && (*(str + 1) == 'x' || *(str + 1) == 'X')) {
-        return strtod_hex(str + 2, sign);
+        return __strtod_hex(str + 2, sign);
     }
 
     if (isdigit(*str)) {
-        return strtod_dec(str, sign);
+        return __strtod_dec(str, sign);
     }
 
     if ((*str == 'i' || *str == 'I') && (*(str + 1) == 'n' || *(str + 1) == 'N') &&

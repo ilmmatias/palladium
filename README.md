@@ -15,6 +15,10 @@ At the moment we have no GUI, or nothing big other than a "Hello, World!" being 
 
 To build the source, you need to have clang, [jwasm](https://github.com/Baron-von-Riedesel/JWasm), and cmake installed.
 
+We assume your distro's LLVM build won't come with the right compiler-rt targets built, so you'll need to rebuild compiler-rt like described [here](https://llvm.org/docs/HowToCrossCompileBuiltinsOnArm.html).  
+You can use the example cmake configuration available [here](./compiler_rt-flags.txt).  
+We use w64-mingw32 targets, such as i686-w64-mingw32 and x86_64-w64-mingw32.
+
 We currently only support the amd64 target (the x86 target is only used for building the bootloader), so make sure to create the llvm-ml and llvm-ml64 symlinks in your /usr/bin folder if your distro doesn't ship with them (as we use MASM syntax on x86/amd64).  
 The lld-link symlink is also required (for all targets).
 

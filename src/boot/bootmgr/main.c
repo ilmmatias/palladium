@@ -2,7 +2,30 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <boot.h>
+#include <stdarg.h>
 #include <stdlib.h>
+
+size_t __vprintf(
+    const char *format,
+    va_list vlist,
+    void *context,
+    void (*put_buf)(const void *buffer, size_t size, void *context));
+
+void put_buf(const void *buffer, size_t size, void *context) {
+    (void)context;
+    const char *src = buffer;
+    while (size--) {
+        BiPutChar(*(src++));
+    }
+}
+
+size_t printf(const char *format, ...) {
+    va_list vlist;
+    va_start(vlist, format);
+    size_t size = __vprintf(format, vlist, NULL, put_buf);
+    va_end(vlist);
+    return size;
+}
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -22,16 +45,14 @@
     BmInitMemory(BootBlock);
 
     const char *p = "10 200000000000000000000000000000 30 -40 - 42";
-    BmPut("Parsing '%s':\n", p);
+    printf("Parsing '%s':\n", p);
     char *end = NULL;
     for (unsigned long i = strtoul(p, &end, 10); p != end; i = strtoul(p, &end, 10)) {
-        char c = *end;
-        *end = 0;
-        BmPut("'%s' -> %d\n", p, i);
-        *end = c;
+        printf("'%.*s' -> ", (int)(end - p), p);
         p = end;
+        printf("%lu\n", i);
     }
-    BmPut("After the loop p points to '%s'\n", p);
+    printf("After the loop p points to '%s'\n", p);
 
     while (1)
         ;
