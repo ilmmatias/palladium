@@ -27,9 +27,8 @@ char *strndup(const char *src, size_t size) {
     char *Copy = malloc(CopySize + 1);
     if (Copy) {
         memcpy(Copy, src, CopySize);
+        Copy[CopySize] = 0;
     }
-
-    Copy[CopySize] = 0;
 
     return Copy;
 }

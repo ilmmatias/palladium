@@ -12,6 +12,10 @@
  *     Copy of the source string, or NULL if we couldn't allocate the memory.
  *-----------------------------------------------------------------------------------------------*/
 char *strdup(const char *src) {
+    if (!src) {
+        return NULL;
+    }
+
     size_t Size = strlen(src) + 1;
     char *Copy = malloc(Size);
 

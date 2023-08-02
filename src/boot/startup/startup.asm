@@ -1,4 +1,4 @@
-; SPDX-FileCopyrightText: (C) 2022-2023 yuuma03
+; SPDX-FileCopyrightText: (C) 2022-2023 ilmmatias
 ; SPDX-License-Identifier: BSD-3-Clause
 
 .model tiny
