@@ -16,6 +16,10 @@ EXPORTS
     tolower
     toupper
 
+    sprintf
+
+    vsprintf
+
     atof
     atoi
     atol

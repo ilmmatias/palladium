@@ -31,22 +31,22 @@
  * RETURN VALUE:
  *     How many characters have been output.
  *-----------------------------------------------------------------------------------------------*/
-static size_t pad(
+static int pad(
     const void *buffer,
-    size_t size,
+    int size,
     int left,
     int width,
     int prec,
     void *context,
-    void (*put_buf)(const void *buffer, size_t size, void *context)) {
-    if (prec >= 0 && (intmax_t)size > prec) {
+    void (*put_buf)(const void *buffer, int size, void *context)) {
+    if (prec >= 0 && size > prec) {
         size = prec;
     }
 
     width -= size;
 
     int pad = ' ';
-    size_t written_size = width;
+    int written_size = width;
 
     while (!left && width-- > 0) {
         put_buf(&pad, 1, context);
@@ -81,9 +81,9 @@ static size_t pad(
  * RETURN VALUE:
  *     How many characters have been output.
  *-----------------------------------------------------------------------------------------------*/
-static size_t pad_num(
+static int pad_num(
     const void *buffer,
-    size_t size,
+    int size,
     int sign,
     int alt,
     int left,
@@ -91,7 +91,7 @@ static size_t pad_num(
     int width,
     int prec,
     void *context,
-    void (*put_buf)(const void *buffer, size_t size, void *context)) {
+    void (*put_buf)(const void *buffer, int size, void *context)) {
     int space_width = 0;
     int space_ch = ' ';
     int zero_width = 0;
@@ -116,7 +116,7 @@ static size_t pad_num(
      *     For left=1, it doesn't matter if the user requested zeroes instead of spaces.
      *     Otherwise, it works just as you would expect. */
     if (prec >= 0) {
-        int max_size = (prec > (intmax_t)size ? prec : size) + (sign > 0) + alt_width;
+        int max_size = (prec > size ? prec : size) + (sign > 0) + alt_width;
         space_width = width - max_size;
         zero_width = prec - size;
     } else if (left || !zero) {
@@ -127,7 +127,7 @@ static size_t pad_num(
         zero_width = width - max_size;
     }
 
-    size_t written_size = space_width + zero_width + alt_width + (sign > 0);
+    int written_size = space_width + zero_width + alt_width + (sign > 0);
 
     while (!left && space_width-- > 0) {
         put_buf(&space_ch, 1, context);
@@ -172,7 +172,7 @@ static size_t pad_num(
  * RETURN VALUE:
  *     How many characters have been output.
  *-----------------------------------------------------------------------------------------------*/
-static size_t itoa(
+static int itoa(
     intmax_t value,
     int sign,
     int left,
@@ -180,11 +180,11 @@ static size_t itoa(
     int width,
     int prec,
     void *context,
-    void (*put_buf)(const void *buffer, size_t size, void *context)) {
+    void (*put_buf)(const void *buffer, int size, void *context)) {
     int value_sign = value < 0;
     char buffer[64];
-    size_t size = 0;
-    size_t pos = 63;
+    int size = 0;
+    int pos = 63;
 
     if (value_sign) {
         value *= -1;
@@ -221,7 +221,7 @@ static size_t itoa(
  * RETURN VALUE:
  *     How many characters have been output.
  *-----------------------------------------------------------------------------------------------*/
-static size_t utoa(
+static int utoa(
     uintmax_t value,
     int base,
     int upper,
@@ -231,10 +231,10 @@ static size_t utoa(
     int width,
     int prec,
     void *context,
-    void (*put_buf)(const void *buffer, size_t size, void *context)) {
+    void (*put_buf)(const void *buffer, int size, void *context)) {
     char buffer[64];
-    size_t size = 0;
-    size_t pos = 63;
+    int size = 0;
+    int pos = 63;
 
     while (value) {
         buffer[--pos] = (upper ? "0123456789ABCDEF" : "0123456789abcdef")[value % base];
@@ -272,12 +272,12 @@ static size_t utoa(
  * RETURN VALUE:
  *     How many characters have been output.
  *-----------------------------------------------------------------------------------------------*/
-size_t __vprintf(
+int __vprintf(
     const char *format,
     va_list vlist,
     void *context,
-    void (*put_buf)(const void *buffer, size_t size, void *context)) {
-    size_t size = 0;
+    void (*put_buf)(const void *buffer, int size, void *context)) {
+    int size = 0;
 
     while (*format) {
         const char *start = format;

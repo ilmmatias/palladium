@@ -9,7 +9,7 @@ else
     cd obj.x86
 fi
 
-cmake --build . "$2"
+cmake --build .
 cd ..
 
 if [[ ! -d obj.amd64 ]]
@@ -21,7 +21,7 @@ else
     cd obj.amd64
 fi
 
-cmake --build . "$2"
+cmake --build .
 cd ..
 
 mkdir -p _root

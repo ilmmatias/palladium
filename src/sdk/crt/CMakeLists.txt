@@ -22,6 +22,8 @@ set(SOURCES
     ctype/toupper.c
 
     stdio/__vprintf.c
+    stdio/sprintf.c
+    stdio/vsprintf.c
 
     stdlib/atof.c
     stdlib/atoi.c
