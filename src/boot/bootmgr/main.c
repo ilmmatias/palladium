@@ -45,8 +45,8 @@ int printf(const char *format, ...) {
     BmInitArch();
     BmInitMemory(BootBlock);
 
-    char TestString[80];
-    int size = sprintf(TestString, "Hello, World! Here is a number :0x%-*.*x:", 16, 8, 0xC0DE);
+    char TestString[28];
+    int size = snprintf(TestString, 28, "Here is a number :0x%-*.*x:", 16, 8, 0xC0DE);
     printf("%d\n%s\n", size, TestString);
 
     while (1)

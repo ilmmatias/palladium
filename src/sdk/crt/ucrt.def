@@ -17,8 +17,10 @@ EXPORTS
     toupper
 
     sprintf
+    snprintf
 
     vsprintf
+    vsnprintf
 
     atof
     atoi
