@@ -1,7 +1,7 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
-#include <boot.h>
+#include <stdio.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -18,7 +18,7 @@
  *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
 [[noreturn]] void __assert(const char *condition, const char *file, int line, const char *func) {
-    BmPut("%s:%d: %s: Assertion `%s` failed.", file, line, func, condition);
+    printf("%s:%d: %s: Assertion `%s` failed.", file, line, func, condition);
     while (1)
         ;
 }

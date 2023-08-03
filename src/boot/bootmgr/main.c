@@ -2,31 +2,7 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <boot.h>
-#include <stdarg.h>
 #include <stdio.h>
-#include <stdlib.h>
-
-int __vprintf(
-    const char *format,
-    va_list vlist,
-    void *context,
-    void (*put_buf)(const void *buffer, int size, void *context));
-
-void put_buf(const void *buffer, int size, void *context) {
-    (void)context;
-    const char *src = buffer;
-    while (size--) {
-        BiPutChar(*(src++));
-    }
-}
-
-int printf(const char *format, ...) {
-    va_list vlist;
-    va_start(vlist, format);
-    int size = __vprintf(format, vlist, NULL, put_buf);
-    va_end(vlist);
-    return size;
-}
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:

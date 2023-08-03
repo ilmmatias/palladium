@@ -2,79 +2,23 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <boot.h>
-#include <stdarg.h>
-
-static void PutString(const char *String) {
-    while (*String) {
-        BiPutChar(*String++);
-    }
-}
-
-static void PutHex(size_t Number) {
-    for (int i = (sizeof(size_t) << 3) - 4; i >= 0; i -= 4) {
-        BiPutChar("0123456789ABCDEF"[(Number >> i) & 0xF]);
-    }
-}
-
-static void PutDec(size_t Number) {
-    if (Number >= 10) {
-        PutDec(Number / 10);
-    }
-
-    BiPutChar('0' + Number % 10);
-}
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function formats and displays a string. It supports the following format specifiers:
- *         %c - Character
- *         %s - String
- *         %x - Hexadecimal number
- *         %d - Decimal number
+ *     This function outputs the specified character buffer into the screen.
  *
  * PARAMETERS:
- *     String - The format string.
- *     ...    - The arguments to be inserted into the format string.
+ *     buffer - What to output.
+ *     size - Size of the buffer.
+ *     context - Ignored by us, can be NULL or whatever you want.
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void BmPut(const char *String, ...) {
-    va_list Args;
-    va_start(Args, String);
-
-    while (*String) {
-        if (*String == '%') {
-            String++;
-
-            switch (*String) {
-                case 'c': {
-                    BiPutChar(va_arg(Args, int));
-                    break;
-                }
-                case 's': {
-                    PutString(va_arg(Args, const char *));
-                    break;
-                }
-                case 'x': {
-                    PutHex(va_arg(Args, size_t));
-                    break;
-                }
-                case 'd': {
-                    PutDec(va_arg(Args, size_t));
-                    break;
-                }
-                default: {
-                    BiPutChar(*String);
-                    break;
-                }
-            }
-        } else {
-            BiPutChar(*String);
-        }
-
-        String++;
+void __put_stdout(const void *buffer, int size, void *context) {
+    (void)context;
+    const char *src = buffer;
+    while (size--) {
+        BiPutChar(*(src++));
     }
-
-    va_end(Args);
 }

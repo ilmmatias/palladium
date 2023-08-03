@@ -112,7 +112,7 @@ uint16_t BmGetCursorY(void) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     Display a character. This is the internal function, use BmPut() instead.
+ *     Display a character. This is the internal function, use printf() instead.
  *
  * PARAMETERS:
  *     c - The character.

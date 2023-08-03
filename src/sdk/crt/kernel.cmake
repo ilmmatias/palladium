@@ -3,6 +3,12 @@
 
 set(KERNEL_SOURCES
     ${SOURCES}
+
+    stdio/printf.c
+    stdio/putchar.c
+    stdio/puts.c
+    stdio/vprintf.c
+
     string/strdup.c
     string/strndup.c)
 
