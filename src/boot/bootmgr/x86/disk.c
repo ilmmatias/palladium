@@ -3,6 +3,7 @@
 
 #include <bios.h>
 #include <boot.h>
+#include <device.h>
 #include <stdalign.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -30,6 +31,7 @@ typedef struct __attribute__((packed)) {
 
 static char ReadBuffer[4096] __attribute__((aligned(16)));
 static BiosExtDriveParameters DriveParameters[256];
+static uint8_t BootDrive;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -42,7 +44,7 @@ static BiosExtDriveParameters DriveParameters[256];
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void BiosDetectDisks(void) {
+void BiosDetectDisks(BiosBootBlock *Data) {
     BiosRegisters Registers;
     BiosExtDriveParameters Parameters;
 
@@ -60,6 +62,7 @@ void BiosDetectDisks(void) {
     }
 
     memset(&DriveParameters, 0, sizeof(DriveParameters));
+    BootDrive = Data->BootDrive;
 
     for (int i = 0; i < 256; i++) {
         /* Make sure extensions are present, and that packet access is supported (that's all
@@ -98,10 +101,62 @@ void BiosDetectDisks(void) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
+ *     This function parses the given path segment, opening the respective disk.
+ *
+ * PARAMETERS:
+ *     Segment - Path segment string.
+ *     Context - Output; Set to the private data required to manipulate the disk.
+ *
+ * RETURN VALUE:
+ *     How many characters we consumed if the disk was valid, 0 otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+int BiOpenArchDevice(const char *Segment, DeviceContext *Context) {
+    /* `bios(n)part(n)/<file> (ARC-like). This function parses the first part (`bios(n)`).
+       You can also pass `bios()` instead of `bios(n)`, indicating that we should open the boot
+       device. */
+    if ((*Segment != 'b' && *Segment != 'B') || (*(Segment + 1) != 'i' && *(Segment + 1) != 'I') ||
+        (*(Segment + 2) != 'o' && *(Segment + 2) != 'O') ||
+        (*(Segment + 3) != 's' && *(Segment + 3) != 'S') || (*(Segment + 4) != '(')) {
+        return 0;
+    }
+
+    char *End;
+    int Drive = strtol(Segment + 5, &End, 16);
+
+    Context->Type = DEVICE_TYPE_ARCH;
+
+    if (Segment + 5 == End) {
+        Context->PrivateData = (void *)(uint32_t)BootDrive;
+    } else if (Drive > 255 || !DriveParameters[Drive].Size) {
+        return 0;
+    } else {
+        Context->PrivateData = (void *)(uint32_t)Drive;
+    }
+
+    return *End == ')' ? End - Segment + 1 : 0;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function does the cleanup of an open arch-specific device, and free()s the Context
+ *     pointer.
+ *
+ * PARAMETERS:
+ *     Context - Device/node private data.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void BiFreeArchDevice(DeviceContext *Context) {
+    free(Context);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
  *     This function uses the BIOS to read sectors from one of the detected disks.
  *
  * PARAMETERS:
- *     Drive - BIOS drive number.
+ *     Context - Expected to be a valid arch device context.
  *     Buffer - Output buffer.
  *     Start - Starting byte index (in the disk).
  *     Size - How many bytes to read into the buffer.
@@ -109,11 +164,8 @@ void BiosDetectDisks(void) {
  * RETURN VALUE:
  *     1 for success, otherwise 0.
  *-----------------------------------------------------------------------------------------------*/
-int BiosReadDisk(int Drive, void *Buffer, uint64_t Start, size_t Size) {
-    if (Drive > 255 || !DriveParameters[Drive].Size) {
-        return 0;
-    }
-
+int BiReadArchDevice(DeviceContext *Context, void *Buffer, uint64_t Start, size_t Size) {
+    uint8_t Drive = (uint8_t)(uint32_t)Context->PrivateData;
     uint16_t BytesPerSector = DriveParameters[Drive].BytesPerSector;
     alignas(16) BiosExtDrivePacket Packet;
     char *OutputBuffer = Buffer;
@@ -152,4 +204,22 @@ int BiosReadDisk(int Drive, void *Buffer, uint64_t Start, size_t Size) {
     }
 
     return 1;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function would travesal the arch-specific device, but as this should be a raw disk,
+ *     there's no traversal to be done.
+ *
+ * PARAMETERS:
+ *     Context - Device/node private data.
+ *     Name - What entry to find inside the directory.
+ *
+ * RETURN VALUE:
+ *     1 for success, otherwise 0; Always 0 here.
+ *-----------------------------------------------------------------------------------------------*/
+int BiReadArchDirectoryEntry(DeviceContext *Context, const char *Name) {
+    (void)Context;
+    (void)Name;
+    return 0;
 }

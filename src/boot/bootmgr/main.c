@@ -4,6 +4,8 @@
 #include <boot.h>
 #include <stdio.h>
 
+void *__open(const char *path, int mode);
+
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function is the BOOTMGR architecture-independent entry point.
@@ -18,8 +20,11 @@
  *-----------------------------------------------------------------------------------------------*/
 [[noreturn]] void BmMain(void *BootBlock) {
     BmInitDisplay();
-    BmInitArch();
+    BmInitArch(BootBlock);
     BmInitMemory(BootBlock);
+
+    printf("%p\n", __open("bios()/flag.txt", 0));
+
     while (1)
         ;
 }

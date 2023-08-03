@@ -13,11 +13,12 @@
  *     going further in the boot process.
  *
  * PARAMETERS:
- *     None.
+ *     BootBlock - Information obtained while setting up the boot environment.
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void BmInitArch() {
-    BiosDetectDisks();
+void BmInitArch(void *BootBlock) {
+    BiosBootBlock *Data = (BiosBootBlock *)BootBlock;
+    BiosDetectDisks(Data);
 }

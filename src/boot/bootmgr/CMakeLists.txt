@@ -15,6 +15,9 @@ endif()
 add_executable(bootmgr "kstdlib"
     ${SOURCES}
 
+    fs/exfat.c
+    fs/vfs.c
+
     support/assert.c
     support/display.c
     support/memory.c

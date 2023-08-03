@@ -27,8 +27,6 @@ typedef struct __attribute__((packed)) {
 } BiosRegisters;
 
 void BiosCall(uint8_t Number, BiosRegisters *Registers);
-
-void BiosDetectDisks(void);
-int BiosReadDisk(int Drive, void *Buffer, uint64_t Start, size_t Size);
+void BiosDetectDisks(BiosBootBlock *Data);
 
 #endif /* _BIOS_H_ */

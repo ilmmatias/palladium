@@ -15,7 +15,7 @@
 
 #define PAGE_SIZE (1 << (PAGE_SHIFT))
 
-void BmInitArch(void);
+void BmInitArch(void *BootBlock);
 
 void BmInitMemory(void *BootBlock);
 void *BmAllocatePages(size_t Pages);
