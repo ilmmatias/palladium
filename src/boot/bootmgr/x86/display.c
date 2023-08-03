@@ -9,17 +9,45 @@
 #define SCREEN_WIDTH 80
 #define SCREEN_HEIGHT 25
 #define SCREEN_SIZE (SCREEN_WIDTH * SCREEN_HEIGHT)
-#define SCREEN_ATTRIBUTE 0x07
 
 #define TAB_SIZE 4
 
 static uint16_t *VideoMemory = (uint16_t *)VIDEO_MEMORY;
+static uint8_t Attribute = 0x07;
 static uint16_t CursorX = 0;
 static uint16_t CursorY = 0;
 
 static void ScrollUp(void) {
     memmove(VideoMemory, VideoMemory + SCREEN_WIDTH, (SCREEN_SIZE - SCREEN_WIDTH) * 2);
     memset(VideoMemory + SCREEN_SIZE - SCREEN_WIDTH, 0, SCREEN_WIDTH * 2);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     Set the background and foreground attributes of the screen.
+ *
+ * PARAMETERS:
+ *     Color - New attributes.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void BmSetColor(uint8_t Color) {
+    Attribute = Color;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     Set the current background and foreground attributes.
+ *
+ * PARAMETERS:
+ *     None.
+ *
+ * RETURN VALUE:
+ *     Background and foreground attributes (in a single uint8_t).
+ *-----------------------------------------------------------------------------------------------*/
+uint8_t BmGetColor(void) {
+    return Attribute;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -127,7 +155,7 @@ void BiPutChar(char Character) {
     } else if (Character == '\t') {
         CursorX = (CursorX + 4) & ~3;
     } else {
-        VideoMemory[CursorY * SCREEN_WIDTH + CursorX] = SCREEN_ATTRIBUTE << 8 | Character;
+        VideoMemory[CursorY * SCREEN_WIDTH + CursorX] = Attribute << 8 | Character;
         CursorX++;
     }
 
@@ -157,11 +185,11 @@ void BmInitDisplay(void) {
     CursorX = 0;
     CursorY = 0;
 
-    if (!(SCREEN_ATTRIBUTE & 0xF0)) {
+    if (!(Attribute & 0xF0)) {
         memset(VideoMemory, 0, SCREEN_SIZE * 2);
     } else {
         for (int i = 0; i < SCREEN_SIZE; i++) {
-            VideoMemory[i] = SCREEN_ATTRIBUTE << 8;
+            VideoMemory[i] = Attribute << 8;
         }
     }
 }

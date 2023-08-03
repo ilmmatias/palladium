@@ -15,17 +15,19 @@
 
 #define PAGE_SIZE (1 << (PAGE_SHIFT))
 
-void BmInitArch();
+void BmInitArch(void);
 
 void BmInitMemory(void *BootBlock);
 void *BmAllocatePages(size_t Pages);
 void BmFreePages(void *Base, size_t Pages);
 
-void BmInitDisplay();
-void BmSetCursor(uint16_t x, uint16_t y);
-void BmGetCursor(uint16_t *x, uint16_t *y);
-void BmSetCursorX(uint16_t x);
-void BmSetCursorY(uint16_t y);
+void BmInitDisplay(void);
+void BmSetColor(uint8_t Color);
+uint8_t BmGetColor(void);
+void BmSetCursor(uint16_t X, uint16_t Y);
+void BmGetCursor(uint16_t *X, uint16_t *Y);
+void BmSetCursorX(uint16_t X);
+void BmSetCursorY(uint16_t Y);
 uint16_t BmGetCursorX(void);
 uint16_t BmGetCursorY(void);
 void BiPutChar(char c);

@@ -4,6 +4,7 @@
 #ifndef _BIOS_H_
 #define _BIOS_H_
 
+#include <stddef.h>
 #include <stdint.h>
 
 #define BIOS_MEMORY_REGION_TYPE_AVAILABLE 1
@@ -26,5 +27,8 @@ typedef struct __attribute__((packed)) {
 } BiosRegisters;
 
 void BiosCall(uint8_t Number, BiosRegisters *Registers);
+
+void BiosDetectDisks(void);
+int BiosReadDisk(int Drive, void *Buffer, uint64_t Start, size_t Size);
 
 #endif /* _BIOS_H_ */

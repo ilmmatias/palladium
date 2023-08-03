@@ -199,6 +199,11 @@ static int itoa(
         size++;
     }
 
+    if (!size) {
+        buffer[--pos] = '0';
+        size++;
+    }
+
     return pad_num(
         buffer + pos, size, value_sign ? '-' : sign, 0, left, zero, width, prec, context, put_buf);
 }
