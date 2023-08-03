@@ -1,3 +1,6 @@
+/* SPDX-FileCopyrightText: (C) 2023 ilmmatias
+ * SPDX-License-Identifier: BSD-3-Clause */
+
 #include <string.h>
 
 void __put_stdout(const void *buffer, int size, void *context);

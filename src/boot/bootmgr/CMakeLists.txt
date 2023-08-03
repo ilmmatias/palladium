@@ -6,6 +6,7 @@ project(os/boot/bootmgr)
 if(ARCH STREQUAL "x86")
     set(SOURCES
         ${ARCH}/bios.asm
+        ${ARCH}/disk.c
         ${ARCH}/display.c
         ${ARCH}/init.c
         ${ARCH}/memory.c)
@@ -13,10 +14,12 @@ endif()
 
 add_executable(bootmgr "kstdlib"
     ${SOURCES}
-    assert.c
-    display.c
-    main.c
-    memory.c)
+
+    support/assert.c
+    support/display.c
+    support/memory.c
+
+    main.c)
 
 target_include_directories(bootmgr PRIVATE include)
 target_compile_options(bootmgr PRIVATE $<$<COMPILE_LANGUAGE:C,CXX>:-ffreestanding>)

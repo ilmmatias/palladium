@@ -1,3 +1,6 @@
+/* SPDX-FileCopyrightText: (C) 2023 ilmmatias
+ * SPDX-License-Identifier: BSD-3-Clause */
+
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function converts uppercase characters into lowercase, leaving anything else
