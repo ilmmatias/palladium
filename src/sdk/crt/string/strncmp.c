@@ -18,10 +18,14 @@
  *     pointers to where the inequality happened).
  *-----------------------------------------------------------------------------------------------*/
 int strncmp(const char *lhs, const char *rhs, size_t count) {
-    while (*lhs && *rhs && *lhs == *rhs && count--) {
+    while (count--) {
+        if (!*lhs || !*rhs || *lhs != *rhs) {
+            return *lhs - *rhs;
+        }
+
         lhs++;
         rhs++;
     }
 
-    return *lhs - *rhs;
+    return 0;
 }

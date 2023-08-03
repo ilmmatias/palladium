@@ -415,6 +415,12 @@ int __vprintf(
             case 'd':
             case 'i':
                 switch (mod) {
+                    case MOD_hh:
+                        signed_value = (char)va_arg(vlist, int);
+                        break;
+                    case MOD_h:
+                        signed_value = (short)va_arg(vlist, int);
+                        break;
                     case MOD_l:
                         signed_value = va_arg(vlist, long);
                         break;
@@ -443,6 +449,12 @@ int __vprintf(
             case 'X':
             case 'u':
                 switch (mod) {
+                    case MOD_hh:
+                        unsigned_value = (unsigned char)va_arg(vlist, int);
+                        break;
+                    case MOD_h:
+                        unsigned_value = (unsigned short)va_arg(vlist, int);
+                        break;
                     case MOD_l:
                         unsigned_value = va_arg(vlist, unsigned long);
                         break;

@@ -20,10 +20,14 @@ int memcmp(const void *lhs, const void *rhs, size_t count) {
     const char *Left = lhs;
     const char *Right = rhs;
 
-    while (*Left == *Right && count--) {
+    while (count--) {
+        if (*Left != *Right) {
+            return *Left - *Right;
+        }
+
         Left++;
         Right++;
     }
 
-    return *Left - *Right;
+    return 0;
 }
