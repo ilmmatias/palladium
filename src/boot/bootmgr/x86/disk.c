@@ -3,7 +3,7 @@
 
 #include <boot.h>
 #include <crt_impl.h>
-#include <device.h>
+#include <file.h>
 #include <stdalign.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -32,7 +32,7 @@ typedef struct __attribute__((packed)) {
 
 static char ReadBuffer[4096] __attribute__((aligned(16)));
 static BiosExtDriveParameters DriveParameters[256];
-static DeviceContext DriveHandles[256];
+static FileContext DriveHandles[256];
 static uint8_t BootDrive;
 
 /*-------------------------------------------------------------------------------------------------
@@ -102,12 +102,12 @@ void BiosDetectDisks(BiosBootBlock *Data) {
         /* If possible, pre-probe the drive and allocate all buffers necessary for FS
            operations. */
 
-        DeviceContext Context;
-        Context.Type = DEVICE_TYPE_ARCH;
+        FileContext Context;
+        Context.Type = FILE_TYPE_ARCH;
         Context.PrivateData = (void *)i;
 
         if (BiProbeExfat(&Context)) {
-            memcpy(&DriveHandles[i], &Context, sizeof(DeviceContext));
+            memcpy(&DriveHandles[i], &Context, sizeof(FileContext));
         }
     }
 }
@@ -123,8 +123,8 @@ void BiosDetectDisks(BiosBootBlock *Data) {
  * RETURN VALUE:
  *     1 on success, 0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int BiCopyArchDevice(DeviceContext *Context, DeviceContext *Copy) {
-    memcpy(Copy, Context, sizeof(DeviceContext));
+int BiCopyArchDevice(FileContext *Context, FileContext *Copy) {
+    memcpy(Copy, Context, sizeof(FileContext));
     return 1;
 }
 
@@ -139,7 +139,7 @@ int BiCopyArchDevice(DeviceContext *Context, DeviceContext *Copy) {
  * RETURN VALUE:
  *     How many characters we consumed if the disk was valid, 0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int BiOpenArchDevice(const char *Segment, DeviceContext *Context) {
+int BiOpenArchDevice(const char *Segment, FileContext *Context) {
     /* `bios(n)part(n)/<file> (ARC-like). This function parses the first part (`bios(n)`).
        You can also pass `bios()` instead of `bios(n)`, indicating that we should open the boot
        device. */
@@ -156,11 +156,11 @@ int BiOpenArchDevice(const char *Segment, DeviceContext *Context) {
         Drive = BootDrive;
     }
 
-    if (*End != ')' || DriveHandles[Drive].Type == DEVICE_TYPE_NONE) {
+    if (*End != ')' || DriveHandles[Drive].Type == FILE_TYPE_NONE) {
         return 0;
     }
 
-    return BiCopyDevice(&DriveHandles[Drive], Context) ? End - Segment + 1 : 1;
+    return BiCopyFileContext(&DriveHandles[Drive], Context) ? End - Segment + 1 : 1;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -174,7 +174,7 @@ int BiOpenArchDevice(const char *Segment, DeviceContext *Context) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void BiFreeArchDevice(DeviceContext *Context) {
+void BiFreeArchDevice(FileContext *Context) {
     free(Context);
 }
 
@@ -191,7 +191,7 @@ void BiFreeArchDevice(DeviceContext *Context) {
  * RETURN VALUE:
  *     __STDIO_FLAGS_ERROR/EOF if something went wrong, 0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int BiReadArchDevice(DeviceContext *Context, void *Buffer, uint64_t Start, size_t Size) {
+int BiReadArchDevice(FileContext *Context, void *Buffer, uint64_t Start, size_t Size) {
     uint8_t Drive = (uint8_t)(uint32_t)Context->PrivateData;
     uint16_t BytesPerSector = DriveParameters[Drive].BytesPerSector;
     alignas(16) BiosExtDrivePacket Packet;
@@ -245,7 +245,7 @@ int BiReadArchDevice(DeviceContext *Context, void *Buffer, uint64_t Start, size_
  * RETURN VALUE:
  *     1 for success, otherwise 0; Always 0 here.
  *-----------------------------------------------------------------------------------------------*/
-int BiReadArchDirectoryEntry(DeviceContext *Context, const char *Name) {
+int BiReadArchDirectoryEntry(FileContext *Context, const char *Name) {
     (void)Context;
     (void)Name;
     return 0;

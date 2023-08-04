@@ -3,14 +3,14 @@
 
 #include <crt_impl.h>
 #include <ctype.h>
-#include <device.h>
 #include <exfat.h>
+#include <file.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 typedef struct {
-    DeviceContext Parent;
+    FileContext Parent;
     void *ClusterBuffer;
     uint8_t ClusterShift;
     uint8_t SectorShift;
@@ -34,7 +34,7 @@ typedef struct {
  * RETURN VALUE:
  *     1 on success, 0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int BiCopyExfat(DeviceContext *Context, DeviceContext *Copy) {
+int BiCopyExfat(FileContext *Context, FileContext *Copy) {
     ExfatContext *FsContext = Context->PrivateData;
     ExfatContext *CopyContext = malloc(sizeof(ExfatContext));
 
@@ -43,7 +43,7 @@ int BiCopyExfat(DeviceContext *Context, DeviceContext *Copy) {
     }
 
     memcpy(CopyContext, FsContext, sizeof(ExfatContext));
-    Copy->Type = DEVICE_TYPE_EXFAT;
+    Copy->Type = FILE_TYPE_EXFAT;
     Copy->PrivateData = CopyContext;
 
     return 1;
@@ -60,7 +60,7 @@ int BiCopyExfat(DeviceContext *Context, DeviceContext *Copy) {
  * RETURN VALUE:
  *     1 if the FS was exFAT, 0 if we need to keep on searching.
  *-----------------------------------------------------------------------------------------------*/
-int BiProbeExfat(DeviceContext *Context) {
+int BiProbeExfat(FileContext *Context) {
     char *Buffer = malloc(512);
     if (!Buffer) {
         return 0;
@@ -127,8 +127,8 @@ int BiProbeExfat(DeviceContext *Context) {
     FsContext->NoFatChain =
         ((ExfatDirectoryEntry *)FsContext->ClusterBuffer)->FileAttributes & 0x02;
 
-    memcpy(&FsContext->Parent, Context, sizeof(DeviceContext));
-    Context->Type = DEVICE_TYPE_EXFAT;
+    memcpy(&FsContext->Parent, Context, sizeof(FileContext));
+    Context->Type = FILE_TYPE_EXFAT;
     Context->PrivateData = FsContext;
 
     free(Buffer);
@@ -146,7 +146,7 @@ int BiProbeExfat(DeviceContext *Context) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void BiCleanupExfat(DeviceContext *Context) {
+void BiCleanupExfat(FileContext *Context) {
     free(((ExfatContext *)Context)->ClusterBuffer);
     free(Context);
 }
@@ -208,7 +208,7 @@ static int FollowCluster(ExfatContext *FsContext, void **Current, uint64_t *Clus
  * RETURN VALUE:
  *     __STDIO_FLAGS_ERROR/EOF if something went wrong, 0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int BiReadExfatFile(DeviceContext *Context, void *Buffer, uint64_t Start, size_t Size) {
+int BiReadExfatFile(FileContext *Context, void *Buffer, uint64_t Start, size_t Size) {
     ExfatContext *FsContext = Context->PrivateData;
     uint64_t Cluster = FsContext->FileCluster;
     char *Current = FsContext->ClusterBuffer;
@@ -266,7 +266,7 @@ int BiReadExfatFile(DeviceContext *Context, void *Buffer, uint64_t Start, size_t
  * RETURN VALUE:
  *     1 for success, otherwise 0.
  *-----------------------------------------------------------------------------------------------*/
-int BiTraverseExfatDirectory(DeviceContext *Context, const char *Name) {
+int BiTraverseExfatDirectory(FileContext *Context, const char *Name) {
     ExfatContext *FsContext = Context->PrivateData;
     ExfatDirectoryEntry *Current = FsContext->ClusterBuffer;
     uint64_t Cluster = FsContext->FileCluster;

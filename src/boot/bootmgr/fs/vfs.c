@@ -3,7 +3,7 @@
 
 #include <assert.h>
 #include <crt_impl.h>
-#include <device.h>
+#include <file.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -28,7 +28,7 @@ void *__fopen(const char *filename, int mode) {
         return NULL;
     }
 
-    DeviceContext *Context = calloc(1, sizeof(DeviceContext));
+    FileContext *Context = calloc(1, sizeof(FileContext));
     if (!Context) {
         free(Path);
         return NULL;
@@ -37,7 +37,7 @@ void *__fopen(const char *filename, int mode) {
     for (char *Segment = strtok(Path, "/"); Segment; Segment = strtok(NULL, "/")) {
         /* First segment should be device; hard-coded to OpenArchDevice, but later on we should
            fall back to at last `display()` too. */
-        if (Context->Type == DEVICE_TYPE_NONE) {
+        if (Context->Type == FILE_TYPE_NONE) {
             int Offset = BiOpenArchDevice(Segment, Context);
             if (!Offset) {
                 free(Context);
@@ -64,19 +64,19 @@ void *__fopen(const char *filename, int mode) {
  *     We expect it to also free the context itself.
  *
  * PARAMETERS:
- *     handle - OS-specific handle; We expect/assume it is a DeviceContext.
+ *     handle - OS-specific handle; We expect/assume it is a FileContext.
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void __fclose(void *handle) {
-    DeviceContext *Context = handle;
+    FileContext *Context = handle;
 
-    if (!Context || Context->Type == DEVICE_TYPE_NONE) {
+    if (!Context || Context->Type == FILE_TYPE_NONE) {
         return;
-    } else if (Context->Type == DEVICE_TYPE_ARCH) {
+    } else if (Context->Type == FILE_TYPE_ARCH) {
         BiFreeArchDevice(Context);
-    } else if (Context->Type == DEVICE_TYPE_EXFAT) {
+    } else if (Context->Type == FILE_TYPE_EXFAT) {
         BiCleanupExfat(Context);
     }
 }
@@ -95,13 +95,13 @@ void __fclose(void *handle) {
  *     __STDIO_FLAGS_ERROR/EOF if something went wrong, 0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
 int __fread(void *handle, size_t pos, void *buffer, size_t size) {
-    DeviceContext *Context = handle;
+    FileContext *Context = handle;
 
-    if (!Context || Context->Type == DEVICE_TYPE_NONE) {
+    if (!Context || Context->Type == FILE_TYPE_NONE) {
         return __STDIO_FLAGS_ERROR;
-    } else if (Context->Type == DEVICE_TYPE_ARCH) {
+    } else if (Context->Type == FILE_TYPE_ARCH) {
         return BiReadArchDevice(Context, buffer, pos, size);
-    } else if (Context->Type == DEVICE_TYPE_EXFAT) {
+    } else if (Context->Type == FILE_TYPE_EXFAT) {
         return BiReadExfatFile(Context, buffer, pos, size);
     } else {
         return __STDIO_FLAGS_ERROR;
@@ -140,15 +140,15 @@ int __fwrite(void *handle, size_t pos, void *buffer, size_t size) {
  * RETURN VALUE:
  *     1 for success, otherwise 0.
  *-----------------------------------------------------------------------------------------------*/
-int BiCopyDevice(DeviceContext *Context, DeviceContext *Copy) {
+int BiCopyFileContext(FileContext *Context, FileContext *Copy) {
     if (!Context) {
         return 0;
-    } else if (Context->Type == DEVICE_TYPE_NONE) {
-        memcpy(Copy, Context, sizeof(DeviceContext));
+    } else if (Context->Type == FILE_TYPE_NONE) {
+        memcpy(Copy, Context, sizeof(FileContext));
         return 1;
-    } else if (Context->Type == DEVICE_TYPE_ARCH) {
+    } else if (Context->Type == FILE_TYPE_ARCH) {
         return BiCopyArchDevice(Context, Copy);
-    } else if (Context->Type == DEVICE_TYPE_EXFAT) {
+    } else if (Context->Type == FILE_TYPE_EXFAT) {
         return BiCopyExfat(Context, Copy);
     } else {
         return 0;
@@ -167,12 +167,12 @@ int BiCopyDevice(DeviceContext *Context, DeviceContext *Copy) {
  * RETURN VALUE:
  *     1 for success, otherwise 0.
  *-----------------------------------------------------------------------------------------------*/
-int BiReadDirectoryEntry(DeviceContext *Context, const char *Name) {
-    if (!Context || Context->Type == DEVICE_TYPE_NONE) {
+int BiReadDirectoryEntry(FileContext *Context, const char *Name) {
+    if (!Context || Context->Type == FILE_TYPE_NONE) {
         return 0;
-    } else if (Context->Type == DEVICE_TYPE_ARCH) {
+    } else if (Context->Type == FILE_TYPE_ARCH) {
         return BiReadArchDirectoryEntry(Context, Name);
-    } else if (Context->Type == DEVICE_TYPE_EXFAT) {
+    } else if (Context->Type == FILE_TYPE_EXFAT) {
         return BiTraverseExfatDirectory(Context, Name);
     } else {
         return 0;
