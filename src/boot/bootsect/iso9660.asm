@@ -86,24 +86,15 @@ Main$Search:
     pop si
     jne Main$Next
 
-    ; Finish up by loading the file (right after the boot sector) and transfering execution.
-    ; Just take a lot of caution with the size, it could be 32-bits in theory, but we're treating the image as
-    ; invalid if that happens (why would our loader be >64KiB anyways?).
-    ; It also might overflow when rounding up, handle that manually too.
-    mov cx, [si + 12]
-    cmp cx, 0
-    jne Main$Overflow
+    ; Now we can load all of the file data just after the boot sector, and jump to it.
+    mov ecx, [si + 10]
+    add ecx, 2047
+    shr ecx, 11
+    cmp ecx, 0FFFFh
+    jb Main$Load
 
-    mov cx, [si + 10]
-    cmp cx, 0F801h
-    jae Main$BigButValid
-
-    add cx, 2047
-    shr cx, 11
-    jmp Main$Load
-
-Main$BigButValid:
-    mov cx, 32
+    mov si, offset OverflowError
+    jmp Error
 
 Main$Load:
     mov eax, [si + 2]
@@ -122,10 +113,6 @@ Main$Next:
     cmp si, bx
     jb Main$Search
     jmp Main$NextSector
-
-Main$Overflow:
-    mov si, offset OverflowError
-    jmp Error
 
 Main$NotFound:
     mov si, offset ImageError
