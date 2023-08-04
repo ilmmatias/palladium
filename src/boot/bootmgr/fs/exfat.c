@@ -9,6 +9,8 @@
 
 typedef struct {
     DeviceContext Parent;
+    void *SectorBuffer;
+    uint8_t BytesPerClusterShift;
     uint8_t BytesPerSectorShift;
     uint32_t ClusterHeapOffset;
     uint32_t FileCluster;
@@ -64,10 +66,19 @@ int BiProbeExfat(DeviceContext *Context) {
         return 0;
     }
 
+    FsContext->SectorBuffer = malloc(1 << BootSector->BytesPerSectorShift);
+    if (!FsContext->SectorBuffer) {
+        free(FsContext);
+        free(Buffer);
+        return 0;
+    }
+
     memcpy(&FsContext->Parent, Context, sizeof(DeviceContext));
+    FsContext->BytesPerClusterShift =
+        BootSector->BytesPerSectorShift + BootSector->SectorsPerClusterShift;
     FsContext->BytesPerSectorShift = BootSector->BytesPerSectorShift;
-    FsContext->ClusterHeapOffset = BootSector->ClusterHeapOffset;
-    FsContext->FileCluster = BootSector->FirstClusterOfRootDirectory;
+    FsContext->ClusterHeapOffset = BootSector->ClusterHeapOffset << BootSector->BytesPerSectorShift;
+    FsContext->FileCluster = BootSector->FirstClusterOfRootDirectory - 2;
 
     Context->Type = DEVICE_TYPE_EXFAT;
     Context->PrivateData = FsContext;
@@ -105,9 +116,29 @@ void BiCleanupExfat(DeviceContext *Context) {
  *-----------------------------------------------------------------------------------------------*/
 int BiTraverseExfatDirectory(DeviceContext *Context, const char *Name) {
     ExfatContext *FsContext = Context->PrivateData;
+    DeviceContext *Parent = &FsContext->Parent;
+    ExfatGenericDirectoryEntry *Current = FsContext->SectorBuffer;
+    ExfatGenericDirectoryEntry *Last =
+        (ExfatGenericDirectoryEntry *)((char *)FsContext->SectorBuffer +
+                                       (1 << FsContext->BytesPerSectorShift));
+    uint32_t Sector =
+        FsContext->ClusterHeapOffset + (FsContext->FileCluster << FsContext->BytesPerClusterShift);
 
-    (void)FsContext;
     (void)Name;
 
-    return 0;
+    for (;; Current++) {
+        if ((void *)Current == FsContext->SectorBuffer || Current >= Last) {
+            if (!BiReadDevice(Parent, Current, Sector, 1 << FsContext->BytesPerSectorShift)) {
+                return 0;
+            }
+
+            Sector += 1 << FsContext->BytesPerSectorShift;
+        }
+
+        if (!Current->EntryType) {
+            return 0;
+        } else if (Current->EntryType != 0x85) {
+            continue;
+        }
+    }
 }

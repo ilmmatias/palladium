@@ -377,15 +377,19 @@ int __vprintf(
                 }
                 break;
             case 'j':
+                format++;
                 mod = MOD_j;
                 break;
             case 'z':
+                format++;
                 mod = MOD_z;
                 break;
             case 't':
+                format++;
                 mod = MOD_t;
                 break;
             case 'L':
+                format++;
                 mod = MOD_L;
                 break;
         }

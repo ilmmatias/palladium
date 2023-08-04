@@ -31,4 +31,11 @@ typedef struct __attribute__((packed)) {
     uint16_t BootSignature;
 } ExfatBootSector;
 
+typedef struct __attribute__((packed)) {
+    uint8_t EntryType;
+    char CustomDefined[19];
+    uint32_t FirstCluster;
+    uint64_t DataLength;
+} ExfatGenericDirectoryEntry;
+
 #endif /* _EXFAT_H_ */
