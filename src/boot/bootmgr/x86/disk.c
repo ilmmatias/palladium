@@ -32,6 +32,7 @@ typedef struct __attribute__((packed)) {
 
 static char ReadBuffer[4096] __attribute__((aligned(16)));
 static BiosExtDriveParameters DriveParameters[256];
+static DeviceContext DriveHandles[256];
 static uint8_t BootDrive;
 
 /*-------------------------------------------------------------------------------------------------
@@ -97,12 +98,39 @@ void BiosDetectDisks(BiosBootBlock *Data) {
         }
 
         memcpy(&DriveParameters[i], &Parameters, sizeof(BiosExtDriveParameters));
+
+        /* If possible, pre-probe the drive and allocate all buffers necessary for FS
+           operations. */
+
+        DeviceContext Context;
+        Context.Type = DEVICE_TYPE_ARCH;
+        Context.PrivateData = (void *)i;
+
+        if (BiProbeExfat(&Context)) {
+            memcpy(&DriveHandles[i], &Context, sizeof(DeviceContext));
+        }
     }
 }
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function parses the given path segment, opening the respective disk.
+ *     This function copies the respective disk context.
+ *
+ * PARAMETERS:
+ *     Context - Source context.
+ *     Copy - Where to copy the context to.
+ *
+ * RETURN VALUE:
+ *     1 on success, 0 otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+int BiCopyArchDevice(DeviceContext *Context, DeviceContext *Copy) {
+    memcpy(Copy, Context, sizeof(DeviceContext));
+    return 1;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function parses the given path segment, opening the FS inside the respective disk.
  *
  * PARAMETERS:
  *     Segment - Path segment string.
@@ -124,17 +152,15 @@ int BiOpenArchDevice(const char *Segment, DeviceContext *Context) {
     char *End;
     int Drive = strtol(Segment + 5, &End, 16);
 
-    Context->Type = DEVICE_TYPE_ARCH;
-
-    if (Segment + 5 == End) {
-        Context->PrivateData = (void *)(uint32_t)BootDrive;
-    } else if (Drive > 255 || !DriveParameters[Drive].Size) {
-        return 0;
-    } else {
-        Context->PrivateData = (void *)(uint32_t)Drive;
+    if (End == Segment + 5) {
+        Drive = BootDrive;
     }
 
-    return *End == ')' ? End - Segment + 1 : 0;
+    if (*End != ')' || DriveHandles[Drive].Type == DEVICE_TYPE_NONE) {
+        return 0;
+    }
+
+    return BiCopyDevice(&DriveHandles[Drive], Context) ? End - Segment + 1 : 1;
 }
 
 /*-------------------------------------------------------------------------------------------------

@@ -24,10 +24,37 @@ typedef struct {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
+ *     This function tries copying the specified exFAT file entry, reusing everything but the
+ *     ExfatContext.
+ *
+ * PARAMETERS:
+ *     Context - File data to be copied.
+ *     Copy - Destination of the copy.
+ *
+ * RETURN VALUE:
+ *     1 on success, 0 otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+int BiCopyExfat(DeviceContext *Context, DeviceContext *Copy) {
+    ExfatContext *FsContext = Context->PrivateData;
+    ExfatContext *CopyContext = malloc(sizeof(ExfatContext));
+
+    if (!CopyContext) {
+        return 0;
+    }
+
+    memcpy(CopyContext, FsContext, sizeof(ExfatContext));
+    Copy->Type = DEVICE_TYPE_EXFAT;
+    Copy->PrivateData = CopyContext;
+
+    return 1;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
  *     This function tries probing an open device/partition for exFAT.
  *
  * PARAMETERS:
- *     context - I/O; Device where the caller is trying to probe for FSes. If the FS is exFAT,
+ *     Context - I/O; Device where the caller is trying to probe for FSes. If the FS is exFAT,
  *               we'll modify it to be an exFAT context.
  *
  * RETURN VALUE:

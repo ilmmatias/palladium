@@ -49,13 +49,6 @@ void *__fopen(const char *filename, int mode) {
                 __fclose(Context);
                 return NULL;
             }
-
-            if (!BiProbeExfat(Context)) {
-                __fclose(Context);
-                return NULL;
-            }
-
-            continue;
         } else if (!BiReadDirectoryEntry(Context, Segment)) {
             __fclose(Context);
             return NULL;
@@ -134,6 +127,32 @@ int __fwrite(void *handle, size_t pos, void *buffer, size_t size) {
     (void)buffer;
     (void)size;
     return __STDIO_FLAGS_ERROR;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function redirects the caller to the correct device-specific skeleton clone function.
+ *
+ * PARAMETERS:
+ *     Context - Device/node private data.
+ *     Copy - Destination of the copy.
+ *
+ * RETURN VALUE:
+ *     1 for success, otherwise 0.
+ *-----------------------------------------------------------------------------------------------*/
+int BiCopyDevice(DeviceContext *Context, DeviceContext *Copy) {
+    if (!Context) {
+        return 0;
+    } else if (Context->Type == DEVICE_TYPE_NONE) {
+        memcpy(Copy, Context, sizeof(DeviceContext));
+        return 1;
+    } else if (Context->Type == DEVICE_TYPE_ARCH) {
+        return BiCopyArchDevice(Context, Copy);
+    } else if (Context->Type == DEVICE_TYPE_EXFAT) {
+        return BiCopyExfat(Context, Copy);
+    } else {
+        return 0;
+    }
 }
 
 /*-------------------------------------------------------------------------------------------------

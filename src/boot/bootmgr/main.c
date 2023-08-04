@@ -18,8 +18,8 @@
  *-----------------------------------------------------------------------------------------------*/
 [[noreturn]] void BmMain(void *BootBlock) {
     BmInitDisplay();
-    BmInitArch(BootBlock);
     BmInitMemory(BootBlock);
+    BmInitArch(BootBlock);
 
     do {
         FILE *File = fopen("bios()/open_this/flag.txt", "r");
@@ -29,13 +29,12 @@
         }
 
         char FileData[54];
-        size_t Count = fread(FileData, 1, 100, File);
-        if (Count != 1) {
-            printf("read %d out of 100\n", Count);
+        if (!fread(FileData, sizeof(FileData), 1, File)) {
+            printf("fread() failed\n");
             break;
         }
 
-        printf("%.*s\n", Count, FileData);
+        printf("%.*s\n", sizeof(FileData), FileData);
         fclose(File);
     } while (0);
 
