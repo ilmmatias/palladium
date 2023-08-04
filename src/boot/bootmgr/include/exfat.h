@@ -33,9 +33,38 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t EntryType;
-    char CustomDefined[19];
+    uint8_t SecondaryCount;
+    uint16_t SetChecksum;
+    uint16_t FileAttributes;
+    char Reserved1[2];
+    uint32_t CreateTimestamp;
+    uint32_t LastModifiedTimestamp;
+    uint32_t LastAccessedTimestamp;
+    uint8_t Create10msIncrement;
+    uint8_t LastModified10msIncrement;
+    uint8_t CreateUtcOffset;
+    uint8_t LastModifiedUtcOffset;
+    uint8_t LastAccessedUtcOffset;
+    char Reserved2[7];
+} ExfatDirectoryEntry;
+
+typedef struct __attribute__((packed)) {
+    uint8_t EntryType;
+    uint8_t GeneralSecondaryFlags;
+    char Reserved1;
+    uint8_t NameLength;
+    uint16_t NameHash;
+    char Reserved2[2];
+    uint64_t ValidDataLength;
+    char Reserved3[4];
     uint32_t FirstCluster;
     uint64_t DataLength;
-} ExfatGenericDirectoryEntry;
+} ExfatStreamEntry;
+
+typedef struct __attribute__((packed)) {
+    uint8_t EntryType;
+    uint8_t GeneralSecondaryFlags;
+    uint16_t FileName[15];
+} ExfatFileNameEntry;
 
 #endif /* _EXFAT_H_ */

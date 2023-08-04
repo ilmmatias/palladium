@@ -1,6 +1,7 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
+#include <ctype.h>
 #include <device.h>
 #include <exfat.h>
 #include <stdio.h>
@@ -10,10 +11,11 @@
 typedef struct {
     DeviceContext Parent;
     void *SectorBuffer;
-    uint8_t BytesPerClusterShift;
-    uint8_t BytesPerSectorShift;
-    uint32_t ClusterHeapOffset;
+    uint8_t ClusterShift;
+    uint8_t SectorShift;
+    uint64_t ClusterOffset;
     uint32_t FileCluster;
+    int Directory;
 } ExfatContext;
 
 /*-------------------------------------------------------------------------------------------------
@@ -74,11 +76,11 @@ int BiProbeExfat(DeviceContext *Context) {
     }
 
     memcpy(&FsContext->Parent, Context, sizeof(DeviceContext));
-    FsContext->BytesPerClusterShift =
-        BootSector->BytesPerSectorShift + BootSector->SectorsPerClusterShift;
-    FsContext->BytesPerSectorShift = BootSector->BytesPerSectorShift;
-    FsContext->ClusterHeapOffset = BootSector->ClusterHeapOffset << BootSector->BytesPerSectorShift;
+    FsContext->ClusterShift = BootSector->BytesPerSectorShift + BootSector->SectorsPerClusterShift;
+    FsContext->SectorShift = BootSector->BytesPerSectorShift;
+    FsContext->ClusterOffset = BootSector->ClusterHeapOffset << BootSector->BytesPerSectorShift;
     FsContext->FileCluster = BootSector->FirstClusterOfRootDirectory - 2;
+    FsContext->Directory = 1;
 
     Context->Type = DEVICE_TYPE_EXFAT;
     Context->PrivateData = FsContext;
@@ -99,7 +101,47 @@ int BiProbeExfat(DeviceContext *Context) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void BiCleanupExfat(DeviceContext *Context) {
+    free(((ExfatContext *)Context)->SectorBuffer);
     free(Context);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function validates that the current sector is inside the cluster, and reloads if we
+ *     crossed over a sector boundary (but not a cluster boundary).
+ *
+ * PARAMETERS:
+ *     FsContext - FS and current directory entry data.
+ *     Current - I/O; Current position of the sector buffer.
+ *     Sector - Start of the current cluster.
+ *     SectorOffset - I/O; Current offset from the start of the cluster.
+ *
+ * RETURN VALUE:
+ *     1 for success, otherwise 0.
+ *-----------------------------------------------------------------------------------------------*/
+static int ValidateSector(
+    ExfatContext *FsContext,
+    ExfatDirectoryEntry **Current,
+    uint64_t Sector,
+    uint64_t *SectorOffset) {
+    size_t BufferOffset = (size_t)((char *)*Current - (char *)FsContext->SectorBuffer);
+
+    if (BufferOffset && BufferOffset < (1 << FsContext->SectorShift)) {
+        return 1;
+    } else if (*SectorOffset >= (1 << FsContext->ClusterShift)) {
+        return 0;
+    } else if (!BiReadDevice(
+                   &FsContext->Parent,
+                   FsContext->SectorBuffer,
+                   Sector + *SectorOffset,
+                   1 << FsContext->SectorShift)) {
+        return 0;
+    }
+
+    *Current = FsContext->SectorBuffer;
+    *SectorOffset += 1 << FsContext->SectorShift;
+
+    return 1;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -116,29 +158,88 @@ void BiCleanupExfat(DeviceContext *Context) {
  *-----------------------------------------------------------------------------------------------*/
 int BiTraverseExfatDirectory(DeviceContext *Context, const char *Name) {
     ExfatContext *FsContext = Context->PrivateData;
-    DeviceContext *Parent = &FsContext->Parent;
-    ExfatGenericDirectoryEntry *Current = FsContext->SectorBuffer;
-    ExfatGenericDirectoryEntry *Last =
-        (ExfatGenericDirectoryEntry *)((char *)FsContext->SectorBuffer +
-                                       (1 << FsContext->BytesPerSectorShift));
-    uint32_t Sector =
-        FsContext->ClusterHeapOffset + (FsContext->FileCluster << FsContext->BytesPerClusterShift);
+    ExfatDirectoryEntry *Current = FsContext->SectorBuffer;
+    uint64_t SectorOffset = 0;
+    uint64_t Cluster = FsContext->FileCluster;
+    uint64_t Sector = FsContext->ClusterOffset + (Cluster << FsContext->ClusterShift);
 
-    (void)Name;
-
-    for (;; Current++) {
-        if ((void *)Current == FsContext->SectorBuffer || Current >= Last) {
-            if (!BiReadDevice(Parent, Current, Sector, 1 << FsContext->BytesPerSectorShift)) {
-                return 0;
-            }
-
-            Sector += 1 << FsContext->BytesPerSectorShift;
-        }
-
-        if (!Current->EntryType) {
+    while (1) {
+        if (!ValidateSector(FsContext, &Current, Sector, &SectorOffset) || !Current->EntryType) {
             return 0;
         } else if (Current->EntryType != 0x85) {
+            Current++;
             continue;
         }
+
+        /* We might need to reload the buffer when checking the secondaries. */
+        ExfatDirectoryEntry Entry;
+        memcpy(&Entry, Current, sizeof(ExfatDirectoryEntry));
+
+        /* The Stream Extension Entry is required and only valid if directly following the
+           File entry we just found (section 7.4). */
+        Current++;
+        Entry.SecondaryCount--;
+
+        if (!ValidateSector(FsContext, &Current, Sector, &SectorOffset)) {
+            return 0;
+        } else if (Current->EntryType != 0xC0) {
+            while (Entry.SecondaryCount--) {
+                Current++;
+                if (!ValidateSector(FsContext, &Current, Sector, &SectorOffset)) {
+                    return 0;
+                }
+            }
+
+            continue;
+        }
+
+        ExfatStreamEntry StreamEntry;
+        memcpy(&StreamEntry, Current, sizeof(ExfatStreamEntry));
+
+        /* File Name entries should only be valid directly following the stream entry. */
+        const char *NamePos = Name;
+        int Match = 1;
+        Current++;
+
+        while (StreamEntry.NameLength && Match) {
+            if (!ValidateSector(FsContext, &Current, Sector, &SectorOffset)) {
+                return 0;
+            } else if (Current->EntryType != 0xC1) {
+                Entry.SecondaryCount--;
+                break;
+            }
+
+            ExfatFileNameEntry *NameEntry = (ExfatFileNameEntry *)Current;
+
+            for (int i = 0; i < (StreamEntry.NameLength < 15 ? StreamEntry.NameLength : 15); i++) {
+                if (NameEntry->FileName[i] != tolower(*(NamePos++))) {
+                    Match = 0;
+                    break;
+                }
+            }
+
+            Current++;
+            Entry.SecondaryCount--;
+            StreamEntry.NameLength = StreamEntry.NameLength > 15 ? StreamEntry.NameLength - 15 : 0;
+        }
+
+        if (!Match || *NamePos) {
+            while (Entry.SecondaryCount--) {
+                Current++;
+                if (!ValidateSector(FsContext, &Current, Sector, &SectorOffset)) {
+                    return 0;
+                }
+            }
+
+            continue;
+        }
+
+        /* Name match, setup the file entry to reflect the new file/directory we opened, and
+           we're done. */
+
+        FsContext->FileCluster = StreamEntry.FirstCluster - 2;
+        FsContext->Directory = Entry.FileAttributes & 0x10;
+
+        return 1;
     }
 }

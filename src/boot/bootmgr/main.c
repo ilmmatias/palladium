@@ -23,7 +23,7 @@ void *__open(const char *path, int mode);
     BmInitArch(BootBlock);
     BmInitMemory(BootBlock);
 
-    printf("%p\n", __open("bios()/flag.txt", 0));
+    printf("%p\n", __open("bios()/open_this/flag.txt", 0));
 
     while (1)
         ;
