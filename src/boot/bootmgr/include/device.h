@@ -27,6 +27,7 @@ int BiReadDirectoryEntry(DeviceContext *Context, const char *Name);
 
 int BiProbeExfat(DeviceContext *Context);
 void BiCleanupExfat(DeviceContext *Context);
+int BiReadExfatFile(DeviceContext *Context, void *Buffer, uint64_t Start, size_t Size);
 int BiTraverseExfatDirectory(DeviceContext *Context, const char *Name);
 
 #endif /* _DEVICE_H_ */

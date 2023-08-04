@@ -16,7 +16,8 @@ FatBpb label byte
     BytesPerSector dw 0
     SectorsPerCluster dd 0
     DataStart dd 0
-    MustBeZero db 39 dup (0)
+    FileFlags db 0
+    MustBeZero db 38 dup (0)
     PartitionOffset dq 0
     VolumeLength dq 131072
     FatOffset dd 128
@@ -88,6 +89,14 @@ Main$Setup:
 
     mov ebp, [FirstClusterOfRootDirectory]
 
+    ; First read is different as we need to store the NoFatChain flag.
+    mov bx, 600h
+    mov si, bx
+    call ReadCluster
+    mov al, [si + 33]
+    mov [FileFlags], al
+    jmp Main$Search
+
 Main$NextCluster:
     mov bx, 600h
     mov si, bx
@@ -143,6 +152,7 @@ Main$NextEntry:
     add si, 32
     cmp si, 512
     jne Main$Search
+    test byte ptr [FileFlags], 2
     call GetNextCluster
     jc Main$NextCluster
 
@@ -157,8 +167,15 @@ Main$Found:
     mov es, bx
     xor bx, bx
 
+    call ReadCluster
+    mov al, [si + 33]
+    mov [FileFlags], al
+    jmp Main$LoopSkipRead
+
 Main$Loop:
     call ReadCluster
+Main$LoopSkipRead:
+    test byte ptr [FileFlags], 2
     call GetNextCluster
     jc Main$Loop
 
@@ -294,6 +311,7 @@ GetNextCluster proc
 ; PARAMETERS:
 ;     DirectoryEntry (esi) - Directory entry (used to determine if we need to follow the FAT).
 ;     Cluster (ebp) - Current cluster.
+;     NoFatChain (!(flags & ZF)) - Unset the ZF flag to follow the chain, set it if we're sequential.
 ;
 ; RETURN VALUE:
 ;     cf will be unset if the file has ended, otherwise, new/next cluster on ebp.
@@ -301,7 +319,6 @@ GetNextCluster proc
 
     ; exFAT supports the sequential data sectors (no need to read the FAT in that case, just decrease the file size
     ; and check if we finished reading, that is, if the size is negative).
-    test byte ptr [esi + 33], 2
     jz GetNextCluster$FollowFat
 
     mov eax, 1

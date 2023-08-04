@@ -29,6 +29,7 @@ void *__open(const char *path, int mode) {
 
     DeviceContext *Context = calloc(1, sizeof(DeviceContext));
     if (!Context) {
+        free(Path);
         return NULL;
     }
 
@@ -102,6 +103,8 @@ int BiReadDevice(DeviceContext *Context, void *Buffer, uint64_t Start, size_t Si
         return 0;
     } else if (Context->Type == DEVICE_TYPE_ARCH) {
         return BiReadArchDevice(Context, Buffer, Start, Size);
+    } else if (Context->Type == DEVICE_TYPE_EXFAT) {
+        return BiReadExfatFile(Context, Buffer, Start, Size);
     } else {
         return 0;
     }

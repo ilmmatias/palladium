@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <boot.h>
+#include <device.h>
 #include <stdio.h>
 
 void *__open(const char *path, int mode);
@@ -23,7 +24,21 @@ void *__open(const char *path, int mode);
     BmInitArch(BootBlock);
     BmInitMemory(BootBlock);
 
-    printf("%p\n", __open("bios()/open_this/flag.txt", 0));
+    do {
+        DeviceContext *File = __open("bios()/open_this/flag.txt", 0);
+        if (!File) {
+            printf("__open() failed\n");
+            break;
+        }
+
+        char FileData[54];
+        if (!BiReadDevice(File, FileData, 0, sizeof(FileData))) {
+            printf("BiReadDevice() failed\n");
+            break;
+        }
+
+        printf("%.*s\n", sizeof(FileData), FileData);
+    } while (0);
 
     while (1)
         ;
