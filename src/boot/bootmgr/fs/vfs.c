@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <assert.h>
+#include <crt_impl.h>
 #include <device.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,10 +20,10 @@
  * RETURN VALUE:
  *     Transparent handle if the file/device exists, NULL otherwise.
  *-----------------------------------------------------------------------------------------------*/
-void *__open(const char *path, int mode) {
+void *__fopen(const char *filename, int mode) {
     (void)mode;
 
-    char *Path = strdup(path);
+    char *Path = strdup(filename);
     if (!Path) {
         return NULL;
     }
@@ -45,18 +46,18 @@ void *__open(const char *path, int mode) {
 
             Segment += Offset;
             if (*Segment) {
-                BiFreeDevice(Context);
+                __fclose(Context);
                 return NULL;
             }
 
             if (!BiProbeExfat(Context)) {
-                BiFreeDevice(Context);
+                __fclose(Context);
                 return NULL;
             }
 
             continue;
         } else if (!BiReadDirectoryEntry(Context, Segment)) {
-            BiFreeDevice(Context);
+            __fclose(Context);
             return NULL;
         }
     }
@@ -70,12 +71,14 @@ void *__open(const char *path, int mode) {
  *     We expect it to also free the context itself.
  *
  * PARAMETERS:
- *     Context - Device/node private data.
+ *     handle - OS-specific handle; We expect/assume it is a DeviceContext.
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void BiFreeDevice(DeviceContext *Context) {
+void __fclose(void *handle) {
+    DeviceContext *Context = handle;
+
     if (!Context || Context->Type == DEVICE_TYPE_NONE) {
         return;
     } else if (Context->Type == DEVICE_TYPE_ARCH) {
@@ -90,24 +93,47 @@ void BiFreeDevice(DeviceContext *Context) {
  *     This function redirects the caller to the correct device-specific read function.
  *
  * PARAMETERS:
- *     Context - Device/node private data.
- *     Buffer - Output buffer.
- *     Start - Starting byte index (in the device).
- *     Size - How many bytes to read into the buffer.
+ *     handle - OS-specific handle; We expect/assume it is a DeviceContext.
+ *     pos - Offset (from the start of the file) to read the element from.
+ *     buffer - Buffer to read the element into.
+ *     size - Size of the element to read.
  *
  * RETURN VALUE:
- *     1 for success, otherwise 0.
+ *     __STDIO_FLAGS_ERROR/EOF if something went wrong, 0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int BiReadDevice(DeviceContext *Context, void *Buffer, uint64_t Start, size_t Size) {
+int __fread(void *handle, size_t pos, void *buffer, size_t size) {
+    DeviceContext *Context = handle;
+
     if (!Context || Context->Type == DEVICE_TYPE_NONE) {
-        return 0;
+        return __STDIO_FLAGS_ERROR;
     } else if (Context->Type == DEVICE_TYPE_ARCH) {
-        return BiReadArchDevice(Context, Buffer, Start, Size);
+        return BiReadArchDevice(Context, buffer, pos, size);
     } else if (Context->Type == DEVICE_TYPE_EXFAT) {
-        return BiReadExfatFile(Context, Buffer, Start, Size);
+        return BiReadExfatFile(Context, buffer, pos, size);
     } else {
-        return 0;
+        return __STDIO_FLAGS_ERROR;
     }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function redirects the caller to the correct device-specific write function.
+ *
+ * PARAMETERS:
+ *     handle - OS-specific handle; We expect/assume it is a DeviceContext.
+ *     pos - Offset (from the start of the file) to write the element into.
+ *     buffer - Buffer to get the element from.
+ *     size - Size of the element.
+ *
+ * RETURN VALUE:
+ *     __STDIO_FLAGS_ERROR/EOF if something went wrong, 0 otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+int __fwrite(void *handle, size_t pos, void *buffer, size_t size) {
+    (void)handle;
+    (void)pos;
+    (void)buffer;
+    (void)size;
+    return __STDIO_FLAGS_ERROR;
 }
 
 /*-------------------------------------------------------------------------------------------------

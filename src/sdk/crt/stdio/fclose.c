@@ -2,19 +2,23 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <crt_impl.h>
-#include <stddef.h>
+#include <stdio.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function outputs a single character to the screen.
+ *     This function closes an existing handle, freeing the FILE husk in the process.
  *
  * PARAMETERS:
- *     ch - Which character to write.
+ *     stream - FILE husk to be closed.
  *
  * RETURN VALUE:
- *     Whatever stored in `ch` on success, EOF otherwise.
+ *     0 on success, EOF otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int putchar(int ch) {
-    __put_stdout(&ch, 1, NULL);
-    return ch;
+int fclose(struct FILE *stream) {
+    if (stream) {
+        __fclose(stream->handle);
+        return 0;
+    } else {
+        return EOF;
+    }
 }

@@ -16,18 +16,16 @@ typedef struct {
     void *PrivateData;
 } DeviceContext;
 
+int BiReadDirectoryEntry(DeviceContext *Context, const char *Name);
+
 int BiOpenArchDevice(const char *Segment, DeviceContext *Context);
 void BiFreeArchDevice(DeviceContext *Context);
-int BiReadArchDevice(DeviceContext *Context, void *Buffer, uint64_t Start, size_t Size);
 int BiReadArchDirectoryEntry(DeviceContext *Context, const char *Name);
-
-void BiFreeDevice(DeviceContext *Context);
-int BiReadDevice(DeviceContext *Context, void *Buffer, uint64_t Start, size_t Size);
-int BiReadDirectoryEntry(DeviceContext *Context, const char *Name);
+int BiReadArchDevice(DeviceContext *Context, void *Buffer, uint64_t Start, size_t Size);
 
 int BiProbeExfat(DeviceContext *Context);
 void BiCleanupExfat(DeviceContext *Context);
-int BiReadExfatFile(DeviceContext *Context, void *Buffer, uint64_t Start, size_t Size);
 int BiTraverseExfatDirectory(DeviceContext *Context, const char *Name);
+int BiReadExfatFile(DeviceContext *Context, void *Buffer, uint64_t Start, size_t Size);
 
 #endif /* _DEVICE_H_ */

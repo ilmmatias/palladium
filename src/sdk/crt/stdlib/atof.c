@@ -1,11 +1,9 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
+#include <crt_impl.h>
 #include <ctype.h>
 #include <math.h>
-
-double __strtod_hex(const char *str, double sign);
-double __strtod_dec(const char *str, double sign);
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:

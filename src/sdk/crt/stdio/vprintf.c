@@ -1,17 +1,10 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
+#include <crt_impl.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
-
-void __put_stdout(const void *buffer, int size, void *context);
-
-int __vprintf(
-    const char *format,
-    va_list vlist,
-    void *context,
-    void (*put_buf)(const void *buffer, int size, void *context));
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:

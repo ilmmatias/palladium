@@ -4,10 +4,21 @@
 #ifndef STDIO_H
 #define STDIO_H
 
+#define __CRT_STDIO_H
+#include <crt_impl.h>
 #include <stdarg.h>
 #include <stddef.h>
+#undef __CRT_STDIO_H
 
 #define EOF (-1)
+
+typedef struct FILE FILE;
+
+FILE *fopen(const char *filename, const char *mode);
+FILE *freopen(const char *filename, const char *mode, FILE *stream);
+int fclose(struct FILE *stream);
+
+size_t fread(void *buffer, size_t size, size_t count, FILE *stream);
 
 int putchar(int ch);
 int puts(const char *str);

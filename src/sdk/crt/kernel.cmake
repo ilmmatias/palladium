@@ -4,6 +4,11 @@
 set(KERNEL_SOURCES
     ${SOURCES}
 
+    stdio/__parse_fopen_mode.c
+    stdio/fclose.c
+    stdio/fopen.c
+    stdio/fread.c
+    stdio/freopen.c
     stdio/printf.c
     stdio/putchar.c
     stdio/puts.c

@@ -1,19 +1,13 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
-#include <stdarg.h>
+#include <crt_impl.h>
 #include <stdio.h>
 #include <string.h>
 
 typedef struct {
     char *buffer;
 } context_t;
-
-int __vprintf(
-    const char *format,
-    va_list vlist,
-    void *context,
-    void (*put_buf)(const void *buffer, int size, void *context));
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:

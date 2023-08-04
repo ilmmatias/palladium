@@ -1,6 +1,7 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
+#include <crt_impl.h>
 #include <ctype.h>
 #include <device.h>
 #include <exfat.h>
@@ -48,8 +49,7 @@ int BiProbeExfat(DeviceContext *Context) {
     const char ExpectedJumpBoot[3] = {0xEB, 0x76, 0x90};
     const char ExpectedFileSystemName[8] = "EXFAT   ";
 
-    if (!BiReadDevice(Context, Buffer, 0, 512) ||
-        memcmp(BootSector->JumpBoot, ExpectedJumpBoot, 3) ||
+    if (__fread(Context, 0, Buffer, 512) || memcmp(BootSector->JumpBoot, ExpectedJumpBoot, 3) ||
         memcmp(BootSector->FileSystemName, ExpectedFileSystemName, 8)) {
         free(Buffer);
         return 0;
@@ -87,10 +87,10 @@ int BiProbeExfat(DeviceContext *Context) {
 
     /* Grab the NoFatChain flag from the root directory (the first entry of a directory
        tells us that info). */
-    if (!BiReadDevice(
+    if (__fread(
             Context,
-            FsContext->ClusterBuffer,
             FsContext->ClusterOffset + (FsContext->FileCluster << FsContext->ClusterShift),
+            FsContext->ClusterBuffer,
             sizeof(ExfatDirectoryEntry))) {
         free(FsContext);
         free(Buffer);
@@ -144,10 +144,10 @@ static int FollowCluster(ExfatContext *FsContext, void **Current, uint64_t *Clus
     } else if (Offset || !Current) {
         if (FsContext->NoFatChain) {
             (*Cluster)++;
-        } else if (!BiReadDevice(
+        } else if (__fread(
                        &FsContext->Parent,
-                       FsContext->ClusterBuffer,
                        FsContext->FatOffset + (*Cluster << 2),
+                       FsContext->ClusterBuffer,
                        4)) {
             return 0;
         } else {
@@ -157,10 +157,10 @@ static int FollowCluster(ExfatContext *FsContext, void **Current, uint64_t *Clus
 
     if (Current) {
         *Current = FsContext->ClusterBuffer;
-        return BiReadDevice(
+        return !__fread(
             &FsContext->Parent,
-            FsContext->ClusterBuffer,
             FsContext->ClusterOffset + (*Cluster << FsContext->ClusterShift),
+            FsContext->ClusterBuffer,
             1 << FsContext->ClusterShift);
     } else {
         return 1;
@@ -179,29 +179,37 @@ static int FollowCluster(ExfatContext *FsContext, void **Current, uint64_t *Clus
  *     Size - How many bytes to read into the buffer.
  *
  * RETURN VALUE:
- *     1 for success, otherwise 0.
+ *     __STDIO_FLAGS_ERROR/EOF if something went wrong, 0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
 int BiReadExfatFile(DeviceContext *Context, void *Buffer, uint64_t Start, size_t Size) {
     ExfatContext *FsContext = Context->PrivateData;
     uint64_t Cluster = FsContext->FileCluster;
     char *Current = FsContext->ClusterBuffer;
     char *Output = Buffer;
+    int Flags = 0;
 
-    if (FsContext->Directory || Start + Size > FsContext->FileLength) {
-        return 0;
+    if (FsContext->Directory) {
+        return __STDIO_FLAGS_ERROR;
+    } else if (Start > FsContext->FileLength) {
+        return __STDIO_FLAGS_EOF;
+    }
+
+    if (Size > FsContext->FileLength - Start) {
+        Flags = __STDIO_FLAGS_EOF;
+        Size = FsContext->FileLength - Start;
     }
 
     /* Seek through the file into the starting cluster (for the given byte index). */
     while (Start >= (1 << FsContext->ClusterShift)) {
         Start -= 1 << FsContext->ClusterShift;
         if (!FollowCluster(FsContext, NULL, &Cluster)) {
-            return 0;
+            return __STDIO_FLAGS_ERROR;
         }
     }
 
     while (Size) {
         if (!FollowCluster(FsContext, (void **)&Current, &Cluster)) {
-            return 0;
+            return __STDIO_FLAGS_ERROR;
         }
 
         size_t CopySize = (1 << FsContext->ClusterShift) - Start;
@@ -216,7 +224,7 @@ int BiReadExfatFile(DeviceContext *Context, void *Buffer, uint64_t Start, size_t
         Size -= CopySize;
     }
 
-    return 1;
+    return Flags;
 }
 
 /*-------------------------------------------------------------------------------------------------

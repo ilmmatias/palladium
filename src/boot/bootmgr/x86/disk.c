@@ -1,13 +1,14 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
-#include <bios.h>
 #include <boot.h>
+#include <crt_impl.h>
 #include <device.h>
 #include <stdalign.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <x86/bios.h>
 
 typedef struct __attribute__((packed)) {
     uint16_t Size;
@@ -162,7 +163,7 @@ void BiFreeArchDevice(DeviceContext *Context) {
  *     Size - How many bytes to read into the buffer.
  *
  * RETURN VALUE:
- *     1 for success, otherwise 0.
+ *     __STDIO_FLAGS_ERROR/EOF if something went wrong, 0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
 int BiReadArchDevice(DeviceContext *Context, void *Buffer, uint64_t Start, size_t Size) {
     uint8_t Drive = (uint8_t)(uint32_t)Context->PrivateData;
@@ -188,7 +189,7 @@ int BiReadArchDevice(DeviceContext *Context, void *Buffer, uint64_t Start, size_
 
         BiosCall(0x13, &Registers);
         if (Registers.Eflags & 1) {
-            return 0;
+            return __STDIO_FLAGS_ERROR;
         }
 
         uint64_t Offset = Start % BytesPerSector;
@@ -203,7 +204,7 @@ int BiReadArchDevice(DeviceContext *Context, void *Buffer, uint64_t Start, size_
         Size -= CopySize;
     }
 
-    return 1;
+    return 0;
 }
 
 /*-------------------------------------------------------------------------------------------------
