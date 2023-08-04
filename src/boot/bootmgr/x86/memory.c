@@ -26,8 +26,8 @@ void BmInitMemory(void *BootBlock) {
     BiosMemoryMap = (BiosMemoryRegion *)(uintptr_t)Data->MemoryRegions;
     BiosMemoryMapEntries = Data->MemoryCount;
 
-    /* The startup module doesn't reserve the first 64KiB, we need to do that manually. */
-    if (BiosMemoryMap->Length > 0x10000) {
+    /* The startup module doesn't reserve the first MiB, we need to do that manually. */
+    if (BiosMemoryMap->Length > 0x100000) {
         memmove(
             BiosMemoryMap + 1,
             BiosMemoryMap + 2,
@@ -35,11 +35,11 @@ void BmInitMemory(void *BootBlock) {
 
         BiosMemoryRegion *Region = BiosMemoryMap + 1;
 
-        Region->BaseAddress = BiosMemoryMap->BaseAddress + 0x10000;
-        Region->Length = BiosMemoryMap->Length - 0x10000;
+        Region->BaseAddress = BiosMemoryMap->BaseAddress + 0x100000;
+        Region->Length = BiosMemoryMap->Length - 0x100000;
         Region->Type = BIOS_MEMORY_REGION_TYPE_AVAILABLE;
 
-        BiosMemoryMap->Length = 0x10000;
+        BiosMemoryMap->Length = 0x100000;
         BiosMemoryMap->Type = BIOS_MEMORY_REGION_TYPE_USED;
     } else {
         BiosMemoryMap->Type = BIOS_MEMORY_REGION_TYPE_USED;
