@@ -159,6 +159,7 @@ static AllocatorEntry *FindFreeEntry(size_t Size) {
  *     a new page failed.
  *-----------------------------------------------------------------------------------------------*/
 void *malloc(size_t size) {
+    size = (size + 15) & ~0x0F;
     AllocatorEntry *Entry = FindFreeEntry(size);
 
     if (Entry) {
