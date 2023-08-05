@@ -36,15 +36,27 @@ size_t fread(void *buffer, size_t size, size_t count, struct FILE *stream) {
     char *dest = buffer;
     stream->flags |= __STDIO_FLAGS_READING;
 
+    size_t total_bytes = size * count;
+    size_t accum = 0;
+    while (stream->unget_size && total_bytes) {
+        *(dest++) = stream->unget_buffer[--stream->unget_size];
+        total_bytes--;
+        accum++;
+    }
+
+    if (!total_bytes) {
+        return count;
+    }
+
     if (!stream->buffer || stream->buffer_type == _IONBF) {
         size_t read;
-        int flags = __fread(stream->handle, stream->file_pos, dest, size * count, &read);
+        int flags = __fread(stream->handle, stream->file_pos, dest, total_bytes, &read);
 
         stream->file_pos += (read / size) * size;
 
         if (flags) {
             stream->flags |= flags;
-            return read / size;
+            return (accum + read) / size;
         }
 
         return count;
@@ -52,8 +64,6 @@ size_t fread(void *buffer, size_t size, size_t count, struct FILE *stream) {
 
     /* No support for line buffering (_IOLBF == _IOFBF for us). */
     int flags = 0;
-    size_t accum = 0;
-
     while (accum < size * count) {
         size_t remaining = size * count - accum;
 

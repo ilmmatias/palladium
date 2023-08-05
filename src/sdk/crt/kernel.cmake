@@ -6,6 +6,7 @@ set(KERNEL_SOURCES
 
     stdio/__parse_fopen_mode.c
     stdio/fclose.c
+    stdio/fgetc.c
     stdio/fopen.c
     stdio/fread.c
     stdio/freopen.c
@@ -14,6 +15,7 @@ set(KERNEL_SOURCES
     stdio/puts.c
     stdio/setbuf.c
     stdio/setvbuf.c
+    stdio/ungetc.c
     stdio/vprintf.c
 
     string/strdup.c

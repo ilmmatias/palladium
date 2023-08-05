@@ -28,8 +28,8 @@
             break;
         }
 
-        char ch;
-        while (fread(&ch, 1, 1, File)) {
+        int ch;
+        while ((ch = fgetc(File)) != EOF) {
             printf("%c", ch);
         }
 

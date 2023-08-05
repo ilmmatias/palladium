@@ -16,6 +16,8 @@ struct FILE {
     size_t buffer_size;
     size_t buffer_read;
     size_t buffer_pos;
+    char unget_buffer[16];
+    size_t unget_size;
     int flags;
 };
 

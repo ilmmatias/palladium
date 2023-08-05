@@ -50,6 +50,7 @@ FILE *fopen(const char *filename, const char *mode) {
     stream->buffer_size = BUFSIZ;
     stream->buffer_read = 0;
     stream->buffer_pos = 0;
+    stream->unget_size = 0;
     stream->flags = flags;
 
     return stream;

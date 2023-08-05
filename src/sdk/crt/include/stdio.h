@@ -24,6 +24,8 @@
 #define SEEK_CUR 1
 #define SEEK_END 2
 
+#define getc(stream) (fgetc((stream)))
+
 typedef struct FILE FILE;
 
 FILE *fopen(const char *filename, const char *mode);
@@ -32,10 +34,12 @@ int fclose(FILE *stream);
 void setbuf(FILE *stream, char *buffer);
 void setvbuf(FILE *stream, char *buffer, int mode, size_t size);
 
+int fgetc(FILE *stream);
 size_t fread(void *buffer, size_t size, size_t count, FILE *stream);
 
 int putchar(int ch);
 int puts(const char *str);
+int ungetc(int ch, FILE *stream);
 
 int printf(const char *format, ...);
 int sprintf(char *buffer, const char *format, ...);
