@@ -52,6 +52,7 @@ FILE *freopen(const char *filename, const char *mode, struct FILE *stream) {
     stream->file_pos = 0;
     stream->buffer_type = _IOFBF;
     stream->buffer_size = BUFSIZ;
+    stream->buffer_read = 0;
     stream->buffer_pos = 0;
     stream->flags = flags;
 

@@ -46,7 +46,7 @@ then
     sudo mount -t exfat -o loop obj.amd64/exfat.img /mnt/mount 1>/dev/null
     sudo cp _root/bootmgr /mnt/mount/bootmgr 1>/dev/null
     sudo mkdir -p /mnt/mount/open_this
-    sudo echo 'Hello, World! This file was stored on the boot disk :3' > /mnt/mount/open_this/flag.txt
+    echo 'Hello, World! This file was stored on the boot disk :3' | sudo tee /mnt/mount/open_this/flag.txt
     sudo umount /mnt/mount 1>/dev/null
     qemu-system-x86_64 -M smm=off -hda obj.amd64/exfat.img -no-reboot -d int
 else

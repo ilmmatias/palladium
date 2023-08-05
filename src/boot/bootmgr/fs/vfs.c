@@ -90,20 +90,29 @@ void __fclose(void *handle) {
  *     pos - Offset (from the start of the file) to read the element from.
  *     buffer - Buffer to read the element into.
  *     size - Size of the element to read.
+ *     read - How many bytes of the total we were able to read.
  *
  * RETURN VALUE:
  *     __STDIO_FLAGS_ERROR/EOF if something went wrong, 0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int __fread(void *handle, size_t pos, void *buffer, size_t size) {
+int __fread(void *handle, size_t pos, void *buffer, size_t size, size_t *read) {
     FileContext *Context = handle;
 
     if (!Context || Context->Type == FILE_TYPE_NONE) {
+        if (read) {
+            *read = 0;
+        }
+
         return __STDIO_FLAGS_ERROR;
     } else if (Context->Type == FILE_TYPE_ARCH) {
-        return BiReadArchDevice(Context, buffer, pos, size);
+        return BiReadArchDevice(Context, buffer, pos, size, read);
     } else if (Context->Type == FILE_TYPE_EXFAT) {
-        return BiReadExfatFile(Context, buffer, pos, size);
+        return BiReadExfatFile(Context, buffer, pos, size, read);
     } else {
+        if (read) {
+            *read = 0;
+        }
+
         return __STDIO_FLAGS_ERROR;
     }
 }
@@ -117,15 +126,21 @@ int __fread(void *handle, size_t pos, void *buffer, size_t size) {
  *     pos - Offset (from the start of the file) to write the element into.
  *     buffer - Buffer to get the element from.
  *     size - Size of the element.
+ *     wrote - How many bytes of the total we were able to write.
  *
  * RETURN VALUE:
  *     __STDIO_FLAGS_ERROR/EOF if something went wrong, 0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int __fwrite(void *handle, size_t pos, void *buffer, size_t size) {
+int __fwrite(void *handle, size_t pos, void *buffer, size_t size, size_t *wrote) {
     (void)handle;
     (void)pos;
     (void)buffer;
     (void)size;
+
+    if (wrote) {
+        *wrote = 0;
+    }
+
     return __STDIO_FLAGS_ERROR;
 }
 

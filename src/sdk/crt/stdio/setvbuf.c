@@ -39,6 +39,7 @@ void setvbuf(struct FILE *stream, char *buffer, int mode, size_t size) {
 
         stream->buffer_type = mode;
         stream->buffer_size = size;
+        stream->buffer_read = 0;
         stream->buffer_pos = 0;
     } else {
         stream->buffer_type = _IONBF;
@@ -49,5 +50,4 @@ void setvbuf(struct FILE *stream, char *buffer, int mode, size_t size) {
     }
 
     stream->buffer = buffer;
-    stream->flags &= ~__STDIO_FLAGS_HAS_BUFFER;
 }

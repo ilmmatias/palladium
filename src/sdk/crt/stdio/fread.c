@@ -36,22 +36,60 @@ size_t fread(void *buffer, size_t size, size_t count, struct FILE *stream) {
     char *dest = buffer;
     stream->flags |= __STDIO_FLAGS_READING;
 
-    /* Unbuffered reads are really inefficient (even more so on platforms like the boot manager,
-       which calls into the BIOS to read the disk); If possible, don't setbuf(NULL). */
-    // if (!stream->buffer || stream->buffer_type == _IONBF) {
-    if (1) {
-        for (size_t i = 0; i < count; i++) {
-            int flags = __fread(stream->handle, stream->file_pos, dest, size);
+    if (!stream->buffer || stream->buffer_type == _IONBF) {
+        size_t read;
+        int flags = __fread(stream->handle, stream->file_pos, dest, size * count, &read);
 
-            if (flags) {
-                stream->flags |= flags;
-                return i;
-            }
+        stream->file_pos += (read / size) * size;
 
-            stream->file_pos += size;
-            dest += size;
+        if (flags) {
+            stream->flags |= flags;
+            return read / size;
         }
 
         return count;
     }
+
+    /* No support for line buffering (_IOLBF == _IOFBF for us). */
+    int flags = 0;
+    size_t accum = 0;
+
+    while (accum < size * count) {
+        size_t remaining = size * count - accum;
+
+        if (stream->buffer_pos >= stream->buffer_read) {
+            flags = __fread(
+                stream->handle,
+                stream->file_pos,
+                stream->buffer,
+                stream->buffer_size,
+                &stream->buffer_read);
+
+            stream->file_pos += stream->buffer_read;
+            stream->buffer_pos = 0;
+
+            /* EOF is only valid/set if the user actually tried reading beyond the file
+               boundaries. */
+            if ((flags & __STDIO_FLAGS_EOF) && remaining <= stream->buffer_read) {
+                flags &= ~__STDIO_FLAGS_EOF;
+            }
+        }
+
+        size_t copy_size = stream->buffer_read - stream->buffer_pos;
+        if (remaining < copy_size) {
+            copy_size = remaining;
+        }
+
+        memcpy(dest, stream->buffer + stream->buffer_pos, copy_size);
+        stream->buffer_pos += copy_size;
+        accum += copy_size;
+        dest += copy_size;
+
+        if (flags) {
+            stream->flags |= flags;
+            break;
+        }
+    }
+
+    return accum / size;
 }

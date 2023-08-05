@@ -31,11 +31,11 @@ void setbuf(struct FILE *stream, char *buffer) {
         stream->user_buffer = 1;
         stream->buffer_type = _IOFBF;
         stream->buffer_size = BUFSIZ;
+        stream->buffer_read = 0;
         stream->buffer_pos = 0;
     } else {
         stream->buffer_type = _IONBF;
     }
 
     stream->buffer = buffer;
-    stream->flags &= ~__STDIO_FLAGS_HAS_BUFFER;
 }

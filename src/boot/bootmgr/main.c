@@ -28,13 +28,12 @@
             break;
         }
 
-        char FileData[54];
-        if (!fread(FileData, sizeof(FileData), 1, File)) {
-            printf("fread() failed\n");
-            break;
+        char ch;
+        while (fread(&ch, 1, 1, File)) {
+            printf("%c", ch);
         }
 
-        printf("%.*s\n", sizeof(FileData), FileData);
+        printf("\n");
         fclose(File);
     } while (0);
 

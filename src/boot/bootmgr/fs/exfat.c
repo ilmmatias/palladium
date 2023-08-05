@@ -76,7 +76,8 @@ int BiProbeExfat(FileContext *Context) {
     const char ExpectedJumpBoot[3] = {0xEB, 0x76, 0x90};
     const char ExpectedFileSystemName[8] = "EXFAT   ";
 
-    if (__fread(Context, 0, Buffer, 512) || memcmp(BootSector->JumpBoot, ExpectedJumpBoot, 3) ||
+    if (__fread(Context, 0, Buffer, 512, NULL) ||
+        memcmp(BootSector->JumpBoot, ExpectedJumpBoot, 3) ||
         memcmp(BootSector->FileSystemName, ExpectedFileSystemName, 8)) {
         free(Buffer);
         return 0;
@@ -118,7 +119,8 @@ int BiProbeExfat(FileContext *Context) {
             Context,
             FsContext->ClusterOffset + (FsContext->FileCluster << FsContext->ClusterShift),
             FsContext->ClusterBuffer,
-            sizeof(ExfatDirectoryEntry))) {
+            sizeof(ExfatDirectoryEntry),
+            NULL)) {
         free(FsContext);
         free(Buffer);
         return 0;
@@ -175,7 +177,8 @@ static int FollowCluster(ExfatContext *FsContext, void **Current, uint64_t *Clus
                        &FsContext->Parent,
                        FsContext->FatOffset + (*Cluster << 2),
                        FsContext->ClusterBuffer,
-                       4)) {
+                       4,
+                       NULL)) {
             return 0;
         } else {
             *Cluster = *((uint32_t *)FsContext->ClusterBuffer);
@@ -188,7 +191,8 @@ static int FollowCluster(ExfatContext *FsContext, void **Current, uint64_t *Clus
             &FsContext->Parent,
             FsContext->ClusterOffset + (*Cluster << FsContext->ClusterShift),
             FsContext->ClusterBuffer,
-            1 << FsContext->ClusterShift);
+            1 << FsContext->ClusterShift,
+            NULL);
     } else {
         return 1;
     }
@@ -204,15 +208,17 @@ static int FollowCluster(ExfatContext *FsContext, void **Current, uint64_t *Clus
  *     Buffer - Output buffer.
  *     Start - Starting byte index (in the file).
  *     Size - How many bytes to read into the buffer.
+ *     Read - How many bytes we read with no error.
  *
  * RETURN VALUE:
  *     __STDIO_FLAGS_ERROR/EOF if something went wrong, 0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int BiReadExfatFile(FileContext *Context, void *Buffer, uint64_t Start, size_t Size) {
+int BiReadExfatFile(FileContext *Context, void *Buffer, size_t Start, size_t Size, size_t *Read) {
     ExfatContext *FsContext = Context->PrivateData;
     uint64_t Cluster = FsContext->FileCluster;
     char *Current = FsContext->ClusterBuffer;
     char *Output = Buffer;
+    size_t Accum = 0;
     int Flags = 0;
 
     if (FsContext->Directory) {
@@ -230,12 +236,20 @@ int BiReadExfatFile(FileContext *Context, void *Buffer, uint64_t Start, size_t S
     while (Start >= (1 << FsContext->ClusterShift)) {
         Start -= 1 << FsContext->ClusterShift;
         if (!FollowCluster(FsContext, NULL, &Cluster)) {
+            if (Read) {
+                *Read = 0;
+            }
+
             return __STDIO_FLAGS_ERROR;
         }
     }
 
     while (Size) {
         if (!FollowCluster(FsContext, (void **)&Current, &Cluster)) {
+            if (Read) {
+                *Read = Accum;
+            }
+
             return __STDIO_FLAGS_ERROR;
         }
 
@@ -249,6 +263,11 @@ int BiReadExfatFile(FileContext *Context, void *Buffer, uint64_t Start, size_t S
         Output += CopySize;
         Start += CopySize;
         Size -= CopySize;
+        Accum += CopySize;
+    }
+
+    if (Read) {
+        *Read = Accum;
     }
 
     return Flags;

@@ -23,12 +23,12 @@ int BiCopyArchDevice(FileContext *Context, FileContext *Copy);
 int BiOpenArchDevice(const char *Segment, FileContext *Context);
 void BiFreeArchDevice(FileContext *Context);
 int BiReadArchDirectoryEntry(FileContext *Context, const char *Name);
-int BiReadArchDevice(FileContext *Context, void *Buffer, uint64_t Start, size_t Size);
+int BiReadArchDevice(FileContext *Context, void *Buffer, size_t Start, size_t Size, size_t *Read);
 
 int BiCopyExfat(FileContext *Context, FileContext *Copy);
 int BiProbeExfat(FileContext *Context);
 void BiCleanupExfat(FileContext *Context);
 int BiTraverseExfatDirectory(FileContext *Context, const char *Name);
-int BiReadExfatFile(FileContext *Context, void *Buffer, uint64_t Start, size_t Size);
+int BiReadExfatFile(FileContext *Context, void *Buffer, size_t Start, size_t Size, size_t *Read);
 
 #endif /* _FILE_H_ */

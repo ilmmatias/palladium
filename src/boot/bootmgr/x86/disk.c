@@ -187,16 +187,18 @@ void BiFreeArchDevice(FileContext *Context) {
  *     Buffer - Output buffer.
  *     Start - Starting byte index (in the disk).
  *     Size - How many bytes to read into the buffer.
+ *     Read - How many bytes we read with no error.
  *
  * RETURN VALUE:
  *     __STDIO_FLAGS_ERROR/EOF if something went wrong, 0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int BiReadArchDevice(FileContext *Context, void *Buffer, uint64_t Start, size_t Size) {
+int BiReadArchDevice(FileContext *Context, void *Buffer, size_t Start, size_t Size, size_t *Read) {
     uint8_t Drive = (uint8_t)(uint32_t)Context->PrivateData;
     uint16_t BytesPerSector = DriveParameters[Drive].BytesPerSector;
     alignas(16) BiosExtDrivePacket Packet;
     char *OutputBuffer = Buffer;
     BiosRegisters Registers;
+    size_t Accum = 0;
 
     /* Always read sector-by-sector, as we can't really trust the Sectors field in the DAP (
        some BIOSes don't properly implement it). */
@@ -215,10 +217,14 @@ int BiReadArchDevice(FileContext *Context, void *Buffer, uint64_t Start, size_t 
 
         BiosCall(0x13, &Registers);
         if (Registers.Eflags & 1) {
+            if (Read) {
+                *Read = Accum;
+            }
+
             return __STDIO_FLAGS_ERROR;
         }
 
-        uint64_t Offset = Start % BytesPerSector;
+        size_t Offset = Start % BytesPerSector;
         size_t CopySize = BytesPerSector - Offset;
         if (Size < CopySize) {
             CopySize = Size;
@@ -228,6 +234,11 @@ int BiReadArchDevice(FileContext *Context, void *Buffer, uint64_t Start, size_t 
         OutputBuffer += CopySize;
         Start += CopySize;
         Size -= CopySize;
+        Accum += CopySize;
+    }
+
+    if (Read) {
+        *Read = Accum;
     }
 
     return 0;
