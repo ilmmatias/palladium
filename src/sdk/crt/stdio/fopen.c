@@ -36,9 +36,20 @@ FILE *fopen(const char *filename, const char *mode) {
         return NULL;
     }
 
+    /* By default we make all files fully buffered. */
+    stream->buffer = malloc(BUFSIZ);
+    if (!stream->buffer) {
+        free(stream);
+        __fclose(handle);
+        return NULL;
+    }
+
     stream->handle = handle;
+    stream->file_pos = 0;
+    stream->buffer_type = _IOFBF;
+    stream->buffer_size = BUFSIZ;
+    stream->buffer_pos = 0;
     stream->flags = flags;
-    stream->pos = 0;
 
     return stream;
 }

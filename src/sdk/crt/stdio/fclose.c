@@ -3,6 +3,7 @@
 
 #include <crt_impl.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -15,10 +16,16 @@
  *     0 on success, EOF otherwise.
  *-----------------------------------------------------------------------------------------------*/
 int fclose(struct FILE *stream) {
-    if (stream) {
-        __fclose(stream->handle);
-        return 0;
-    } else {
+    if (!stream) {
         return EOF;
     }
+
+    if (stream->buffer && !stream->user_buffer) {
+        free(stream->buffer);
+    }
+
+    __fclose(stream->handle);
+    free(stream);
+
+    return 0;
 }

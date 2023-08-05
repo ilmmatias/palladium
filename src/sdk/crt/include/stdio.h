@@ -12,11 +12,25 @@
 
 #define EOF (-1)
 
+#define FOPEN_MAX 1024
+#define FILENAME_MAX 256
+
+#define BUFSIZ 1024
+#define _IONBF 0
+#define _IOLBF 1
+#define _IOFBF 2
+
+#define SEEK_SET 0
+#define SEEK_CUR 1
+#define SEEK_END 2
+
 typedef struct FILE FILE;
 
 FILE *fopen(const char *filename, const char *mode);
 FILE *freopen(const char *filename, const char *mode, FILE *stream);
-int fclose(struct FILE *stream);
+int fclose(FILE *stream);
+void setbuf(FILE *stream, char *buffer);
+void setvbuf(FILE *stream, char *buffer, int mode, size_t size);
 
 size_t fread(void *buffer, size_t size, size_t count, FILE *stream);
 

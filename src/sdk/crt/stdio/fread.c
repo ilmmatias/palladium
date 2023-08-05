@@ -36,18 +36,22 @@ size_t fread(void *buffer, size_t size, size_t count, struct FILE *stream) {
     char *dest = buffer;
     stream->flags |= __STDIO_FLAGS_READING;
 
-    /* Element-by-element so that we can break in the exact element we failed. */
-    for (size_t i = 0; i < count; i++) {
-        int flags = __fread(stream->handle, stream->pos, dest, size);
+    /* Unbuffered reads are really inefficient (even more so on platforms like the boot manager,
+       which calls into the BIOS to read the disk); If possible, don't setbuf(NULL). */
+    // if (!stream->buffer || stream->buffer_type == _IONBF) {
+    if (1) {
+        for (size_t i = 0; i < count; i++) {
+            int flags = __fread(stream->handle, stream->file_pos, dest, size);
 
-        if (flags) {
-            stream->flags |= flags;
-            return i;
+            if (flags) {
+                stream->flags |= flags;
+                return i;
+            }
+
+            stream->file_pos += size;
+            dest += size;
         }
 
-        stream->pos += size;
-        dest += size;
+        return count;
     }
-
-    return count;
 }

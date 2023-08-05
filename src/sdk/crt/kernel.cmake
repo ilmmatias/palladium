@@ -12,6 +12,8 @@ set(KERNEL_SOURCES
     stdio/printf.c
     stdio/putchar.c
     stdio/puts.c
+    stdio/setbuf.c
+    stdio/setvbuf.c
     stdio/vprintf.c
 
     string/strdup.c

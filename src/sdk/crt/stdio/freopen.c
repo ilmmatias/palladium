@@ -25,6 +25,10 @@ FILE *freopen(const char *filename, const char *mode, struct FILE *stream) {
 
     __fclose(stream->handle);
 
+    if (stream->buffer && !stream->user_buffer) {
+        free(stream->buffer);
+    }
+
     if (!filename || !mode) {
         free(stream);
         return NULL;
@@ -37,9 +41,19 @@ FILE *freopen(const char *filename, const char *mode, struct FILE *stream) {
         return NULL;
     }
 
+    stream->buffer = malloc(BUFSIZ);
+    if (!stream->buffer) {
+        free(stream);
+        __fclose(handle);
+        return NULL;
+    }
+
     stream->handle = handle;
+    stream->file_pos = 0;
+    stream->buffer_type = _IOFBF;
+    stream->buffer_size = BUFSIZ;
+    stream->buffer_pos = 0;
     stream->flags = flags;
-    stream->pos = 0;
 
     return stream;
 }

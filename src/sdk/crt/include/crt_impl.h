@@ -9,8 +9,13 @@
 
 struct FILE {
     void *handle;
+    size_t file_pos;
+    char *buffer;
+    int user_buffer;
+    int buffer_type;
+    size_t buffer_size;
+    size_t buffer_pos;
     int flags;
-    size_t pos;
 };
 
 #ifndef __CRT_STDIO_H
@@ -23,6 +28,7 @@ struct FILE {
 #define __STDIO_FLAGS_EOF 0x40
 #define __STDIO_FLAGS_READING 0x80
 #define __STDIO_FLAGS_WRITING 0x100
+#define __STDIO_FLAGS_HAS_BUFFER 0x200
 
 int __parse_fopen_mode(const char *mode);
 void *__fopen(const char *filename, int mode);
