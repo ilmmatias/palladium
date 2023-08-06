@@ -7,6 +7,7 @@ set(KERNEL_SOURCES
     stdio/__parse_fopen_mode.c
     stdio/fclose.c
     stdio/fgetc.c
+    stdio/fgets.c
     stdio/fopen.c
     stdio/fread.c
     stdio/freopen.c

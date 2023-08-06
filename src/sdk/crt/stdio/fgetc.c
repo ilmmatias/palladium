@@ -14,6 +14,6 @@
  *     Data stored in the fread buffer, or EOF on failure.
  *-----------------------------------------------------------------------------------------------*/
 int fgetc(FILE *stream) {
-    int ch;
+    int ch = 0;
     return fread(&ch, 1, 1, stream) ? ch : EOF;
 }

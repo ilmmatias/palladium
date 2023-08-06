@@ -20,23 +20,6 @@
     BmInitDisplay();
     BmInitMemory(BootBlock);
     BmInitArch(BootBlock);
-
-    do {
-        FILE *File = fopen("bios()/open_this/flag.txt", "r");
-        if (!File) {
-            printf("fopen() failed\n");
-            break;
-        }
-
-        int ch;
-        while ((ch = fgetc(File)) != EOF) {
-            printf("%c", ch);
-        }
-
-        printf("\n");
-        fclose(File);
-    } while (0);
-
     while (1)
         ;
 }

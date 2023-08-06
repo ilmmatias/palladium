@@ -22,6 +22,7 @@ set(SOURCES
     ctype/toupper.c
 
     stdio/__vprintf.c
+    stdio/__vscanf.c
     stdio/snprintf.c
     stdio/sprintf.c
     stdio/vsnprintf.c

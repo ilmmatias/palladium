@@ -35,6 +35,7 @@ void setbuf(FILE *stream, char *buffer);
 void setvbuf(FILE *stream, char *buffer, int mode, size_t size);
 
 int fgetc(FILE *stream);
+char *fgets(char *str, int count, FILE *stream);
 size_t fread(void *buffer, size_t size, size_t count, FILE *stream);
 
 int putchar(int ch);

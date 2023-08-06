@@ -45,6 +45,13 @@ int __vprintf(
     void *context,
     void (*put_buf)(const void *buffer, int size, void *context));
 
+int __vscanf(
+    const char *format,
+    va_list vlist,
+    void *context,
+    int (*read_ch)(void *context),
+    void (*unread_ch)(void *context, int ch));
+
 double __strtod_hex(const char *str, double sign);
 double __strtod_dec(const char *str, double sign);
 #endif /* __CRT_STDIO_H */
