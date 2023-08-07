@@ -1,6 +1,10 @@
+/* SPDX-FileCopyrightText: (C) 2023 ilmmatias
+ * SPDX-License-Identifier: BSD-3-Clause */
+
 #include <ctype.h>
 #include <limits.h>
 #include <stdarg.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,7 +21,7 @@
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     Alternative version of strtol, reading character-by-character instead of expecting the
+ *     Alternative version of strtoll, reading character-by-character instead of expecting the
  *     whole string to be already in place.
  *
  * PARAMETERS:
@@ -30,16 +34,16 @@
  * RETURN VALUE:
  *     1 on success, 0 on failure.
  *-----------------------------------------------------------------------------------------------*/
-static int _strtol(
+static int _strtoll(
     int base,
-    long *value,
+    long long *value,
     void *context,
     int (*read_ch)(void *context),
     void (*unread_ch)(void *context, int ch)) {
-    /* Rule-by-rule match with the strtol implementation; We're optimistic, and we're guessing
-       it is a valid integer; It should fail by the end (and unwind) if we were wrong.
-       Some sections are commented in the original implementation but not here, they are
-       functionally equivalent in both (but using read_ch here instead of *(str++)). */
+    /* An almost rule-by-rule match with the strtol implementation; We're optimistic, and
+       we're guessing it is a valid integer; It should fail by the end (and unwind) if we
+       were wrong. Some sections are commented in the original implementation but not here,
+       they are functionally equivalent in both (but using read_ch here instead of *(str++)). */
 
     int ch = read_ch(context);
     while (isspace(ch)) {
@@ -79,11 +83,11 @@ static int _strtol(
     }
 
     size_t accum = 0;
-    int error = 0;
+    int overflow = 0;
 
     *value = 0;
     while (1) {
-        long last = *value;
+        long long last = *value;
 
         if (islower(ch)) {
             ch -= 0x57;
@@ -99,11 +103,13 @@ static int _strtol(
             break;
         }
 
-        if (!error) {
+        /* The other main difference between this and strtoll, is that overflow isn't an error
+           here (we just fix the value to LLONG_MAX). */
+        if (!overflow) {
             *value = (*value * base) + ch;
             if (*value < last) {
-                *value = LONG_MAX;
-                error = 1;
+                *value = LLONG_MAX;
+                overflow = 1;
             }
         }
 
@@ -113,9 +119,11 @@ static int _strtol(
 
     unread_ch(context, ch);
 
-    if (accum) {
+    if (overflow) {
+        return 1;
+    } else if (accum) {
         *value *= sign;
-        return !error;
+        return 1;
     } else {
         *value = 0;
         return 0;
@@ -124,7 +132,7 @@ static int _strtol(
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     Alternative version of strtoul, reading character-by-character instead of expecting the
+ *     Alternative version of strtoull, reading character-by-character instead of expecting the
  *     whole string to be already in place.
  *
  * PARAMETERS:
@@ -137,9 +145,9 @@ static int _strtol(
  * RETURN VALUE:
  *     1 on success, 0 on failure.
  *-----------------------------------------------------------------------------------------------*/
-static int _strtoul(
+static int _strtoull(
     int base,
-    unsigned long *value,
+    unsigned long long *value,
     void *context,
     int (*read_ch)(void *context),
     void (*unread_ch)(void *context, int ch)) {
@@ -162,11 +170,11 @@ static int _strtoul(
     }
 
     size_t accum = 0;
-    int error = 0;
+    int overflow = 0;
 
     *value = 0;
     while (1) {
-        unsigned long last = *value;
+        unsigned long long last = *value;
 
         if (islower(ch)) {
             ch -= 0x57;
@@ -182,11 +190,11 @@ static int _strtoul(
             break;
         }
 
-        if (!error) {
+        if (!overflow) {
             *value = (*value * base) + ch;
             if (*value < last) {
-                *value = ULONG_MAX;
-                error = 1;
+                *value = ULLONG_MAX;
+                overflow = 1;
             }
         }
 
@@ -196,12 +204,7 @@ static int _strtoul(
 
     unread_ch(context, ch);
 
-    if (accum) {
-        return !error;
-    } else {
-        *value = 0;
-        return 0;
-    }
+    return accum > 0;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -311,15 +314,12 @@ int __vscanf(
                 break;
         }
 
-        unsigned long unsigned_value;
-        long signed_value;
+        unsigned long long unsigned_value;
+        long long signed_value;
         char *str_start;
         char *str;
 
         ch = *(format++);
-
-        /* TODO: add proper length modifier handling below. */
-        (void)mod;
 
         /* At last, handle the specifiers. */
         switch (ch) {
@@ -391,14 +391,42 @@ int __vscanf(
                 }
 
                 break;
+            /* Is there any reason why signed integer specifiers have an auto-base, but not
+               unsigned? */
             case 'd':
             case 'i':
-                if (!_strtol(ch == 'd' ? 10 : 0, &signed_value, context, read_ch, unread_ch)) {
+                if (!_strtoll(ch == 'd' ? 10 : 0, &signed_value, context, read_ch, unread_ch)) {
                     return filled ? filled : EOF;
                 }
 
                 if (!supress) {
-                    *va_arg(vlist, long *) = signed_value;
+                    switch (mod) {
+                        case MOD_hh:
+                            *va_arg(vlist, char *) = signed_value;
+                            break;
+                        case MOD_h:
+                            *va_arg(vlist, short *) = signed_value;
+                            break;
+                        case MOD_l:
+                            *va_arg(vlist, long *) = signed_value;
+                            break;
+                        case MOD_ll:
+                            *va_arg(vlist, long long *) = signed_value;
+                            break;
+                        case MOD_j:
+                            *va_arg(vlist, intmax_t *) = signed_value;
+                            break;
+                        case MOD_z:
+                            *va_arg(vlist, size_t *) = signed_value;
+                            break;
+                        case MOD_t:
+                            *va_arg(vlist, ptrdiff_t *) = signed_value;
+                            break;
+                        default:
+                            *va_arg(vlist, int *) = signed_value;
+                            break;
+                    }
+
                     filled++;
                 }
 
@@ -407,7 +435,7 @@ int __vscanf(
             case 'o':
             case 'x':
             case 'X':
-                if (!_strtoul(
+                if (!_strtoull(
                         ch == 'u'   ? 10
                         : ch == 'o' ? 8
                                     : 16,
@@ -419,13 +447,50 @@ int __vscanf(
                 }
 
                 if (!supress) {
-                    *va_arg(vlist, unsigned long *) = unsigned_value;
+                    switch (mod) {
+                        case MOD_hh:
+                            *va_arg(vlist, unsigned char *) = unsigned_value;
+                            break;
+                        case MOD_h:
+                            *va_arg(vlist, unsigned short *) = unsigned_value;
+                            break;
+                        case MOD_l:
+                            *va_arg(vlist, unsigned long *) = unsigned_value;
+                            break;
+                        case MOD_ll:
+                            *va_arg(vlist, unsigned long long *) = unsigned_value;
+                            break;
+                        case MOD_j:
+                            *va_arg(vlist, intmax_t *) = unsigned_value;
+                            break;
+                        case MOD_z:
+                            *va_arg(vlist, size_t *) = unsigned_value;
+                            break;
+                        case MOD_t:
+                            *va_arg(vlist, ptrdiff_t *) = unsigned_value;
+                            break;
+                        default:
+                            *va_arg(vlist, unsigned int *) = unsigned_value;
+                            break;
+                    }
+
+                    filled++;
+                }
+
+                break;
+            case 'p':
+                if (!_strtoull(16, &unsigned_value, context, read_ch, unread_ch)) {
+                    return filled ? filled : EOF;
+                }
+
+                if (!supress) {
+                    *va_arg(vlist, void **) = (void *)unsigned_value;
                     filled++;
                 }
 
                 break;
             default:
-                for (size_t i = 0; i < (size_t)(format - start); i++) {
+                for (ptrdiff_t i = 0; i < format - start; i++) {
                     ch = read_ch(context);
                     if (ch != start[i]) {
                         unread_ch(context, ch);

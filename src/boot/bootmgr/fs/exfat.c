@@ -166,7 +166,7 @@ void BiCleanupExfat(FileContext *Context) {
  *     1 for success, otherwise 0.
  *-----------------------------------------------------------------------------------------------*/
 static int FollowCluster(ExfatContext *FsContext, void **Current, uint64_t *Cluster) {
-    size_t Offset = Current ? (size_t)*Current - (size_t)FsContext->ClusterBuffer : 0;
+    ptrdiff_t Offset = Current ? *Current - FsContext->ClusterBuffer : 0;
 
     if (Offset && Offset < (1 << FsContext->ClusterShift)) {
         return 1;
