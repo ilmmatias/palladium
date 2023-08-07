@@ -21,11 +21,13 @@
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     Alternative version of strtoll, reading character-by-character instead of expecting the
- *     whole string to be already in place.
+ *     Alternative version of strtoll, supporting intmax_t, and reading character-by-character
+ *     instead of expecting the whole string to be already in place.
  *
  * PARAMETERS:
  *     base - Which base the number is in, or 0 for auto detection.
+ *     width_set - Set to 1 if we should take into consideration the width.
+ *     width - Maximum amount of characters we're allowed to read.
  *     value - Output; Where to store the number on success.
  *     context - Platform-specific implementation context/detail.
  *     read_ch - What to do when we need to read something; Do not pass a NULL pointer!
@@ -34,9 +36,11 @@
  * RETURN VALUE:
  *     1 on success, 0 on failure.
  *-----------------------------------------------------------------------------------------------*/
-static int _strtoll(
+static int _strtoi(
     int base,
-    long long *value,
+    int width_set,
+    int width,
+    intmax_t *value,
     void *context,
     int (*read_ch)(void *context),
     void (*unread_ch)(void *context, int ch)) {
@@ -47,47 +51,76 @@ static int _strtoll(
 
     int ch = read_ch(context);
     while (isspace(ch)) {
+        if (width_set && !--width) {
+            *value = 0;
+            return 0;
+        }
+
         ch = read_ch(context);
     }
 
-    long sign = ch == '-' ? -1 : 1;
+    intmax_t sign = ch == '-' ? -1 : 1;
     if (sign < 0 || ch == '+') {
+        if (width_set && !--width) {
+            *value = 0;
+            return 0;
+        }
+
         ch = read_ch(context);
     }
 
     int prefix = 0;
-    if (base == 0 && ch == '0') {
-        ch = read_ch(context);
+    size_t accum = 0;
+    int overflow = 0;
 
-        if (ch == 'x' || ch == 'X') {
-            base = 16;
+    if (base == 0 && ch == '0') {
+        if (!width_set || --width) {
+            ch = read_ch(context);
+
+            if (ch == 'x' || ch == 'X') {
+                if (width_set && !--width) {
+                    *value = 0;
+                    return 1;
+                }
+
+                base = 16;
+                ch = read_ch(context);
+            } else {
+                base = 8;
+                accum++;
+            }
         } else {
-            base = 10;
+            base = 8;
+            accum++;
         }
 
-        ch = read_ch(context);
         prefix = 1;
     } else if (base == 0) {
         base = 10;
     }
 
     if (!prefix && base == 16 && ch == '0') {
-        ch = read_ch(context);
-
-        if (ch == 'x' || ch == 'X') {
+        if (!width_set || --width) {
             ch = read_ch(context);
+
+            if (ch == 'x' || ch == 'X') {
+                if (width_set && !--width) {
+                    *value = 0;
+                    return 1;
+                }
+
+                ch = read_ch(context);
+            } else {
+                accum++;
+            }
         } else {
-            unread_ch(context, ch);
-            ch = '0';
+            accum++;
         }
     }
 
-    size_t accum = 0;
-    int overflow = 0;
-
     *value = 0;
     while (1) {
-        long long last = *value;
+        intmax_t last = *value;
 
         if (islower(ch)) {
             ch -= 0x57;
@@ -104,17 +137,23 @@ static int _strtoll(
         }
 
         /* The other main difference between this and strtoll, is that overflow isn't an error
-           here (we just fix the value to LLONG_MAX). */
+           here (we just fix the value to INTMAX_MAX). */
         if (!overflow) {
             *value = (*value * base) + ch;
             if (*value < last) {
-                *value = LLONG_MAX;
+                *value = INTMAX_MAX;
                 overflow = 1;
             }
         }
 
-        ch = read_ch(context);
         accum++;
+
+        if (!width_set || --width) {
+            ch = read_ch(context);
+        } else {
+            ch = EOF;
+            break;
+        }
     }
 
     unread_ch(context, ch);
@@ -132,11 +171,13 @@ static int _strtoll(
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     Alternative version of strtoull, reading character-by-character instead of expecting the
- *     whole string to be already in place.
+ *     Alternative version of strtoull, supporting uintmax_t, and reading character-by-character
+ *     instead of expecting the whole string to be already in place.
  *
  * PARAMETERS:
  *     base - Which base the number is in, or 0 for auto detection.
+ *     width_set - Set to 1 if we should take into consideration the width.
+ *     width - Maximum amount of characters we're allowed to read.
  *     value - Output; Where to store the number on success.
  *     context - Platform-specific implementation context/detail.
  *     read_ch - What to do when we need to read something; Do not pass a NULL pointer!
@@ -145,36 +186,51 @@ static int _strtoll(
  * RETURN VALUE:
  *     1 on success, 0 on failure.
  *-----------------------------------------------------------------------------------------------*/
-static int _strtoull(
+static int _strtou(
     int base,
-    unsigned long long *value,
+    int width_set,
+    int width,
+    uintmax_t *value,
     void *context,
     int (*read_ch)(void *context),
     void (*unread_ch)(void *context, int ch)) {
     int ch = read_ch(context);
     while (isspace(ch)) {
-        ch = read_ch(context);
-    }
-
-    /* Base detection is disabled/absent, as scanf doesn't have an auto-detect specifier for
-       unsigned integers. */
-    if (base == 16 && ch == '0') {
-        ch = read_ch(context);
-
-        if (ch == 'x' || ch == 'X') {
-            ch = read_ch(context);
-        } else {
-            unread_ch(context, ch);
-            ch = '0';
+        if (width_set && !--width) {
+            *value = 0;
+            return 0;
         }
+
+        ch = read_ch(context);
     }
 
     size_t accum = 0;
     int overflow = 0;
 
+    /* Base detection is disabled/absent, as scanf doesn't have an auto-detect specifier for
+       unsigned integers. */
+    if (base == 16 && ch == '0') {
+        if (!width_set || --width) {
+            ch = read_ch(context);
+
+            if (ch == 'x' || ch == 'X') {
+                if (width_set && !--width) {
+                    *value = 0;
+                    return 1;
+                }
+
+                ch = read_ch(context);
+            } else {
+                accum++;
+            }
+        } else {
+            accum++;
+        }
+    }
+
     *value = 0;
     while (1) {
-        unsigned long long last = *value;
+        uintmax_t last = *value;
 
         if (islower(ch)) {
             ch -= 0x57;
@@ -193,13 +249,19 @@ static int _strtoull(
         if (!overflow) {
             *value = (*value * base) + ch;
             if (*value < last) {
-                *value = ULLONG_MAX;
+                *value = UINTMAX_MAX;
                 overflow = 1;
             }
         }
 
-        ch = read_ch(context);
         accum++;
+
+        if (!width_set || --width) {
+            ch = read_ch(context);
+        } else {
+            ch = EOF;
+            break;
+        }
     }
 
     unread_ch(context, ch);
@@ -314,8 +376,8 @@ int __vscanf(
                 break;
         }
 
-        unsigned long long unsigned_value;
-        long long signed_value;
+        uintmax_t unsigned_value;
+        intmax_t signed_value;
         char *str_start;
         char *str;
 
@@ -395,7 +457,14 @@ int __vscanf(
                unsigned? */
             case 'd':
             case 'i':
-                if (!_strtoll(ch == 'd' ? 10 : 0, &signed_value, context, read_ch, unread_ch)) {
+                if (!_strtoi(
+                        ch == 'd' ? 10 : 0,
+                        width_set && width,
+                        width,
+                        &signed_value,
+                        context,
+                        read_ch,
+                        unread_ch)) {
                     return filled ? filled : EOF;
                 }
 
@@ -435,10 +504,12 @@ int __vscanf(
             case 'o':
             case 'x':
             case 'X':
-                if (!_strtoull(
+                if (!_strtou(
                         ch == 'u'   ? 10
                         : ch == 'o' ? 8
                                     : 16,
+                        width_set,
+                        width,
                         &unsigned_value,
                         context,
                         read_ch,
@@ -461,7 +532,7 @@ int __vscanf(
                             *va_arg(vlist, unsigned long long *) = unsigned_value;
                             break;
                         case MOD_j:
-                            *va_arg(vlist, intmax_t *) = unsigned_value;
+                            *va_arg(vlist, uintmax_t *) = unsigned_value;
                             break;
                         case MOD_z:
                             *va_arg(vlist, size_t *) = unsigned_value;
@@ -479,7 +550,7 @@ int __vscanf(
 
                 break;
             case 'p':
-                if (!_strtoull(16, &unsigned_value, context, read_ch, unread_ch)) {
+                if (!_strtou(16, width, width_set, &unsigned_value, context, read_ch, unread_ch)) {
                     return filled ? filled : EOF;
                 }
 
