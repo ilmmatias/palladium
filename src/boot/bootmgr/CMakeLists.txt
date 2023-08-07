@@ -16,6 +16,7 @@ add_executable(bootmgr "kstdlib"
     ${SOURCES}
 
     fs/exfat.c
+    fs/ntfs.c
     fs/vfs.c
 
     support/assert.c

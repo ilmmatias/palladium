@@ -106,7 +106,7 @@ void BiosDetectDisks(BiosBootBlock *Data) {
         Context.Type = FILE_TYPE_ARCH;
         Context.PrivateData = (void *)i;
 
-        if (BiProbeExfat(&Context)) {
+        if (BiProbeExfat(&Context) || BiProbeNtfs(&Context)) {
             memcpy(&DriveHandles[i], &Context, sizeof(FileContext));
         }
     }

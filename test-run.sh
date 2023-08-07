@@ -46,13 +46,11 @@ then
     sudo fsck.exfat -y obj.amd64/exfat.img
     sudo mount -t exfat -o loop obj.amd64/exfat.img /mnt/mount 1>/dev/null
     sudo cp _root/bootmgr /mnt/mount/bootmgr 1>/dev/null
-    sudo mkdir /mnt/mount/open_this 1>/dev/null
-    printf '25 Thompson 56987' | sudo tee /mnt/mount/open_this/flag.txt
     sudo umount /mnt/mount 1>/dev/null
     qemu-system-x86_64 -M smm=off -hda obj.amd64/exfat.img -no-reboot -d int
 else
     mkisofs -R -b iso9660boot.com -no-emul-boot -o obj.amd64/iso9660.iso _root
-    qemu-system-x86_64 -M smm=off -cdrom obj.amd64/iso9660.iso -no-reboot -d int
+    qemu-system-x86_64 -M smm=off -cdrom obj.amd64/iso9660.iso -hda obj.amd64/ntfs.img -boot d -no-reboot -d int
 fi
 
 rm -rf _root

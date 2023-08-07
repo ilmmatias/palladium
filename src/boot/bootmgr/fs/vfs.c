@@ -78,6 +78,8 @@ void __fclose(void *handle) {
         BiFreeArchDevice(Context);
     } else if (Context->Type == FILE_TYPE_EXFAT) {
         BiCleanupExfat(Context);
+    } else if (Context->Type == FILE_TYPE_NTFS) {
+        BiCleanupNtfs(Context);
     }
 }
 
@@ -165,6 +167,8 @@ int BiCopyFileContext(FileContext *Context, FileContext *Copy) {
         return BiCopyArchDevice(Context, Copy);
     } else if (Context->Type == FILE_TYPE_EXFAT) {
         return BiCopyExfat(Context, Copy);
+    } else if (Context->Type == FILE_TYPE_NTFS) {
+        return BiCopyNtfs(Context, Copy);
     } else {
         return 0;
     }
@@ -189,6 +193,8 @@ int BiReadDirectoryEntry(FileContext *Context, const char *Name) {
         return BiReadArchDirectoryEntry(Context, Name);
     } else if (Context->Type == FILE_TYPE_EXFAT) {
         return BiTraverseExfatDirectory(Context, Name);
+    } else if (Context->Type == FILE_TYPE_NTFS) {
+        return BiTraverseNtfsDirectory(Context, Name);
     } else {
         return 0;
     }

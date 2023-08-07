@@ -61,20 +61,20 @@ int BiCopyExfat(FileContext *Context, FileContext *Copy) {
  *     1 if the FS was exFAT, 0 if we need to keep on searching.
  *-----------------------------------------------------------------------------------------------*/
 int BiProbeExfat(FileContext *Context) {
+    const char ExpectedJumpBoot[3] = {0xEB, 0x76, 0x90};
+    const char ExpectedFileSystemName[8] = "EXFAT   ";
+
     char *Buffer = malloc(512);
+    ExfatBootSector *BootSector = (ExfatBootSector *)Buffer;
     if (!Buffer) {
         return 0;
     }
 
     /* exFAT seems to have an actual way of validating its "BPB" + if we're really dealing with
-       it, instead of having to do a bit of guessing like on FAT32 and NTFS.
+       it, instead of having to do a bit of guessing like on FAT32.
        We can use the mandatory fields described on the Main Boot Sector structure at
        https://learn.microsoft.com/en-us/windows/win32/fileio/exfat-specification to quickly
        probe this. */
-
-    ExfatBootSector *BootSector = (ExfatBootSector *)Buffer;
-    const char ExpectedJumpBoot[3] = {0xEB, 0x76, 0x90};
-    const char ExpectedFileSystemName[8] = "EXFAT   ";
 
     if (__fread(Context, 0, Buffer, 512, NULL) ||
         memcmp(BootSector->JumpBoot, ExpectedJumpBoot, 3) ||
@@ -158,7 +158,7 @@ void BiCleanupExfat(FileContext *Context) {
  *     This function checks if we need to read in a cluster, following the FAT if required.
  *
  * PARAMETERS:
- *     Context - Device/node private data.
+ *     FsContext - FS-specific data.
  *     Current - I/O; Current position along the cluster buffer.
  *     Cluster - I/O; Current cluster (minus 2, as usual on FAT32/exFAT).
  *
