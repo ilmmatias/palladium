@@ -11,12 +11,14 @@ set(KERNEL_SOURCES
     stdio/fopen.c
     stdio/fread.c
     stdio/freopen.c
+    stdio/fscanf.c
     stdio/printf.c
     stdio/putchar.c
     stdio/puts.c
     stdio/setbuf.c
     stdio/setvbuf.c
     stdio/ungetc.c
+    stdio/vfscanf.c
     stdio/vprintf.c
 
     string/strdup.c

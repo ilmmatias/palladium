@@ -37,6 +37,7 @@ then
     qemu-system-x86_64 -M smm=off -hda obj.amd64/fat32.img -no-reboot -d int
 elif [ "$1" == "exfat" ]
 then
+    sudo rm -rf /mnt/mount
 	sudo mkdir -p /mnt/mount
     dd if=/dev/zero of=obj.amd64/exfat.img count=64 bs=1M 2>/dev/null
     sudo mkfs.exfat obj.amd64/exfat.img 1>/dev/null
@@ -45,6 +46,8 @@ then
     sudo fsck.exfat -y obj.amd64/exfat.img
     sudo mount -t exfat -o loop obj.amd64/exfat.img /mnt/mount 1>/dev/null
     sudo cp _root/bootmgr /mnt/mount/bootmgr 1>/dev/null
+    sudo mkdir /mnt/mount/open_this 1>/dev/null
+    printf '25 Thompson 56987' | sudo tee /mnt/mount/open_this/flag.txt
     sudo umount /mnt/mount 1>/dev/null
     qemu-system-x86_64 -M smm=off -hda obj.amd64/exfat.img -no-reboot -d int
 else

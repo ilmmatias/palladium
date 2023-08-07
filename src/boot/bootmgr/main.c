@@ -20,6 +20,38 @@
     BmInitDisplay();
     BmInitMemory(BootBlock);
     BmInitArch(BootBlock);
+
+    int i, j, k;
+    char str1[10];
+
+    FILE *stream = fopen("bios()/open_this/flag.txt", "r");
+    if (!stream) {
+        printf("fopen() failed\n");
+        while (1)
+            ;
+    }
+
+    /* parse as follows:
+       %d: an integer
+       %9s: a string of at most 9 non-whitespace characters
+       %2d: two-digit integer (digits 5 and 6)
+       %*d: an integer which isn't stored anywhere
+       %n: characters read so far */
+    int ret = fscanf(stream, "%d%9s%2d%*d%n", &i, str1, &j, &k);
+
+    printf(
+        "Converted %d fields:\n"
+        "i = %d\n"
+        "str1 = %s\n"
+        "j = %d\n"
+        "k = %d\n",
+        ret,
+        i,
+        str1,
+        j,
+        k);
+
+    fclose(stream);
     while (1)
         ;
 }

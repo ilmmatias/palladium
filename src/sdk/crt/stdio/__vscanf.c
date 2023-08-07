@@ -29,6 +29,7 @@
  *     width_set - Set to 1 if we should take into consideration the width.
  *     width - Maximum amount of characters we're allowed to read.
  *     value - Output; Where to store the number on success.
+ *     read - I/O; Pointer to an integer storing the `total amount of characters read`.
  *     context - Platform-specific implementation context/detail.
  *     read_ch - What to do when we need to read something; Do not pass a NULL pointer!
  *     unread_ch - What to do when we failed to match something, and we need to unwind the input.
@@ -41,6 +42,7 @@ static int _strtoi(
     int width_set,
     int width,
     intmax_t *value,
+    int *read,
     void *context,
     int (*read_ch)(void *context),
     void (*unread_ch)(void *context, int ch)) {
@@ -51,12 +53,8 @@ static int _strtoi(
 
     int ch = read_ch(context);
     while (isspace(ch)) {
-        if (width_set && !--width) {
-            *value = 0;
-            return 0;
-        }
-
         ch = read_ch(context);
+        (*read)++;
     }
 
     intmax_t sign = ch == '-' ? -1 : 1;
@@ -67,6 +65,7 @@ static int _strtoi(
         }
 
         ch = read_ch(context);
+        (*read)++;
     }
 
     int prefix = 0;
@@ -76,6 +75,7 @@ static int _strtoi(
     if (base == 0 && ch == '0') {
         if (!width_set || --width) {
             ch = read_ch(context);
+            (*read)++;
 
             if (ch == 'x' || ch == 'X') {
                 if (width_set && !--width) {
@@ -83,15 +83,16 @@ static int _strtoi(
                     return 1;
                 }
 
-                base = 16;
                 ch = read_ch(context);
+                base = 16;
+                (*read)++;
             } else {
                 base = 8;
                 accum++;
             }
         } else {
-            base = 8;
-            accum++;
+            *value = 0;
+            return 1;
         }
 
         prefix = 1;
@@ -102,6 +103,7 @@ static int _strtoi(
     if (!prefix && base == 16 && ch == '0') {
         if (!width_set || --width) {
             ch = read_ch(context);
+            (*read)++;
 
             if (ch == 'x' || ch == 'X') {
                 if (width_set && !--width) {
@@ -110,17 +112,22 @@ static int _strtoi(
                 }
 
                 ch = read_ch(context);
+                (*read)++;
             } else {
                 accum++;
             }
         } else {
-            accum++;
+            *value = 0;
+            return 1;
         }
     }
 
     *value = 0;
     while (1) {
         intmax_t last = *value;
+        if (ch == EOF) {
+            break;
+        }
 
         if (islower(ch)) {
             ch -= 0x57;
@@ -147,6 +154,7 @@ static int _strtoi(
         }
 
         accum++;
+        (*read)++;
 
         if (!width_set || --width) {
             ch = read_ch(context);
@@ -179,6 +187,7 @@ static int _strtoi(
  *     width_set - Set to 1 if we should take into consideration the width.
  *     width - Maximum amount of characters we're allowed to read.
  *     value - Output; Where to store the number on success.
+ *     read - I/O; Pointer to an integer storing the `total amount of characters read`.
  *     context - Platform-specific implementation context/detail.
  *     read_ch - What to do when we need to read something; Do not pass a NULL pointer!
  *     unread_ch - What to do when we failed to match something, and we need to unwind the input.
@@ -191,17 +200,14 @@ static int _strtou(
     int width_set,
     int width,
     uintmax_t *value,
+    int *read,
     void *context,
     int (*read_ch)(void *context),
     void (*unread_ch)(void *context, int ch)) {
     int ch = read_ch(context);
     while (isspace(ch)) {
-        if (width_set && !--width) {
-            *value = 0;
-            return 0;
-        }
-
         ch = read_ch(context);
+        (*read)++;
     }
 
     size_t accum = 0;
@@ -212,6 +218,7 @@ static int _strtou(
     if (base == 16 && ch == '0') {
         if (!width_set || --width) {
             ch = read_ch(context);
+            (*read)++;
 
             if (ch == 'x' || ch == 'X') {
                 if (width_set && !--width) {
@@ -220,17 +227,22 @@ static int _strtou(
                 }
 
                 ch = read_ch(context);
+                (*read)++;
             } else {
                 accum++;
             }
         } else {
-            accum++;
+            *value = 0;
+            return 1;
         }
     }
 
     *value = 0;
     while (1) {
         uintmax_t last = *value;
+        if (ch == EOF) {
+            break;
+        }
 
         if (islower(ch)) {
             ch -= 0x57;
@@ -255,6 +267,7 @@ static int _strtou(
         }
 
         accum++;
+        (*read)++;
 
         if (!width_set || --width) {
             ch = read_ch(context);
@@ -291,9 +304,9 @@ int __vscanf(
     int (*read_ch)(void *context),
     void (*unread_ch)(void *context, int ch)) {
     int filled = 0;
+    int read = 0;
 
     while (*format) {
-        const char *start = format;
         int ch = *(format++);
 
         if (isspace(ch)) {
@@ -304,22 +317,26 @@ int __vscanf(
 
             while (1) {
                 ch = read_ch(context);
+
                 if (!isspace(ch)) {
                     unread_ch(context, ch);
                     break;
                 }
+
+                read++;
             }
 
             continue;
         }
 
         if (ch != '%') {
-            int read = read_ch(context);
-            if (read != ch) {
-                unread_ch(context, read);
-                return filled ? filled : EOF;
+            int in = read_ch(context);
+            if (in != ch) {
+                unread_ch(context, in);
+                return filled;
             }
 
+            read++;
             continue;
         }
 
@@ -392,10 +409,12 @@ int __vscanf(
                     return filled ? filled : EOF;
                 }
 
+                read++;
                 break;
             /* Reads exactly 1 or `width` characters; Don't use it if you expect NULL
                termination! */
             case 'c':
+                /* TODO: missing wide char support. */
                 if (!supress) {
                     str_start = va_arg(vlist, char *);
                     str = str_start;
@@ -405,7 +424,7 @@ int __vscanf(
                 while (width-- > 0) {
                     int ch = read_ch(context);
                     if (ch == EOF && str - str_start) {
-                        return supress ? filled : filled + 1;
+                        break;
                     } else if (ch == EOF) {
                         return filled ? filled : EOF;
                     }
@@ -413,6 +432,8 @@ int __vscanf(
                     if (!supress) {
                         *(str++) = ch;
                     }
+
+                    read++;
                 }
 
                 if (!supress) {
@@ -423,11 +444,19 @@ int __vscanf(
             /* Reads until whitespace/end, or until width == 0; Buffer size should be width+1,
                as we always write the NULL terminator. */
             case 's':
+                /* TODO: missing wide string support. */
+                ch = read_ch(context);
+                while (isspace(ch)) {
+                    ch = read_ch(context);
+                    read++;
+                }
+
                 if (!supress) {
                     str_start = va_arg(vlist, char *);
                     str = str_start;
                 }
 
+                unread_ch(context, ch);
                 while (1) {
                     if (width_set && width-- <= 0) {
                         break;
@@ -435,16 +464,19 @@ int __vscanf(
 
                     ch = read_ch(context);
                     if (ch == EOF && str - str_start) {
-                        return supress ? filled : filled + 1;
+                        break;
                     } else if (ch == EOF) {
                         return filled ? filled : EOF;
-                    } else if (!ch || isspace(ch)) {
+                    } else if (isspace(ch)) {
+                        unread_ch(context, ch);
                         break;
                     }
 
                     if (!supress) {
                         *(str++) = ch;
                     }
+
+                    read++;
                 }
 
                 if (!supress) {
@@ -462,6 +494,7 @@ int __vscanf(
                         width_set && width,
                         width,
                         &signed_value,
+                        &read,
                         context,
                         read_ch,
                         unread_ch)) {
@@ -511,6 +544,7 @@ int __vscanf(
                         width_set,
                         width,
                         &unsigned_value,
+                        &read,
                         context,
                         read_ch,
                         unread_ch)) {
@@ -549,8 +583,22 @@ int __vscanf(
                 }
 
                 break;
+            case 'n':
+                if (!supress) {
+                    *va_arg(vlist, int *) = read;
+                }
+
+                break;
             case 'p':
-                if (!_strtou(16, width, width_set, &unsigned_value, context, read_ch, unread_ch)) {
+                if (!_strtou(
+                        16,
+                        width,
+                        width_set,
+                        &unsigned_value,
+                        &read,
+                        context,
+                        read_ch,
+                        unread_ch)) {
                     return filled ? filled : EOF;
                 }
 
@@ -561,17 +609,7 @@ int __vscanf(
 
                 break;
             default:
-                for (ptrdiff_t i = 0; i < format - start; i++) {
-                    ch = read_ch(context);
-                    if (ch != start[i]) {
-                        unread_ch(context, ch);
-                        return filled ? filled : EOF;
-                    }
-
-                    break;
-                }
-
-                break;
+                return filled;
         }
     }
 

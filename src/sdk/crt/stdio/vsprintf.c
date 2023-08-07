@@ -23,7 +23,7 @@ typedef struct {
  *     How many characters have been output.
  *-----------------------------------------------------------------------------------------------*/
 static void put_buf(const void *buffer, int size, void *context) {
-    context_t *str_context = (context_t *)context;
+    context_t *str_context = context;
     memcpy(str_context->buffer, buffer, size);
     str_context->buffer += size;
 }

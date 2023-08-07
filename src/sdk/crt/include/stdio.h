@@ -42,6 +42,12 @@ int putchar(int ch);
 int puts(const char *str);
 int ungetc(int ch, FILE *stream);
 
+int sscanf(char *buffer, const char *format, ...);
+int fscanf(FILE *stream, const char *format, ...);
+
+int vsscanf(char *buffer, const char *format, va_list vlist);
+int vfscanf(FILE *stream, const char *format, va_list vlist);
+
 int printf(const char *format, ...);
 int sprintf(char *buffer, const char *format, ...);
 int snprintf(char *buffer, size_t bufsz, const char *format, ...);

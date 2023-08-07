@@ -25,8 +25,10 @@ set(SOURCES
     stdio/__vscanf.c
     stdio/snprintf.c
     stdio/sprintf.c
+    stdio/sscanf.c
     stdio/vsnprintf.c
     stdio/vsprintf.c
+    stdio/vsscanf.c
 
     stdlib/atof.c
     stdlib/atoi.c

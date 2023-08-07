@@ -26,7 +26,7 @@ typedef struct {
  *     How many characters have been output.
  *-----------------------------------------------------------------------------------------------*/
 static void put_buf(const void *buffer, int size, void *context) {
-    context_t *str_context = (context_t *)context;
+    context_t *str_context = context;
 
     if ((intmax_t)str_context->bufsz < size) {
         size = str_context->bufsz;

@@ -16,6 +16,10 @@ EXPORTS
     tolower
     toupper
 
+    sscanf
+
+    vsscanf
+
     sprintf
     snprintf
 
