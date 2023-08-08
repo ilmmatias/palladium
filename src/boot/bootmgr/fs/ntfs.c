@@ -191,7 +191,7 @@ static int ApplyFixups(NtfsContext *FsContext, uint16_t FixupOffset, uint16_t Nu
  * RETURN VALUE:
  *     Either a pointer to the attribute, or NULL if it couldn't be found.
  *-----------------------------------------------------------------------------------------------*/
-static void *FindAttribute(NtfsContext *FsContext, uint32_t Type) {
+static void *FindAttribute(NtfsContext *FsContext, uint32_t Type, int NonResident) {
     char *Start = FsContext->ClusterBuffer;
     char *Current = Start + ((NtfsMftEntry *)FsContext->ClusterBuffer)->AttributeOffset;
 
@@ -199,7 +199,15 @@ static void *FindAttribute(NtfsContext *FsContext, uint32_t Type) {
         NtfsMftAttributeHeader *Attribute = (NtfsMftAttributeHeader *)Current;
 
         if (Attribute->Type == Type) {
-            return Current + 8;
+            /* Resident mismatch means instant error; No negotiating (unless it's set to
+               -1/auto). */
+            if (NonResident != -1 && Attribute->NonResident != NonResident) {
+                return NULL;
+            } else if (Attribute->NonResident) {
+                return NULL;
+            } else {
+                return Current + Attribute->ResidentForm.Offset;
+            }
         }
 
         Current += Attribute->Size;
@@ -241,17 +249,42 @@ int BiTraverseNtfsDirectory(FileContext *Context, const char *Name) {
 
     /* $I30 ($INDEX_ROOT and $INDEX_ALLOCATION) are the attributes containing the directory
        tree itself (that we can iterate over). */
-    NtfsIndexRootHeader *IndexRoot = FindAttribute(FsContext, 0x90);
-    if (!IndexRoot) {
+    NtfsIndexRootHeader *IndexRoot = FindAttribute(FsContext, 0x90, 0);
+    NtfsIndexHeader *IndexHeader = (NtfsIndexHeader *)IndexRoot + 1;
+    if (!IndexRoot || IndexRoot->AttributeType != 0x30 || IndexRoot->CollationType != 0x01) {
         return 0;
     }
 
-    printf(
-        "%04x, %04x, %04x, %04x\n",
-        IndexRoot->AttributeType,
-        IndexRoot->CollationType,
-        IndexRoot->IndexEntrySize,
-        IndexRoot->IndexEntryNumber);
+    /* First bit SET means this is a large directory; Anything over ~16 entries cannot fit inside
+       the small INDEX_ROOT. */
+    if (!(IndexHeader->Flags & 1)) {
+        char *Start = (char *)IndexHeader + IndexHeader->FirstEntryOffset;
+        char *Current = Start;
+
+        while (Current - Start < (ptrdiff_t)IndexHeader->TotalEntriesSize) {
+            NtfsIndexEntry *IndexEntry = (NtfsIndexEntry *)Current;
+
+            if (IndexEntry->Flags & 1) {
+                break;
+            }
+
+            printf(
+                "%llx, %hd, %hd, %x\n",
+                IndexEntry->MftEntry,
+                IndexEntry->EntryLength,
+                IndexEntry->NameLength,
+                IndexEntry->Flags);
+
+            Current += IndexEntry->EntryLength;
+        }
+
+        return 0;
+    }
+
+    NtfsIndexAllocationHeader *IndexAllocation = FindAttribute(FsContext, 0xA0, 1);
+    if (!IndexAllocation) {
+        return 0;
+    }
 
     return 0;
 }

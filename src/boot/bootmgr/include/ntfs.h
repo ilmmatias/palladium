@@ -56,11 +56,28 @@ typedef struct __attribute__((packed)) {
 typedef struct __attribute__((packed)) {
     uint32_t Type;
     uint32_t Size;
-    uint8_t Resident;
-    uint8_t NameSize;
+    uint8_t NonResident;
+    uint8_t NameLength;
     uint16_t NameOffset;
     uint16_t DataFlags;
     uint16_t Identifier;
+    union {
+        struct {
+            uint32_t Length;
+            uint16_t Offset;
+        } ResidentForm;
+        struct {
+            uint64_t FirstVcn;
+            uint64_t LastVcn;
+            uint16_t DataRunOffset;
+            uint16_t CompressionUnit;
+            uint32_t Padding;
+            uint64_t AllocatedDataLength;
+            uint64_t DataLength;
+            uint64_t ValidDataLength;
+            uint64_t TotalAllocatedSize;
+        } NonResidentForm;
+    };
 } NtfsMftAttributeHeader;
 
 typedef struct __attribute__((packed)) {
@@ -69,5 +86,28 @@ typedef struct __attribute__((packed)) {
     uint32_t IndexEntrySize;
     uint32_t IndexEntryNumber;
 } NtfsIndexRootHeader;
+
+typedef struct __attribute__((packed)) {
+    char Signature[4];
+    uint16_t FixupOffset;
+    uint16_t NumberOfFixups;
+    uint64_t TransactionJournalNumber;
+    uint64_t IndexVcn;
+} NtfsIndexAllocationHeader;
+
+typedef struct __attribute__((packed)) {
+    uint32_t FirstEntryOffset;
+    uint32_t TotalEntriesSize;
+    uint32_t AllocatedEntriesSize;
+    uint8_t Flags;
+    char Padding[3];
+} NtfsIndexHeader;
+
+typedef struct __attribute__((packed)) {
+    uint64_t MftEntry;
+    uint16_t EntryLength;
+    uint16_t NameLength;
+    uint32_t Flags;
+} NtfsIndexEntry;
 
 #endif /* _NTFS_H_ */
