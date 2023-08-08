@@ -25,4 +25,5 @@ if(NOT ARCH STREQUAL "x86")
 endif()
 
 add_subdirectory(boot)
+add_subdirectory(drivers)
 add_subdirectory(sdk)

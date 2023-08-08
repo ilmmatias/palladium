@@ -25,6 +25,13 @@ add_executable(bootmgr "kstdlib"
 
     main.c)
 
+target_link_libraries(bootmgr
+    bexfatfs
+    bfat32fs
+    biso9660fs
+    bntfs
+)
+
 target_include_directories(bootmgr PRIVATE include)
 target_compile_options(bootmgr PRIVATE $<$<COMPILE_LANGUAGE:C,CXX>:-ffreestanding>)
 target_link_options(bootmgr PRIVATE -Wl,--subsystem=native,--entry=BmMain,--image-base=0x8000,--no-dynamicbase)
