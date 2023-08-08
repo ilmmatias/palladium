@@ -8,9 +8,18 @@
 #include <stdlib.h>
 #include <string.h>
 
+typedef struct NtfsDataRun {
+    int Used;
+    uint64_t Vcn;
+    uint64_t Lcn;
+    uint64_t Length;
+    struct NtfsDataRun *Next;
+} NtfsDataRun;
+
 typedef struct {
     FileContext Parent;
     void *ClusterBuffer;
+    NtfsDataRun *DataRuns;
     uint16_t BytesPerSector;
     uint32_t BytesPerCluster;
     uint32_t BytesPerMftEntry;
@@ -182,16 +191,46 @@ static int ApplyFixups(NtfsContext *FsContext, uint16_t FixupOffset, uint16_t Nu
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
+ *     This function uses a data run list obtained from FindAttribute to convert a Virtual Cluster
+ *     Number (VCN) into a Logical Cluster Number (LCN, aka something we can just multiply by the
+ *     size of a cluster and __fread).
+ *
+ * PARAMETERS:
+ *     FsContext - FS-specific data.
+ *     Vcn - Virtual cluster to translate.
+ *     Lcn - Output; Contains the Logical Cluster Number on success.
+ *
+ * RETURN VALUE:
+ *     1 on match (if a translation was found), 0 otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+static int TranslateVcn(NtfsContext *FsContext, uint64_t Vcn, uint64_t *Lcn) {
+    for (NtfsDataRun *Entry = FsContext->DataRuns; Entry && Entry->Used; Entry = Entry->Next) {
+        if (Entry->Vcn >= Vcn) {
+            *Lcn = Entry->Lcn + Vcn - Entry->Vcn;
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
  *     This function searches for a given attribute inside a FILE record.
  *
  * PARAMETERS:
  *     FsContext - FS-specific data.
  *     Type - Attribute's `Type` field to search for.
+ *     NonResident - Set to either 0 or 1 depending on if the caller expects the attribute to be
+ *                   resident/non-resident; Can be set to -1 for ignore/no preference.
+ *     LastVcn - Output; Ending cluster for non-resident attributes; It's a VCN, so make sure to
+ *               use TranslateVcn()!
  *
  * RETURN VALUE:
  *     Either a pointer to the attribute, or NULL if it couldn't be found.
  *-----------------------------------------------------------------------------------------------*/
-static void *FindAttribute(NtfsContext *FsContext, uint32_t Type, int NonResident) {
+static void *
+FindAttribute(NtfsContext *FsContext, uint32_t Type, int NonResident, uint64_t *LastVcn) {
     char *Start = FsContext->ClusterBuffer;
     char *Current = Start + ((NtfsMftEntry *)FsContext->ClusterBuffer)->AttributeOffset;
 
@@ -203,11 +242,85 @@ static void *FindAttribute(NtfsContext *FsContext, uint32_t Type, int NonResiden
                -1/auto). */
             if (NonResident != -1 && Attribute->NonResident != NonResident) {
                 return NULL;
-            } else if (Attribute->NonResident) {
-                return NULL;
-            } else {
+            } else if (!Attribute->NonResident) {
                 return Current + Attribute->ResidentForm.Offset;
             }
+
+            /* On non-resident attributes, we always load up the first cluster (saving the
+               last cluster); This will invalidate all pointers we currently have into the
+               cluster buffer, make sure to copy any important data beforehand (such as we do for
+               the data run translations themselves)! */
+            uint8_t *DataRun = (uint8_t *)Current + Attribute->NonResidentForm.DataRunOffset;
+            NtfsDataRun *LastRun = FsContext->DataRuns;
+            NtfsDataRun *CurrentRun = LastRun;
+            uint64_t CurrentVcn = 0;
+
+            while (1) {
+                uint8_t Current = *(DataRun++);
+                uint8_t OffsetSize = Current >> 4;
+                uint8_t LengthSize = Current & 0x0F;
+
+                if (!Current) {
+                    if (CurrentRun) {
+                        CurrentRun->Used = 0;
+                    }
+
+                    break;
+                }
+
+                /* We shouldn't be over 8 bytes, if we are, we're just discarding those
+                   higher bits. */
+                uint64_t Length = 0;
+                memcpy((char *)&Length, DataRun, LengthSize > 8 ? 8 : LengthSize);
+                DataRun += LengthSize;
+
+                uint64_t Offset = 0;
+                memcpy((char *)&Offset, DataRun, OffsetSize > 8 ? 8 : OffsetSize);
+                DataRun += OffsetSize;
+
+                /* If possible, reuse our past allocated data run list, overwriting its
+                   entries. */
+                NtfsDataRun *Entry = CurrentRun;
+                if (!Entry) {
+                    Entry = malloc(sizeof(NtfsDataRun));
+                    if (!Entry) {
+                        return NULL;
+                    }
+                }
+
+                Entry->Used = 1;
+                Entry->Vcn = CurrentVcn;
+                Entry->Lcn = Offset;
+                Entry->Length = Length;
+
+                if (!CurrentRun && !LastRun) {
+                    FsContext->DataRuns = Entry;
+                } else if (!CurrentRun) {
+                    LastRun->Next = Entry;
+                } else {
+                    CurrentRun = CurrentRun->Next;
+                }
+
+                LastRun = Entry;
+                CurrentVcn += Length;
+            }
+
+            if (LastVcn) {
+                *LastVcn = Attribute->NonResidentForm.LastVcn;
+            }
+
+            uint64_t Cluster;
+            if (!TranslateVcn(FsContext, Attribute->NonResidentForm.FirstVcn, &Cluster) ||
+                __fread(
+                    &FsContext->Parent,
+                    Cluster * FsContext->BytesPerCluster,
+                    FsContext->ClusterBuffer,
+                    FsContext->BytesPerCluster,
+                    NULL)) {
+                return NULL;
+            }
+
+            return FsContext->ClusterBuffer;
         }
 
         Current += Attribute->Size;
@@ -249,7 +362,7 @@ int BiTraverseNtfsDirectory(FileContext *Context, const char *Name) {
 
     /* $I30 ($INDEX_ROOT and $INDEX_ALLOCATION) are the attributes containing the directory
        tree itself (that we can iterate over). */
-    NtfsIndexRootHeader *IndexRoot = FindAttribute(FsContext, 0x90, 0);
+    NtfsIndexRootHeader *IndexRoot = FindAttribute(FsContext, 0x90, 0, NULL);
     NtfsIndexHeader *IndexHeader = (NtfsIndexHeader *)IndexRoot + 1;
     if (!IndexRoot || IndexRoot->AttributeType != 0x30 || IndexRoot->CollationType != 0x01) {
         return 0;
@@ -281,7 +394,8 @@ int BiTraverseNtfsDirectory(FileContext *Context, const char *Name) {
         return 0;
     }
 
-    NtfsIndexAllocationHeader *IndexAllocation = FindAttribute(FsContext, 0xA0, 1);
+    uint64_t LastVcn;
+    NtfsIndexAllocationHeader *IndexAllocation = FindAttribute(FsContext, 0xA0, 1, &LastVcn);
     if (!IndexAllocation) {
         return 0;
     }
