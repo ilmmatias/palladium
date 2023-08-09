@@ -119,7 +119,6 @@ Main$NotFound:
     jmp Error
 Main endp
 
-ReadSectors proc
 ;---------------------------------------------------------------------------------------------------------------------
 ; PURPOSE:
 ;     This function reads sectors from the boot disk. The input should be an LBA value.
@@ -132,7 +131,7 @@ ReadSectors proc
 ; RETURN VALUE:
 ;     Does not return on failure, all of the inputs are already incremented on success.
 ;---------------------------------------------------------------------------------------------------------------------
-
+ReadSectors proc
     pushad
 
     ; We just need to mount the disk address packet and call int 13h.
@@ -181,7 +180,6 @@ ReadSectors$NoOverflow:
     ret
 ReadSectors endp
 
-Error proc
 ;---------------------------------------------------------------------------------------------------------------------
 ; PURPOSE:
 ;     This function should be called when something in the load process goes wrong. It prints the contents of
@@ -193,7 +191,7 @@ Error proc
 ; RETURN VALUE:
 ;     Does not return.
 ;---------------------------------------------------------------------------------------------------------------------
-
+Error proc
     lodsb
     or al, al
     jz Error$Halt

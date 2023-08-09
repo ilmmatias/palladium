@@ -23,7 +23,6 @@ typedef struct {
     uint16_t BytesPerSector;
     uint32_t BytesPerCluster;
     uint32_t BytesPerMftEntry;
-    uint32_t BytesPerIndexEntry;
     uint64_t MftOffset;
     uint64_t FileEntry;
     uint64_t FileSize;
@@ -89,8 +88,8 @@ int BiProbeNtfs(FileContext *Context) {
         BootSector->SectorsPerCluster > 255 || BootSector->ReservedSectors ||
         BootSector->NumberOfFats || BootSector->RootEntries || BootSector->NumberOfSectors16 ||
         BootSector->SectorsPerFat || BootSector->NumberOfSectors32 ||
-        BootSector->MftEntrySize > 255 || BootSector->IndexEntrySize > 255 ||
-        BootSector->SectorSignaure != 0xAA55) {
+        BootSector->BpbSignature != 0x80 || BootSector->MftEntrySize > 255 ||
+        BootSector->IndexEntrySize > 255) {
         free(Buffer);
         return 0;
     }
@@ -125,12 +124,6 @@ int BiProbeNtfs(FileContext *Context) {
         FsContext->BytesPerMftEntry = FsContext->BytesPerCluster * BootSector->MftEntrySize;
     }
 
-    if (BootSector->IndexEntrySize > 127) {
-        FsContext->BytesPerIndexEntry = 1 << -(int8_t)BootSector->IndexEntrySize;
-    } else {
-        FsContext->BytesPerIndexEntry = FsContext->BytesPerCluster * BootSector->IndexEntrySize;
-    }
-
     /* MFT entry 5 is `.` (the root directory). */
     FsContext->MftOffset = BootSector->MftCluster * FsContext->BytesPerCluster;
     FsContext->FileEntry = 5;
@@ -157,7 +150,6 @@ int BiProbeNtfs(FileContext *Context) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void BiCleanupNtfs(FileContext *Context) {
-    free(((NtfsContext *)Context)->ClusterBuffer);
     free(Context);
 }
 
@@ -241,108 +233,109 @@ static void *FindAttribute(
     char *Start = FsContext->ClusterBuffer;
     char *Current = Start + ((NtfsMftEntry *)FsContext->ClusterBuffer)->AttributeOffset;
 
-    while (Current - Start < (ptrdiff_t)FsContext->BytesPerCluster) {
+    while (Current - Start < (ptrdiff_t)FsContext->BytesPerMftEntry) {
         NtfsMftAttributeHeader *Attribute = (NtfsMftAttributeHeader *)Current;
 
-        if (Attribute->Type == Type) {
-            /* Resident mismatch means instant error; No negotiating (unless it's set to
-               -1/auto). */
-            if (NonResident != -1 && Attribute->NonResident != NonResident) {
-                return NULL;
-            } else if (!Attribute->NonResident) {
-                if (FirstVcn) {
-                    *FirstVcn = UINT64_MAX;
-                }
+        if (Attribute->Type != Type) {
+            Current += Attribute->Size;
+            continue;
+        }
 
-                if (LastVcn) {
-                    *LastVcn = UINT64_MAX;
-                }
-
-                return Current + Attribute->ResidentForm.Offset;
-            }
-
-            /* On non-resident attributes, we always load up the first cluster (saving the
-               last cluster); This will invalidate all pointers we currently have into the
-               cluster buffer, make sure to copy any important data beforehand (such as we do for
-               the data run translations themselves)! */
-            uint8_t *DataRun = (uint8_t *)Current + Attribute->NonResidentForm.DataRunOffset;
-            NtfsDataRun *LastRun = FsContext->DataRuns;
-            NtfsDataRun *CurrentRun = LastRun;
-            uint64_t CurrentVcn = 0;
-
-            while (1) {
-                uint8_t Current = *(DataRun++);
-                uint8_t OffsetSize = Current >> 4;
-                uint8_t LengthSize = Current & 0x0F;
-
-                if (!Current) {
-                    if (CurrentRun) {
-                        CurrentRun->Used = 0;
-                    }
-
-                    break;
-                }
-
-                /* We shouldn't be over 8 bytes, if we are, we're just discarding those
-                   higher bits. */
-                uint64_t Length = 0;
-                memcpy((char *)&Length, DataRun, LengthSize > 8 ? 8 : LengthSize);
-                DataRun += LengthSize;
-
-                uint64_t Offset = 0;
-                memcpy((char *)&Offset, DataRun, OffsetSize > 8 ? 8 : OffsetSize);
-                DataRun += OffsetSize;
-
-                /* If possible, reuse our past allocated data run list, overwriting its
-                   entries. */
-                NtfsDataRun *Entry = CurrentRun;
-                if (!Entry) {
-                    Entry = malloc(sizeof(NtfsDataRun));
-                    if (!Entry) {
-                        return NULL;
-                    }
-                }
-
-                Entry->Used = 1;
-                Entry->Vcn = CurrentVcn;
-                Entry->Lcn = Offset;
-                Entry->Length = Length;
-
-                if (!CurrentRun && !LastRun) {
-                    FsContext->DataRuns = Entry;
-                } else if (!CurrentRun) {
-                    LastRun->Next = Entry;
-                } else {
-                    CurrentRun = CurrentRun->Next;
-                }
-
-                LastRun = Entry;
-                CurrentVcn += Length;
-            }
-
+        /* Resident mismatch means instant error; No negotiating (unless it's set to
+           -1/auto). */
+        if (NonResident != -1 && Attribute->NonResident != NonResident) {
+            return NULL;
+        } else if (!Attribute->NonResident) {
             if (FirstVcn) {
-                *FirstVcn = Attribute->NonResidentForm.FirstVcn;
+                *FirstVcn = UINT64_MAX;
             }
 
             if (LastVcn) {
-                *LastVcn = Attribute->NonResidentForm.LastVcn;
+                *LastVcn = UINT64_MAX;
             }
 
-            uint64_t Cluster;
-            if (!TranslateVcn(FsContext, Attribute->NonResidentForm.FirstVcn, &Cluster) ||
-                __fread(
-                    &FsContext->Parent,
-                    Cluster * FsContext->BytesPerCluster,
-                    FsContext->ClusterBuffer,
-                    FsContext->BytesPerCluster,
-                    NULL)) {
-                return NULL;
-            }
-
-            return FsContext->ClusterBuffer;
+            return Current + Attribute->ResidentForm.Offset;
         }
 
-        Current += Attribute->Size;
+        /* On non-resident attributes, we always load up the first cluster (saving the
+           last cluster); This will invalidate all pointers we currently have into the
+           cluster buffer, make sure to copy any important data beforehand (such as we do for
+           the data run translations themselves)! */
+        uint8_t *DataRun = (uint8_t *)Current + Attribute->NonResidentForm.DataRunOffset;
+        NtfsDataRun *LastRun = FsContext->DataRuns;
+        NtfsDataRun *CurrentRun = LastRun;
+        uint64_t CurrentVcn = 0;
+
+        while (1) {
+            uint8_t Current = *(DataRun++);
+            uint8_t OffsetSize = Current >> 4;
+            uint8_t LengthSize = Current & 0x0F;
+
+            if (!Current) {
+                if (CurrentRun) {
+                    CurrentRun->Used = 0;
+                }
+
+                break;
+            }
+
+            /* We shouldn't be over 8 bytes, if we are, we're just discarding those
+               higher bits. */
+            uint64_t Length = 0;
+            memcpy((char *)&Length, DataRun, LengthSize > 8 ? 8 : LengthSize);
+            DataRun += LengthSize;
+
+            uint64_t Offset = 0;
+            memcpy((char *)&Offset, DataRun, OffsetSize > 8 ? 8 : OffsetSize);
+            DataRun += OffsetSize;
+
+            /* If possible, reuse our past allocated data run list, overwriting its
+               entries. */
+            NtfsDataRun *Entry = CurrentRun;
+            if (!Entry) {
+                Entry = malloc(sizeof(NtfsDataRun));
+                if (!Entry) {
+                    return NULL;
+                }
+            }
+
+            Entry->Used = 1;
+            Entry->Vcn = CurrentVcn;
+            Entry->Lcn = Offset;
+            Entry->Length = Length;
+
+            if (!CurrentRun && !LastRun) {
+                FsContext->DataRuns = Entry;
+            } else if (!CurrentRun) {
+                LastRun->Next = Entry;
+            } else {
+                CurrentRun = CurrentRun->Next;
+            }
+
+            LastRun = Entry;
+            CurrentVcn += Length;
+        }
+
+        if (FirstVcn) {
+            *FirstVcn = Attribute->NonResidentForm.FirstVcn;
+        }
+
+        if (LastVcn) {
+            *LastVcn = Attribute->NonResidentForm.LastVcn;
+        }
+
+        uint64_t Cluster;
+        if (!TranslateVcn(FsContext, Attribute->NonResidentForm.FirstVcn, &Cluster) ||
+            __fread(
+                &FsContext->Parent,
+                Cluster * FsContext->BytesPerCluster,
+                FsContext->ClusterBuffer,
+                FsContext->BytesPerCluster,
+                NULL)) {
+            return NULL;
+        }
+
+        return FsContext->ClusterBuffer;
     }
 
     return NULL;
@@ -435,7 +428,7 @@ int BiTraverseNtfsDirectory(FileContext *Context, const char *Name) {
             &FsContext->Parent,
             FsContext->MftOffset + FsContext->FileEntry * FsContext->BytesPerMftEntry,
             FsContext->ClusterBuffer,
-            FsContext->BytesPerCluster,
+            FsContext->BytesPerMftEntry,
             NULL) ||
         memcmp(MftEntry->Signature, ExpectedFileSignature, 4) ||
         !ApplyFixups(FsContext, MftEntry->FixupOffset, MftEntry->NumberOfFixups)) {
@@ -532,7 +525,7 @@ int BiReadNtfsFile(FileContext *Context, void *Buffer, size_t Start, size_t Size
             &FsContext->Parent,
             FsContext->MftOffset + FsContext->FileEntry * FsContext->BytesPerMftEntry,
             FsContext->ClusterBuffer,
-            FsContext->BytesPerCluster,
+            FsContext->BytesPerMftEntry,
             NULL) ||
         memcmp(MftEntry->Signature, ExpectedFileSignature, 4) ||
         !ApplyFixups(FsContext, MftEntry->FixupOffset, MftEntry->NumberOfFixups)) {
@@ -557,8 +550,13 @@ int BiReadNtfsFile(FileContext *Context, void *Buffer, size_t Start, size_t Size
     }
 
     /* Now safely seek through the file into the starting cluster (for the given byte index). */
-    while (Start > FsContext->BytesPerCluster) {
-        if (++FirstVcn > LastVcn || !TranslateVcn(FsContext, FirstVcn, &Cluster) ||
+    if (Start > FsContext->BytesPerCluster) {
+        size_t Clusters = Start / FsContext->BytesPerCluster;
+
+        FirstVcn += Clusters;
+        Start -= Clusters * FsContext->BytesPerCluster;
+
+        if (FirstVcn > LastVcn || !TranslateVcn(FsContext, FirstVcn, &Cluster) ||
             __fread(
                 &FsContext->Parent,
                 Cluster * FsContext->BytesPerCluster,
@@ -567,8 +565,6 @@ int BiReadNtfsFile(FileContext *Context, void *Buffer, size_t Start, size_t Size
                 NULL)) {
             return __STDIO_FLAGS_ERROR;
         }
-
-        Start -= FsContext->BytesPerCluster;
     }
 
     while (1) {

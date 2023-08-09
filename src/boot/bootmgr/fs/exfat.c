@@ -149,7 +149,6 @@ int BiProbeExfat(FileContext *Context) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void BiCleanupExfat(FileContext *Context) {
-    free(((ExfatContext *)Context)->ClusterBuffer);
     free(Context);
 }
 
@@ -268,7 +267,7 @@ int BiTraverseExfatDirectory(FileContext *Context, const char *Name) {
             ExfatFileNameEntry *NameEntry = (ExfatFileNameEntry *)Current;
 
             for (int i = 0; i < (StreamEntry.NameLength < 15 ? StreamEntry.NameLength : 15); i++) {
-                if (NameEntry->FileName[i] != tolower(*(NamePos++))) {
+                if (tolower(NameEntry->FileName[i]) != tolower(*(NamePos++))) {
                     Match = 0;
                     break;
                 }

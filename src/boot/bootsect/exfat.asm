@@ -246,7 +246,6 @@ ReadSectors$NoOverflow:
     ret
 ReadSectors endp
 
-Error proc
 ;---------------------------------------------------------------------------------------------------------------------
 ; PURPOSE:
 ;     This function should be called when something in the load process goes wrong. It prints the contents of
@@ -258,7 +257,7 @@ Error proc
 ; RETURN VALUE:
 ;     Does not return.
 ;---------------------------------------------------------------------------------------------------------------------
-
+Error proc
     lodsb
     or al, al
     jz Error$Halt
@@ -281,7 +280,6 @@ ImageSize equ ($ - ImageName) / 2
 org 7DFEh
 dw 0AA55h
 
-ReadCluster proc
 ;---------------------------------------------------------------------------------------------------------------------
 ; PURPOSE:
 ;     This function converts the cluster number into an LBA/sector number and reads in the data (getting the next
@@ -293,7 +291,7 @@ ReadCluster proc
 ; RETURN VALUE:
 ;     Same as ReadSectors.
 ;---------------------------------------------------------------------------------------------------------------------
-
+ReadCluster proc
     mov ecx, [SectorsPerCluster]
     lea eax, [ebp - 2]
     mul ecx
@@ -302,7 +300,6 @@ ReadCluster proc
     ret
 ReadCluster endp
 
-GetNextCluster proc
 ;---------------------------------------------------------------------------------------------------------------------
 ; PURPOSE:
 ;     This function loads the required FAT to get the next cluster of a chain (or to indicate that the file ended).
@@ -316,7 +313,7 @@ GetNextCluster proc
 ; RETURN VALUE:
 ;     cf will be unset if the file has ended, otherwise, new/next cluster on ebp.
 ;---------------------------------------------------------------------------------------------------------------------
-
+GetNextCluster proc
     ; exFAT supports the sequential data sectors (no need to read the FAT in that case, just decrease the file size
     ; and check if we finished reading, that is, if the size is negative).
     jz GetNextCluster$FollowFat

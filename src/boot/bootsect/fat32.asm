@@ -134,7 +134,6 @@ Main$Loop:
     retf
 Main endp
 
-ReadSectors proc
 ;---------------------------------------------------------------------------------------------------------------------
 ; PURPOSE:
 ;     This function reads sectors from the boot disk. The input should be an LBA value.
@@ -147,7 +146,7 @@ ReadSectors proc
 ; RETURN VALUE:
 ;     Does not return on failure, all of the inputs are already incremented on success.
 ;---------------------------------------------------------------------------------------------------------------------
-
+ReadSectors proc
     pushad
 
     ; We just need to mount the disk address packet and call int 13h.
@@ -196,7 +195,6 @@ ReadSectors$NoOverflow:
     ret
 ReadSectors endp
 
-ReadCluster proc
 ;---------------------------------------------------------------------------------------------------------------------
 ; PURPOSE:
 ;     This function converts the cluster number into an LBA/sector number and reads in the data (getting the next
@@ -208,7 +206,7 @@ ReadCluster proc
 ; RETURN VALUE:
 ;     Same as ReadSectors.
 ;---------------------------------------------------------------------------------------------------------------------
-
+ReadCluster proc
     movzx ecx, [SectorsPerCluster]
     lea eax, [ebp - 2]
     mul ecx
@@ -217,7 +215,6 @@ ReadCluster proc
     ret
 ReadCluster endp
 
-GetNextCluster proc
 ;---------------------------------------------------------------------------------------------------------------------
 ; PURPOSE:
 ;     This function loads the required FAT to get the next cluster of a chain (or to indicate that the file ended).
@@ -229,7 +226,7 @@ GetNextCluster proc
 ; RETURN VALUE:
 ;     cf will be unset if the file has ended, otherwise, new/next cluster on ebp.
 ;---------------------------------------------------------------------------------------------------------------------
-
+GetNextCluster proc
     ; In the FAT, the size of each entry (representing a cluster) is 4 bytes. We can get the sector of the current
     ; cluster by doing Cluster*EntrySize/BytesPerSector, which will as a side effect leave the offset in the sector
     ; inside edx (because div).
@@ -260,7 +257,6 @@ GetNextCluster proc
     ret
 GetNextCluster endp
 
-Error proc
 ;---------------------------------------------------------------------------------------------------------------------
 ; PURPOSE:
 ;     This function should be called when something in the load process goes wrong. It prints the contents of
@@ -272,7 +268,7 @@ Error proc
 ; RETURN VALUE:
 ;     Does not return.
 ;---------------------------------------------------------------------------------------------------------------------
-
+Error proc
     lodsb
     or al, al
     jz Error$Halt

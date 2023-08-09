@@ -36,6 +36,7 @@
         }
 
         printf("%.*s\n", read, data);
+        fclose(stream);
     } while (0);
 
     while (1)

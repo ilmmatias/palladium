@@ -3,6 +3,6 @@
 
 project(os/boot/bootsect)
 
-foreach(TARGET exfat fat32 iso9660)
+foreach(TARGET exfat fat32 iso9660 ntfs)
     add_bootsector(${TARGET}boot ${TARGET}.asm)
 endforeach()
