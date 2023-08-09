@@ -110,6 +110,8 @@ int __fread(void *handle, size_t pos, void *buffer, size_t size, size_t *read) {
         return BiReadArchDevice(Context, buffer, pos, size, read);
     } else if (Context->Type == FILE_TYPE_EXFAT) {
         return BiReadExfatFile(Context, buffer, pos, size, read);
+    } else if (Context->Type == FILE_TYPE_NTFS) {
+        return BiReadNtfsFile(Context, buffer, pos, size, read);
     } else {
         if (read) {
             *read = 0;

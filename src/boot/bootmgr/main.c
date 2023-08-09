@@ -21,7 +21,22 @@
     BmInitMemory(BootBlock);
     BmInitArch(BootBlock);
 
-    printf("%d\n", fopen("bios(80)/open_this/flag.txt", "r"));
+    do {
+        FILE *stream = fopen("bios(80)/open_this/flag.txt", "r");
+        if (!stream) {
+            printf("fopen() failed\n");
+            break;
+        }
+
+        char data[128];
+        int read = fread(data, 128, 1, stream);
+        if (!read) {
+            printf("fread() failed\n");
+            break;
+        }
+
+        printf("?\n");
+    } while (0);
 
     while (1)
         ;

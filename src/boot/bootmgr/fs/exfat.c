@@ -200,81 +200,6 @@ static int FollowCluster(ExfatContext *FsContext, void **Current, uint64_t *Clus
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function tries to read what should be an exFAT file. Calling it on a directory will
- *     fail.
- *
- * PARAMETERS:
- *     Context - Device/node private data.
- *     Buffer - Output buffer.
- *     Start - Starting byte index (in the file).
- *     Size - How many bytes to read into the buffer.
- *     Read - How many bytes we read with no error.
- *
- * RETURN VALUE:
- *     __STDIO_FLAGS_ERROR/EOF if something went wrong, 0 otherwise.
- *-----------------------------------------------------------------------------------------------*/
-int BiReadExfatFile(FileContext *Context, void *Buffer, size_t Start, size_t Size, size_t *Read) {
-    ExfatContext *FsContext = Context->PrivateData;
-    uint64_t Cluster = FsContext->FileCluster;
-    char *Current = FsContext->ClusterBuffer;
-    char *Output = Buffer;
-    size_t Accum = 0;
-    int Flags = 0;
-
-    if (FsContext->Directory) {
-        return __STDIO_FLAGS_ERROR;
-    } else if (Start > FsContext->FileLength) {
-        return __STDIO_FLAGS_EOF;
-    }
-
-    if (Size > FsContext->FileLength - Start) {
-        Flags = __STDIO_FLAGS_EOF;
-        Size = FsContext->FileLength - Start;
-    }
-
-    /* Seek through the file into the starting cluster (for the given byte index). */
-    while (Start >= (1 << FsContext->ClusterShift)) {
-        Start -= 1 << FsContext->ClusterShift;
-        if (!FollowCluster(FsContext, NULL, &Cluster)) {
-            if (Read) {
-                *Read = 0;
-            }
-
-            return __STDIO_FLAGS_ERROR;
-        }
-    }
-
-    while (Size) {
-        if (!FollowCluster(FsContext, (void **)&Current, &Cluster)) {
-            if (Read) {
-                *Read = Accum;
-            }
-
-            return __STDIO_FLAGS_ERROR;
-        }
-
-        size_t CopySize = (1 << FsContext->ClusterShift) - Start;
-        if (Size < CopySize) {
-            CopySize = Size;
-        }
-
-        memcpy(Output, Current + Start, CopySize);
-        Current += 1 << FsContext->ClusterShift;
-        Output += CopySize;
-        Start += CopySize;
-        Size -= CopySize;
-        Accum += CopySize;
-    }
-
-    if (Read) {
-        *Read = Accum;
-    }
-
-    return Flags;
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
  *     This function does traversal on what should be a exFAT directory (if its a file, we error
  *     out), searching for a specific node.
  *
@@ -375,4 +300,79 @@ int BiTraverseExfatDirectory(FileContext *Context, const char *Name) {
 
         return 1;
     }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function tries to read what should be an exFAT file. Calling it on a directory will
+ *     fail.
+ *
+ * PARAMETERS:
+ *     Context - Device/node private data.
+ *     Buffer - Output buffer.
+ *     Start - Starting byte index (in the file).
+ *     Size - How many bytes to read into the buffer.
+ *     Read - How many bytes we read with no error.
+ *
+ * RETURN VALUE:
+ *     __STDIO_FLAGS_ERROR/EOF if something went wrong, 0 otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+int BiReadExfatFile(FileContext *Context, void *Buffer, size_t Start, size_t Size, size_t *Read) {
+    ExfatContext *FsContext = Context->PrivateData;
+    uint64_t Cluster = FsContext->FileCluster;
+    char *Current = FsContext->ClusterBuffer;
+    char *Output = Buffer;
+    size_t Accum = 0;
+    int Flags = 0;
+
+    if (FsContext->Directory) {
+        return __STDIO_FLAGS_ERROR;
+    } else if (Start > FsContext->FileLength) {
+        return __STDIO_FLAGS_EOF;
+    }
+
+    if (Size > FsContext->FileLength - Start) {
+        Flags = __STDIO_FLAGS_EOF;
+        Size = FsContext->FileLength - Start;
+    }
+
+    /* Seek through the file into the starting cluster (for the given byte index). */
+    while (Start >= (1 << FsContext->ClusterShift)) {
+        Start -= 1 << FsContext->ClusterShift;
+        if (!FollowCluster(FsContext, NULL, &Cluster)) {
+            if (Read) {
+                *Read = 0;
+            }
+
+            return __STDIO_FLAGS_ERROR;
+        }
+    }
+
+    while (Size) {
+        if (!FollowCluster(FsContext, (void **)&Current, &Cluster)) {
+            if (Read) {
+                *Read = Accum;
+            }
+
+            return __STDIO_FLAGS_ERROR;
+        }
+
+        size_t CopySize = (1 << FsContext->ClusterShift) - Start;
+        if (Size < CopySize) {
+            CopySize = Size;
+        }
+
+        memcpy(Output, Current + Start, CopySize);
+        Current += 1 << FsContext->ClusterShift;
+        Output += CopySize;
+        Start += CopySize;
+        Size -= CopySize;
+        Accum += CopySize;
+    }
+
+    if (Read) {
+        *Read = Accum;
+    }
+
+    return Flags;
 }

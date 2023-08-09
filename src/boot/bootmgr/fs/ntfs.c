@@ -25,7 +25,8 @@ typedef struct {
     uint32_t BytesPerMftEntry;
     uint32_t BytesPerIndexEntry;
     uint64_t MftOffset;
-    uint32_t FileEntry;
+    uint64_t FileEntry;
+    uint64_t FileSize;
     int Directory;
 } NtfsContext;
 
@@ -133,6 +134,7 @@ int BiProbeNtfs(FileContext *Context) {
     /* MFT entry 5 is `.` (the root directory). */
     FsContext->MftOffset = BootSector->MftCluster * FsContext->BytesPerCluster;
     FsContext->FileEntry = 5;
+    FsContext->FileSize = 0;
     FsContext->Directory = 1;
 
     memcpy(&FsContext->Parent, Context, sizeof(FileContext));
@@ -248,6 +250,14 @@ static void *FindAttribute(
             if (NonResident != -1 && Attribute->NonResident != NonResident) {
                 return NULL;
             } else if (!Attribute->NonResident) {
+                if (FirstVcn) {
+                    *FirstVcn = UINT64_MAX;
+                }
+
+                if (LastVcn) {
+                    *LastVcn = UINT64_MAX;
+                }
+
                 return Current + Attribute->ResidentForm.Offset;
             }
 
@@ -390,6 +400,7 @@ static int TraverseIndexBlock(
         if (Match && !IndexEntry->NameLength) {
             FsContext->FileEntry = IndexEntry->MftEntry & 0xFFFFFFFFFFFF;
             FsContext->Directory = (IndexEntry->FileFlags & 0x10000000) != 0;
+            FsContext->FileSize = IndexEntry->RealSize;
             return 1;
         }
 
@@ -481,4 +492,119 @@ int BiTraverseNtfsDirectory(FileContext *Context, const char *Name) {
             return 0;
         }
     }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function tries to read what should be an NTFS file. Calling it on a directory will
+ *     fail.
+ *
+ * PARAMETERS:
+ *     Context - Device/node private data.
+ *     Buffer - Output buffer.
+ *     Start - Starting byte index (in the file).
+ *     Size - How many bytes to read into the buffer.
+ *     Read - How many bytes we read with no error.
+ *
+ * RETURN VALUE:
+ *     __STDIO_FLAGS_ERROR/EOF if something went wrong, 0 otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+int BiReadNtfsFile(FileContext *Context, void *Buffer, size_t Start, size_t Size, size_t *Read) {
+    const char ExpectedFileSignature[4] = "FILE";
+
+    NtfsContext *FsContext = Context->PrivateData;
+    NtfsMftEntry *MftEntry = FsContext->ClusterBuffer;
+    size_t Accum = 0;
+    int Flags = 0;
+
+    if (FsContext->Directory) {
+        return __STDIO_FLAGS_ERROR;
+    } else if (Start > FsContext->FileSize) {
+        return __STDIO_FLAGS_EOF;
+    }
+
+    if (Size > FsContext->FileSize - Start) {
+        Flags = __STDIO_FLAGS_EOF;
+        Size = FsContext->FileSize - Start;
+    }
+
+    if (__fread(
+            &FsContext->Parent,
+            FsContext->MftOffset + FsContext->FileEntry * FsContext->BytesPerMftEntry,
+            FsContext->ClusterBuffer,
+            FsContext->BytesPerCluster,
+            NULL) ||
+        memcmp(MftEntry->Signature, ExpectedFileSignature, 4) ||
+        !ApplyFixups(FsContext, MftEntry->FixupOffset, MftEntry->NumberOfFixups)) {
+        return __STDIO_FLAGS_ERROR;
+    }
+
+    /* The unnamed data stream (aka the main content stream) should have a type of 0x80. */
+    uint64_t FirstVcn;
+    uint64_t LastVcn;
+    uint64_t Cluster;
+
+    char *Current = FindAttribute(FsContext, 0x80, -1, &FirstVcn, &LastVcn);
+    char *Output = Buffer;
+    if (!Current) {
+        return __STDIO_FLAGS_ERROR;
+    }
+
+    /* We're resident, yet, we somehow are over a cluster; Filesystem corruption, probably. */
+    if (FirstVcn == UINT64_MAX &&
+        Current + Start >= (char *)FsContext->ClusterBuffer + FsContext->BytesPerCluster) {
+        return __STDIO_FLAGS_ERROR;
+    }
+
+    /* Now safely seek through the file into the starting cluster (for the given byte index). */
+    while (Start > FsContext->BytesPerCluster) {
+        if (++FirstVcn > LastVcn || !TranslateVcn(FsContext, FirstVcn, &Cluster) ||
+            __fread(
+                &FsContext->Parent,
+                Cluster * FsContext->BytesPerCluster,
+                FsContext->ClusterBuffer,
+                FsContext->BytesPerCluster,
+                NULL)) {
+            return __STDIO_FLAGS_ERROR;
+        }
+
+        Start -= FsContext->BytesPerCluster;
+    }
+
+    while (1) {
+        size_t CopySize = FsContext->BytesPerCluster - Start;
+        if (Size < CopySize) {
+            CopySize = Size;
+        }
+
+        memcpy(Output, Current + Start, CopySize);
+        Output += CopySize;
+        Start += CopySize;
+        Size -= CopySize;
+        Accum += CopySize;
+
+        if (!Size) {
+            break;
+        }
+
+        if (++FirstVcn > LastVcn || !TranslateVcn(FsContext, FirstVcn, &Cluster) ||
+            __fread(
+                &FsContext->Parent,
+                Cluster * FsContext->BytesPerCluster,
+                FsContext->ClusterBuffer,
+                FsContext->BytesPerCluster,
+                NULL)) {
+            if (Read) {
+                *Read = Accum;
+            }
+
+            return __STDIO_FLAGS_ERROR;
+        }
+    }
+
+    if (Read) {
+        *Read = Accum;
+    }
+
+    return Flags;
 }

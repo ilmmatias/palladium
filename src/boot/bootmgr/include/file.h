@@ -36,5 +36,6 @@ int BiCopyNtfs(FileContext *Context, FileContext *Copy);
 int BiProbeNtfs(FileContext *Context);
 void BiCleanupNtfs(FileContext *Context);
 int BiTraverseNtfsDirectory(FileContext *Context, const char *Name);
+int BiReadNtfsFile(FileContext *Context, void *Buffer, size_t Start, size_t Size, size_t *Read);
 
 #endif /* _FILE_H_ */
