@@ -106,8 +106,18 @@ typedef struct __attribute__((packed)) {
 typedef struct __attribute__((packed)) {
     uint64_t MftEntry;
     uint16_t EntryLength;
-    uint16_t NameLength;
+    uint16_t NameOffset;
     uint32_t Flags;
-} NtfsIndexEntry;
+    uint64_t MftParentEntry;
+    uint64_t CreationDate;
+    uint64_t LastModificationDate;
+    uint64_t LastRecordModificationDate;
+    uint64_t LastAccessDate;
+    uint64_t AllocatedSize;
+    uint64_t RealSize;
+    uint64_t FileFlags;
+    uint8_t NameLength;
+    uint8_t NameSpace;
+} NtfsIndexRecord;
 
 #endif /* _NTFS_H_ */

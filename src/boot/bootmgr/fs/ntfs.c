@@ -223,14 +223,19 @@ static int TranslateVcn(NtfsContext *FsContext, uint64_t Vcn, uint64_t *Lcn) {
  *     Type - Attribute's `Type` field to search for.
  *     NonResident - Set to either 0 or 1 depending on if the caller expects the attribute to be
  *                   resident/non-resident; Can be set to -1 for ignore/no preference.
- *     LastVcn - Output; Ending cluster for non-resident attributes; It's a VCN, so make sure to
- *               use TranslateVcn()!
+ *     FirstVcn - Output; Starting cluster for non-resident attributes; It's a VCN, so make sure to
+ *                use TranslateVcn() if you want to load it from the disk!
+ *     LastVcn - Output; Ending cluster for non-resident attributes.
  *
  * RETURN VALUE:
  *     Either a pointer to the attribute, or NULL if it couldn't be found.
  *-----------------------------------------------------------------------------------------------*/
-static void *
-FindAttribute(NtfsContext *FsContext, uint32_t Type, int NonResident, uint64_t *LastVcn) {
+static void *FindAttribute(
+    NtfsContext *FsContext,
+    uint32_t Type,
+    int NonResident,
+    uint64_t *FirstVcn,
+    uint64_t *LastVcn) {
     char *Start = FsContext->ClusterBuffer;
     char *Current = Start + ((NtfsMftEntry *)FsContext->ClusterBuffer)->AttributeOffset;
 
@@ -305,6 +310,10 @@ FindAttribute(NtfsContext *FsContext, uint32_t Type, int NonResident, uint64_t *
                 CurrentVcn += Length;
             }
 
+            if (FirstVcn) {
+                *FirstVcn = Attribute->NonResidentForm.FirstVcn;
+            }
+
             if (LastVcn) {
                 *LastVcn = Attribute->NonResidentForm.LastVcn;
             }
@@ -331,6 +340,68 @@ FindAttribute(NtfsContext *FsContext, uint32_t Type, int NonResident, uint64_t *
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
+ *     This function searches for a given file inside an directory index block.
+ *
+ * PARAMETERS:
+ *     FsContext - FS-specific data.
+ *     HeaderStart - Where the index header starts.
+ *     LastEntry - Output; Last entry of the block. Use this to check for more blocks.
+ *     Name - What entry to find inside the directory.
+ *
+ * RETURN VALUE:
+ *     Either a pointer to the attribute, or NULL if it couldn't be found.
+ *-----------------------------------------------------------------------------------------------*/
+static int TraverseIndexBlock(
+    NtfsContext *FsContext,
+    char *HeaderStart,
+    NtfsIndexRecord **LastEntry,
+    const char *Name) {
+    NtfsIndexHeader *IndexHeader = (NtfsIndexHeader *)HeaderStart;
+    char *Start = HeaderStart + IndexHeader->FirstEntryOffset;
+    char *Current = Start;
+
+    /* This specific block should fit inside a cluster, if it doesn't, something is wrong with
+       the FS! */
+    if (HeaderStart + IndexHeader->FirstEntryOffset + IndexHeader->TotalEntriesSize >
+        (char *)FsContext->ClusterBuffer + FsContext->BytesPerCluster) {
+        *LastEntry = NULL;
+        return 0;
+    }
+
+    while (Current - Start < (ptrdiff_t)IndexHeader->TotalEntriesSize) {
+        NtfsIndexRecord *IndexEntry = (NtfsIndexRecord *)Current;
+        uint16_t *ThisNamePos = (uint16_t *)(Current + sizeof(NtfsIndexRecord));
+        const char *SearchNamePos = Name;
+        int Match = 1;
+
+        if (IndexEntry->Flags & 0x02) {
+            break;
+        }
+
+        while (*SearchNamePos && IndexEntry->NameLength) {
+            if (*(ThisNamePos++) != *(SearchNamePos++)) {
+                Match = 0;
+                break;
+            }
+
+            IndexEntry->NameLength--;
+        }
+
+        if (Match && !IndexEntry->NameLength) {
+            FsContext->FileEntry = IndexEntry->MftEntry & 0xFFFFFFFFFFFF;
+            FsContext->Directory = (IndexEntry->FileFlags & 0x10000000) != 0;
+            return 1;
+        }
+
+        Current += IndexEntry->EntryLength;
+    }
+
+    *LastEntry = (NtfsIndexRecord *)Current;
+    return 0;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
  *     This function does traversal on what should be a NTFS directory (if its a file, we error
  *     out), searching for a specific node.
  *
@@ -342,11 +413,11 @@ FindAttribute(NtfsContext *FsContext, uint32_t Type, int NonResident, uint64_t *
  *     1 for success, otherwise 0.
  *-----------------------------------------------------------------------------------------------*/
 int BiTraverseNtfsDirectory(FileContext *Context, const char *Name) {
-    const char ExpectedSignature[4] = "FILE";
+    const char ExpectedFileSignature[4] = "FILE";
+    const char ExpectedIndexSignature[4] = "INDX";
 
     NtfsContext *FsContext = Context->PrivateData;
     NtfsMftEntry *MftEntry = FsContext->ClusterBuffer;
-    (void)Name;
 
     if (!FsContext->Directory ||
         __fread(
@@ -355,50 +426,59 @@ int BiTraverseNtfsDirectory(FileContext *Context, const char *Name) {
             FsContext->ClusterBuffer,
             FsContext->BytesPerCluster,
             NULL) ||
-        memcmp(MftEntry->Signature, ExpectedSignature, 4) ||
+        memcmp(MftEntry->Signature, ExpectedFileSignature, 4) ||
         !ApplyFixups(FsContext, MftEntry->FixupOffset, MftEntry->NumberOfFixups)) {
         return 0;
     }
 
     /* $I30 ($INDEX_ROOT and $INDEX_ALLOCATION) are the attributes containing the directory
        tree itself (that we can iterate over). */
-    NtfsIndexRootHeader *IndexRoot = FindAttribute(FsContext, 0x90, 0, NULL);
-    NtfsIndexHeader *IndexHeader = (NtfsIndexHeader *)IndexRoot + 1;
+    NtfsIndexRootHeader *IndexRoot = FindAttribute(FsContext, 0x90, 0, NULL, NULL);
     if (!IndexRoot || IndexRoot->AttributeType != 0x30 || IndexRoot->CollationType != 0x01) {
         return 0;
     }
 
-    /* First bit SET means this is a large directory; Anything over ~16 entries cannot fit inside
-       the small INDEX_ROOT. */
-    if (!(IndexHeader->Flags & 1)) {
-        char *Start = (char *)IndexHeader + IndexHeader->FirstEntryOffset;
-        char *Current = Start;
+    NtfsIndexRecord *LastEntry;
+    if (TraverseIndexBlock(FsContext, (char *)(IndexRoot + 1), &LastEntry, Name)) {
+        return 1;
+    } else if (!LastEntry || !(LastEntry->Flags & 0x01)) {
+        return 0;
+    }
 
-        while (Current - Start < (ptrdiff_t)IndexHeader->TotalEntriesSize) {
-            NtfsIndexEntry *IndexEntry = (NtfsIndexEntry *)Current;
+    /* We expect the "size" to be only one clusters. Other clusters are loaded by following the
+       last index entry. */
+    uint64_t FirstVcn;
+    uint64_t LastVcn;
+    uint64_t Cluster;
+    NtfsIndexAllocationHeader *IndexAllocation =
+        FindAttribute(FsContext, 0xA0, 1, &FirstVcn, &LastVcn);
+    if (!IndexAllocation || FirstVcn != LastVcn) {
+        return 0;
+    }
 
-            if (IndexEntry->Flags & 1) {
-                break;
-            }
-
-            printf(
-                "%llx, %hd, %hd, %x\n",
-                IndexEntry->MftEntry,
-                IndexEntry->EntryLength,
-                IndexEntry->NameLength,
-                IndexEntry->Flags);
-
-            Current += IndexEntry->EntryLength;
+    while (1) {
+        if (!ApplyFixups(
+                FsContext, IndexAllocation->FixupOffset, IndexAllocation->NumberOfFixups) ||
+            memcmp(IndexAllocation->Signature, ExpectedIndexSignature, 4) ||
+            IndexAllocation->IndexVcn != FirstVcn) {
+            return 0;
         }
 
-        return 0;
-    }
+        if (TraverseIndexBlock(FsContext, (char *)(IndexAllocation + 1), &LastEntry, Name)) {
+            return 1;
+        } else if (!LastEntry || !(LastEntry->Flags & 0x01)) {
+            return 0;
+        }
 
-    uint64_t LastVcn;
-    NtfsIndexAllocationHeader *IndexAllocation = FindAttribute(FsContext, 0xA0, 1, &LastVcn);
-    if (!IndexAllocation) {
-        return 0;
+        FirstVcn = *(uint64_t *)((char *)LastEntry + 8 - LastEntry->EntryLength);
+        if (!TranslateVcn(FsContext, FirstVcn, &Cluster) ||
+            __fread(
+                &FsContext->Parent,
+                Cluster * FsContext->BytesPerCluster,
+                FsContext->ClusterBuffer,
+                FsContext->BytesPerCluster,
+                NULL)) {
+            return 0;
+        }
     }
-
-    return 0;
 }
