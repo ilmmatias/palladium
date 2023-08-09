@@ -29,13 +29,13 @@
         }
 
         char data[128];
-        int read = fread(data, 128, 1, stream);
+        int read = fread(data, 1, 128, stream);
         if (!read) {
             printf("fread() failed\n");
             break;
         }
 
-        printf("?\n");
+        printf("%.*s\n", read, data);
     } while (0);
 
     while (1)
