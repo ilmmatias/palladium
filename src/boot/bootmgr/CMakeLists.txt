@@ -16,6 +16,7 @@ add_executable(bootmgr "kstdlib"
     ${SOURCES}
 
     fs/exfat.c
+    fs/fat32.c
     fs/iso9660.c
     fs/ntfs.c
     fs/vfs.c

@@ -69,11 +69,9 @@ int BiProbeExfat(FileContext *Context) {
         return 0;
     }
 
-    /* exFAT seems to have an actual way of validating its "BPB" + if we're really dealing with
-       it, instead of having to do a bit of guessing like on FAT32.
-       We can use the mandatory fields described on the Main Boot Sector structure at
-       https://learn.microsoft.com/en-us/windows/win32/fileio/exfat-specification to quickly
-       probe this. */
+    /* We can use the mandatory fields described on the Main Boot Sector structure at
+       https://learn.microsoft.com/en-us/windows/win32/fileio/exfat-specification to quickly do
+       the probing. */
 
     if (__fread(Context, 0, Buffer, 512, NULL) ||
         memcmp(BootSector->JumpBoot, ExpectedJumpBoot, 3) ||

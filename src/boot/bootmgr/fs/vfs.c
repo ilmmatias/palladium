@@ -77,10 +77,12 @@ void __fclose(void *handle) {
         BiFreeArchDevice(Context);
     } else if (Context->Type == FILE_TYPE_EXFAT) {
         BiCleanupExfat(Context);
-    } else if (Context->Type == FILE_TYPE_NTFS) {
-        BiCleanupNtfs(Context);
+    } else if (Context->Type == FILE_TYPE_FAT32) {
+        BiCleanupFat32(Context);
     } else if (Context->Type == FILE_TYPE_ISO9660) {
         BiCleanupIso9660(Context);
+    } else if (Context->Type == FILE_TYPE_NTFS) {
+        BiCleanupNtfs(Context);
     }
 }
 
@@ -111,10 +113,12 @@ int __fread(void *handle, size_t pos, void *buffer, size_t size, size_t *read) {
         return BiReadArchDevice(Context, buffer, pos, size, read);
     } else if (Context->Type == FILE_TYPE_EXFAT) {
         return BiReadExfatFile(Context, buffer, pos, size, read);
-    } else if (Context->Type == FILE_TYPE_NTFS) {
-        return BiReadNtfsFile(Context, buffer, pos, size, read);
+    } else if (Context->Type == FILE_TYPE_FAT32) {
+        return BiReadFat32File(Context, buffer, pos, size, read);
     } else if (Context->Type == FILE_TYPE_ISO9660) {
         return BiReadIso9660File(Context, buffer, pos, size, read);
+    } else if (Context->Type == FILE_TYPE_NTFS) {
+        return BiReadNtfsFile(Context, buffer, pos, size, read);
     } else {
         if (read) {
             *read = 0;
@@ -172,10 +176,12 @@ int BiCopyFileContext(FileContext *Context, FileContext *Copy) {
         return BiCopyArchDevice(Context, Copy);
     } else if (Context->Type == FILE_TYPE_EXFAT) {
         return BiCopyExfat(Context, Copy);
-    } else if (Context->Type == FILE_TYPE_NTFS) {
-        return BiCopyNtfs(Context, Copy);
+    } else if (Context->Type == FILE_TYPE_FAT32) {
+        return BiCopyFat32(Context, Copy);
     } else if (Context->Type == FILE_TYPE_ISO9660) {
         return BiCopyIso9660(Context, Copy);
+    } else if (Context->Type == FILE_TYPE_NTFS) {
+        return BiCopyNtfs(Context, Copy);
     } else {
         return 0;
     }
@@ -200,10 +206,12 @@ int BiReadDirectoryEntry(FileContext *Context, const char *Name) {
         return BiReadArchDirectoryEntry(Context, Name);
     } else if (Context->Type == FILE_TYPE_EXFAT) {
         return BiTraverseExfatDirectory(Context, Name);
-    } else if (Context->Type == FILE_TYPE_NTFS) {
-        return BiTraverseNtfsDirectory(Context, Name);
+    } else if (Context->Type == FILE_TYPE_FAT32) {
+        return BiTraverseFat32Directory(Context, Name);
     } else if (Context->Type == FILE_TYPE_ISO9660) {
         return BiTraverseIso9660Directory(Context, Name);
+    } else if (Context->Type == FILE_TYPE_NTFS) {
+        return BiTraverseNtfsDirectory(Context, Name);
     } else {
         return 0;
     }

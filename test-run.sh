@@ -30,10 +30,13 @@ cat obj.x86/boot/startup/startup.com obj.x86/boot/bootmgr/bootmgr.exe > _root/bo
 
 if [ "$1" == "fat32" ]
 then
+    mkdir -p _root/open_this
+    printf 'Hello, World! This file has been loaded using the boot FAT32 driver.\n' | tee _root/open_this/flag.txt 1>/dev/null
     dd if=/dev/zero of=obj.amd64/fat32.img count=64 bs=1M 2>/dev/null
-    sudo mkfs.fat -F32 obj.amd64/fat32.img 1>/dev/null
-    mcopy -i obj.amd64/fat32.img _root/bootmgr ::/ 1>/dev/null
+    /usr/sbin/mkfs.fat -F32 obj.amd64/fat32.img 1>/dev/null
     dd if=obj.x86/boot/bootsect/fat32boot.com of=obj.amd64/fat32.img seek=90 skip=90 count=422 bs=1 conv=notrunc 2>/dev/null
+    mcopy -i obj.amd64/fat32.img _root/bootmgr ::/ 1>/dev/null
+    mcopy -i obj.amd64/fat32.img _root/open_this ::/ 1>/dev/null
     qemu-system-x86_64 -M smm=off -hda obj.amd64/fat32.img -no-reboot -d int
 elif [ "$1" == "exfat" ]
 then

@@ -10,8 +10,9 @@
 #define FILE_TYPE_NONE 0
 #define FILE_TYPE_ARCH 1
 #define FILE_TYPE_EXFAT 2
-#define FILE_TYPE_NTFS 3
+#define FILE_TYPE_FAT32 3
 #define FILE_TYPE_ISO9660 4
+#define FILE_TYPE_NTFS 5
 
 typedef struct {
     int Type;
@@ -32,6 +33,12 @@ int BiProbeExfat(FileContext *Context);
 void BiCleanupExfat(FileContext *Context);
 int BiTraverseExfatDirectory(FileContext *Context, const char *Name);
 int BiReadExfatFile(FileContext *Context, void *Buffer, size_t Start, size_t Size, size_t *Read);
+
+int BiCopyFat32(FileContext *Context, FileContext *Copy);
+int BiProbeFat32(FileContext *Context);
+void BiCleanupFat32(FileContext *Context);
+int BiTraverseFat32Directory(FileContext *Context, const char *Name);
+int BiReadFat32File(FileContext *Context, void *Buffer, size_t Start, size_t Size, size_t *Read);
 
 int BiCopyIso9660(FileContext *Context, FileContext *Copy);
 int BiProbeIso9660(FileContext *Context, uint16_t BytesPerSector);

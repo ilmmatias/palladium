@@ -266,8 +266,6 @@ Error$Halt:
     jmp $
 Error endp
 
-ResidentMessage db "Resident", 0
-NonResidentMessage db "Non Resident", 0
 DiskError db "Disk error", 0
 OverflowError db "Data overflow", 0
 FsCorruptionError db "Bad filesystem", 0
