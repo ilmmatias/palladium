@@ -474,7 +474,7 @@ int BiTraverseNtfsDirectory(FileContext *Context, const char *Name) {
             return 0;
         }
 
-        FirstVcn = *(uint64_t *)((char *)LastEntry + 8 - LastEntry->EntryLength);
+        FirstVcn = *(uint64_t *)((char *)LastEntry + LastEntry->EntryLength - 8);
         if (!TranslateVcn(FsContext, FirstVcn, &Cluster) ||
             __fread(
                 &FsContext->Parent,

@@ -46,6 +46,8 @@ then
     sudo fsck.exfat -y obj.amd64/exfat.img
     sudo mount -t exfat -o loop obj.amd64/exfat.img /mnt/mount 1>/dev/null
     sudo cp _root/bootmgr /mnt/mount/bootmgr 1>/dev/null
+    sudo mkdir -p /mnt/mount/open_this
+    printf 'Hello, World! This file has been loaded using the boot exFAT driver.\n' | sudo tee /mnt/mount/open_this/flag.txt 1>/dev/null
     sudo umount /mnt/mount 1>/dev/null
     qemu-system-x86_64 -M smm=off -hda obj.amd64/exfat.img -no-reboot -d int
 elif [ "$1" == "ntfs" ]
@@ -63,16 +65,8 @@ then
     sudo umount /mnt/mount 1>/dev/null
     qemu-system-x86_64 -M smm=off -hda obj.amd64/ntfs.img -no-reboot -d int
 else
-    sudo rm -rf /mnt/mount
-    sudo mkdir -p /mnt/mount
-    dd if=/dev/zero of=obj.amd64/ntfs.img count=64 bs=1M 2>/dev/null
-    sudo mkfs.ntfs -F obj.amd64/ntfs.img 1>/dev/null
-    sudo mount -t ntfs -o loop obj.amd64/ntfs.img /mnt/mount 1>/dev/null
-    sudo mkdir -p /mnt/mount/open_this
-    printf 'Hello, World! This file has been loaded using the boot NTFS driver.\n' | sudo tee /mnt/mount/open_this/flag.txt 1>/dev/null
-    sudo umount /mnt/mount 1>/dev/null
     mkisofs -R -b iso9660boot.com -no-emul-boot -o obj.amd64/iso9660.iso _root
-    qemu-system-x86_64 -M smm=off -cdrom obj.amd64/iso9660.iso -hda obj.amd64/ntfs.img -boot d -no-reboot -d int
+    qemu-system-x86_64 -M smm=off -cdrom obj.amd64/iso9660.iso -no-reboot -d int
 fi
 
 rm -rf _root

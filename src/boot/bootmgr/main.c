@@ -22,7 +22,7 @@
     BmInitArch(BootBlock);
 
     do {
-        FILE *stream = fopen("bios(80)/open_this/flag.txt", "r");
+        FILE *stream = fopen("bios()/open_this/flag.txt", "r");
         if (!stream) {
             printf("fopen() failed\n");
             break;
