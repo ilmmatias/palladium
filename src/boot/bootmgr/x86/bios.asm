@@ -3,20 +3,22 @@
 
 .code
 
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 ; PURPOSE:
-;     This function drops the processor back to real mode, and executes a BIOS interrupt with the given processor
-;     context.
+;     This function drops the processor back to real mode, and executes a BIOS interrupt with the
+;     given processor context.
 ;
 ; PARAMETERS:
 ;     Number (esp + 4) - Interrupt number.
-;     Registers (esp + 8) - I/O; State of the processor when executing the interrupt, and state after.
+;     Registers (esp + 8) - I/O; State of the processor when executing the interrupt, and state
+;                           after.
 ;
 ; RETURN VALUE:
 ;     None.
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 _BiosCall proc
-    ; We should be in low memory, so start by overwriting the int call number up ahead and saving the regs pointer.
+    ; We should be in low memory, so start by overwriting the int call number up ahead and saving
+    ; the regs pointer.
     mov al, [esp + 4]
     mov [_BiosCall$Int + 1], al
     mov eax, [esp + 8]
@@ -27,7 +29,8 @@ _BiosCall proc
     ; Worst case the BIOS might overwrite our GDT, so we need to save that.
     sgdt [_BiosCall$SavedGdt]
 
-    ; We'll popa on real mode, trashing all registers. Save anything the compiler expects us to not mess with.
+    ; We'll popa on real mode, trashing all registers. Save anything the compiler expects us to
+    ; not mess with.
     push ebx
     push esi
     push edi
@@ -66,7 +69,8 @@ _BiosCall$Protected16:
     retf
 
 _BiosCall$Real:
-    ; Zero out all the segments, and we should be ready to reenable interrupts and execute what was requested.
+    ; Zero out all the segments, and we should be ready to reenable interrupts and execute
+    ; what was requested.
     xor eax, eax
     mov ds, eax
     mov es, eax

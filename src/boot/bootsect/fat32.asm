@@ -37,7 +37,7 @@ FatBpb label byte
     VolLabel db "BOOT DISK  "
     SysIdent db "FAT32   "
 
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 ; PURPOSE:
 ;     This function implements the necessary code to load the second stage loader and execute it.
 ;
@@ -46,16 +46,16 @@ FatBpb label byte
 ;
 ; RETURN VALUE:
 ;     Does not return.
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 Main proc
-    ; Some BIOSes might load us to 07C0:0000, but our code expects the cs to be 0 (so the BPB would have been loaded
-    ; to 0000:7C00), so let's do a far jump just to make sure.
+    ; Some BIOSes might load us to 07C0:0000, but our code expects the cs to be 0 (so the BPB
+    ; would have been loaded to 0000:7C00), so let's do a far jump just to make sure.
     db 0EAh
     dw Main$Setup, 0
 
 Main$Setup:
-    ; Init the segments that we might use (to zero), the stack (so that the top coincides with the boot sector load
-    ; address), and save the boot drive.
+    ; Init the segments that we might use (to zero), the stack (so that the top coincides with
+    ; the boot sector load address), and save the boot drive.
     cld
     xor ax, ax
     mov ds, ax
@@ -66,9 +66,9 @@ Main$Setup:
     push dx
     mov [BootDrive], dl
 
-    ; There is no need to calculate the start or the size of the root directory, so everything we need is the
-    ; start of the data section clusters (which is the same as the position of the root dir in FAT12/16,
-    ; fats + reserved).
+    ; There is no need to calculate the start or the size of the root directory, so everything
+    ; we need is the start of the data section clusters (which is the same as the position of the
+    ; root dir in FAT12/16, fats + reserved).
     movzx eax, [NumOfFats]
     movzx ecx, [ReservedSectors]
     mul [SectorsPerFat32]
@@ -76,8 +76,8 @@ Main$Setup:
     add eax, [HiddenSectors]
     mov [DataStart], eax
 
-    ; Now we need to find the correct directory entry, loading a new cluster after we reach the end of the
-    ; current one.
+    ; Now we need to find the correct directory entry, loading a new cluster after we
+    ; reach the end of the current one.
     mov ebp, [RootCluster]
 
 Main$NextCluster:
@@ -112,8 +112,8 @@ Main$NotFound:
 
 Main$Found:
     ; Now we can load all of the file data just after the boot sector.
-    ; The only fields that we use from the directory entry are the ones at +20 (high bits of the cluster) and
-    ; at +26 (low bits of the cluster).
+    ; The only fields that we use from the directory entry are the ones at +20 (high bits of the
+    ; cluster) and at +26 (low bits of the cluster).
     movzx ebx, word ptr [si + 26]
     movzx ebp, word ptr [si + 20]
     shl ebp, 16
@@ -134,7 +134,7 @@ Main$Loop:
     retf
 Main endp
 
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 ; PURPOSE:
 ;     This function reads sectors from the boot disk. The input should be an LBA value.
 ;
@@ -145,7 +145,7 @@ Main endp
 ;
 ; RETURN VALUE:
 ;     Does not return on failure, all of the inputs are already incremented on success.
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 ReadSectors proc
     pushad
 
@@ -175,8 +175,8 @@ ReadSectors$Next:
     jnc ReadSectors$NoOverflow
 
     ; We overflowed in the low 16-bits of the address.
-    ; Let's try to bump up the high 4 bits (segment), if we also overflowed there, then we crash (data too big for
-    ; us).
+    ; Let's try to bump up the high 4 bits (segment), if we also overflowed there, then we crash
+    ; (data too big for us).
 
     push bx
     mov bx, es
@@ -195,17 +195,17 @@ ReadSectors$NoOverflow:
     ret
 ReadSectors endp
 
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 ; PURPOSE:
-;     This function converts the cluster number into an LBA/sector number and reads in the data (getting the next
-;     cluster should be done with GetNextCluster).
+;     This function converts the cluster number into an LBA/sector number and reads in the data
+;     (getting the next cluster should be done with GetNextCluster).
 ;
 ; PARAMETERS:
 ;     Cluster (ebp) - Cluster to read.
 ;
 ; RETURN VALUE:
 ;     Same as ReadSectors.
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 ReadCluster proc
     movzx ecx, [SectorsPerCluster]
     lea eax, [ebp - 2]
@@ -215,9 +215,10 @@ ReadCluster proc
     ret
 ReadCluster endp
 
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 ; PURPOSE:
-;     This function loads the required FAT to get the next cluster of a chain (or to indicate that the file ended).
+;     This function loads the required FAT to get the next cluster of a chain (or to indicate that
+;     the file ended).
 ;     Afterwards, it loads the new/next cluster if possible/necessary.
 ;
 ; PARAMETERS:
@@ -225,11 +226,11 @@ ReadCluster endp
 ;
 ; RETURN VALUE:
 ;     cf will be unset if the file has ended, otherwise, new/next cluster on ebp.
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 GetNextCluster proc
-    ; In the FAT, the size of each entry (representing a cluster) is 4 bytes. We can get the sector of the current
-    ; cluster by doing Cluster*EntrySize/BytesPerSector, which will as a side effect leave the offset in the sector
-    ; inside edx (because div).
+    ; In the FAT, the size of each entry (representing a cluster) is 4 bytes. We can get the
+    ; sector of the current cluster by doing Cluster*EntrySize/BytesPerSector, which will as a
+    ; side effect leave the offset in the sector inside edx (because div).
     movzx ecx, [BytesPerSector]
     xor edx, edx
     mov eax, ebp
@@ -257,17 +258,17 @@ GetNextCluster proc
     ret
 GetNextCluster endp
 
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 ; PURPOSE:
-;     This function should be called when something in the load process goes wrong. It prints the contents of
-;     Message and halts the system.
+;     This function should be called when something in the load process goes wrong. It prints the
+;     contents of Message and halts the system.
 ;
 ; PARAMETERS:
 ;     Message (si) - Error message to print.
 ;
 ; RETURN VALUE:
 ;     Does not return.
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 Error proc
     lodsb
     or al, al

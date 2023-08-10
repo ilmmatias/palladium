@@ -35,7 +35,7 @@ FatBpb label byte
     PercentInUse db 0
     Reserved db 7 dup (0)
 
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 ; PURPOSE:
 ;     This function implements the necessary code to load the second stage loader and execute it.
 ;
@@ -44,16 +44,16 @@ FatBpb label byte
 ;
 ; RETURN VALUE:
 ;     Does not return.
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 Main proc
-    ; Some BIOSes might load us to 07C0:0000, but our code expects the cs to be 0 (so the BPB would have been loaded
-    ; to 0000:7C00), so let's do a far jump just to make sure.
+    ; Some BIOSes might load us to 07C0:0000, but our code expects the cs to be 0 (so the BPB
+    ; would have been loaded to 0000:7C00), so let's do a far jump just to make sure.
     db 0EAh
     dw Main$Setup, 0
 
 Main$Setup:
-    ; Unknown register states are not cool, get all the segment registers ready, and setup a valid stack (ending
-    ; behind us).
+    ; Unknown register states are not cool, get all the segment registers ready, and setup a valid
+    ; stack (ending behind us).
     cld
     xor ax, ax
     mov ds, ax
@@ -74,15 +74,15 @@ Main$Setup:
     shl eax, cl
     mov [SectorsPerCluster], eax
 
-    ; The exFAT code is a bit too big for just 512 byte, but exFAT does reserve 8 extra sectors for us too, we just
-    ; need to load them in.
+    ; The exFAT code is a bit too big for just 512 bytes, but exFAT does reserve 8 extra sectors
+    ; for us too, we just need to load them in.
     mov eax, 1
     mov bx, 07E00h
     mov cx, 1
     call ReadSectors
 
-    ; Close to equal to FAT32, we also just need to grab the offset (in sectors) of the first cluster, and then
-    ; the BPB gives us the first root directory cluster for free.
+    ; Close to equal to FAT32, we also just need to grab the offset (in sectors) of the first
+    ; cluster, and then the BPB gives us the first root directory cluster for free.
     mov eax, [ClusterHeapOffset]
     add eax, dword ptr [PartitionOffset]
     mov [DataStart], eax
@@ -112,8 +112,8 @@ Main$Search:
     test byte ptr [si + 4], 10h
     jnz Main$NextEntry
 
-    ; We need exactly 2 entries to exist (stream entry + name entry), and only 2, as we know the name should fit in
-    ; just 15 characters.
+    ; We need exactly 2 entries to exist (stream entry + name entry), and only 2, as we know the
+    ; name should fit in just 15 characters.
     cmp byte ptr [si + 1], 2
     jne Main$NextEntry
     cmp byte ptr [si + 32], 0C0h
@@ -131,8 +131,8 @@ Main$Search:
     mov di, offset ImageName
 
 Main$CheckName:
-    ; exFAT is supposed to be case-insensitive, but it does save the names using the full UTF-16 range (so it might
-    ; include lowercase characters).
+    ; exFAT is supposed to be case-insensitive, but it does save the names using the full UTF-16
+    ; range (so it might include lowercase characters).
     ; We're supposed to load and use the uppercase table, but let's just manually check and convert.
     cmp word ptr [si], 61h
     jb Main$NotLower
@@ -185,7 +185,7 @@ Main$LoopSkipRead:
     retf
 Main endp
 
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 ; PURPOSE:
 ;     This function reads sectors from the boot disk. The input should be an LBA value.
 ;
@@ -196,7 +196,7 @@ Main endp
 ;
 ; RETURN VALUE:
 ;     Does not return on failure, all of the inputs are already incremented on success.
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 ReadSectors proc
     pushad
 
@@ -226,8 +226,8 @@ ReadSectors$Next:
     jnc ReadSectors$NoOverflow
 
     ; We overflowed in the low 16-bits of the address.
-    ; Let's try to bump up the high 4 bits (segment), if we also overflowed there, then we crash (data too big for
-    ; us).
+    ; Let's try to bump up the high 4 bits (segment), if we also overflowed there, then we crash
+    ; (data too big for us).
 
     push bx
     mov bx, es
@@ -246,17 +246,17 @@ ReadSectors$NoOverflow:
     ret
 ReadSectors endp
 
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 ; PURPOSE:
-;     This function should be called when something in the load process goes wrong. It prints the contents of
-;     Message and halts the system.
+;     This function should be called when something in the load process goes wrong. It prints the
+;     contents of Message and halts the system.
 ;
 ; PARAMETERS:
 ;     Message (si) - Error message to print.
 ;
 ; RETURN VALUE:
 ;     Does not return.
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 Error proc
     lodsb
     or al, al
@@ -280,17 +280,17 @@ ImageSize equ ($ - ImageName) / 2
 org 7DFEh
 dw 0AA55h
 
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 ; PURPOSE:
-;     This function converts the cluster number into an LBA/sector number and reads in the data (getting the next
-;     cluster should be done with GetNextCluster).
+;     This function converts the cluster number into an LBA/sector number and reads in the data
+;     (getting the next cluster should be done with GetNextCluster).
 ;
 ; PARAMETERS:
 ;     Cluster (ebp) - Cluster to read.
 ;
 ; RETURN VALUE:
 ;     Same as ReadSectors.
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 ReadCluster proc
     mov ecx, [SectorsPerCluster]
     lea eax, [ebp - 2]
@@ -300,22 +300,24 @@ ReadCluster proc
     ret
 ReadCluster endp
 
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 ; PURPOSE:
-;     This function loads the required FAT to get the next cluster of a chain (or to indicate that the file ended).
+;     This function loads the required FAT to get the next cluster of a chain (or to indicate that
+;     the file ended).
 ;     Afterwards, it loads the new/next cluster if possible/necessary.
 ;
 ; PARAMETERS:
 ;     DirectoryEntry (esi) - Directory entry (used to determine if we need to follow the FAT).
 ;     Cluster (ebp) - Current cluster.
-;     NoFatChain (!(flags & ZF)) - Unset the ZF flag to follow the chain, set it if we're sequential.
+;     NoFatChain (!(flags & ZF)) - Unset the ZF flag to follow the chain, set it if we're
+;                                  sequential.
 ;
 ; RETURN VALUE:
 ;     cf will be unset if the file has ended, otherwise, new/next cluster on ebp.
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 GetNextCluster proc
-    ; exFAT supports the sequential data sectors (no need to read the FAT in that case, just decrease the file size
-    ; and check if we finished reading, that is, if the size is negative).
+    ; exFAT supports the sequential data sectors (no need to read the FAT in that case, just
+    ; decrease the file size and check if we finished reading, that is, if the size is negative).
     jz GetNextCluster$FollowFat
 
     mov eax, 1
@@ -333,9 +335,9 @@ GetNextCluster$NoSign:
     ret
 
 GetNextCluster$FollowFat:
-    ; In the FAT, the size of each entry (representing a cluster) is 4 bytes. We can get the sector of the current
-    ; cluster by doing Cluster*EntrySize/BytesPerSector, which will as a side effect leave the offset in the sector
-    ; inside edx (because div).
+    ; In the FAT, the size of each entry (representing a cluster) is 4 bytes. We can get the
+    ; sector of the current cluster by doing Cluster*EntrySize/BytesPerSector, which will as a
+    ; side effect leave the offset in the sector inside edx (because div).
     movzx ecx, [BytesPerSector]
     xor edx, edx
     mov eax, ebp

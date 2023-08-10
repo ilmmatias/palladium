@@ -35,7 +35,7 @@ NtfsBpb label byte
     MftOffset dq 0
     Checksum dd 0
 
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 ; PURPOSE:
 ;     This function implements the necessary code to load the second stage loader and execute it.
 ;
@@ -44,16 +44,16 @@ NtfsBpb label byte
 ;
 ; RETURN VALUE:
 ;     Does not return.
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 Main proc
-    ; Some BIOSes might load us to 07C0:0000, but our code expects the cs to be 0 (so the BPB would have been loaded
-    ; to 0000:7C00), so let's do a far jump just to make sure.
+    ; Some BIOSes might load us to 07C0:0000, but our code expects the cs to be 0 (so the BPB
+    ; would have been loaded to 0000:7C00), so let's do a far jump just to make sure.
     db 0EAh
     dw Main$Setup, 0
 
 Main$Setup:
-    ; Unknown register states are not cool, get all the segment registers ready, and setup a valid stack (ending
-    ; behind us).
+    ; Unknown register states are not cool, get all the segment registers ready, and setup a
+    ; valid stack (ending behind us).
     cld
     xor ax, ax
     mov ds, ax
@@ -123,7 +123,7 @@ Main$LoadMoreSectors:
     jmp LoadBootmgr
 Main endp
 
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 ; PURPOSE:
 ;     This function reads sectors from the boot disk. The input should be an LBA value.
 ;
@@ -134,7 +134,7 @@ Main endp
 ;
 ; RETURN VALUE:
 ;     Does not return on failure, all of the inputs are already incremented on success.
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 ReadSectors proc
     pushad
 
@@ -163,8 +163,8 @@ ReadSectors$Next:
     jnc ReadSectors$NoOverflow
 
     ; We overflowed in the low 16-bits of the address.
-    ; Let's try to bump up the high 4 bits (segment), if we also overflowed there, then we crash (data too big for
-    ; us).
+    ; Let's try to bump up the high 4 bits (segment), if we also overflowed there, then we crash
+    ; (data too big for us).
 
     push bx
     mov bx, es
@@ -184,7 +184,7 @@ ReadSectors$NoOverflow:
     ret
 ReadSectors endp
 
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 ; PURPOSE:
 ;     This function multiplies the 64-bits number at EAX:EDX with the 32-bits number at EBX.
 ;
@@ -194,7 +194,7 @@ ReadSectors endp
 ;
 ; RETURN VALUE:
 ;     Result of the multiplication in EAX:EDX.
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 Multiply64x32 proc
     push esi
     mov esi, edx
@@ -210,7 +210,7 @@ Multiply64x32 proc
     ret
 Multiply64x32 endp
 
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 ; PURPOSE:
 ;     This function multiplies the 64-bits number at EAX:EDX with the 64-bits number at EBX:ECX.
 ;
@@ -220,7 +220,7 @@ Multiply64x32 endp
 ;
 ; RETURN VALUE:
 ;     Result of the multiplication in EAX:EDX.
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 Multiply64x64 proc
     push esi
     push edi
@@ -242,17 +242,17 @@ Multiply64x64 proc
     ret
 Multiply64x64 endp
 
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 ; PURPOSE:
-;     This function should be called when something in the load process goes wrong. It prints the contents of
-;     Message and halts the system.
+;     This function should be called when something in the load process goes wrong. It prints the
+;     contents of Message and halts the system.
 ;
 ; PARAMETERS:
 ;     Message (si) - Error message to print.
 ;
 ; RETURN VALUE:
 ;     Does not return.
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 Error proc
     lodsb
     or al, al
@@ -279,16 +279,17 @@ ImageSize equ ($ - ImageName) / 2
 org 7DFEh
 dw 0AA55h
 
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 ; PURPOSE:
-;     This function implements the main code to parse the NTFS structure, search for the file, and load it into RAM.
+;     This function implements the main code to parse the NTFS structure, search for the file,
+;     and load it into RAM.
 ;
 ; PARAMETERS:
 ;     None.
 ;
 ; RETURN VALUE:
 ;     Does not return.
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 LoadBootmgr proc
     ; The 5th MFT entry is `.` (the root directory).
     mov ecx, [SectorsPerMftEntry]
@@ -309,8 +310,8 @@ LoadBootmgr proc
     mov es, bx
     xor bx, bx
 
-    ; We're doing the bare minimum to be able to boot here, and fixups are part of that, as otherwise part of the
-    ; sectors would be corrupted/contain wrong data.
+    ; We're doing the bare minimum to be able to boot here, and fixups are part of that, as
+    ; otherwise part of the sectors would be corrupted/contain wrong data.
     call ApplyFixups
 
     ; $I30 ($INDEX_ROOT and $INDEX_ALLOCATION) are the attributes containing the directory
@@ -324,8 +325,8 @@ LoadBootmgr proc
     jnc LoadBootmgr$Found
     jz LoadBootmgr$NotFound
 
-    ; Failed to find it in the INDEX_ROOT, but it has sub blocks; We can assume that means an INDEX_ALLOCATION
-    ; attribute exists.
+    ; Failed to find it in the INDEX_ROOT, but it has sub blocks; We can assume that means
+    ; an INDEX_ALLOCATION attribute exists.
     mov eax, 0A0h
     call FindAttribute
     jc LoadBootmgr$Corrupt
@@ -348,7 +349,8 @@ LoadBootmgr$Found:
     push ebx
     push ecx
 
-    ; EAX:EDX contains our MFT entry now; The process to load it is the same as the root directory.
+    ; EAX:EDX contains our MFT entry now; The process to load it is the same as the root
+    ; directory.
     mov ecx, [SectorsPerMftEntry]
     mov ebx, ecx
     call Multiply64x32
@@ -464,7 +466,7 @@ LoadBootmgr$Overflow:
     jmp Error
 LoadBootmgr endp
 
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 ; PURPOSE:
 ;     This function applies the fixups for any given record.
 ;
@@ -473,7 +475,7 @@ LoadBootmgr endp
 ;
 ; RETURN VALUE:
 ;     None.
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 ApplyFixups proc
     push eax
     push esi
@@ -511,7 +513,7 @@ ApplyFixups$End:
     ret
 ApplyFixups endp
 
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 ; PURPOSE:
 ;     This function searches for a given attribute inside a FILE record.
 ;
@@ -521,9 +523,9 @@ ApplyFixups endp
 ;
 ; RETURN VALUE:
 ;     Carry flag set if we failed to find the entry.
-;     Zero flag set if this is a non resident entry (and we should ignore the buffer); In that case, EAX:EDX contains
-;     the starting VCN of the attribute.
-;---------------------------------------------------------------------------------------------------------------------
+;     Zero flag set if this is a non resident entry (and we should ignore the buffer); In that
+;     case, EAX:EDX contains the starting VCN of the attribute.
+;--------------------------------------------------------------------------------------------------
 FindAttribute proc
     push ebx
     push esi
@@ -555,7 +557,8 @@ FindAttribute$Loop:
     ret
 
 FindAttribute$NonResident:
-    ; Non resident clusters get loaded on a separate buffer, as we need access to the data run list at all times.
+    ; Non resident clusters get loaded on a separate buffer, as we need access to the data run
+    ; list at all times.
     mov di, si
     add di, es:[si + 32]
     mov [DataRuns], di
@@ -595,16 +598,17 @@ FindAttribute$End:
     ret
 FindAttribute endp
 
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 ; PURPOSE:
-;     This function parses the data run list, and converts a Virtual Cluster Number (VCN) into a physical sector.
+;     This function parses the data run list, and converts a Virtual Cluster Number (VCN) into a
+;     physical sector.
 ;
 ; PARAMETERS:
 ;     Vcn (eax:edx) - Virtual cluster to be translated.
 ;
 ; RETURN VALUE:
 ;     Physical sector where VCN is located (overwriting the old value in eax:edx).
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 TranslateVcn proc
     push ebx
     push ecx
@@ -614,8 +618,8 @@ TranslateVcn proc
     push ds
     push es
 
-    ; We should only be opening one file/directory at a time, so assuming [DataRuns] contains the revelant data is
-    ; safe.
+    ; We should only be opening one file/directory at a time, so assuming [DataRuns] contains
+    ; the revelant data is safe.
     xor si, si
     mov ds, si
     mov si, 1000h
@@ -630,8 +634,8 @@ TranslateVcn$Loop:
     jz TranslateVcn$End
     inc si
 
-    ; rep movsb copies whatever is at DS:SI to ES:DI; That means we're almost set, but our segment registers are
-    ; inverted.
+    ; rep movsb copies whatever is at DS:SI to ES:DI; That means we're almost set, but our
+    ; segment registers are inverted.
     push ecx
     push es
     mov cx, ds
@@ -660,8 +664,8 @@ TranslateVcn$Loop:
     cmp eax, ebp
     jb TranslateVcn$Next
 
-    ; VCN match, extract the right cluster out of it, and Multiply64x32 to transform it into physical
-    ; sectors.
+    ; VCN match, extract the right cluster out of it, and Multiply64x32 to transform it
+    ; into physical sectors.
     sub eax, ebp
     sbb edx, ecx
     add eax, dword ptr [DataRunOffset]
@@ -686,7 +690,7 @@ TranslateVcn$End:
     ret
 TranslateVcn endp
 
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 ; PURPOSE:
 ;     This function searches for the image file inside an directory index block.
 ;
@@ -694,16 +698,18 @@ TranslateVcn endp
 ;     HeaderStart (es:di) - Where the index header starts.
 ;
 ; RETURN VALUE:
-;     Carry flag set if we didn't find it; Otherwise, EAX:EDX points to file MFT entry, and EBX:ECX points to the 
-;     file length.
-;     On failure, zero flag set if this entry has no sub nodes; Otherwise, EAX:EDX points to the sub node VCN.
-;---------------------------------------------------------------------------------------------------------------------
+;     Carry flag set if we didn't find it; Otherwise, EAX:EDX points to file MFT entry, and
+;     EBX:ECX points to the  file length.
+;     On failure, zero flag set if this entry has no sub nodes; Otherwise, EAX:EDX points to the
+;     sub node VCN.
+;--------------------------------------------------------------------------------------------------
 TraverseIndexBlock proc
     push ecx
     push ebp
     push esi
 
-    ; 32-bits field, but we're assuming it is 16-bits only (as we can't access address too big in real mode).
+    ; 32-bits field, but we're assuming it is 16-bits only (as we can't access address too big
+    ; in real mode).
     mov si, word ptr es:[di]
     add si, di
 
@@ -714,7 +720,8 @@ TraverseIndexBlock$Loop:
     cmp bp, word ptr es:[di + 4]
     jae TraverseIndexBlock$Overflow
 
-    ; Check the end flag; If it's set, we know that it's the end of this block, but there might be sub blocks/nodes.
+    ; Check the end flag; If it's set, we know that it's the end of this block, but there might
+    ; be sub blocks/nodes.
     test byte ptr es:[si + 12], 2
     jz TraverseIndexBlock$Compare
 
@@ -751,7 +758,8 @@ TraverseIndexBlock$Compare:
 TraverseIndexBlock$CheckName:
     ; NTFS stores the filenames in their original case, but we don't care (we just want to do
     ; a case insensitive compare).
-    ; We're supposed to load and use the uppercase table, but let's just manually check and convert.
+    ; We're supposed to load and use the uppercase table, but let's just manually check and
+    ; convert.
     cmp word ptr es:[di], 61h
     jb TraverseIndexBlock$NotLower
     cmp word ptr es:[di], 7Ah
@@ -793,7 +801,7 @@ TraverseIndexBlock$Overflow:
     ret
 TraverseIndexBlock endp
 
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 ; PURPOSE:
 ;     This function extends `rep movsb` into multi-segment copies.
 ;
@@ -803,8 +811,9 @@ TraverseIndexBlock endp
 ;     Size (EBX) - Data size.
 ;
 ; RETURN VALUE:
-;     All input parameters + ECX are trashed (including the two segments); Other than that, no return value.
-;---------------------------------------------------------------------------------------------------------------------
+;     All input parameters + ECX are trashed (including the two segments); Other than that, no
+;     return value.
+;--------------------------------------------------------------------------------------------------
 CopyLargeBuffer proc
     cmp ebx, 1000h
     jbe CopyLargeBuffer$UseRemainingSize

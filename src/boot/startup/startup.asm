@@ -7,17 +7,17 @@
 _TEXT16 segment use16
 org 0
 
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 ; PURPOSE:
-;     This function implements the necessary code to prepare the processor and environment to reload and jump into
-;     bootmgr.exe.
+;     This function implements the necessary code to prepare the processor and environment to
+;     reload and jump into bootmgr.exe.
 ;
 ; PARAMETERS:
 ;     BootDrive (dl) - Boot drive BIOS index.
 ;
 ; RETURN VALUE:
 ;     This function does not return.
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 Main proc
     mov ax, cs
     mov ds, ax
@@ -41,8 +41,8 @@ Main proc
     call Error
 
 Main$A20Enabled:
-    ; We try using E820h to get low+high mem map, if that fails, use int 12h + one of the other 2 methods to get the
-    ; high mem.
+    ; We try using E820h to get low+high mem map, if that fails, use int 12h + one of the other 2
+    ; methods to get the high mem.
 
     call TryE820
     jnc Main$GotMemMap
@@ -60,8 +60,8 @@ Main$NoMemMap:
 Main$GotMemMap:
     mov dword ptr [BootBlock$MemoryRegions], 4014h
 
-    ; Checking for validity of the PE file (and its sections) is our job, as the code at _TEXTJ onwards assumes
-    ; everything is valid.
+    ; Checking for validity of the PE file (and its sections) is our job, as the code at
+    ; _TEXTJ onwards assumes everything is valid.
     mov esi, _TEXT16$End + (_TEXTJ$End - _TEXTJ$Start)
     cmp word ptr [esi], 5A4Dh
     je Main$MzFound
@@ -95,8 +95,8 @@ Main$MachMatch:
 
 Main$SubsysMatch:
     ; Every single section should be inside a free memory region.
-    ; The memory regions should be contigous (and the biggest size possible), so we can just find the first region
-    ; that could fit the section, and check if we really fit inside it.
+    ; The memory regions should be contigous (and the biggest size possible), so we can just
+    ; find the first region that could fit the section, and check if we really fit inside it.
     movzx ecx, word ptr [esi + 6]
     movzx eax, word ptr [esi + 20]
     add eax, esi
@@ -122,8 +122,8 @@ Main$Next:
     loop Main$Loop
 
 Main$Continue:
-    ; This whole code is loaded at >64K (using CS != 0), we need to fix up the GDT, all of our other data structures,
-    ; and the far jump IP.
+    ; This whole code is loaded at >64K (using CS != 0), we need to fix up the GDT, all of
+    ; our other data structures, and the far jump IP.
     cli
 
     mov eax, cs
@@ -152,17 +152,17 @@ Main$Continue:
     jmp far32 ptr [bp]
 Main endp
 
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 ; PURPOSE:
-;     This function should be called when something in the load process goes wrong. It prints the contents of
-;     Message and halts the system.
+;     This function should be called when something in the load process goes wrong. It prints the
+;     contents of Message and halts the system.
 ;
 ; PARAMETERS:
 ;     Message (si) - error message to print.
 ;
 ; RETURN VALUE:
 ;     Does not return.
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 Error proc
     lodsb
     or al, al
@@ -204,16 +204,17 @@ _TEXT16 ends
 _TEXTJ segment byte use32
 _TEXTJ$Start:
 
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 ; PURPOSE:
-;     This function implements the necessary code to relocate bootmgr.exe into himem and transfer execution to it.
+;     This function implements the necessary code to relocate bootmgr.exe into himem and transfer
+;     execution to it.
 ;
 ; PARAMETERS:
 ;     None
 ;
 ; RETURN VALUE:
 ;     This function does not return.
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 Relocate proc
     ; We just loaded the new GDT, so we need to fix our segment registers.
     mov ax, 10h

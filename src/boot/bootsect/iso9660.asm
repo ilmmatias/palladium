@@ -7,7 +7,7 @@
 _TEXT segment use16
 org 7C00h
 
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 ; PURPOSE:
 ;     This function implements the necessary code to load the second stage loader and execute it.
 ;
@@ -16,16 +16,16 @@ org 7C00h
 ;
 ; RETURN VALUE:
 ;     Does not return.
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 Main proc
-    ; Some BIOSes might load us to 07C0:0000, but our code expects the cs to be 0 (so the BPB would have been loaded
-    ; to 0000:7C00), so let's do a far jump just to make sure.
+    ; Some BIOSes might load us to 07C0:0000, but our code expects the cs to be 0 (so the BPB
+    ; would have been loaded to 0000:7C00), so let's do a far jump just to make sure.
     db 0EAh
     dw Main$Setup, 0
 
 Main$Setup:
-    ; Unknown register states are not cool, get all the segment registers ready, and setup a valid stack (ending
-    ; behind us).
+    ; Unknown register states are not cool, get all the segment registers ready, and setup a
+    ; valid stack (ending behind us).
     cld
     xor ax, ax
     mov ds, ax
@@ -36,8 +36,8 @@ Main$Setup:
     push dx
     mov [BootDrive], dl
 
-    ; The volume descriptors start at sector 0x10, we want to find the one with type==1, as it contains the root
-    ; directory LBA.
+    ; The volume descriptors start at sector 0x10, we want to find the one with type==1, as
+    ; it contains the root directory LBA.
     mov eax, 10h
 
 Main$SearchRoot:
@@ -119,7 +119,7 @@ Main$NotFound:
     jmp Error
 Main endp
 
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 ; PURPOSE:
 ;     This function reads sectors from the boot disk. The input should be an LBA value.
 ;
@@ -130,7 +130,7 @@ Main endp
 ;
 ; RETURN VALUE:
 ;     Does not return on failure, all of the inputs are already incremented on success.
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 ReadSectors proc
     pushad
 
@@ -160,8 +160,8 @@ ReadSectors$Next:
     jnc ReadSectors$NoOverflow
 
     ; We overflowed in the low 16-bits of the address.
-    ; Let's try to bump up the high 4 bits (segment), if we also overflowed there, then we crash (data too big for
-    ; us).
+    ; Let's try to bump up the high 4 bits (segment), if we also overflowed there, then we crash
+    ; (data too big for us).
 
     push bx
     mov bx, es
@@ -180,7 +180,7 @@ ReadSectors$NoOverflow:
     ret
 ReadSectors endp
 
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 ; PURPOSE:
 ;     This function should be called when something in the load process goes wrong. It prints the contents of
 ;     Message and halts the system.
@@ -190,7 +190,7 @@ ReadSectors endp
 ;
 ; RETURN VALUE:
 ;     Does not return.
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 Error proc
     lodsb
     or al, al

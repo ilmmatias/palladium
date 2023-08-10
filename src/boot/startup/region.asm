@@ -1,17 +1,18 @@
 ; SPDX-FileCopyrightText: (C) 2023 ilmmatias
 ; SPDX-License-Identifier: BSD-3-Clause
 
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 ; PURPOSE:
-;     This function inserts a new E820 style memory region to the list (while mantaining the list sorted).
+;     This function inserts a new E820 style memory region to the list (while mantaining the list
+;     sorted).
 ;
 ; PARAMETERS:
-;     Entry (es:di) - entry to add; di used as it's where E820h returns its value (+ it frees us from using
-;                     registers).
+;     Entry (es:di) - entry to add; di used as it's where E820h returns its value (+ it frees us
+;                     from using registers).
 ;
 ; RETURN VALUE:
 ;     None.
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 InsertRegion proc
     push si
     push di
@@ -25,7 +26,8 @@ InsertRegion proc
     jz InsertRegion$New
 
 InsertRegion$Loop:
-    ; We shouldn't have this situation, but check for contiguous entries (our base == their base+length).
+    ; We shouldn't have this situation, but check for contiguous entries (our base == their
+    ; base+length).
     mov eax, dword ptr ds:[si + 16]
     cmp eax, dword ptr es:[di + 16]
     jne InsertRegion$CheckAbove
@@ -120,7 +122,7 @@ InsertRegion$End:
     ret
 InsertRegion endp
 
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 ; PURPOSE:
 ;     This function tries to find a memory region containing the given address range.
 ;
@@ -130,7 +132,7 @@ InsertRegion endp
 ;
 ; RETURN VALUE:
 ;     None.
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 FindRegion proc
     push di
     push eax
@@ -143,7 +145,8 @@ FindRegion proc
     jz FindRegion$Fail
 
 FindRegion$Loop:
-    ; base > 32bits means fail (as no way it+the length will somehow contain the wanted range.
+    ; base > 32bits means fail (as no way it+the length will somehow contain the wanted
+    ; range.
     cmp dword ptr es:[di + 4], 0
     jne FindRegion$Fail
 
@@ -158,7 +161,8 @@ FindRegion$Loop:
 
     mov ebp, ebx
     add ebp, edx
-    ; Overflow is not really supposed to happen, but let's take that as an error/region is too big to possibly fit.
+    ; Overflow is not really supposed to happen, but let's take that as an error/region is
+    ; too big to possibly fit.
     jo FindRegion$Fail
     cmp ebp, eax
     jge FindRegion$CheckLower

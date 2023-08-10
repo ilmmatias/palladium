@@ -1,7 +1,7 @@
 ; SPDX-FileCopyrightText: (C) 2023 ilmmatias
 ; SPDX-License-Identifier: BSD-3-Clause
 
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 ; PURPOSE:
 ;     This function tries to get the full memory map using the E820h BIOS function.
 ;
@@ -10,7 +10,7 @@
 ;
 ; RETURN VALUE:
 ;     CF set if we couldn't get the memory map.
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 TryE820 proc
     push eax
     push ebx
@@ -24,16 +24,17 @@ TryE820 proc
     xor ax, ax
     mov ds, ax
 
-    ; ebx = 0 means start from the top, other values are all magic to not break anything (though ecx might be
-    ; ignored).
+    ; ebx = 0 means start from the top, other values are all magic to not break anything (though
+    ; ecx might be ignored).
     mov eax, 0E820h
     xor ebx, ebx
     mov edx, 534D4150h
     mov ecx, 24
     mov di, 4000h
 
-    ; First call shouldn't set carry (that means E820 is unsupported), it shouldn't return invalid EAX, nor should it
-    ; be the last (that also means unsupported/broken implementation, at least for us).
+    ; First call shouldn't set carry (that means E820 is unsupported), it shouldn't return
+    ; invalid EAX, nor should it be the last (that also means unsupported/broken implementation,
+    ; at least for us).
     int 15h
     jc TryE820$Fail
     cmp eax, 0534D4150h
@@ -54,7 +55,8 @@ TryE820$Next:
 TryE820$Loop:
     jcxz TryE820$Next
 
-    ; ecx = 24 means that this is an extended ACPI 3 entry, which can have the "this entry is valid!" bit unset.
+    ; ecx = 24 means that this is an extended ACPI 3 entry, which can have the "this entry is
+    ; valid!" bit unset.
     cmp ecx, 24
     jb TryE820$NotAcpi3
     test byte ptr es:[di + 20], 1
@@ -95,7 +97,7 @@ TryE820$Fail:
     ret
 TryE820 endp
 
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 ; PURPOSE:
 ;     This function gets (and assumes a bit) how much contigous memory we have in the low memory.
 ;     We need this when not using E820.
@@ -105,7 +107,7 @@ TryE820 endp
 ;
 ; RETURN VALUE:
 ;     CF set if we couldn't get the memory map.
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 GetLowMap proc
     push di
     push eax
@@ -132,7 +134,8 @@ GetLowMap proc
 
     mov edx, 100000h
     sub edx, eax
-    ; From the end of the contig memory up to 000FFFFF we have the EBDA, reserved hardware mappings, BIOS stuff, etc.
+    ; From the end of the contig memory up to 000FFFFF we have the EBDA, reserved hardware
+    ; mappings, BIOS stuff, etc.
     mov dword ptr es:[di], eax
     mov dword ptr es:[di + 4], 0
     mov dword ptr es:[di + 8], edx
@@ -163,16 +166,17 @@ GetLowMap$Fail:
     ret
 GetLowMap endp
 
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 ; PURPOSE:
-;     This function tries to get how much contiguous high memory we have using the E801h BIOS function.
+;     This function tries to get how much contiguous high memory we have using the E801h BIOS
+;     function.
 ;
 ; PARAMETERS:
 ;     None.
 ;
 ; RETURN VALUE:
 ;     CF set if we couldn't get the memory map.
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 TryE801 proc
     push eax
     push bx
@@ -252,9 +256,10 @@ TryE801$Fail:
     ret
 TryE801 endp
 
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 ; PURPOSE:
-;     This function tries to get how much contiguous high memory we have using the 88h BIOS function.
+;     This function tries to get how much contiguous high memory we have using the 88h BIOS
+;     function.
 ;     This is the last BIOS function we will try, so it needs to succed (or we will panic/crash).
 ;
 ; PARAMETERS:
@@ -262,7 +267,7 @@ TryE801 endp
 ;
 ; RETURN VALUE:
 ;     CF set if we couldn't get the memory map.
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 Try88 proc
     push ax
     push di

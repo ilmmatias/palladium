@@ -1,21 +1,22 @@
 ; SPDX-FileCopyrightText: (C) 2023 ilmmatias
 ; SPDX-License-Identifier: BSD-3-Clause
 
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 ; PURPOSE:
-;     This function checks if the A20 line (which allows access to addresses over the 1MiB barrier) is enabled.
+;     This function checks if the A20 line (which allows access to addresses over the 1MiB
+;     barrier) is enabled.
 ;
 ; PARAMETERS:
 ;     None.
 ;
 ; RETURN VALUE:
 ;     CF set if the A20 line is disabled.
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 CheckA20 proc
-    ; We do the check by comparing the memory at the end of the bootsector (0xAA55) with the memory at the same
-    ; address but 1MiB higher.
-    ; Just to make sure we don't have some kind of one off coincidence, we modify said value after checking it
-    ; once, and then check it again.
+    ; We do the check by comparing the memory at the end of the bootsector (0xAA55) with the
+    ; memory at the same address but 1MiB higher.
+    ; Just to make sure we don't have some kind of one off coincidence, we modify said value
+    ; after checking it once, and then check it again.
 
     push ax
     push si
@@ -67,7 +68,7 @@ CheckA20$Enabled:
     ret
 CheckA20 endp
 
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 ; PURPOSE:
 ;     This function tries to enable the A20 line using the BIOS int 15h functions.
 ;
@@ -76,7 +77,7 @@ CheckA20 endp
 ;
 ; RETURN VALUE:
 ;     CF set if we couldn't enable the A20 line.
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 TryA20Bios proc
     push ax
     push bx
@@ -120,16 +121,17 @@ TryA20Bios$Fail:
     ret
 TryA20Bios endp
 
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 ; PURPOSE:
-;     This function tries to enable the A20 line using the keyboard controller (yes, the KB controller).
+;     This function tries to enable the A20 line using the keyboard controller (yes, the KB
+;     controller).
 ;
 ; PARAMETERS:
 ;     None.
 ;
 ; RETURN VALUE:
 ;     CF set if we couldn't enable the A20 line.
-;---------------------------------------------------------------------------------------------------------------------
+;--------------------------------------------------------------------------------------------------
 TryA20Keyboard proc
     push ax
     push cx
