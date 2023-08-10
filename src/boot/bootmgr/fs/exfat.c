@@ -5,7 +5,6 @@
 #include <ctype.h>
 #include <exfat.h>
 #include <file.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 

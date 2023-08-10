@@ -4,7 +4,6 @@
 #include <assert.h>
 #include <crt_impl.h>
 #include <file.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -80,6 +79,8 @@ void __fclose(void *handle) {
         BiCleanupExfat(Context);
     } else if (Context->Type == FILE_TYPE_NTFS) {
         BiCleanupNtfs(Context);
+    } else if (Context->Type == FILE_TYPE_ISO9660) {
+        BiCleanupIso9660(Context);
     }
 }
 
@@ -112,6 +113,8 @@ int __fread(void *handle, size_t pos, void *buffer, size_t size, size_t *read) {
         return BiReadExfatFile(Context, buffer, pos, size, read);
     } else if (Context->Type == FILE_TYPE_NTFS) {
         return BiReadNtfsFile(Context, buffer, pos, size, read);
+    } else if (Context->Type == FILE_TYPE_ISO9660) {
+        return BiReadIso9660File(Context, buffer, pos, size, read);
     } else {
         if (read) {
             *read = 0;
@@ -171,6 +174,8 @@ int BiCopyFileContext(FileContext *Context, FileContext *Copy) {
         return BiCopyExfat(Context, Copy);
     } else if (Context->Type == FILE_TYPE_NTFS) {
         return BiCopyNtfs(Context, Copy);
+    } else if (Context->Type == FILE_TYPE_ISO9660) {
+        return BiCopyIso9660(Context, Copy);
     } else {
         return 0;
     }
@@ -197,6 +202,8 @@ int BiReadDirectoryEntry(FileContext *Context, const char *Name) {
         return BiTraverseExfatDirectory(Context, Name);
     } else if (Context->Type == FILE_TYPE_NTFS) {
         return BiTraverseNtfsDirectory(Context, Name);
+    } else if (Context->Type == FILE_TYPE_ISO9660) {
+        return BiTraverseIso9660Directory(Context, Name);
     } else {
         return 0;
     }

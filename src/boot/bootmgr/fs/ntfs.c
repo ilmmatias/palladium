@@ -2,9 +2,9 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <crt_impl.h>
+#include <ctype.h>
 #include <file.h>
 #include <ntfs.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -25,7 +25,7 @@ typedef struct {
     uint32_t BytesPerMftEntry;
     uint64_t MftOffset;
     uint64_t FileEntry;
-    uint64_t FileSize;
+    uint64_t FileLength;
     int Directory;
 } NtfsContext;
 
@@ -127,7 +127,7 @@ int BiProbeNtfs(FileContext *Context) {
     /* MFT entry 5 is `.` (the root directory). */
     FsContext->MftOffset = BootSector->MftCluster * FsContext->BytesPerCluster;
     FsContext->FileEntry = 5;
-    FsContext->FileSize = 0;
+    FsContext->FileLength = 0;
     FsContext->Directory = 1;
 
     memcpy(&FsContext->Parent, Context, sizeof(FileContext));
@@ -382,7 +382,7 @@ static int TraverseIndexBlock(
         }
 
         while (*SearchNamePos && IndexEntry->NameLength) {
-            if (*(ThisNamePos++) != *(SearchNamePos++)) {
+            if (tolower(*(ThisNamePos++)) != tolower(*(SearchNamePos++))) {
                 Match = 0;
                 break;
             }
@@ -393,7 +393,7 @@ static int TraverseIndexBlock(
         if (Match && !IndexEntry->NameLength) {
             FsContext->FileEntry = IndexEntry->MftEntry & 0xFFFFFFFFFFFF;
             FsContext->Directory = (IndexEntry->FileFlags & 0x10000000) != 0;
-            FsContext->FileSize = IndexEntry->RealSize;
+            FsContext->FileLength = IndexEntry->RealSize;
             return 1;
         }
 
@@ -512,13 +512,13 @@ int BiReadNtfsFile(FileContext *Context, void *Buffer, size_t Start, size_t Size
 
     if (FsContext->Directory) {
         return __STDIO_FLAGS_ERROR;
-    } else if (Start > FsContext->FileSize) {
+    } else if (Start > FsContext->FileLength) {
         return __STDIO_FLAGS_EOF;
     }
 
-    if (Size > FsContext->FileSize - Start) {
+    if (Size > FsContext->FileLength - Start) {
         Flags = __STDIO_FLAGS_EOF;
-        Size = FsContext->FileSize - Start;
+        Size = FsContext->FileLength - Start;
     }
 
     if (__fread(
@@ -567,7 +567,7 @@ int BiReadNtfsFile(FileContext *Context, void *Buffer, size_t Start, size_t Size
         }
     }
 
-    while (1) {
+    while (Size) {
         size_t CopySize = FsContext->BytesPerCluster - Start;
         if (Size < CopySize) {
             CopySize = Size;

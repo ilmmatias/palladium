@@ -65,7 +65,9 @@ then
     sudo umount /mnt/mount 1>/dev/null
     qemu-system-x86_64 -M smm=off -hda obj.amd64/ntfs.img -no-reboot -d int
 else
-    mkisofs -R -b iso9660boot.com -no-emul-boot -o obj.amd64/iso9660.iso _root
+    mkdir -p _root/open_this
+    printf 'Hello, World! This file has been loaded using the boot ISO9660 driver.\n' | tee _root/open_this/flag.txt 1>/dev/null
+    mkisofs -iso-level 2 -R -b iso9660boot.com -no-emul-boot -o obj.amd64/iso9660.iso _root
     qemu-system-x86_64 -M smm=off -cdrom obj.amd64/iso9660.iso -no-reboot -d int
 fi
 
