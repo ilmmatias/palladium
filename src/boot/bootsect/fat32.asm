@@ -225,7 +225,8 @@ ReadCluster endp
 ;     Cluster (ebp) - Current cluster.
 ;
 ; RETURN VALUE:
-;     cf will be unset if the file has ended, otherwise, new/next cluster on ebp.
+;     Flags will be set so that `jc` will NOT JUMP if the file has ended, otherwise, new/next
+;     cluster on ebp.
 ;--------------------------------------------------------------------------------------------------
 GetNextCluster proc
     ; In the FAT, the size of each entry (representing a cluster) is 4 bytes. We can get the
@@ -254,7 +255,7 @@ GetNextCluster proc
 
     mov ebp, [edx + 600h]
     and ebp, 0FFFFFFFh
-    cmp ebp, 0FFFFFF0h
+    cmp ebp, 0FFFFFF6h
     ret
 GetNextCluster endp
 

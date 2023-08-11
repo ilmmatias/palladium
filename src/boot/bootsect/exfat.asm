@@ -313,7 +313,8 @@ ReadCluster endp
 ;                                  sequential.
 ;
 ; RETURN VALUE:
-;     cf will be unset if the file has ended, otherwise, new/next cluster on ebp.
+;     Flags will be set so that `jc` will NOT JUMP if the file has ended, otherwise, new/next
+;     cluster  on ebp.
 ;--------------------------------------------------------------------------------------------------
 GetNextCluster proc
     ; exFAT supports the sequential data sectors (no need to read the FAT in that case, just
@@ -360,7 +361,7 @@ GetNextCluster$FollowFat:
     pop bx
 
     mov ebp, [edx + 600h]
-    cmp ebp, 0FFFFFFF0h
+    cmp ebp, 0FFFFFFF6h
     ret
 GetNextCluster endp
 

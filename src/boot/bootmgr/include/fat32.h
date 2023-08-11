@@ -39,4 +39,30 @@ typedef struct __attribute__((packed)) {
     uint16_t BootSignature;
 } Fat32BootSector;
 
+typedef struct __attribute__((packed)) {
+    char DosName[11];
+    uint8_t Attributes;
+    char Reserved;
+    uint8_t CreationTimeTenths;
+    uint16_t CreationTime;
+    uint16_t CreationDate;
+    uint16_t LastAccessDate;
+    uint16_t FileClusterHigh;
+    uint16_t LastModificationTime;
+    uint16_t LastModificationDate;
+    uint16_t FileClusterLow;
+    uint32_t FileSize;
+} Fat32DirectoryEntry;
+
+typedef struct __attribute__((packed)) {
+    uint8_t Order;
+    uint16_t First5[5];
+    uint8_t Attributes;
+    uint8_t LongEntryType;
+    uint8_t Checksum;
+    uint16_t Next6[6];
+    uint16_t AlwaysZero;
+    uint16_t Final2[2];
+} Fat32LongFileNameEntry;
+
 #endif /* _FAT32_H_ */

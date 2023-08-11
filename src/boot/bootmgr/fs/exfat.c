@@ -178,6 +178,9 @@ static int FollowCluster(ExfatContext *FsContext, void **Current, uint64_t *Clus
             return 0;
         } else {
             *Cluster = *((uint32_t *)FsContext->ClusterBuffer);
+            if (*Cluster > 0xFFFFFFF6) {
+                return 0;
+            }
         }
     }
 
