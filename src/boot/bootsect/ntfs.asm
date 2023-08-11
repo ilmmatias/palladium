@@ -484,7 +484,7 @@ ApplyFixups proc
     mov si, [BytesPerSector]
     sub si, 2
 
-    ; Load up the mount of fixups.
+    ; Load up the amount of fixups.
     mov di, 6
     mov cx, es:[di]
 
@@ -561,7 +561,6 @@ FindAttribute$NonResident:
     add di, es:[si + 32]
     mov [DataRuns], di
 
-    mov [Reserved2], al
     mov eax, es:[si + 16]
     mov edx, es:[si + 20]
     push eax

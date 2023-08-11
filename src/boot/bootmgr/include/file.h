@@ -17,6 +17,7 @@
 typedef struct {
     int Type;
     void *PrivateData;
+    uint64_t FileLength;
 } FileContext;
 
 int BiCopyFileContext(FileContext *Context, FileContext *Copy);

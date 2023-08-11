@@ -25,7 +25,6 @@ typedef struct {
     uint32_t BytesPerMftEntry;
     uint64_t MftOffset;
     uint64_t FileEntry;
-    uint64_t FileLength;
     int Directory;
 } NtfsContext;
 
@@ -52,6 +51,7 @@ int BiCopyNtfs(FileContext *Context, FileContext *Copy) {
     memcpy(CopyContext, FsContext, sizeof(NtfsContext));
     Copy->Type = FILE_TYPE_NTFS;
     Copy->PrivateData = CopyContext;
+    Copy->FileLength = Context->FileLength;
 
     return 1;
 }
@@ -127,12 +127,12 @@ int BiProbeNtfs(FileContext *Context) {
     /* MFT entry 5 is `.` (the root directory). */
     FsContext->MftOffset = BootSector->MftCluster * FsContext->BytesPerCluster;
     FsContext->FileEntry = 5;
-    FsContext->FileLength = 0;
     FsContext->Directory = 1;
 
     memcpy(&FsContext->Parent, Context, sizeof(FileContext));
     Context->Type = FILE_TYPE_NTFS;
     Context->PrivateData = FsContext;
+    Context->FileLength = 0;
 
     free(Buffer);
     return 1;
@@ -346,6 +346,7 @@ static void *FindAttribute(
  *     This function searches for a given file inside an directory index block.
  *
  * PARAMETERS:
+ *     Context - Device/node private data.
  *     FsContext - FS-specific data.
  *     HeaderStart - Where the index header starts.
  *     LastEntry - Output; Last entry of the block. Use this to check for more blocks.
@@ -355,6 +356,7 @@ static void *FindAttribute(
  *     Either a pointer to the attribute, or NULL if it couldn't be found.
  *-----------------------------------------------------------------------------------------------*/
 static int TraverseIndexBlock(
+    FileContext *Context,
     NtfsContext *FsContext,
     char *HeaderStart,
     NtfsIndexRecord **LastEntry,
@@ -393,7 +395,7 @@ static int TraverseIndexBlock(
         if (Match && !IndexEntry->NameLength) {
             FsContext->FileEntry = IndexEntry->MftEntry & 0xFFFFFFFFFFFF;
             FsContext->Directory = (IndexEntry->FileFlags & 0x10000000) != 0;
-            FsContext->FileLength = IndexEntry->RealSize;
+            Context->FileLength = IndexEntry->RealSize;
             return 1;
         }
 
@@ -443,7 +445,7 @@ int BiTraverseNtfsDirectory(FileContext *Context, const char *Name) {
     }
 
     NtfsIndexRecord *LastEntry;
-    if (TraverseIndexBlock(FsContext, (char *)(IndexRoot + 1), &LastEntry, Name)) {
+    if (TraverseIndexBlock(Context, FsContext, (char *)(IndexRoot + 1), &LastEntry, Name)) {
         return 1;
     } else if (!LastEntry || !(LastEntry->Flags & 0x01)) {
         return 0;
@@ -468,7 +470,8 @@ int BiTraverseNtfsDirectory(FileContext *Context, const char *Name) {
             return 0;
         }
 
-        if (TraverseIndexBlock(FsContext, (char *)(IndexAllocation + 1), &LastEntry, Name)) {
+        if (TraverseIndexBlock(
+                Context, FsContext, (char *)(IndexAllocation + 1), &LastEntry, Name)) {
             return 1;
         } else if (!LastEntry || !(LastEntry->Flags & 0x01)) {
             return 0;
@@ -512,13 +515,13 @@ int BiReadNtfsFile(FileContext *Context, void *Buffer, size_t Start, size_t Size
 
     if (FsContext->Directory) {
         return __STDIO_FLAGS_ERROR;
-    } else if (Start > FsContext->FileLength) {
+    } else if (Start > Context->FileLength) {
         return __STDIO_FLAGS_EOF;
     }
 
-    if (Size > FsContext->FileLength - Start) {
+    if (Size > Context->FileLength - Start) {
         Flags = __STDIO_FLAGS_EOF;
-        Size = FsContext->FileLength - Start;
+        Size = Context->FileLength - Start;
     }
 
     if (__fread(

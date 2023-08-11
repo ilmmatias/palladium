@@ -27,6 +27,7 @@
 #define getc(stream) (fgetc((stream)))
 
 typedef struct FILE FILE;
+typedef struct fpos_t fpos_t;
 
 FILE *fopen(const char *filename, const char *mode);
 FILE *freopen(const char *filename, const char *mode, FILE *stream);
@@ -55,5 +56,14 @@ int snprintf(char *buffer, size_t bufsz, const char *format, ...);
 int vprintf(const char *format, va_list vlist);
 int vsprintf(char *buffer, const char *format, va_list vlist);
 int vsnprintf(char *buffer, size_t bufsz, const char *format, va_list vlist);
+
+long ftell(FILE *stream);
+int fgetpos(FILE *stream, fpos_t *pos);
+int fseek(FILE *stream, long offset, int origin);
+int fsetpos(FILE *stream, fpos_t *pos);
+int rewind(FILE *stream);
+void clearerr(FILE *stream);
+int feof(FILE *stream);
+int ferror(FILE *stream);
 
 #endif /* STDIO_H */

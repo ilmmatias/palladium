@@ -15,7 +15,6 @@ typedef struct {
     uint16_t BytesPerCluster;
     uint32_t ClusterOffset;
     uint32_t FileCluster;
-    uint32_t FileLength;
     int Directory;
 } Fat32Context;
 
@@ -42,6 +41,7 @@ int BiCopyFat32(FileContext *Context, FileContext *Copy) {
     memcpy(CopyContext, FsContext, sizeof(Fat32Context));
     Copy->Type = FILE_TYPE_FAT32;
     Copy->PrivateData = CopyContext;
+    Copy->FileLength = Context->FileLength;
 
     return 1;
 }
@@ -99,6 +99,7 @@ int BiProbeFat32(FileContext *Context) {
     memcpy(&FsContext->Parent, Context, sizeof(FileContext));
     Context->Type = FILE_TYPE_FAT32;
     Context->PrivateData = FsContext;
+    Context->FileLength = 0;
 
     free(Buffer);
     return 1;
@@ -308,8 +309,8 @@ int BiTraverseFat32Directory(FileContext *Context, const char *Name) {
             (uint8_t)Current->DosName[0] != 0xE5 && !memcmp(Current->DosName, ShortName, 11)) {
             FsContext->FileCluster =
                 (((uint32_t)Current->FileClusterHigh << 16) | Current->FileClusterLow) - 2;
-            FsContext->FileLength = Current->FileSize;
             FsContext->Directory = Current->Attributes & 0x10;
+            Context->FileLength = Current->FileSize;
             return 1;
         }
 
@@ -344,13 +345,13 @@ int BiReadFat32File(FileContext *Context, void *Buffer, size_t Start, size_t Siz
 
     if (FsContext->Directory) {
         return __STDIO_FLAGS_ERROR;
-    } else if (Start > FsContext->FileLength) {
+    } else if (Start > Context->FileLength) {
         return __STDIO_FLAGS_EOF;
     }
 
-    if (Size > FsContext->FileLength - Start) {
+    if (Size > Context->FileLength - Start) {
         Flags = __STDIO_FLAGS_EOF;
-        Size = FsContext->FileLength - Start;
+        Size = Context->FileLength - Start;
     }
 
     /* Seek through the file into the starting cluster (for the given byte index). */

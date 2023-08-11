@@ -70,12 +70,12 @@ size_t fread(void *buffer, size_t size, size_t count, struct FILE *stream) {
         if (stream->buffer_pos >= stream->buffer_read) {
             flags = __fread(
                 stream->handle,
-                stream->file_pos,
+                stream->buffer_file_pos,
                 stream->buffer,
                 stream->buffer_size,
                 &stream->buffer_read);
 
-            stream->file_pos += stream->buffer_read;
+            stream->buffer_file_pos += stream->buffer_read;
             stream->buffer_pos = 0;
 
             /* EOF is only valid/set if the user actually tried reading beyond the file
@@ -91,6 +91,7 @@ size_t fread(void *buffer, size_t size, size_t count, struct FILE *stream) {
         }
 
         memcpy(dest, stream->buffer + stream->buffer_pos, copy_size);
+        stream->file_pos += copy_size;
         stream->buffer_pos += copy_size;
         accum += copy_size;
         dest += copy_size;

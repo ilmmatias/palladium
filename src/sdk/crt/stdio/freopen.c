@@ -34,8 +34,9 @@ FILE *freopen(const char *filename, const char *mode, struct FILE *stream) {
         return NULL;
     }
 
+    size_t length;
     int flags = __parse_fopen_mode(mode);
-    void *handle = __fopen(filename, flags);
+    void *handle = __fopen(filename, flags, &length);
     if (!handle) {
         free(stream);
         return NULL;
@@ -49,11 +50,13 @@ FILE *freopen(const char *filename, const char *mode, struct FILE *stream) {
     }
 
     stream->handle = handle;
+    stream->file_size = length;
     stream->file_pos = 0;
     stream->buffer_type = _IOFBF;
     stream->buffer_size = BUFSIZ;
     stream->buffer_read = 0;
     stream->buffer_pos = 0;
+    stream->buffer_file_pos = 0;
     stream->unget_size = 0;
     stream->flags = flags;
 

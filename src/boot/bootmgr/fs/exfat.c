@@ -16,7 +16,6 @@ typedef struct {
     uint64_t ClusterOffset;
     uint64_t FatOffset;
     uint32_t FileCluster;
-    uint64_t FileLength;
     int NoFatChain;
     int Directory;
 } ExfatContext;
@@ -44,6 +43,7 @@ int BiCopyExfat(FileContext *Context, FileContext *Copy) {
     memcpy(CopyContext, FsContext, sizeof(ExfatContext));
     Copy->Type = FILE_TYPE_EXFAT;
     Copy->PrivateData = CopyContext;
+    Copy->FileLength = Context->FileLength;
 
     return 1;
 }
@@ -129,6 +129,7 @@ int BiProbeExfat(FileContext *Context) {
     memcpy(&FsContext->Parent, Context, sizeof(FileContext));
     Context->Type = FILE_TYPE_EXFAT;
     Context->PrivateData = FsContext;
+    Context->FileLength = 0;
 
     free(Buffer);
     return 1;
@@ -293,9 +294,9 @@ int BiTraverseExfatDirectory(FileContext *Context, const char *Name) {
            we're done. */
 
         FsContext->FileCluster = StreamEntry.FirstCluster - 2;
-        FsContext->FileLength = StreamEntry.ValidDataLength;
         FsContext->NoFatChain = StreamEntry.GeneralSecondaryFlags & 0x02;
         FsContext->Directory = Entry.FileAttributes & 0x10;
+        Context->FileLength = StreamEntry.ValidDataLength;
 
         return 1;
     }
@@ -326,13 +327,13 @@ int BiReadExfatFile(FileContext *Context, void *Buffer, size_t Start, size_t Siz
 
     if (FsContext->Directory) {
         return __STDIO_FLAGS_ERROR;
-    } else if (Start > FsContext->FileLength) {
+    } else if (Start > Context->FileLength) {
         return __STDIO_FLAGS_EOF;
     }
 
-    if (Size > FsContext->FileLength - Start) {
+    if (Size > Context->FileLength - Start) {
         Flags = __STDIO_FLAGS_EOF;
-        Size = FsContext->FileLength - Start;
+        Size = Context->FileLength - Start;
     }
 
     /* Seek through the file into the starting cluster (for the given byte index). */

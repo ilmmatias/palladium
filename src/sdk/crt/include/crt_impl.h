@@ -9,6 +9,7 @@
 
 struct FILE {
     void *handle;
+    size_t file_size;
     size_t file_pos;
     char *buffer;
     int user_buffer;
@@ -16,9 +17,14 @@ struct FILE {
     size_t buffer_size;
     size_t buffer_read;
     size_t buffer_pos;
+    size_t buffer_file_pos;
     char unget_buffer[16];
     size_t unget_size;
     int flags;
+};
+
+struct fpos_t {
+    size_t file_pos;
 };
 
 #ifndef __CRT_STDIO_H
@@ -33,7 +39,7 @@ struct FILE {
 #define __STDIO_FLAGS_WRITING 0x100
 
 int __parse_fopen_mode(const char *mode);
-void *__fopen(const char *filename, int mode);
+void *__fopen(const char *filename, int mode, size_t *length);
 void __fclose(void *handle);
 int __fread(void *handle, size_t pos, void *buffer, size_t size, size_t *read);
 int __fwrite(void *handle, size_t pos, void *buffer, size_t size, size_t *wrote);

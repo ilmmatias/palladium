@@ -15,11 +15,12 @@
  * PARAMETERS:
  *     path - Full path of the file to open.
  *     mode - File flags; We don't really have any use for them, and they are ignore.
+ *     length - Output; Total file size in bytes.
  *
  * RETURN VALUE:
  *     Transparent handle if the file/device exists, NULL otherwise.
  *-----------------------------------------------------------------------------------------------*/
-void *__fopen(const char *filename, int mode) {
+void *__fopen(const char *filename, int mode, size_t *length) {
     (void)mode;
 
     char *Path = strdup(filename);
@@ -54,6 +55,7 @@ void *__fopen(const char *filename, int mode) {
         }
     }
 
+    *length = Context->FileLength;
     return Context;
 }
 

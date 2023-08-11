@@ -14,7 +14,6 @@ typedef struct {
     void *SectorBuffer;
     uint16_t BytesPerSector;
     uint64_t FileSector;
-    uint64_t FileLength;
     int Directory;
 } Iso9660Context;
 
@@ -41,6 +40,7 @@ int BiCopyIso9660(FileContext *Context, FileContext *Copy) {
     memcpy(CopyContext, FsContext, sizeof(Iso9660Context));
     Copy->Type = FILE_TYPE_ISO9660;
     Copy->PrivateData = CopyContext;
+    Copy->FileLength = Context->FileLength;
 
     return 1;
 }
@@ -101,26 +101,27 @@ int BiProbeIso9660(FileContext *Context, uint16_t BytesPerSector) {
 
     FsContext->BytesPerSector = BytesPerSector;
     FsContext->FileSector = VolumeDescriptor->RootDirectory.ExtentSector;
-    FsContext->FileLength = VolumeDescriptor->RootDirectory.ExtentSize;
     FsContext->Directory = 1;
 
     if (BytesPerSector == 2048) {
         FsContext->SectorBuffer = Buffer;
     } else {
         FsContext->SectorBuffer = malloc(BytesPerSector);
-
         if (!FsContext->SectorBuffer) {
             free(FsContext);
             free(Buffer);
             return 0;
         }
-
-        free(Buffer);
     }
 
     memcpy(&FsContext->Parent, Context, sizeof(FileContext));
     Context->Type = FILE_TYPE_ISO9660;
     Context->PrivateData = FsContext;
+    Context->FileLength = VolumeDescriptor->RootDirectory.ExtentSize;
+
+    if (FsContext->SectorBuffer != Buffer) {
+        free(Buffer);
+    }
 
     return 1;
 }
@@ -154,7 +155,7 @@ void BiCleanupIso9660(FileContext *Context) {
  *-----------------------------------------------------------------------------------------------*/
 int BiTraverseIso9660Directory(FileContext *Context, const char *Name) {
     Iso9660Context *FsContext = Context->PrivateData;
-    uint64_t Remaining = FsContext->FileLength;
+    uint64_t Remaining = Context->FileLength;
     uint64_t Sector = FsContext->FileSector;
     char *Current = NULL;
 
@@ -210,8 +211,8 @@ int BiTraverseIso9660Directory(FileContext *Context, const char *Name) {
             ((!(Record->FileFlags & 0x02) && !HasDot) && Record->NameLength == 3 &&
              *ThisNamePos == '.' && *(ThisNamePos + 1) == ';' && *(ThisNamePos + 2) == '1')) {
             FsContext->FileSector = Record->ExtentSector;
-            FsContext->FileLength = Record->ExtentSize;
             FsContext->Directory = Record->FileFlags & 0x02;
+            Context->FileLength = Record->ExtentSize;
             return 1;
         }
 
@@ -243,13 +244,13 @@ int BiReadIso9660File(FileContext *Context, void *Buffer, size_t Start, size_t S
 
     if (FsContext->Directory) {
         return __STDIO_FLAGS_ERROR;
-    } else if (Start > FsContext->FileLength) {
+    } else if (Start > Context->FileLength) {
         return __STDIO_FLAGS_EOF;
     }
 
-    if (Size > FsContext->FileLength - Start) {
+    if (Size > Context->FileLength - Start) {
         Flags = __STDIO_FLAGS_EOF;
-        Size = FsContext->FileLength - Start;
+        Size = Context->FileLength - Start;
     }
 
     /* Files in ISO9660 are on sequential sectors, so we can just __fread the parent device. */
