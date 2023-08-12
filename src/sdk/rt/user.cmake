@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 add_library(urt "ucrt" SHARED ${SOURCES})
-add_import_library(urt urt.def)
 
 target_include_directories(urt PUBLIC include)
 target_compile_options(urt PRIVATE $<$<COMPILE_LANGUAGE:C,CXX>:-ffreestanding>)

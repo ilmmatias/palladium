@@ -65,17 +65,7 @@ function(add_library target type)
         	${target}
         	PRIVATE
         	--target=${TARGET_${ARCH}}-w64-mingw32
+            -Wl,--out-implib,${CMAKE_CURRENT_BINARY_DIR}/${target}.lib
         	-fuse-ld=lld
         	/usr/local/lib/baremetal/libclang_rt.builtins-${TARGET_${ARCH}}.a)
-endfunction()
-
-function(add_import_library target def_file)
-    add_custom_command(
-        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${target}.lib
-        COMMAND lld-link /def:${CMAKE_CURRENT_SOURCE_DIR}/${def_file}
-                         /out:${CMAKE_CURRENT_BINARY_DIR}/${target}.lib /machine:${ARCH}
-        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${def_file}
-    )
-
-    add_custom_target(${target}lib ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${target}.lib)
 endfunction()

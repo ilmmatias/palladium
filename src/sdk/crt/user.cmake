@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 add_library(ucrt "nostdlib" SHARED ${SOURCES} ucrt.def)
-add_import_library(ucrt ucrt.def)
 
 target_include_directories(ucrt PUBLIC include)
 target_compile_options(ucrt PRIVATE $<$<COMPILE_LANGUAGE:C,CXX>:-ffreestanding>)
