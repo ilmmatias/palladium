@@ -1,8 +1,8 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
-#include <boot.h>
 #include <crt_impl.h>
+#include <display.h>
 #include <file.h>
 #include <stdalign.h>
 #include <stdio.h>

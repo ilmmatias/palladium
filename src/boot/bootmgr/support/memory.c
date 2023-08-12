@@ -1,7 +1,8 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
-#include <boot.h>
+#include <memory.h>
+#include <stdint.h>
 #include <string.h>
 
 typedef struct AllocatorEntry {

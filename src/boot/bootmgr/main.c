@@ -2,6 +2,9 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <boot.h>
+#include <display.h>
+#include <keyboard.h>
+#include <memory.h>
 #include <stdio.h>
 
 /*-------------------------------------------------------------------------------------------------
@@ -18,26 +21,13 @@
  *-----------------------------------------------------------------------------------------------*/
 [[noreturn]] void BmMain(void *BootBlock) {
     BmInitDisplay();
+    BmInitKeyboard();
     BmInitMemory(BootBlock);
     BmInitArch(BootBlock);
 
-    do {
-        FILE *stream = fopen("bios()/open_this/flag.txt", "r");
-        if (!stream) {
-            printf("fopen() failed\n");
-            break;
-        }
-
-        char data[128];
-        int read = fread(data, 1, 128, stream);
-        if (!read) {
-            printf("fread() failed\n");
-            break;
-        }
-
-        printf("%.*s\n", read, data);
-        fclose(stream);
-    } while (0);
+    while (1) {
+        printf("%c", BmPollKey());
+    }
 
     while (1)
         ;

@@ -9,6 +9,7 @@ if(ARCH STREQUAL "x86")
         ${ARCH}/disk.c
         ${ARCH}/display.c
         ${ARCH}/init.c
+        ${ARCH}/keyboard.c
         ${ARCH}/memory.c)
 endif()
 

@@ -1,7 +1,7 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
-#include <boot.h>
+#include <stdint.h>
 #include <string.h>
 
 #define VIDEO_MEMORY 0xB8000
