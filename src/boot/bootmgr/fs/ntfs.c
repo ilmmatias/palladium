@@ -364,6 +364,7 @@ static int TraverseIndexBlock(
     NtfsIndexHeader *IndexHeader = (NtfsIndexHeader *)HeaderStart;
     char *Start = HeaderStart + IndexHeader->FirstEntryOffset;
     char *Current = Start;
+    size_t NameLength = strlen(Name);
 
     /* This specific block should fit inside a cluster, if it doesn't, something is wrong with
        the FS! */
@@ -381,18 +382,19 @@ static int TraverseIndexBlock(
 
         if (IndexEntry->Flags & 0x02) {
             break;
+        } else if (IndexEntry->NameLength != NameLength) {
+            Current += IndexEntry->EntryLength;
+            continue;
         }
 
-        while (*SearchNamePos && IndexEntry->NameLength) {
+        while (*SearchNamePos) {
             if (tolower(*(ThisNamePos++)) != tolower(*(SearchNamePos++))) {
                 Match = 0;
                 break;
             }
-
-            IndexEntry->NameLength--;
         }
 
-        if (Match && !IndexEntry->NameLength) {
+        if (Match) {
             FsContext->FileEntry = IndexEntry->MftEntry & 0xFFFFFFFFFFFF;
             FsContext->Directory = (IndexEntry->FileFlags & 0x10000000) != 0;
             Context->FileLength = IndexEntry->RealSize;

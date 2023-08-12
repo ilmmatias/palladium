@@ -5,6 +5,7 @@
 #include <ctype.h>
 #include <exfat.h>
 #include <file.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -214,6 +215,7 @@ int BiTraverseExfatDirectory(FileContext *Context, const char *Name) {
     ExfatContext *FsContext = Context->PrivateData;
     ExfatDirectoryEntry *Current = FsContext->ClusterBuffer;
     uint64_t Cluster = FsContext->FileCluster;
+    size_t NameLength = strlen(Name);
 
     if (!FsContext->Directory) {
         return 0;
@@ -238,7 +240,8 @@ int BiTraverseExfatDirectory(FileContext *Context, const char *Name) {
 
         if (!FollowCluster(FsContext, (void **)&Current, &Cluster)) {
             return 0;
-        } else if (Current->EntryType != 0xC0) {
+        } else if (
+            Current->EntryType != 0xC0 || ((ExfatStreamEntry *)Current)->NameLength != NameLength) {
             while (Entry.SecondaryCount--) {
                 Current++;
                 if (!FollowCluster(FsContext, (void **)&Current, &Cluster)) {
@@ -279,7 +282,7 @@ int BiTraverseExfatDirectory(FileContext *Context, const char *Name) {
             StreamEntry.NameLength = StreamEntry.NameLength > 15 ? StreamEntry.NameLength - 15 : 0;
         }
 
-        if (!Match || *NamePos) {
+        if (!Match) {
             while (Entry.SecondaryCount--) {
                 Current++;
                 if (!FollowCluster(FsContext, (void **)&Current, &Cluster)) {

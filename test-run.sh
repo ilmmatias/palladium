@@ -52,7 +52,7 @@ then
     sudo mkfs.exfat obj.amd64/exfat.img 1>/dev/null
     dd if=obj.x86/boot/bootsect/exfatboot.com of=obj.amd64/exfat.img seek=120 skip=120 count=392 bs=1 conv=notrunc 2>/dev/null
     dd if=obj.x86/boot/bootsect/exfatboot.com of=obj.amd64/exfat.img seek=512 skip=512 bs=1 conv=notrunc 2>/dev/null
-    sudo fsck.exfat -y obj.amd64/exfat.img
+    sudo fsck.exfat -y obj.amd64/exfat.img 1>/dev/null 2>&1
     sudo mount -t exfat -o loop obj.amd64/exfat.img /mnt/mount 1>/dev/null
     sudo cp _root/bootmgr /mnt/mount/bootmgr 1>/dev/null
     sudo mkdir -p /mnt/mount/open_this
