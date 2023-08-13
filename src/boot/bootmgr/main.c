@@ -27,6 +27,13 @@
     BmInitArch(BootBlock);
     BmInitStdio();
 
+    while (1) {
+        int num = 0;
+        rewind(stdin);
+        scanf("%d", &num);
+        printf("The input is: %d (%#x in hex)\n", num, num);
+    }
+
     while (1)
         ;
 }

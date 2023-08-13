@@ -6,7 +6,17 @@
 #include <display.h>
 #include <file.h>
 #include <keyboard.h>
+#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+
+#define LINE_SIZE 128
+
+typedef struct {
+    char Line[LINE_SIZE];
+    size_t Position;
+    size_t Size;
+} ConsoleContext;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -32,7 +42,9 @@ int BiOpenConsoleDevice(const char *Segment, FileContext *Context) {
     }
 
     Context->Type = FILE_TYPE_CONSOLE;
-    return 9;
+    Context->PrivateData = calloc(1, sizeof(ConsoleContext));
+
+    return Context->PrivateData ? 9 : 0;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -46,6 +58,7 @@ int BiOpenConsoleDevice(const char *Segment, FileContext *Context) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void BiFreeConsoleDevice(FileContext *Context) {
+    free(Context->PrivateData);
     free(Context);
 }
 
@@ -69,25 +82,52 @@ int BiReadConsoleDevice(
     size_t Start,
     size_t Size,
     size_t *Read) {
-    (void)Context;
     (void)Start;
-    (void)Size;
 
-    char *OutputBuffer = Buffer;
-    int Key = BmPollKey();
+    /* The CRT expects us to be buffering the input ourselves too (storing the whole line).
+       So, we need to call PollKey until we reach the end of the line (ignoring any characters
+       past our max line size). */
 
-    /* Special keys like ESC need manual handling via BmPolLKey(). */
-    if (Key >= KEY_ESC) {
-        *(OutputBuffer++) = KEY_UNKNOWN;
-    } else {
-        *(OutputBuffer++) = Key;
+    ConsoleContext *DevContext = Context->PrivateData;
+
+    if (!DevContext->Size) {
+        DevContext->Position = 0;
+
+        while (1) {
+            int Key = BmPollKey();
+
+            /* Special keys like ESC need manual handling via BmPollKey(). */
+            if (Key >= KEY_ESC) {
+                Key = KEY_UNKNOWN;
+            }
+
+            if (DevContext->Size < LINE_SIZE) {
+                DevContext->Line[DevContext->Size++] = Key;
+            }
+
+            BmPutChar(Key);
+
+            if (Key == '\n') {
+                break;
+            }
+        }
     }
+
+    size_t CopySize = DevContext->Size;
+    if (CopySize > Size) {
+        CopySize = Size;
+    }
+
+    memcpy(Buffer, DevContext->Line + DevContext->Position, CopySize);
+
+    DevContext->Position += CopySize;
+    DevContext->Size -= CopySize;
 
     if (Read) {
-        *Read = 1;
+        *Read = CopySize;
     }
 
-    return Size > 1 ? __STDIO_FLAGS_EOF : 0;
+    return CopySize < Size ? __STDIO_FLAGS_EOF : 0;
 }
 
 /*-------------------------------------------------------------------------------------------------

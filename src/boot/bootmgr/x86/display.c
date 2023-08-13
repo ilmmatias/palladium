@@ -17,6 +17,16 @@ static uint8_t Attribute = 0x07;
 static uint16_t CursorX = 0;
 static uint16_t CursorY = 0;
 
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function displaces all lines one slot up, giving way for a new line at the bottom.
+ *
+ * PARAMETERS:
+ *     Color - New attributes.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
 static void ScrollUp(void) {
     memmove(VideoMemory, VideoMemory + SCREEN_WIDTH, (SCREEN_SIZE - SCREEN_WIDTH) * 2);
     memset(VideoMemory + SCREEN_SIZE - SCREEN_WIDTH, 0, SCREEN_WIDTH * 2);
@@ -24,7 +34,7 @@ static void ScrollUp(void) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     Set the background and foreground attributes of the screen.
+ *     This function sets the background and foreground attributes of the screen.
  *
  * PARAMETERS:
  *     Color - New attributes.
@@ -38,7 +48,7 @@ void BmSetColor(uint8_t Color) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     Set the current background and foreground attributes.
+ *     This function returns the current background and foreground attributes.
  *
  * PARAMETERS:
  *     None.
@@ -52,7 +62,7 @@ uint8_t BmGetColor(void) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     Set the X and Y positions of the console cursor simultaneously.
+ *     This function sets the X and Y positions of the console cursor simultaneously.
  *
  * PARAMETERS:
  *     X - New X position.
@@ -68,7 +78,7 @@ void BmSetCursor(uint16_t X, uint16_t Y) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     Save the X and Y positions of the console cursor simultaneously.
+ *     This function saves the X and Y positions of the console cursor simultaneously.
  *
  * PARAMETERS:
  *     X - Pointer to save location for the X position.
@@ -84,7 +94,7 @@ void BmGetCursor(uint16_t *X, uint16_t *Y) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     Set only the X position of the console cursor.
+ *     This function sets only the X position of the console cursor.
  *
  * PARAMETERS:
  *     X - New X position.
@@ -98,7 +108,7 @@ void BmSetCursorX(uint16_t x) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     Set only the Y position of the console cursor.
+ *     This function sets only the Y position of the console cursor.
  *
  * PARAMETERS:
  *     Y - New X position.
@@ -112,7 +122,7 @@ void BmSetCursorY(uint16_t y) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     Get only the X position of the console cursor.
+ *     This function gets only the X position of the console cursor.
  *
  * PARAMETERS:
  *     None.
@@ -126,7 +136,7 @@ uint16_t BmGetCursorX(void) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     Get only the Y position of the console cursor.
+ *     This function gets only the Y position of the console cursor.
  *
  * PARAMETERS:
  *     None.
@@ -140,7 +150,7 @@ uint16_t BmGetCursorY(void) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     Display a character. This is the internal function, use printf() instead.
+ *     This function displays a character using the current bg/fg attribute value.
  *
  * PARAMETERS:
  *     Character - The character.
@@ -172,8 +182,8 @@ void BmPutChar(char Character) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function clears anything that the BIOS or our bootsector has displayed during the boot
- *     process.
+ *     This function reinitializes the screen, either right after we took over, or before showing
+ *     a panic screen.
  *
  * PARAMETERS:
  *     None.
