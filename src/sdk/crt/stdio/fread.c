@@ -33,6 +33,13 @@ size_t fread(void *buffer, size_t size, size_t count, struct FILE *stream) {
         return 0;
     }
 
+    /* Not flushing stdout before reading user input can cause some funky/unexpected behaviour
+       (like the prompt not appearing, because it doesn't end with a new line). */
+    if (stream == stdin) {
+        fflush(stderr);
+        fflush(stdout);
+    }
+
     char *dest = buffer;
     stream->flags |= __STDIO_FLAGS_READING;
 

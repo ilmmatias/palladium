@@ -18,7 +18,7 @@
 char *strtok(char *str, const char *delim) {
     static char *Context = NULL;
 
-    if (!Context) {
+    if (!Context || str) {
         Context = str;
     }
 
@@ -28,6 +28,7 @@ char *strtok(char *str, const char *delim) {
 
     Context += strspn(Context, delim);
     if (!*Context) {
+        Context = NULL;
         return NULL;
     }
 

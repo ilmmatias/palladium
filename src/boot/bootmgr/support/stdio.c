@@ -36,6 +36,6 @@ void BmInitStdio(void) {
     }
 
     setbuf(stdin, NULL);
+    setbuf(stderr, NULL);
     stdout->buffer_type = _IOLBF;
-    stderr->buffer_type = _IOLBF;
 }
