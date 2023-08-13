@@ -8,7 +8,7 @@
  *     This function returns the current position along an open FILE.
  *
  * PARAMETERS:
- *     stream - Input file stream.
+ *     stream - Pointer to an open file handle.
  *
  * RETURN VALUE:
  *     How many bytes are we into the file.

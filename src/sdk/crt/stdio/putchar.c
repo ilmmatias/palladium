@@ -1,12 +1,11 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
-#include <crt_impl.h>
-#include <stddef.h>
+#include <stdio.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function outputs a single character to the screen.
+ *     Wrapper around fputc(stdout).
  *
  * PARAMETERS:
  *     ch - Which character to write.
@@ -15,6 +14,5 @@
  *     Whatever stored in `ch` on success, EOF otherwise.
  *-----------------------------------------------------------------------------------------------*/
 int putchar(int ch) {
-    __put_stdout(&ch, 1, NULL);
-    return ch;
+    return fputc(ch, stdout);
 }

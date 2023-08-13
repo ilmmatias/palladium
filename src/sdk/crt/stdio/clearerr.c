@@ -8,7 +8,7 @@
  *     This function resets the file flags back to a no error/EOF state.
  *
  * PARAMETERS:
- *     stream - Input file stream.
+ *     stream - Pointer to an open file handle.
  *
  * RETURN VALUE:
  *     0 on success, 1 otherwise.

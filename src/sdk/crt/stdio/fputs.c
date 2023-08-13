@@ -2,23 +2,19 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <stdio.h>
+#include <string.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function outputs a string followed by a new-line character to the screen.
+ *     Wrapper around fwrite(str, 1, strlen(str), stream).
  *
  * PARAMETERS:
- *     str - The string to be written.
+ *     stream - FILE stream; Needs to be open as __STDIO_FLAGS_WRITE.
  *
  * RETURN VALUE:
- *     How many characters we wrote on success, EOF on failure.
+ *     EOF on failure, size of the string otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int puts(const char *str) {
-    int accum = fputs(str, stdout);
-
-    if (accum == EOF || fputc('\n', stdout) == EOF) {
-        return EOF;
-    }
-
-    return accum + 1;
+int fputs(const char *str, FILE *stream) {
+    size_t count = strlen(str);
+    return fwrite((void *)str, 1, count, stream) == count ? count : EOF;
 }

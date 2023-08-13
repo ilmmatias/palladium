@@ -9,31 +9,31 @@
 /* Scan Code Set 1 (the old PC-XT keyboard scan codes, which the controller should be emulating
    by default). */
 static int LowercaseScanCodeSet1[89] = {
-    KEY_UNKNOWN, KEY_ESC, '1',         '2',    '3',       '4',         '5',         '6',
-    '7',         '8',     '9',         '0',    '-',       '=',         KEY_BACK,    '\t',
-    'q',         'w',     'e',         'r',    't',       'y',         'u',         'i',
-    'o',         'p',     '[',         ']',    KEY_ENTER, KEY_UNKNOWN, 'a',         's',
-    'd',         'f',     'g',         'h',    'j',       'k',         'l',         ';',
-    '\'',        '`',     KEY_UNKNOWN, '\\',   'z',       'x',         'c',         'v',
-    'b',         'n',     'm',         ',',    '.',       '/',         KEY_UNKNOWN, '*',
-    KEY_UNKNOWN, ' ',     KEY_UNKNOWN, KEY_F1, KEY_F2,    KEY_F3,      KEY_F4,      KEY_F5,
-    KEY_F6,      KEY_F7,  KEY_F8,      KEY_F9, KEY_F10,   KEY_UNKNOWN, KEY_UNKNOWN, '7',
-    '8',         '9',     '-',         '4',    '5',       '6',         '+',         '1',
-    '2',         '3',     '0',         '.',    KEY_F11,   KEY_F12,
+    KEY_UNKNOWN, KEY_ESC, '1',         '2',    '3',     '4',         '5',         '6',
+    '7',         '8',     '9',         '0',    '-',     '=',         '\b',        '\t',
+    'q',         'w',     'e',         'r',    't',     'y',         'u',         'i',
+    'o',         'p',     '[',         ']',    '\n',    KEY_UNKNOWN, 'a',         's',
+    'd',         'f',     'g',         'h',    'j',     'k',         'l',         ';',
+    '\'',        '`',     KEY_UNKNOWN, '\\',   'z',     'x',         'c',         'v',
+    'b',         'n',     'm',         ',',    '.',     '/',         KEY_UNKNOWN, '*',
+    KEY_UNKNOWN, ' ',     KEY_UNKNOWN, KEY_F1, KEY_F2,  KEY_F3,      KEY_F4,      KEY_F5,
+    KEY_F6,      KEY_F7,  KEY_F8,      KEY_F9, KEY_F10, KEY_UNKNOWN, KEY_UNKNOWN, '7',
+    '8',         '9',     '-',         '4',    '5',     '6',         '+',         '1',
+    '2',         '3',     '0',         '.',    KEY_F11, KEY_F12,
 };
 
 static int UppercaseScanCodeSet1[89] = {
-    KEY_UNKNOWN, KEY_ESC, '!',         '@',    '#',       '$',         '%',         '^',
-    '&',         '*',     '(',         ')',    '_',       '+',         KEY_BACK,    '\t',
-    'Q',         'W',     'E',         'R',    'T',       'Y',         'U',         'I',
-    'O',         'P',     '{',         '}',    KEY_ENTER, KEY_UNKNOWN, 'A',         'S',
-    'D',         'F',     'G',         'H',    'J',       'K',         'L',         ':',
-    '"',         '~',     KEY_UNKNOWN, '|',    'Z',       'X',         'C',         'V',
-    'B',         'N',     'M',         '<',    '>',       '?',         KEY_UNKNOWN, '*',
-    KEY_UNKNOWN, ' ',     KEY_UNKNOWN, KEY_F1, KEY_F2,    KEY_F3,      KEY_F4,      KEY_F5,
-    KEY_F6,      KEY_F7,  KEY_F8,      KEY_F9, KEY_F10,   KEY_UNKNOWN, KEY_UNKNOWN, '7',
-    '8',         '9',     '-',         '4',    '5',       '6',         '+',         '1',
-    '2',         '3',     '0',         '.',    KEY_F11,   KEY_F12,
+    KEY_UNKNOWN, KEY_ESC, '!',         '@',    '#',     '$',         '%',         '^',
+    '&',         '*',     '(',         ')',    '_',     '+',         '\b',        '\t',
+    'Q',         'W',     'E',         'R',    'T',     'Y',         'U',         'I',
+    'O',         'P',     '{',         '}',    '\n',    KEY_UNKNOWN, 'A',         'S',
+    'D',         'F',     'G',         'H',    'J',     'K',         'L',         ':',
+    '"',         '~',     KEY_UNKNOWN, '|',    'Z',     'X',         'C',         'V',
+    'B',         'N',     'M',         '<',    '>',     '?',         KEY_UNKNOWN, '*',
+    KEY_UNKNOWN, ' ',     KEY_UNKNOWN, KEY_F1, KEY_F2,  KEY_F3,      KEY_F4,      KEY_F5,
+    KEY_F6,      KEY_F7,  KEY_F8,      KEY_F9, KEY_F10, KEY_UNKNOWN, KEY_UNKNOWN, '7',
+    '8',         '9',     '-',         '4',    '5',     '6',         '+',         '1',
+    '2',         '3',     '0',         '.',    KEY_F11, KEY_F12,
 };
 
 static int CapsLockActive = 0;

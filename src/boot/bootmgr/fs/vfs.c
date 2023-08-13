@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <crt_impl.h>
 #include <file.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -35,10 +36,14 @@ void *__fopen(const char *filename, int mode, size_t *length) {
     }
 
     for (char *Segment = strtok(Path, "/"); Segment; Segment = strtok(NULL, "/")) {
-        /* First segment should be device; hard-coded to OpenArchDevice, but later on we should
-           fall back to at last `display()` too. */
+        /* First segment should always be the device. */
         if (Context->Type == FILE_TYPE_NONE) {
-            int Offset = BiOpenArchDevice(Segment, Context);
+            int Offset = BiOpenConsoleDevice(Segment, Context);
+
+            if (!Offset) {
+                Offset = BiOpenArchDevice(Segment, Context);
+            }
+
             if (!Offset) {
                 free(Context);
                 return NULL;
@@ -75,6 +80,8 @@ void __fclose(void *handle) {
 
     if (!Context || Context->Type == FILE_TYPE_NONE) {
         return;
+    } else if (Context->Type == FILE_TYPE_CONSOLE) {
+        BiFreeConsoleDevice(Context);
     } else if (Context->Type == FILE_TYPE_ARCH) {
         BiFreeArchDevice(Context);
     } else if (Context->Type == FILE_TYPE_EXFAT) {
@@ -111,6 +118,8 @@ int __fread(void *handle, size_t pos, void *buffer, size_t size, size_t *read) {
         }
 
         return __STDIO_FLAGS_ERROR;
+    } else if (Context->Type == FILE_TYPE_CONSOLE) {
+        return BiReadConsoleDevice(Context, buffer, pos, size, read);
     } else if (Context->Type == FILE_TYPE_ARCH) {
         return BiReadArchDevice(Context, buffer, pos, size, read);
     } else if (Context->Type == FILE_TYPE_EXFAT) {
@@ -121,13 +130,11 @@ int __fread(void *handle, size_t pos, void *buffer, size_t size, size_t *read) {
         return BiReadIso9660File(Context, buffer, pos, size, read);
     } else if (Context->Type == FILE_TYPE_NTFS) {
         return BiReadNtfsFile(Context, buffer, pos, size, read);
-    } else {
-        if (read) {
-            *read = 0;
-        }
-
-        return __STDIO_FLAGS_ERROR;
+    } else if (read) {
+        *read = 0;
     }
+
+    return __STDIO_FLAGS_ERROR;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -144,13 +151,12 @@ int __fread(void *handle, size_t pos, void *buffer, size_t size, size_t *read) {
  * RETURN VALUE:
  *     __STDIO_FLAGS_ERROR/EOF if something went wrong, 0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int __fwrite(void *handle, size_t pos, void *buffer, size_t size, size_t *wrote) {
-    (void)handle;
-    (void)pos;
-    (void)buffer;
-    (void)size;
+int __fwrite(void *handle, size_t pos, const void *buffer, size_t size, size_t *wrote) {
+    FileContext *Context = handle;
 
-    if (wrote) {
+    if (Context && Context->Type == FILE_TYPE_CONSOLE) {
+        return BiWriteConsoleDevice(Context, buffer, pos, size, wrote);
+    } else if (wrote) {
         *wrote = 0;
     }
 

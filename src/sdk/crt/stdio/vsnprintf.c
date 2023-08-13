@@ -41,7 +41,7 @@ static void put_buf(const void *buffer, int size, void *context) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function implements a standard complying version of `formatting into a string`.
+ *     This function outputs formatted text into a string.
  *     While snprintf() takes in variadic arguments and calls va_start(), we take in the va_list
  *     (result of va_start).
  *     For supported format parameters, take a look at your favorite std C reference manual.

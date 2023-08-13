@@ -43,7 +43,7 @@ static void unread_ch(void *context, int ch) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function implements a standard complying version of `formatted read from a string`.
+ *     This function matches values from a string based on another format string.
  *     While sscanf() takes in variadic arguments and calls va_start(), we take in the va_list
  *     (result of va_start).
  *     For supported format parameters, take a look at your favorite std C reference manual.

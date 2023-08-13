@@ -12,7 +12,7 @@
  *
  * PARAMETERS:
  *     ch -  Which character to be put in the buffer.
- *     stream - FILE stream.
+ *     stream - Pointer to an open file handle.
  *
  * RETURN VALUE:
  *     The character written into the buffer, or EOF on failure.
@@ -24,6 +24,7 @@ int ungetc(int ch, struct FILE *stream) {
 
     stream->unget_buffer[stream->unget_size++] = ch;
     stream->flags &= ~__STDIO_FLAGS_EOF;
+    stream->file_pos--;
 
     return ch;
 }

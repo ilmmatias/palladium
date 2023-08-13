@@ -143,12 +143,12 @@ uint16_t BmGetCursorY(void) {
  *     Display a character. This is the internal function, use printf() instead.
  *
  * PARAMETERS:
- *     c - The character.
+ *     Character - The character.
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void BiPutChar(char Character) {
+void BmPutChar(char Character) {
     if (Character == '\n') {
         CursorX = 0;
         CursorY++;

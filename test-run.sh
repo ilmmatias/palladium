@@ -6,7 +6,7 @@ if [[ ! -d obj.x86 ]]
 then
     mkdir obj.x86
     cd obj.x86
-    cmake ../src -GNinja -DARCH=x86 -DCMAKE_BUILD_TYPE=Debug 1>/dev/null
+    cmake ../src -GNinja -DARCH=x86 -DCMAKE_BUILD_TYPE=Debug
 else
     cd obj.x86
 fi
@@ -20,7 +20,7 @@ if [[ ! -d obj.amd64 ]]
 then
     mkdir obj.amd64
     cd obj.amd64
-    cmake ../src -GNinja -DARCH=amd64 -DCMAKE_BUILD_TYPE=Debug 1>/dev/null
+    cmake ../src -GNinja -DARCH=amd64 -DCMAKE_BUILD_TYPE=Debug
 else
     cd obj.amd64
 fi
@@ -78,7 +78,7 @@ then
 else
     mkdir -p _root/open_this
     printf 'Hello, World! This file has been loaded using the boot ISO9660 driver.\n' | tee _root/open_this/flag.txt 1>/dev/null
-    mkisofs -iso-level 2 -R -b iso9660boot.com -no-emul-boot -o obj.amd64/iso9660.iso _root
+    mkisofs -iso-level 2 -R -b iso9660boot.com -no-emul-boot -o obj.amd64/iso9660.iso _root 1>/dev/null 2>&1
     echo "[4/4] Running emulator"
     qemu-system-x86_64 -M smm=off -cdrom obj.amd64/iso9660.iso -no-reboot 1>/dev/null
 fi

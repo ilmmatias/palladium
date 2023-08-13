@@ -6,24 +6,18 @@
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function repeatedly reads bytes until we reach EOF, a new line, or the exceed/reach
- *     the max `count`, minus 1 for the null terminator.
+ *     This function repeatedly reads bytes from stdin until we reach EOF or a new line.
  *
  * PARAMETERS:
- *     str - Destination buffer.
- *     count - Max amount of bytes to read into the buffer.
- *     stream - FILE stream; Needs to be open as __STDIO_FLAGS_READ.
+ *     str - Output; Where to store the read data.
  *
  * RETURN VALUE:
- *     The destination buffer itself on success, NULL otherwise.
+ *     Pointer to the start of the output, or NULL on failure.
  *-----------------------------------------------------------------------------------------------*/
-char *fgets(char *str, int count, struct FILE *stream) {
-    if (!stream) {
-        return NULL;
-    } else if (
-        !str || !count || !(stream->flags & __STDIO_FLAGS_READ) ||
-        (stream->flags & __STDIO_FLAGS_WRITING) || (stream->flags & __STDIO_FLAGS_ERROR) ||
-        (stream->flags & __STDIO_FLAGS_EOF)) {
+char *gets(char *str) {
+    struct FILE *stream = stdin;
+
+    if ((stream->flags & __STDIO_FLAGS_ERROR) || (stream->flags & __STDIO_FLAGS_EOF)) {
         if (!(stream->flags & __STDIO_FLAGS_EOF)) {
             stream->flags |= __STDIO_FLAGS_ERROR;
         }
@@ -35,17 +29,14 @@ char *fgets(char *str, int count, struct FILE *stream) {
     char *dest = str;
     stream->flags |= __STDIO_FLAGS_READING;
 
-    while (count > 1) {
+    while (1) {
         int ch = fgetc(stream);
-
         if (ch == EOF) {
             fail = 1;
             break;
         }
 
         *(dest++) = ch;
-        count--;
-
         if (ch == '\n') {
             break;
         }

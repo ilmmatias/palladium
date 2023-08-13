@@ -5,20 +5,14 @@
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function outputs a string followed by a new-line character to the screen.
+ *     Wrapper around fwrite(&ch, 1, 1, stream), returning either `ch`, or EOF on failure.
  *
  * PARAMETERS:
- *     str - The string to be written.
+ *     stream - FILE stream; Needs to be open as __STDIO_FLAGS_WRITE.
  *
  * RETURN VALUE:
- *     How many characters we wrote on success, EOF on failure.
+ *     Data written onto the file, or EOF on failure.
  *-----------------------------------------------------------------------------------------------*/
-int puts(const char *str) {
-    int accum = fputs(str, stdout);
-
-    if (accum == EOF || fputc('\n', stdout) == EOF) {
-        return EOF;
-    }
-
-    return accum + 1;
+int fputc(int ch, FILE *stream) {
+    return fwrite(&ch, 1, 1, stream) ? ch : EOF;
 }

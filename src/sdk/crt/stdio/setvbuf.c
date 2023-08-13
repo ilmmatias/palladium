@@ -11,7 +11,7 @@
  *     controlling the type of the buffer directly, and the size as well.
  *
  * PARAMETERS:
- *     stream - FILE stream.
+ *     stream - Pointer to an open file handle.
  *     buffer - New file buffer.
  *     mode - Desired buffer type.
  *     size - Buffer size.
@@ -23,6 +23,10 @@ void setvbuf(struct FILE *stream, char *buffer, int mode, size_t size) {
     if (!stream) {
         return;
     }
+
+    /* We'll be overwriting those fields in the next block, so we need to save it. */
+    int user_buffer = stream->user_buffer;
+    fflush(stream);
 
     if (mode == _IOLBF || mode == _IOFBF) {
         if (!buffer) {
@@ -45,7 +49,7 @@ void setvbuf(struct FILE *stream, char *buffer, int mode, size_t size) {
         stream->buffer_type = _IONBF;
     }
 
-    if (stream->buffer && !stream->user_buffer) {
+    if (stream->buffer && !user_buffer) {
         free(stream->buffer);
     }
 

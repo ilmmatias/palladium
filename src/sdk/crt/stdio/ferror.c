@@ -8,7 +8,7 @@
  *     This function checks if the ERROR flag is set in the stream.
  *
  * PARAMETERS:
- *     stream - Input file stream.
+ *     stream - Pointer to an open file handle.
  *
  * RETURN VALUE:
  *     `and` between the internal flags and the ERROR flag.

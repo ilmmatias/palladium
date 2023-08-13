@@ -10,7 +10,7 @@
  *     `origin` point within the stream.
  *
  * PARAMETERS:
- *     stream - Input file stream.
+ *     stream - Pointer to an open file handle.
  *     offset - How far away from the `origin` we want to go.
  *     origin - Which point of the file we want to use as base (SET/start, CUR/current, END/end).
  *
@@ -37,11 +37,10 @@ int fseek(struct FILE *stream, long offset, int origin) {
             break;
     }
 
+    fflush(stream);
     stream->flags &= ~__STDIO_FLAGS_EOF;
-    stream->unget_size = 0;
     stream->file_pos = pos;
     stream->buffer_file_pos = pos;
-    stream->buffer_pos = 0;
 
     return 0;
 }

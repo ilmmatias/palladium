@@ -8,7 +8,7 @@
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function tries reading `count` chunks of `size` bytes each from the FILE stream,
+ *     This function tries reading `count` chunks of `size` bytes each from the FILE stream.
  *
  * PARAMETERS:
  *     buffer - Buffer to store the read data.
@@ -17,7 +17,7 @@
  *     stream - FILE stream; Needs to be open as __STDIO_FLAGS_READ.
  *
  * RETURN VALUE:
- *     How many bytes we were able to read without any error.
+ *     How many chunks we were able to read without any error.
  *-----------------------------------------------------------------------------------------------*/
 size_t fread(void *buffer, size_t size, size_t count, struct FILE *stream) {
     if (!stream || !size || !count) {
@@ -40,6 +40,7 @@ size_t fread(void *buffer, size_t size, size_t count, struct FILE *stream) {
     size_t accum = 0;
     while (stream->unget_size && total_bytes) {
         *(dest++) = stream->unget_buffer[--stream->unget_size];
+        stream->file_pos++;
         total_bytes--;
         accum++;
     }
@@ -53,16 +54,14 @@ size_t fread(void *buffer, size_t size, size_t count, struct FILE *stream) {
         int flags = __fread(stream->handle, stream->file_pos, dest, total_bytes, &read);
 
         stream->file_pos += (read / size) * size;
-
         if (flags) {
             stream->flags |= flags;
-            return (accum + read) / size;
         }
 
-        return count;
+        return (accum + read) / size;
     }
 
-    /* No support for line buffering (_IOLBF == _IOFBF for us). */
+    /* No support for line buffering on read (_IOLBF == _IOFBF). */
     int flags = 0;
     while (accum < size * count) {
         size_t remaining = size * count - accum;

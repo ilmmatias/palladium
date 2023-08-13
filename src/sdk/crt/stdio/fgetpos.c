@@ -9,7 +9,7 @@
  *     later can be restored using fsetpos.
  *
  * PARAMETERS:
- *     stream - Input file stream.
+ *     stream - Pointer to an open file handle.
  *     pos - Output; Where to save the file position.
  *
  * RETURN VALUE:

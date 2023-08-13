@@ -42,9 +42,8 @@ int __parse_fopen_mode(const char *mode);
 void *__fopen(const char *filename, int mode, size_t *length);
 void __fclose(void *handle);
 int __fread(void *handle, size_t pos, void *buffer, size_t size, size_t *read);
-int __fwrite(void *handle, size_t pos, void *buffer, size_t size, size_t *wrote);
+int __fwrite(void *handle, size_t pos, const void *buffer, size_t size, size_t *wrote);
 
-void __put_stdout(const void *buffer, int size, void *context);
 int __vprintf(
     const char *format,
     va_list vlist,

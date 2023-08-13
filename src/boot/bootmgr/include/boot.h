@@ -4,6 +4,7 @@
 #ifndef _BOOT_H_
 #define _BOOT_H_
 
+void BmInitStdio(void);
 void BmInitArch(void *BootBlock);
 
 #endif /* _BOOT_H_ */

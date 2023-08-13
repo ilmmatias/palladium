@@ -23,6 +23,7 @@ FILE *freopen(const char *filename, const char *mode, struct FILE *stream) {
         return NULL;
     }
 
+    fflush(stream);
     __fclose(stream->handle);
 
     if (stream->buffer && !stream->user_buffer) {

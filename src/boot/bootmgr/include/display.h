@@ -15,6 +15,7 @@ void BmSetCursorX(uint16_t X);
 void BmSetCursorY(uint16_t Y);
 uint16_t BmGetCursorX(void);
 uint16_t BmGetCursorY(void);
-void BiPutChar(char c);
+void BmPutChar(char Character);
+void BmPutString(const char *String);
 
 #endif /* _DISPLAY_H_ */

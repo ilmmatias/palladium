@@ -6,11 +6,11 @@
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function implements a standard complying version of `formatted read from a file`.
+ *     This function matches values from a FILE based on a format string.
  *     For supported format parameters, take a look at your favorite std C reference manual.
  *
  * PARAMETERS:
- *     stream - Input file stream.
+ *     stream - Pointer to an open file handle.
  *     format - Base format string.
  *     ... - Further variadic arguments.
  *

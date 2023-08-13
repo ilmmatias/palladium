@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <crt_impl.h>
+#include <ctype.h>
 #include <display.h>
 #include <file.h>
 #include <stdalign.h>
@@ -56,8 +57,8 @@ void BiosDetectDisks(BiosBootBlock *Data) {
         BmSetColor(0x4F);
         BmInitDisplay();
 
-        printf("An error occoured while trying to setup the boot manager environment.\n");
-        printf("The disk read buffer is placed too high for BIOS usage.\n");
+        BmPutString("An error occoured while trying to setup the boot manager environment.\n");
+        BmPutString("The disk read buffer is placed too high for BIOS usage.\n");
 
         while (1)
             ;
@@ -144,9 +145,8 @@ int BiOpenArchDevice(const char *Segment, FileContext *Context) {
     /* `bios(n)part(n)/<file> (ARC-like). This function parses the first part (`bios(n)`).
        You can also pass `bios()` instead of `bios(n)`, indicating that we should open the boot
        device. */
-    if ((*Segment != 'b' && *Segment != 'B') || (*(Segment + 1) != 'i' && *(Segment + 1) != 'I') ||
-        (*(Segment + 2) != 'o' && *(Segment + 2) != 'O') ||
-        (*(Segment + 3) != 's' && *(Segment + 3) != 'S') || (*(Segment + 4) != '(')) {
+    if (tolower(*Segment) != 'b' || tolower(*(Segment + 1)) != 'i' ||
+        tolower(*(Segment + 2)) != 'o' || tolower(*(Segment + 3)) != 's' || *(Segment + 4) != '(') {
         return 0;
     }
 

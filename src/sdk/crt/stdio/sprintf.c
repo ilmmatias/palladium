@@ -6,7 +6,7 @@
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function implements a standard complying version of `formatting into a string`.
+ *     This function outputs formatted text into a string.
  *     For supported format parameters, take a look at your favorite std C reference manual.
  *
  * PARAMETERS:

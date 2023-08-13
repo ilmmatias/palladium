@@ -6,24 +6,21 @@
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function outputs formatted text into a string.
- *     Differently from sprintf(), this allows setting the max amount of data to output, and allows
- *     the buffer to be NULL as long as the max size is set to 0.
+ *     This function outputs formatted text into a FILE.
  *     For supported format parameters, take a look at your favorite std C reference manual.
  *
  * PARAMETERS:
- *     buffer - Output buffer.
- *     bufsz - Size of the output buffer.
+ *     stream - Pointer to an open file handle.
  *     format - Base format string.
  *     ... - Further variadic arguments.
  *
  * RETURN VALUE:
  *     How many characters have been output.
  *-----------------------------------------------------------------------------------------------*/
-int snprintf(char *buffer, size_t bufsz, const char *format, ...) {
+int fprintf(FILE *stream, const char *format, ...) {
     va_list vlist;
     va_start(vlist, format);
-    int size = vsnprintf(buffer, bufsz, format, vlist);
+    int size = vfprintf(stream, format, vlist);
     va_end(vlist);
     return size;
 }

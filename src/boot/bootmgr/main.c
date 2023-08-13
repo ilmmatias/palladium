@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <boot.h>
+#include <crt_impl.h>
 #include <display.h>
 #include <keyboard.h>
 #include <memory.h>
@@ -24,10 +25,7 @@
     BmInitKeyboard();
     BmInitMemory(BootBlock);
     BmInitArch(BootBlock);
-
-    while (1) {
-        printf("%c", BmPollKey());
-    }
+    BmInitStdio();
 
     while (1)
         ;

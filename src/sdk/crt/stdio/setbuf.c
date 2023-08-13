@@ -12,7 +12,7 @@
  *     setvbuf() instead.
  *
  * PARAMETERS:
- *     stream - FILE stream.
+ *     stream - Pointer to an open file handle.
  *     buffer - New file buffer.
  *
  * RETURN VALUE:
@@ -22,6 +22,8 @@ void setbuf(struct FILE *stream, char *buffer) {
     if (!stream) {
         return;
     }
+
+    fflush(stream);
 
     if (stream->buffer && !stream->user_buffer) {
         free(stream->buffer);

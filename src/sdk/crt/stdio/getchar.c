@@ -5,20 +5,14 @@
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function outputs a string followed by a new-line character to the screen.
+ *     Wrapper around fgetc(stdin).
  *
  * PARAMETERS:
- *     str - The string to be written.
+ *     None.
  *
  * RETURN VALUE:
- *     How many characters we wrote on success, EOF on failure.
+ *     Data read from stdin, or EOF on failure.
  *-----------------------------------------------------------------------------------------------*/
-int puts(const char *str) {
-    int accum = fputs(str, stdout);
-
-    if (accum == EOF || fputc('\n', stdout) == EOF) {
-        return EOF;
-    }
-
-    return accum + 1;
+int getchar(void) {
+    return fgetc(stdin);
 }

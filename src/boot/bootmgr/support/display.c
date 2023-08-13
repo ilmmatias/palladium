@@ -8,6 +8,22 @@
  *     This function outputs the specified character buffer into the screen.
  *
  * PARAMETERS:
+ *     String - What to output.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void BmPutString(const char *String) {
+    while (*String) {
+        BmPutChar(*(String++));
+    }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function outputs the specified character buffer into the screen.
+ *
+ * PARAMETERS:
  *     buffer - What to output.
  *     size - Size of the buffer.
  *     context - Ignored by us, can be NULL or whatever you want.
@@ -19,6 +35,6 @@ void __put_stdout(const void *buffer, int size, void *context) {
     (void)context;
     const char *src = buffer;
     while (size--) {
-        BiPutChar(*(src++));
+        BmPutChar(*(src++));
     }
 }

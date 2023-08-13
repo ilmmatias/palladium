@@ -8,11 +8,12 @@
 #include <stdint.h>
 
 #define FILE_TYPE_NONE 0
-#define FILE_TYPE_ARCH 1
-#define FILE_TYPE_EXFAT 2
-#define FILE_TYPE_FAT32 3
-#define FILE_TYPE_ISO9660 4
-#define FILE_TYPE_NTFS 5
+#define FILE_TYPE_CONSOLE 1
+#define FILE_TYPE_ARCH 2
+#define FILE_TYPE_EXFAT 3
+#define FILE_TYPE_FAT32 4
+#define FILE_TYPE_ISO9660 5
+#define FILE_TYPE_NTFS 6
 
 typedef struct {
     int Type;
@@ -22,6 +23,21 @@ typedef struct {
 
 int BiCopyFileContext(FileContext *Context, FileContext *Copy);
 int BiReadDirectoryEntry(FileContext *Context, const char *Name);
+
+int BiOpenConsoleDevice(const char *Segment, FileContext *Context);
+void BiFreeConsoleDevice(FileContext *Context);
+int BiReadConsoleDevice(
+    FileContext *Context,
+    void *Buffer,
+    size_t Start,
+    size_t Size,
+    size_t *Read);
+int BiWriteConsoleDevice(
+    FileContext *Context,
+    const void *Buffer,
+    size_t Start,
+    size_t Size,
+    size_t *Wrote);
 
 int BiCopyArchDevice(FileContext *Context, FileContext *Copy);
 int BiOpenArchDevice(const char *Segment, FileContext *Context);
