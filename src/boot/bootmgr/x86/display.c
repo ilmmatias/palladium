@@ -150,6 +150,32 @@ uint16_t BmGetCursorY(void) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
+ *     This function clears the current line, using the current attribute background.
+ *
+ * PARAMETERS:
+ *     LeftOffset - How many spaces should we put (with no background) on the left side.
+ *     RightOffset - How many spaces should we put (with no background) on the right side.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void BmClearLine(int LeftOffset, int RightOffset) {
+    int Size = SCREEN_WIDTH - LeftOffset - RightOffset;
+
+    memset(VideoMemory + CursorY * SCREEN_WIDTH, 0, LeftOffset * 2);
+    memset(VideoMemory + (CursorY + 1) * SCREEN_WIDTH - RightOffset, 0, RightOffset * 2);
+
+    if (!(Attribute & 0xF0)) {
+        memset(VideoMemory + CursorY * SCREEN_WIDTH + LeftOffset, 0, Size * 2);
+    } else {
+        for (int i = 0; i < Size; i++) {
+            VideoMemory[CursorY * SCREEN_WIDTH + LeftOffset + i] = Attribute << 8;
+        }
+    }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
  *     This function displays a character using the current bg/fg attribute value.
  *
  * PARAMETERS:

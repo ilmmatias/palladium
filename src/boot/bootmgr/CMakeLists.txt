@@ -16,19 +16,20 @@ endif()
 add_executable(bootmgr "kstdlib"
     ${SOURCES}
 
-    fs/console.c
+    dev/console.c
+    dev/display.c
+    dev/memory.c
+
     fs/exfat.c
     fs/fat32.c
     fs/iso9660.c
     fs/ntfs.c
+    fs/stdio.c
     fs/vfs.c
 
-    support/assert.c
-    support/display.c
-    support/memory.c
-    support/stdio.c
-
-    main.c)
+    assert.c
+    main.c
+    menu.c)
 
 target_include_directories(bootmgr PRIVATE include)
 target_compile_options(bootmgr PRIVATE $<$<COMPILE_LANGUAGE:C,CXX>:-ffreestanding>)

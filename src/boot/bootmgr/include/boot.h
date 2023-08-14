@@ -6,5 +6,6 @@
 
 void BmInitStdio(void);
 void BmInitArch(void *BootBlock);
+[[noreturn]] void BmEnterMenu(void);
 
 #endif /* _BOOT_H_ */
