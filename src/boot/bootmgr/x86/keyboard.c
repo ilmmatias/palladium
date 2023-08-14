@@ -4,36 +4,54 @@
 #include <display.h>
 #include <keyboard.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <x86/keyboard.h>
 
 /* Scan Code Set 1 (the old PC-XT keyboard scan codes, which the controller should be emulating
    by default). */
 static int LowercaseScanCodeSet1[89] = {
-    KEY_UNKNOWN, KEY_ESC, '1',         '2',    '3',     '4',         '5',         '6',
-    '7',         '8',     '9',         '0',    '-',     '=',         '\b',        '\t',
-    'q',         'w',     'e',         'r',    't',     'y',         'u',         'i',
-    'o',         'p',     '[',         ']',    '\n',    KEY_UNKNOWN, 'a',         's',
-    'd',         'f',     'g',         'h',    'j',     'k',         'l',         ';',
-    '\'',        '`',     KEY_UNKNOWN, '\\',   'z',     'x',         'c',         'v',
-    'b',         'n',     'm',         ',',    '.',     '/',         KEY_UNKNOWN, '*',
-    KEY_UNKNOWN, ' ',     KEY_UNKNOWN, KEY_F1, KEY_F2,  KEY_F3,      KEY_F4,      KEY_F5,
-    KEY_F6,      KEY_F7,  KEY_F8,      KEY_F9, KEY_F10, KEY_UNKNOWN, KEY_UNKNOWN, '7',
-    '8',         '9',     '-',         '4',    '5',     '6',         '+',         '1',
-    '2',         '3',     '0',         '.',    KEY_F11, KEY_F12,
+    KEY_UNKNOWN, KEY_ESC, '1',         '2',    '3',         '4',         '5',         '6',
+    '7',         '8',     '9',         '0',    '-',         '=',         '\b',        '\t',
+    'q',         'w',     'e',         'r',    't',         'y',         'u',         'i',
+    'o',         'p',     '[',         ']',    '\n',        KEY_UNKNOWN, 'a',         's',
+    'd',         'f',     'g',         'h',    'j',         'k',         'l',         ';',
+    '\'',        '`',     KEY_UNKNOWN, '\\',   'z',         'x',         'c',         'v',
+    'b',         'n',     'm',         ',',    '.',         '/',         KEY_UNKNOWN, '*',
+    KEY_UNKNOWN, ' ',     KEY_UNKNOWN, KEY_F1, KEY_F2,      KEY_F3,      KEY_F4,      KEY_F5,
+    KEY_F6,      KEY_F7,  KEY_F8,      KEY_F9, KEY_F10,     KEY_UNKNOWN, KEY_UNKNOWN, '7',
+    '8',         '9',     '-',         '4',    '5',         '6',         '+',         '1',
+    '2',         '3',     '0',         '.',    KEY_UNKNOWN, KEY_UNKNOWN, KEY_UNKNOWN, KEY_F11,
+    KEY_F12,
 };
 
 static int UppercaseScanCodeSet1[89] = {
-    KEY_UNKNOWN, KEY_ESC, '!',         '@',    '#',     '$',         '%',         '^',
-    '&',         '*',     '(',         ')',    '_',     '+',         '\b',        '\t',
-    'Q',         'W',     'E',         'R',    'T',     'Y',         'U',         'I',
-    'O',         'P',     '{',         '}',    '\n',    KEY_UNKNOWN, 'A',         'S',
-    'D',         'F',     'G',         'H',    'J',     'K',         'L',         ':',
-    '"',         '~',     KEY_UNKNOWN, '|',    'Z',     'X',         'C',         'V',
-    'B',         'N',     'M',         '<',    '>',     '?',         KEY_UNKNOWN, '*',
-    KEY_UNKNOWN, ' ',     KEY_UNKNOWN, KEY_F1, KEY_F2,  KEY_F3,      KEY_F4,      KEY_F5,
-    KEY_F6,      KEY_F7,  KEY_F8,      KEY_F9, KEY_F10, KEY_UNKNOWN, KEY_UNKNOWN, '7',
-    '8',         '9',     '-',         '4',    '5',     '6',         '+',         '1',
-    '2',         '3',     '0',         '.',    KEY_F11, KEY_F12,
+    KEY_UNKNOWN, KEY_ESC, '!',         '@',    '#',         '$',         '%',         '^',
+    '&',         '*',     '(',         ')',    '_',         '+',         '\b',        '\t',
+    'Q',         'W',     'E',         'R',    'T',         'Y',         'U',         'I',
+    'O',         'P',     '{',         '}',    '\n',        KEY_UNKNOWN, 'A',         'S',
+    'D',         'F',     'G',         'H',    'J',         'K',         'L',         ':',
+    '"',         '~',     KEY_UNKNOWN, '|',    'Z',         'X',         'C',         'V',
+    'B',         'N',     'M',         '<',    '>',         '?',         KEY_UNKNOWN, '*',
+    KEY_UNKNOWN, ' ',     KEY_UNKNOWN, KEY_F1, KEY_F2,      KEY_F3,      KEY_F4,      KEY_F5,
+    KEY_F6,      KEY_F7,  KEY_F8,      KEY_F9, KEY_F10,     KEY_UNKNOWN, KEY_UNKNOWN, '7',
+    '8',         '9',     '-',         '4',    '5',         '6',         '+',         '1',
+    '2',         '3',     '0',         '.',    KEY_UNKNOWN, KEY_UNKNOWN, KEY_UNKNOWN, KEY_F11,
+    KEY_F12,
+};
+
+static int ExtendedScanCodeSet1[80] = {
+    KEY_UNKNOWN, KEY_UNKNOWN, KEY_UNKNOWN, KEY_UNKNOWN, KEY_UNKNOWN, KEY_UNKNOWN, KEY_UNKNOWN,
+    KEY_UNKNOWN, KEY_UNKNOWN, KEY_UNKNOWN, KEY_UNKNOWN, KEY_UNKNOWN, '\n',        KEY_UNKNOWN,
+    KEY_UNKNOWN, KEY_UNKNOWN, KEY_UNKNOWN, KEY_UNKNOWN, KEY_UNKNOWN, KEY_UNKNOWN, KEY_UNKNOWN,
+    KEY_UNKNOWN, KEY_UNKNOWN, KEY_UNKNOWN, KEY_UNKNOWN, KEY_UNKNOWN, KEY_UNKNOWN, KEY_UNKNOWN,
+    KEY_UNKNOWN, KEY_UNKNOWN, KEY_UNKNOWN, KEY_UNKNOWN, KEY_UNKNOWN, KEY_UNKNOWN, KEY_UNKNOWN,
+    KEY_UNKNOWN, KEY_UNKNOWN, '/',         KEY_UNKNOWN, KEY_UNKNOWN, KEY_UNKNOWN, KEY_UNKNOWN,
+    KEY_UNKNOWN, KEY_UNKNOWN, KEY_UNKNOWN, KEY_UNKNOWN, KEY_UNKNOWN, KEY_UNKNOWN, KEY_UNKNOWN,
+    KEY_UNKNOWN, KEY_UNKNOWN, KEY_UNKNOWN, KEY_UNKNOWN, KEY_UNKNOWN, KEY_UNKNOWN, KEY_HOME,
+    KEY_UP,      KEY_PGUP,    KEY_UNKNOWN, KEY_LEFT,    KEY_UNKNOWN, KEY_RIGHT,   KEY_UNKNOWN,
+    KEY_END,     KEY_DOWN,    KEY_PGDOWN,  KEY_INS,     KEY_DEL,     KEY_UNKNOWN, KEY_UNKNOWN,
+    KEY_UNKNOWN, KEY_UNKNOWN, KEY_UNKNOWN, KEY_UNKNOWN, KEY_UNKNOWN, KEY_UNKNOWN, KEY_UNKNOWN,
+    KEY_UNKNOWN, KEY_UNKNOWN, KEY_UNKNOWN,
 };
 
 static int CapsLockActive = 0;
@@ -107,11 +125,23 @@ int BmPollKey(void) {
             continue;
         }
 
-        /* Anything higher than 0x80 is a key release, or one of the extended scan codes, neither
-           of which we handle. */
+        /* E0 is the extended scan code prefix; We mostly support what's already in the normal
+           table, plus arrow keys. */
+        if (ScanCode == 0xE0) {
+            ScanCode = PollData();
+
+            if (ScanCode > 0x90) {
+                continue;
+            }
+
+            return ScanCode < 16 || ScanCode > 95 ? KEY_UNKNOWN
+                                                  : ExtendedScanCodeSet1[ScanCode - 16];
+        }
+
+        /* Other than E0, anything higher than 0x80 is a key release, which we don't handle. */
         if (ScanCode > 0x80) {
             continue;
-        } else if (ScanCode > 89) {
+        } else if (ScanCode > 88) {
             return KEY_UNKNOWN;
         }
 

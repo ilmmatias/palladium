@@ -16,8 +16,6 @@
 #define KEY_END 0x1008
 #define KEY_PGUP 0x1009
 #define KEY_PGDOWN 0x100A
-#define KEY_LEFT_GUI 0x100B
-#define KEY_RIGHT_GUI 0x100C
 #define KEY_F1 0x1010
 #define KEY_F2 0x1011
 #define KEY_F3 0x1012
