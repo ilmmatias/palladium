@@ -29,7 +29,8 @@ add_executable(bootmgr "kstdlib"
 
     assert.c
     main.c
-    menu.c)
+    menu.c
+    registry.c)
 
 target_include_directories(bootmgr PRIVATE include)
 target_compile_options(bootmgr PRIVATE $<$<COMPILE_LANGUAGE:C,CXX>:-ffreestanding>)
