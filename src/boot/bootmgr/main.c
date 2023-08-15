@@ -2,11 +2,10 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <boot.h>
-#include <crt_impl.h>
 #include <display.h>
 #include <keyboard.h>
 #include <memory.h>
-#include <stdio.h>
+#include <registry.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:

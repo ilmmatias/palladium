@@ -6,8 +6,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "/home/italo/Palladium/src/boot/bootmgr/include/display.h"
-
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function tries writing `count` chunks of `size` bytes each into the FILE stream,

@@ -143,18 +143,23 @@ int BiCopyArchDevice(FileContext *Context, FileContext *Copy) {
  *-----------------------------------------------------------------------------------------------*/
 int BiOpenArchDevice(const char *Segment, FileContext *Context) {
     /* `bios(n)part(n)/<file> (ARC-like). This function parses the first part (`bios(n)`).
-       You can also pass `bios()` instead of `bios(n)`, indicating that we should open the boot
+       You can also pass `boot()` instead of `bios(n)`, indicating that we should open the boot
        device. */
-    if (tolower(*Segment) != 'b' || tolower(*(Segment + 1)) != 'i' ||
-        tolower(*(Segment + 2)) != 'o' || tolower(*(Segment + 3)) != 's' || *(Segment + 4) != '(') {
-        return 0;
-    }
 
     char *End;
-    int Drive = strtol(Segment + 5, &End, 16);
+    int Drive;
 
-    if (End == Segment + 5) {
+    if (tolower(*Segment) == 'b' && tolower(*(Segment + 1)) == 'o' &&
+        tolower(*(Segment + 2)) == 'o' && tolower(*(Segment + 3)) == 't' &&
+        tolower(*(Segment + 4)) == '(') {
+        End = (char *)Segment + 5;
         Drive = BootDrive;
+    } else if (
+        tolower(*Segment) != 'b' || tolower(*(Segment + 1)) != 'i' ||
+        tolower(*(Segment + 2)) != 'o' || tolower(*(Segment + 3)) != 's' || *(Segment + 4) != '(') {
+        return 0;
+    } else {
+        Drive = strtol(Segment + 5, &End, 16);
     }
 
     if (*End != ')' || DriveHandles[Drive].Type == FILE_TYPE_NONE) {

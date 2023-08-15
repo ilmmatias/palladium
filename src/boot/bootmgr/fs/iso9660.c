@@ -206,10 +206,11 @@ int BiTraverseIso9660Directory(FileContext *Context, const char *Name) {
         }
 
         if ((Match && !Record->NameLength) ||
-            (((Record->FileFlags & 0x02) || HasDot) && Record->NameLength == 2 &&
-             *ThisNamePos == ';' && *(ThisNamePos + 1) == '1') ||
-            ((!(Record->FileFlags & 0x02) && !HasDot) && Record->NameLength == 3 &&
-             *ThisNamePos == '.' && *(ThisNamePos + 1) == ';' && *(ThisNamePos + 2) == '1')) {
+            (!*SearchNamePos &&
+             ((((Record->FileFlags & 0x02) || HasDot) && Record->NameLength == 2 &&
+               *ThisNamePos == ';' && *(ThisNamePos + 1) == '1') ||
+              ((!(Record->FileFlags & 0x02) && !HasDot) && Record->NameLength == 3 &&
+               *ThisNamePos == '.' && *(ThisNamePos + 1) == ';' && *(ThisNamePos + 2) == '1')))) {
             FsContext->FileSector = Record->ExtentSector;
             FsContext->Directory = Record->FileFlags & 0x02;
             Context->FileLength = Record->ExtentSize;
