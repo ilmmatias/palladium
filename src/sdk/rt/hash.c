@@ -12,7 +12,7 @@
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function gives a 32-bits hash of some data, using a fast (but not cryptographically
+ *     This function gives a 32-bits hash of some data, using a fast (though not cryptographically
  *     secure) algorithm.
  *
  * PARAMETERS:
@@ -22,7 +22,7 @@
  * RETURN VALUE:
  *     32-bits hash of the data.
  *-----------------------------------------------------------------------------------------------*/
-uint32_t BmHashData(const void* Buffer, size_t Length) {
+uint32_t RtGetHash(const void* Buffer, size_t Length) {
     /* We follow the 32-bits version of xxHash, as described in
      * https://github.com/Cyan4973/xxHash/blob/dev/doc/xxhash_spec.md.
      * The Seed is assumed to be zero, other then that, this algorithm is a 1-to-1 match with

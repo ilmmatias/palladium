@@ -5,6 +5,7 @@ project(os/sdk/rt)
 
 set(SOURCES
     ${SOURCES}
+    hash.c
     placeholder.c)
 
 include(kernel.cmake)

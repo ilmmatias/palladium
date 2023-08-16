@@ -12,6 +12,4 @@ void BmInitArch(void* BootBlock);
 
 [[noreturn]] void BmEnterMenu(void);
 
-uint32_t BmHashData(const void* Buffer, size_t Length);
-
 #endif /* _BOOT_H_ */
