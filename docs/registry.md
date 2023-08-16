@@ -36,7 +36,8 @@ An entry represents a key (which can be thought of as a directory) or a value (w
 |--|--|--|--|--|
 |0|1|Type|0x00 (REMOVED), 0x01 (BYTE), 0x02 (WORD), 0x03 (DWORD), 0x04 (STRING), 0x05 (BINARY), 0x80 (SUBKEY)|This identifies the type of the entry, and the format of the content coming right after this header.|
 |1|2|Size||Size of the entire entry (including this header). This cannot be higher than `size of a block - size of the block header`.|
-|3||Name||NULL-terminated string to be used when searching for a specific entry.|
+|3|4|Name Hash||xxHash32 of the name. Used for quickly checking for a match.|
+|7||Name||NULL-terminated string to be used when searching for a specific entry.|
 
 ### Integer Values
 
