@@ -5,28 +5,42 @@
 #define _REGISTRY_
 
 #include <stdint.h>
+#include <stdio.h>
 
-#define REG_KEY_NONE 0x00
-#define REG_KEY_STRING 0x01
-#define REG_KEY_INTEGER 0x02
-#define REG_KEY_BINARY 0x03
-#define REG_SUBKEY 0x80
+#define REG_FILE_SIGNATURE "REFF"
+#define REG_BLOCK_SIGNATURE "REGB"
 
-typedef struct RegKey {
-    int Type;
-    union {
-        char *String;
-        uint64_t Integer;
-        struct {
-            int Size;
-            uint8_t *Data;
-        } Binary;
-        struct {
-            char *Name;
-            uint32_t EntryCount;
-            struct RegKey *Entries;
-        } SubKey;
-    };
-} RegKey;
+#define REG_BLOCK_SIZE 2048
+#define REG_NAME_SIZE 32
+
+#define REG_ENTRY_REMOVED 0x00
+#define REG_ENTRY_BYTE 0x01
+#define REG_ENTRY_WORD 0x02
+#define REG_ENTRY_DWORD 0x03
+#define REG_ENTRY_QWORD 0x04
+#define REG_ENTRY_BINARY 0x05
+#define REG_ENTRY_SUBKEY 0x80
+
+typedef struct __attribute__((packed)) {
+    char Signature[4];
+    char Reserved[12];
+} RegFileHeader;
+
+typedef struct __attribute__((packed)) {
+    char Signature[4];
+    uint32_t InsertOffsetHint;
+    uint32_t OffsetToNextBlock;
+} RegBlockHeader;
+
+typedef struct __attribute__((packed)) {
+    uint8_t Type;
+    uint16_t Length;
+    uint32_t NameHash;
+} RegEntryHeader;
+
+typedef struct {
+    char Buffer[REG_BLOCK_SIZE];
+    FILE *Stream;
+} RegHandle;
 
 #endif /* _REGISTRY_ */

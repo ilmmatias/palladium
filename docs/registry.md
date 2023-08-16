@@ -20,7 +20,7 @@ The first block of the registry root should directly follow the file header.
 
 A block represents a collection of registry keys/values.  
 By default, a block has only a single REMOVED value, encompassing `size of a block - size of the block header`.  
-The block size is currently fixed at 4096 bytes (4KiB).
+The block size is currently fixed at 2048 bytes (2KiB).
 
 |Offset|Length|Field|Value(s)|Description|
 |--|--|--|--|--|
@@ -35,9 +35,9 @@ An entry represents a key (which can be thought of as a directory) or a value (w
 |Offset|Length|Field|Value(s)|Description|
 |--|--|--|--|--|
 |0|1|Type|0x00 (REMOVED), 0x01 (BYTE), 0x02 (WORD), 0x03 (DWORD), 0x04 (STRING), 0x05 (BINARY), 0x80 (SUBKEY)|This identifies the type of the entry, and the format of the content coming right after this header.|
-|1|2|Size||Size of the entire entry (including this header). This cannot be higher than `size of a block - size of the block header`.|
+|1|2|Length||Size of the entire entry (including this header). This cannot be higher than `size of a block - size of the block header`.|
 |3|4|Name Hash||xxHash32 of the name. Used for quickly checking for a match.|
-|7||Name||NULL-terminated string to be used when searching for a specific entry.|
+|7||Name||NULL-terminated string to be used when searching for a specific entry. Limited to a max of 32 characters, including the NULL-terminator.|
 
 ### Integer Values
 
