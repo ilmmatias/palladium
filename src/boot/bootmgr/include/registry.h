@@ -1,8 +1,8 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
-#ifndef _REGISTRY_
-#define _REGISTRY_
+#ifndef _REGISTRY_H_
+#define _REGISTRY_H_
 
 #include <stdint.h>
 #include <stdio.h>
@@ -43,4 +43,7 @@ typedef struct {
     FILE *Stream;
 } RegHandle;
 
-#endif /* _REGISTRY_ */
+RegHandle *BmLoadRegistry(const char *Path);
+RegEntryHeader *BmFindRegistryEntry(RegHandle *Handle, const char *Path);
+
+#endif /* _REGISTRY_H_ */

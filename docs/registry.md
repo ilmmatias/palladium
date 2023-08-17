@@ -26,7 +26,7 @@ The block size is currently fixed at 2048 bytes (2KiB).
 |--|--|--|--|--|
 |0|4|Signature|REGB|This identifies that this should be the start of a valid block.|
 |4|4|Insert Offset Hint||Offset from the end of the block header into the first free/REMOVED entry. In case the block is full, this field should be set to `0xFFFFFFFF`.|
-|8|4|Offset to the Next Block||Offset from the start of the file into the next block associated with this (sub)key.|
+|8|4|Offset to the Next Block||Offset from the start of the file into the next block associated with this (sub)key. If this field is 0, there are no more blocks.|
 
 ## Entry Header
 
