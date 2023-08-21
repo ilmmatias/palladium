@@ -580,7 +580,7 @@ int BiReadNtfsFile(FileContext *Context, void *Buffer, size_t Start, size_t Size
 
         memcpy(Output, Current + Start, CopySize);
         Output += CopySize;
-        Start += CopySize;
+        Start = 0;
         Size -= CopySize;
         Accum += CopySize;
 

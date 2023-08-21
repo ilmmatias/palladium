@@ -50,13 +50,11 @@ cat obj.x86/boot/startup/startup.com obj.x86/boot/bootmgr/bootmgr.exe > _root/bo
 
 if [ "$1" == "fat32" ]
 then
-    mkdir -p _root/open_this
-    printf 'Hello, World! This file has been loaded using the boot FAT32 driver.\n' | tee _root/open_this/flag.txt 1>/dev/null
     dd if=/dev/zero of=obj.amd64/fat32.img count=64 bs=1M 2>/dev/null
     /usr/sbin/mkfs.fat -F32 obj.amd64/fat32.img 1>/dev/null
     dd if=obj.x86/boot/bootsect/fat32boot.com of=obj.amd64/fat32.img seek=90 skip=90 count=422 bs=1 conv=notrunc 2>/dev/null
     mcopy -i obj.amd64/fat32.img _root/bootmgr ::/ 1>/dev/null
-    mcopy -i obj.amd64/fat32.img _root/open_this ::/ 1>/dev/null
+    mcopy -i obj.amd64/fat32.img _root/bootmgr.reg ::/ 1>/dev/null
     echo "[5/5] Running emulator"
     qemu-system-x86_64 -M smm=off -drive file=obj.amd64/fat32.img,index=0,media=disk,format=raw -no-reboot 1>/dev/null
 elif [ "$1" == "exfat" ]
@@ -70,8 +68,7 @@ then
     sudo fsck.exfat -y obj.amd64/exfat.img 1>/dev/null 2>&1
     sudo mount -t exfat -o loop obj.amd64/exfat.img /mnt/mount 1>/dev/null
     sudo cp _root/bootmgr /mnt/mount/bootmgr 1>/dev/null
-    sudo mkdir -p /mnt/mount/open_this
-    printf 'Hello, World! This file has been loaded using the boot exFAT driver.\n' | sudo tee /mnt/mount/open_this/flag.txt 1>/dev/null
+    sudo cp _root/bootmgr.reg /mnt/mount/bootmgr.reg 1>/dev/null
     sudo umount /mnt/mount 1>/dev/null
     echo "[5/5] Running emulator"
     qemu-system-x86_64 -M smm=off -drive file=obj.amd64/exfat.img,index=0,media=disk,format=raw -no-reboot 1>/dev/null
@@ -85,14 +82,11 @@ then
     dd if=obj.x86/boot/bootsect/ntfsboot.com of=obj.amd64/ntfs.img seek=512 skip=512 bs=1 conv=notrunc 2>/dev/null
     sudo mount -t ntfs -o loop obj.amd64/ntfs.img /mnt/mount 1>/dev/null
     sudo cp _root/bootmgr /mnt/mount/bootmgr 1>/dev/null
-    sudo mkdir -p /mnt/mount/open_this
-    printf 'Hello, World! This file has been loaded using the boot NTFS driver.\n' | sudo tee /mnt/mount/open_this/flag.txt 1>/dev/null
+    sudo cp _root/bootmgr.reg /mnt/mount/bootmgr.reg 1>/dev/null
     sudo umount /mnt/mount 1>/dev/null
     echo "[5/5] Running emulator"
     qemu-system-x86_64 -M smm=off -drive file=obj.amd64/ntfs.img,index=0,media=disk,format=raw -no-reboot 1>/dev/null
 else
-    mkdir -p _root/open_this
-    printf 'Hello, World! This file has been loaded using the boot ISO9660 driver.\n' | tee _root/open_this/flag.txt 1>/dev/null
     mkisofs -iso-level 2 -R -b iso9660boot.com -no-emul-boot -o obj.amd64/iso9660.iso _root 1>/dev/null 2>&1
     echo "[5/5] Running emulator"
     qemu-system-x86_64 -M smm=off -cdrom obj.amd64/iso9660.iso -no-reboot 1>/dev/null

@@ -8,6 +8,4 @@ if(ARCH STREQUAL "x86")
     add_subdirectory(startup)
 endif()
 
-if(NOT ARCH STREQUAL "amd64")
-    add_subdirectory(bootmgr)
-endif()
+add_subdirectory(bootmgr)

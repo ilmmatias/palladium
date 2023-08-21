@@ -108,14 +108,14 @@ int BiProbeExfat(FileContext *Context) {
     FsContext->SectorShift = BootSector->BytesPerSectorShift;
     FsContext->ClusterOffset = BootSector->ClusterHeapOffset << BootSector->BytesPerSectorShift;
     FsContext->FatOffset = BootSector->FatOffset << BootSector->BytesPerSectorShift;
-    FsContext->FileCluster = BootSector->FirstClusterOfRootDirectory - 2;
+    FsContext->FileCluster = BootSector->FirstClusterOfRootDirectory;
     FsContext->Directory = 1;
 
     /* Grab the NoFatChain flag from the root directory (the first entry of a directory
        tells us that info). */
     if (__fread(
             Context,
-            FsContext->ClusterOffset + (FsContext->FileCluster << FsContext->ClusterShift),
+            FsContext->ClusterOffset + ((FsContext->FileCluster - 2) << FsContext->ClusterShift),
             FsContext->ClusterBuffer,
             sizeof(ExfatDirectoryEntry),
             NULL)) {
@@ -190,7 +190,7 @@ static int FollowCluster(ExfatContext *FsContext, void **Current, uint64_t *Clus
         *Current = FsContext->ClusterBuffer;
         return !__fread(
             &FsContext->Parent,
-            FsContext->ClusterOffset + (*Cluster << FsContext->ClusterShift),
+            FsContext->ClusterOffset + ((*Cluster - 2) << FsContext->ClusterShift),
             FsContext->ClusterBuffer,
             1 << FsContext->ClusterShift,
             NULL);
@@ -296,7 +296,7 @@ int BiTraverseExfatDirectory(FileContext *Context, const char *Name) {
         /* Name match, setup the file entry to reflect the new file/directory we opened, and
            we're done. */
 
-        FsContext->FileCluster = StreamEntry.FirstCluster - 2;
+        FsContext->FileCluster = StreamEntry.FirstCluster;
         FsContext->NoFatChain = StreamEntry.GeneralSecondaryFlags & 0x02;
         FsContext->Directory = Entry.FileAttributes & 0x10;
         Context->FileLength = StreamEntry.ValidDataLength;
@@ -368,7 +368,7 @@ int BiReadExfatFile(FileContext *Context, void *Buffer, size_t Start, size_t Siz
         memcpy(Output, Current + Start, CopySize);
         Current += 1 << FsContext->ClusterShift;
         Output += CopySize;
-        Start += CopySize;
+        Start = 0;
         Size -= CopySize;
         Accum += CopySize;
     }

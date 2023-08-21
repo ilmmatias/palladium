@@ -20,5 +20,12 @@ else()
     enable_language(ASM C CXX RC)
 endif()
 
-add_subdirectory(boot)
+if (NOT ARCH STREQUAL "x86")
+    add_subdirectory(kernel)
+endif()
+
+if (NOT ARCH STREQUAL "amd64")
+    add_subdirectory(boot)
+endif()
+
 add_subdirectory(sdk)

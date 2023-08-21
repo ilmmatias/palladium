@@ -13,6 +13,7 @@ typedef struct {
     FileContext Parent;
     void *ClusterBuffer;
     uint16_t BytesPerCluster;
+    uint32_t FatOffset;
     uint32_t ClusterOffset;
     uint32_t FileCluster;
     int Directory;
@@ -90,10 +91,11 @@ int BiProbeFat32(FileContext *Context) {
         return 0;
     }
 
+    FsContext->FatOffset = BootSector->ReservedSectors * BootSector->BytesPerSector;
     FsContext->ClusterOffset =
-        (BootSector->NumberOfFats * BootSector->SectorsPerFat + BootSector->ReservedSectors) *
-        BootSector->BytesPerSector;
-    FsContext->FileCluster = BootSector->RootDirectoryCluster - 2;
+        BootSector->NumberOfFats * BootSector->SectorsPerFat * BootSector->BytesPerSector +
+        FsContext->FatOffset;
+    FsContext->FileCluster = BootSector->RootDirectoryCluster;
     FsContext->Directory = 1;
 
     memcpy(&FsContext->Parent, Context, sizeof(FileContext));
@@ -140,7 +142,7 @@ static int FollowCluster(Fat32Context *FsContext, void **Current, uint32_t *Clus
     } else if (Offset || !Current) {
         if (__fread(
                 &FsContext->Parent,
-                FsContext->ClusterOffset + (*Cluster << 2),
+                FsContext->FatOffset + (*Cluster << 2),
                 FsContext->ClusterBuffer,
                 4,
                 NULL)) {
@@ -158,7 +160,7 @@ static int FollowCluster(Fat32Context *FsContext, void **Current, uint32_t *Clus
         *Current = FsContext->ClusterBuffer;
         return !__fread(
             &FsContext->Parent,
-            FsContext->ClusterOffset + *Cluster * FsContext->BytesPerCluster,
+            FsContext->ClusterOffset + (*Cluster - 2) * FsContext->BytesPerCluster,
             FsContext->ClusterBuffer,
             FsContext->BytesPerCluster,
             NULL);
@@ -305,10 +307,11 @@ int BiTraverseFat32Directory(FileContext *Context, const char *Name) {
     while (1) {
         if (!FollowCluster(FsContext, (void **)&Current, &Cluster) || !Current->DosName[0]) {
             return 0;
-        } else if (
-            (uint8_t)Current->DosName[0] != 0xE5 && !memcmp(Current->DosName, ShortName, 11)) {
+        }
+
+        if ((uint8_t)Current->DosName[0] != 0xE5 && !memcmp(Current->DosName, ShortName, 11)) {
             FsContext->FileCluster =
-                (((uint32_t)Current->FileClusterHigh << 16) | Current->FileClusterLow) - 2;
+                ((uint32_t)Current->FileClusterHigh << 16) | Current->FileClusterLow;
             FsContext->Directory = Current->Attributes & 0x10;
             Context->FileLength = Current->FileSize;
             return 1;
@@ -316,8 +319,6 @@ int BiTraverseFat32Directory(FileContext *Context, const char *Name) {
 
         Current++;
     }
-
-    return 0;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -383,7 +384,7 @@ int BiReadFat32File(FileContext *Context, void *Buffer, size_t Start, size_t Siz
         memcpy(Output, Current + Start, CopySize);
         Current += FsContext->BytesPerCluster;
         Output += CopySize;
-        Start += CopySize;
+        Start -= CopySize;
         Size -= CopySize;
         Accum += CopySize;
     }
