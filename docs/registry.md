@@ -20,7 +20,7 @@ The first block of the registry root should directly follow the file header.
 
 A block represents a collection of registry keys/values.  
 By default, a block has only a single REMOVED value, encompassing `size of a block - size of the block header`.  
-The block size is currently fixed at 2048 bytes (2KiB).
+The block size is currently fixed at 1024 bytes (1KiB).
 
 |Offset|Length|Field|Value(s)|Description|
 |--|--|--|--|--|

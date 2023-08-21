@@ -5,7 +5,6 @@
 #define _REGISTRY_H_
 
 #include <stdint.h>
-#include <stdio.h>
 
 #define REG_FILE_SIGNATURE "REFF"
 #define REG_BLOCK_SIGNATURE "REGB"
@@ -38,13 +37,5 @@ typedef struct __attribute__((packed)) {
     uint16_t Length;
     uint32_t NameHash;
 } RegEntryHeader;
-
-typedef struct {
-    char Buffer[REG_BLOCK_SIZE];
-    FILE *Stream;
-} RegHandle;
-
-RegHandle *BmLoadRegistry(const char *Path);
-RegEntryHeader *BmFindRegistryEntry(RegHandle *Handle, const char *Path);
 
 #endif /* _REGISTRY_H_ */

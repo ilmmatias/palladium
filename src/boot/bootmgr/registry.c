@@ -115,7 +115,7 @@ RegEntryHeader *BmFindRegistryEntry(RegHandle *Handle, const char *Path) {
     RegEntryHeader *Current = NULL;
     for (char *Segment = strtok(CopyPath, "/"); Segment; Segment = strtok(NULL, "/")) {
         if (Current) {
-            if (Current->Type != REG_ENTRY_SUBKEY) {
+            if (Current->Type != REG_ENTRY_KEY) {
                 return NULL;
             }
 
@@ -142,7 +142,7 @@ RegEntryHeader *BmFindRegistryEntry(RegHandle *Handle, const char *Path) {
     } else if (Current) {
         memcpy(Entry, Current, Current->Length);
     } else {
-        Entry->Type = REG_ENTRY_SUBKEY;
+        Entry->Type = REG_ENTRY_KEY;
         Entry->Length = sizeof(RegEntryHeader) + 5;
         Entry->NameHash = 0;
         *((char *)(Entry + 1)) = 0;

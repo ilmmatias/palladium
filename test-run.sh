@@ -1,6 +1,20 @@
 #!/bin/bash
 
-echo "[1/4] Building bootsector"
+echo "[1/5] Building host tools"
+
+if [[ ! -d obj.host ]]
+then
+    mkdir obj.host
+    cd obj.host
+    cmake ../src/sdk/host -GNinja -DCMAKE_BUILD_TYPE=Debug
+else
+    cd obj.host
+fi
+
+cmake --build .
+cd ..
+
+echo "[2/5] Building bootsector"
 
 if [[ ! -d obj.x86 ]]
 then
@@ -14,7 +28,7 @@ fi
 cmake --build .
 cd ..
 
-echo "[2/4] Building system"
+echo "[3/5] Building system"
 
 if [[ ! -d obj.amd64 ]]
 then
@@ -28,8 +42,9 @@ fi
 cmake --build .
 cd ..
 
-echo "[3/4] Creating bootable image"
+echo "[4/5] Creating bootable image"
 mkdir -p _root
+obj.host/create-boot-registry
 cp obj.x86/boot/bootsect/iso9660boot.com _root/iso9660boot.com
 cat obj.x86/boot/startup/startup.com obj.x86/boot/bootmgr/bootmgr.exe > _root/bootmgr
 
@@ -42,7 +57,7 @@ then
     dd if=obj.x86/boot/bootsect/fat32boot.com of=obj.amd64/fat32.img seek=90 skip=90 count=422 bs=1 conv=notrunc 2>/dev/null
     mcopy -i obj.amd64/fat32.img _root/bootmgr ::/ 1>/dev/null
     mcopy -i obj.amd64/fat32.img _root/open_this ::/ 1>/dev/null
-    echo "[4/4] Running emulator"
+    echo "[5/5] Running emulator"
     qemu-system-x86_64 -M smm=off -drive file=obj.amd64/fat32.img,index=0,media=disk,format=raw -no-reboot 1>/dev/null
 elif [ "$1" == "exfat" ]
 then
@@ -58,7 +73,7 @@ then
     sudo mkdir -p /mnt/mount/open_this
     printf 'Hello, World! This file has been loaded using the boot exFAT driver.\n' | sudo tee /mnt/mount/open_this/flag.txt 1>/dev/null
     sudo umount /mnt/mount 1>/dev/null
-    echo "[4/4] Running emulator"
+    echo "[5/5] Running emulator"
     qemu-system-x86_64 -M smm=off -drive file=obj.amd64/exfat.img,index=0,media=disk,format=raw -no-reboot 1>/dev/null
 elif [ "$1" == "ntfs" ]
 then
@@ -73,13 +88,13 @@ then
     sudo mkdir -p /mnt/mount/open_this
     printf 'Hello, World! This file has been loaded using the boot NTFS driver.\n' | sudo tee /mnt/mount/open_this/flag.txt 1>/dev/null
     sudo umount /mnt/mount 1>/dev/null
-    echo "[4/4] Running emulator"
+    echo "[5/5] Running emulator"
     qemu-system-x86_64 -M smm=off -drive file=obj.amd64/ntfs.img,index=0,media=disk,format=raw -no-reboot 1>/dev/null
 else
     mkdir -p _root/open_this
     printf 'Hello, World! This file has been loaded using the boot ISO9660 driver.\n' | tee _root/open_this/flag.txt 1>/dev/null
     mkisofs -iso-level 2 -R -b iso9660boot.com -no-emul-boot -o obj.amd64/iso9660.iso _root 1>/dev/null 2>&1
-    echo "[4/4] Running emulator"
+    echo "[5/5] Running emulator"
     qemu-system-x86_64 -M smm=off -cdrom obj.amd64/iso9660.iso -no-reboot 1>/dev/null
 fi
 
