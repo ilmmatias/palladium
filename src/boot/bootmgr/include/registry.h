@@ -45,6 +45,7 @@ typedef struct {
 } RegHandle;
 
 RegHandle *BmLoadRegistry(const char *Path);
-RegEntryHeader *BmFindRegistryEntry(RegHandle *Handle, const char *Path);
+RegEntryHeader *BmFindRegistryEntry(RegHandle *Handle, RegEntryHeader *Parent, const char *Path);
+RegEntryHeader *BmGetRegistryEntry(RegHandle *Handle, RegEntryHeader *Parent, int Which);
 
 #endif /* _REGISTRY_H_ */

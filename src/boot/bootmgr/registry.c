@@ -100,30 +100,29 @@ static RegEntryHeader *FindEntry(RegHandle *Handle, uint32_t KeyBlock, const cha
  *
  * PARAMETERS:
  *     Handle - Registry handle, as returned by BmLoadRegistry().
+ *     Parent - Pointer to the parent entry, as returned by BmGetRegistryEntry() or by ourselves.
+ *              Pass NULL to search from the root directory onwards.
  *     Path - Full path to the key or value.
  *
  * RETURN VALUE:
  *     Pointer to a copy of the entry, or NULL if we failed to find it.
  *     The user is expected to manage and free it at the end of its lifetime.
  *-----------------------------------------------------------------------------------------------*/
-RegEntryHeader *BmFindRegistryEntry(RegHandle *Handle, const char *Path) {
+RegEntryHeader *BmFindRegistryEntry(RegHandle *Handle, RegEntryHeader *Parent, const char *Path) {
     char *CopyPath = strdup(Path);
     if (!CopyPath) {
         return NULL;
     }
 
-    RegEntryHeader *Current = NULL;
+    RegEntryHeader *Current = Parent;
     for (char *Segment = strtok(CopyPath, "/"); Segment; Segment = strtok(NULL, "/")) {
         if (Current) {
             if (Current->Type != REG_ENTRY_KEY) {
                 return NULL;
             }
 
-            size_t NameLength = strlen((const char *)(Current + 1)) + 1;
-            uint32_t *EntryData =
-                (uint32_t *)((uint8_t *)Current + sizeof(RegEntryHeader) + NameLength);
-
-            Current = FindEntry(Handle, *EntryData, Segment);
+            Current =
+                FindEntry(Handle, *(uint32_t *)((uint8_t *)Current + Current->Length - 4), Segment);
         } else {
             Current = FindEntry(Handle, sizeof(RegFileHeader), Segment);
         }
@@ -147,6 +146,56 @@ RegEntryHeader *BmFindRegistryEntry(RegHandle *Handle, const char *Path) {
         Entry->NameHash = 0;
         *((char *)(Entry + 1)) = 0;
         *((uint32_t *)((uint8_t *)Entry + sizeof(RegEntryHeader) + 1)) = sizeof(RegFileHeader);
+    }
+
+    return Entry;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function traverses the loaded registry handle in search of the nth entry of a
+ *     specified parent.
+ *
+ * PARAMETERS:
+ *     Handle - Registry handle, as returned by BmLoadRegistry().
+ *     Parent - Pointer to the parent entry, as returned by BmFindRegistryEntry() or by ourselves.
+ *     Which - Ordinal of the entry to be found.
+ *
+ * RETURN VALUE:
+ *     Pointer to a copy of the entry, or NULL if we failed to find it.
+ *     The user is expected to manage and free it at the end of its lifetime.
+ *-----------------------------------------------------------------------------------------------*/
+RegEntryHeader *BmGetRegistryEntry(RegHandle *Handle, RegEntryHeader *Parent, int Which) {
+    uint32_t KeyBlock = *(uint32_t *)((uint8_t *)Parent + Parent->Length - 4);
+    RegBlockHeader *Header = (RegBlockHeader *)Handle->Buffer;
+    RegEntryHeader *Current = NULL;
+
+    while (1) {
+        if (!Current || (char *)Current - Handle->Buffer >= REG_BLOCK_SIZE) {
+            if (Current) {
+                KeyBlock = Header->OffsetToNextBlock;
+            }
+
+            if (!KeyBlock || fseek(Handle->Stream, KeyBlock, SEEK_SET) ||
+                fread(Handle->Buffer, REG_BLOCK_SIZE, 1, Handle->Stream) != 1 ||
+                memcmp(Header->Signature, REG_BLOCK_SIGNATURE, 4)) {
+                return NULL;
+            }
+
+            Current = (RegEntryHeader *)(Header + 1);
+        }
+
+        if (Current->Type == REG_ENTRY_REMOVED || Which--) {
+            Current = (RegEntryHeader *)((char *)Current + Current->Length);
+        } else {
+            break;
+        }
+    }
+
+    RegEntryHeader *Entry = malloc(Current->Length);
+
+    if (Entry) {
+        memcpy(Entry, Current, Current->Length);
     }
 
     return Entry;
