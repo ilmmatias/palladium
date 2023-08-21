@@ -7,6 +7,10 @@
 #include <string.h>
 #include <x86/bios.h>
 
+/* We know the internals of our CRT, we can use that on our favor to initialize the whole 64-bits
+   of the internal state. */
+extern uint64_t __rand_state;
+
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function sets up any architecture-dependent features, and gets the system ready for
@@ -21,4 +25,9 @@
 void BmInitArch(void *BootBlock) {
     BiosBootBlock *Data = (BiosBootBlock *)BootBlock;
     BiosDetectDisks(Data);
+
+    __asm__ volatile("rdtsc" : "=A"(__rand_state));
+    if (!__rand_state) {
+        __rand_state = 1;
+    }
 }
