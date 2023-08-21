@@ -13,4 +13,6 @@ void BmInitArch(void* BootBlock);
 void BmLoadMenuEntries(void);
 [[noreturn]] void BmEnterMenu(void);
 
+void BmLoadPalladium(const char* SystemFolder);
+
 #endif /* _BOOT_H_ */

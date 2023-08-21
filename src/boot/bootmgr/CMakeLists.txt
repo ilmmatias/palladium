@@ -27,6 +27,8 @@ add_executable(bootmgr "kstdlib"
     fs/stdio.c
     fs/vfs.c
 
+    loader/palladium.c
+
     assert.c
     main.c
     menu.c

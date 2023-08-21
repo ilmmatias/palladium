@@ -4,7 +4,10 @@
 #ifndef STDLIB_H
 #define STDLIB_H
 
+#include <limits.h>
 #include <stddef.h>
+
+#define RAND_MAX INT_MAX
 
 #ifdef __cplusplus
 extern "C" {
@@ -25,6 +28,9 @@ long double strtold(const char *str, char **str_end);
 void *malloc(size_t size);
 void *calloc(size_t num, size_t size);
 void free(void *ptr);
+
+int rand(void);
+void srand(unsigned seed);
 
 void abort(void);
 

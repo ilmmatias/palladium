@@ -43,10 +43,11 @@ cmake --build .
 cd ..
 
 echo "[4/5] Creating bootable image"
-mkdir -p _root
+mkdir -p _root/System
 obj.host/create-boot-registry
 cp obj.x86/boot/bootsect/iso9660boot.com _root/iso9660boot.com
 cat obj.x86/boot/startup/startup.com obj.x86/boot/bootmgr/bootmgr.exe > _root/bootmgr
+cp obj.amd64/kernel/kernel.exe _root/System/kernel.exe
 
 if [ "$1" == "fat32" ]
 then
@@ -55,6 +56,7 @@ then
     dd if=obj.x86/boot/bootsect/fat32boot.com of=obj.amd64/fat32.img seek=90 skip=90 count=422 bs=1 conv=notrunc 2>/dev/null
     mcopy -i obj.amd64/fat32.img _root/bootmgr ::/ 1>/dev/null
     mcopy -i obj.amd64/fat32.img _root/bootmgr.reg ::/ 1>/dev/null
+    mcopy -i obj.amd64/fat32.img _root/System ::/ 1>/dev/null
     echo "[5/5] Running emulator"
     qemu-system-x86_64 -M smm=off -drive file=obj.amd64/fat32.img,index=0,media=disk,format=raw -no-reboot 1>/dev/null
 elif [ "$1" == "exfat" ]
@@ -69,6 +71,7 @@ then
     sudo mount -t exfat -o loop obj.amd64/exfat.img /mnt/mount 1>/dev/null
     sudo cp _root/bootmgr /mnt/mount/bootmgr 1>/dev/null
     sudo cp _root/bootmgr.reg /mnt/mount/bootmgr.reg 1>/dev/null
+    sudo cp -Rf _root/System /mnt/mount/System 1>/dev/null
     sudo umount /mnt/mount 1>/dev/null
     echo "[5/5] Running emulator"
     qemu-system-x86_64 -M smm=off -drive file=obj.amd64/exfat.img,index=0,media=disk,format=raw -no-reboot 1>/dev/null
@@ -83,6 +86,7 @@ then
     sudo mount -t ntfs -o loop obj.amd64/ntfs.img /mnt/mount 1>/dev/null
     sudo cp _root/bootmgr /mnt/mount/bootmgr 1>/dev/null
     sudo cp _root/bootmgr.reg /mnt/mount/bootmgr.reg 1>/dev/null
+    sudo cp -Rf _root/System /mnt/mount/System 1>/dev/null
     sudo umount /mnt/mount 1>/dev/null
     echo "[5/5] Running emulator"
     qemu-system-x86_64 -M smm=off -drive file=obj.amd64/ntfs.img,index=0,media=disk,format=raw -no-reboot 1>/dev/null

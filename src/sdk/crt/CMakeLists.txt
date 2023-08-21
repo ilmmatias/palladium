@@ -34,6 +34,8 @@ set(SOURCES
     stdlib/atoi.c
     stdlib/atol.c
     stdlib/atoll.c
+    stdlib/rand.c
+    stdlib/srand.c
     stdlib/strtod.c
     stdlib/strtof.c
     stdlib/strtol.c

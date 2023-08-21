@@ -1,15 +1,22 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
+#include <boot.h>
 #include <display.h>
 #include <keyboard.h>
 #include <registry.h>
-#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+
+static struct {
+    uint32_t Type;
+    char *Name;
+    char *BootDevice;
+    char *SystemFolder;
+} Options[32];
 
 static uint32_t Selection = 0;
 static uint32_t OptionCount = 0;
-static char *Options[32];
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -27,12 +34,12 @@ static void MoveSelection(int NewSelection) {
     BmSetCursor(2, 5 + Selection);
     BmSetColor(DISPLAY_COLOR_DEFAULT);
     BmClearLine(2, 2);
-    BmPutString(Options[Selection]);
+    BmPutString(Options[Selection].Name);
 
     BmSetCursor(2, 5 + NewSelection);
     BmSetColor(DISPLAY_COLOR_INVERSE);
     BmClearLine(2, 2);
-    BmPutString(Options[NewSelection]);
+    BmPutString(Options[NewSelection].Name);
 
     Selection = NewSelection;
 }
@@ -75,10 +82,56 @@ void BmLoadMenuEntries(void) {
         if (!Entry) {
             break;
         } else if (Entry->Type != REG_ENTRY_KEY) {
+            free(Entry);
             continue;
         }
 
-        Options[OptionCount++] = (char *)(Entry + 1);
+        /* Type is always required; SystemFolder is required for Palladium (0), BootDevice for
+           chainloading (1). */
+        RegEntryHeader *Type = BmFindRegistryEntry(BmBootRegistry, Entry, "Type");
+        if (!Type) {
+            continue;
+        } else if (Type->Type != REG_ENTRY_DWORD) {
+            free(Entry);
+            continue;
+        }
+
+        Options[OptionCount].Type = *((uint8_t *)Type + Type->Length - 4);
+
+        if (!Options[OptionCount].Type) {
+            RegEntryHeader *SystemFolder =
+                BmFindRegistryEntry(BmBootRegistry, Entry, "SystemFolder");
+
+            if (!SystemFolder) {
+                free(Entry);
+                continue;
+            } else if (SystemFolder->Type != REG_ENTRY_STRING) {
+                free(SystemFolder);
+                free(Entry);
+                continue;
+            }
+
+            Options[OptionCount].BootDevice = NULL;
+            Options[OptionCount].SystemFolder =
+                (char *)(SystemFolder + 1) + strlen((char *)(SystemFolder + 1)) + 1;
+        } else {
+            RegEntryHeader *BootDevice = BmFindRegistryEntry(BmBootRegistry, Entry, "BootDevice");
+
+            if (!BootDevice) {
+                free(Entry);
+                continue;
+            } else if (BootDevice->Type != REG_ENTRY_STRING) {
+                free(BootDevice);
+                free(Entry);
+                continue;
+            }
+
+            Options[OptionCount].BootDevice =
+                (char *)(BootDevice + 1) + strlen((char *)(BootDevice + 1)) + 1;
+            Options[OptionCount].SystemFolder = NULL;
+        }
+
+        Options[OptionCount++].Name = (char *)(Entry + 1);
     }
 
     Selection = *(uint32_t *)((uint8_t *)SelectionHeader + SelectionHeader->Length - 4);
@@ -96,43 +149,56 @@ void BmLoadMenuEntries(void) {
  *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
 [[noreturn]] void BmEnterMenu(void) {
-    const char Header[] = "Boot Manager";
-    BmSetCursor((DISPLAY_WIDTH - strlen(Header)) / 2, 0);
-    BmSetColor(DISPLAY_COLOR_INVERSE);
-    BmClearLine(0, 0);
-    BmPutString(Header);
-
-    const char SubHeader[] = "Choose an operating system to start.";
-    BmSetCursor((DISPLAY_WIDTH - strlen(SubHeader)) / 2, 2);
-    BmSetColor(DISPLAY_COLOR_HIGHLIGHT);
-    BmClearLine(0, 0);
-    BmPutString(SubHeader);
-
-    const char Subtitle[] = "(Use the arrow keys to highlight your choice, then press ENTER.)";
-    BmSetCursor((DISPLAY_WIDTH - strlen(Subtitle)) / 2, 3);
-    BmSetColor(DISPLAY_COLOR_DEFAULT);
-    BmClearLine(0, 0);
-    BmPutString(Subtitle);
-
-    uint32_t Count = OptionCount;
-    if (Count > DISPLAY_HEIGHT - 6) {
-        Count = DISPLAY_HEIGHT - 6;
-    }
-
-    for (uint32_t i = 0; i < Count; i++) {
-        BmSetCursor(2, 5 + i);
-        BmSetColor(Selection == i ? DISPLAY_COLOR_INVERSE : DISPLAY_COLOR_DEFAULT);
-        BmClearLine(2, 2);
-        BmPutString(Options[i]);
-    }
-
     while (1) {
-        int Key = BmPollKey();
+        BmSetColor(DISPLAY_COLOR_DEFAULT);
+        BmInitDisplay();
 
-        if (Key == KEY_UP) {
-            MoveSelection(Selection ? Selection - 1 : Count - 1);
-        } else if (Key == KEY_DOWN) {
-            MoveSelection(Selection == Count - 1 ? 0 : Selection + 1);
+        const char Header[] = "Boot Manager";
+        BmSetCursor((DISPLAY_WIDTH - strlen(Header)) / 2, 0);
+        BmSetColor(DISPLAY_COLOR_INVERSE);
+        BmClearLine(0, 0);
+        BmPutString(Header);
+
+        const char SubHeader[] = "Choose an operating system to start.";
+        BmSetCursor((DISPLAY_WIDTH - strlen(SubHeader)) / 2, 2);
+        BmSetColor(DISPLAY_COLOR_HIGHLIGHT);
+        BmClearLine(0, 0);
+        BmPutString(SubHeader);
+
+        const char Subtitle[] = "(Use the arrow keys to highlight your choice, then press ENTER.)";
+        BmSetCursor((DISPLAY_WIDTH - strlen(Subtitle)) / 2, 3);
+        BmSetColor(DISPLAY_COLOR_DEFAULT);
+        BmClearLine(0, 0);
+        BmPutString(Subtitle);
+
+        uint32_t Count = OptionCount;
+        if (Count > DISPLAY_HEIGHT - 6) {
+            Count = DISPLAY_HEIGHT - 6;
+        }
+
+        for (uint32_t i = 0; i < Count; i++) {
+            BmSetCursor(2, 5 + i);
+            BmSetColor(Selection == i ? DISPLAY_COLOR_INVERSE : DISPLAY_COLOR_DEFAULT);
+            BmClearLine(2, 2);
+            BmPutString(Options[i].Name);
+        }
+
+        while (1) {
+            int Key = BmPollKey();
+
+            if (Key == KEY_UP) {
+                MoveSelection(Selection ? Selection - 1 : Count - 1);
+            } else if (Key == KEY_DOWN) {
+                MoveSelection(Selection == Count - 1 ? 0 : Selection + 1);
+            } else if (Key == '\n') {
+                switch (Options[Selection].Type) {
+                    case 0:
+                        BmLoadPalladium(Options[Selection].SystemFolder);
+                        break;
+                }
+
+                break;
+            }
         }
     }
 }
