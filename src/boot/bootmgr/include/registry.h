@@ -44,6 +44,9 @@ typedef struct {
     FILE *Stream;
 } RegHandle;
 
+extern RegHandle *BmBootRegistry;
+
+void BmInitRegistry(void);
 RegHandle *BmLoadRegistry(const char *Path);
 RegEntryHeader *BmFindRegistryEntry(RegHandle *Handle, RegEntryHeader *Parent, const char *Path);
 RegEntryHeader *BmGetRegistryEntry(RegHandle *Handle, RegEntryHeader *Parent, int Which);

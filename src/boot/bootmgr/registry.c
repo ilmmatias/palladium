@@ -1,11 +1,37 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
+#include <display.h>
 #include <registry.h>
 #include <rt.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+RegHandle *BmBootRegistry = NULL;
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function sets up the boot manager registry file, used by the menu.
+ *
+ * PARAMETERS:
+ *     None.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void BmInitRegistry(void) {
+    BmBootRegistry = BmLoadRegistry("boot()/bootmgr.reg");
+    if (!BmBootRegistry) {
+        BmSetColor(0x4F);
+        BmInitDisplay();
+
+        BmPutString("An error occoured while trying to setup the boot manager environment.\n");
+        BmPutString("Could not open the Boot Manager Registry file.\n");
+
+        while (1)
+            ;
+    }
+}
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:

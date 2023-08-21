@@ -358,8 +358,8 @@ int main(void) {
     }
 
     uint32_t Root = sizeof(RegFileHeader);
-    if (!CreateIntegerKey(Stream, Root, "Timeout", 0, 5) ||
-        !CreateIntegerKey(Stream, Root, "DefaultSelection", 0, 0)) {
+    if (!CreateIntegerKey(Stream, Root, "Timeout", REG_ENTRY_DWORD, 5) ||
+        !CreateIntegerKey(Stream, Root, "DefaultSelection", REG_ENTRY_DWORD, 0)) {
         fclose(Stream);
         return 1;
     }
@@ -372,15 +372,15 @@ int main(void) {
 
     uint32_t Entry;
     if (!CreateSubKey(Stream, Entries, "Boot from the Installation Disk", &Entry) ||
-        !CreateIntegerKey(Stream, Entry, "Type", 0, 0) ||
+        !CreateIntegerKey(Stream, Entry, "Type", REG_ENTRY_DWORD, 0) ||
         !CreateStringKey(Stream, Entry, "SystemFolder", "boot()/System")) {
         fclose(Stream);
         return 1;
     }
 
     if (!CreateSubKey(Stream, Entries, "Boot from the First Hard Disk", &Entry) ||
-        CreateIntegerKey(Stream, Entry, "Type", 0, 1) ||
-        CreateStringKey(Stream, Entry, "BootDevice", "bios(80)")) {
+        !CreateIntegerKey(Stream, Entry, "Type", REG_ENTRY_DWORD, 1) ||
+        !CreateStringKey(Stream, Entry, "BootDevice", "bios(80)")) {
         fclose(Stream);
         return 1;
     }

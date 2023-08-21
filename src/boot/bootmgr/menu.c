@@ -3,30 +3,13 @@
 
 #include <display.h>
 #include <keyboard.h>
+#include <registry.h>
 #include <stdio.h>
 #include <string.h>
 
-static int Selection = 0;
-static char *Options[] = {
-    "Test Entry 0",
-    "Test Entry 1",
-    "Test Entry 2",
-    "Test Entry 3",
-    "Test Entry 4",
-    "Test Entry 5",
-    "Test Entry 6",
-    "Test Entry 7",
-    "Test Entry 8",
-    "Test Entry 9",
-    "Test Entry 10",
-    "Test Entry 11",
-    "Test Entry 12",
-    "Test Entry 13",
-    "Test Entry 14",
-    "Test Entry 15",
-    "Test Entry 16",
-    "Test Entry 17",
-};
+static uint32_t Selection = 0;
+static uint32_t OptionCount = 0;
+static char *Options[32];
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -56,7 +39,55 @@ static void MoveSelection(int NewSelection) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function draws the menu decoration, and enters the main event loop.
+ *     This function loads all the menu entries, panicking if the registry seems to be in an
+ *     unsafe state.
+ *
+ * PARAMETERS:
+ *     None.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void BmLoadMenuEntries(void) {
+    /* Selection, Timeout, and Entries are required (and required to be of the right size); Assume
+       a corrupted registry if they aren't present or are of the wrong type. */
+    RegEntryHeader *TimeoutHeader = BmFindRegistryEntry(BmBootRegistry, NULL, "Timeout");
+    RegEntryHeader *SelectionHeader = BmFindRegistryEntry(BmBootRegistry, NULL, "DefaultSelection");
+    RegEntryHeader *EntriesHeader = BmFindRegistryEntry(BmBootRegistry, NULL, "Entries");
+
+    if (!TimeoutHeader || !SelectionHeader || !EntriesHeader ||
+        TimeoutHeader->Type != REG_ENTRY_DWORD || SelectionHeader->Type != REG_ENTRY_DWORD ||
+        EntriesHeader->Type != REG_ENTRY_KEY) {
+        BmSetColor(0x4F);
+        BmInitDisplay();
+
+        BmPutString("An error occoured while trying to setup the boot manager environment.\n");
+        BmPutString(
+            "The Boot Manager Registry file seems to be corrupt or of an invalid format.\n");
+
+        while (1)
+            ;
+    }
+
+    for (int i = 0; OptionCount < 32; i++) {
+        RegEntryHeader *Entry = BmGetRegistryEntry(BmBootRegistry, EntriesHeader, i);
+
+        if (!Entry) {
+            break;
+        } else if (Entry->Type != REG_ENTRY_KEY) {
+            continue;
+        }
+
+        Options[OptionCount++] = (char *)(Entry + 1);
+    }
+
+    Selection = *(uint32_t *)((uint8_t *)SelectionHeader + SelectionHeader->Length - 4);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function loads all the menu entries, draws the menu decoration, and enters the main
+ *     event loop.
  *
  * PARAMETERS:
  *     None.
@@ -83,12 +114,12 @@ static void MoveSelection(int NewSelection) {
     BmClearLine(0, 0);
     BmPutString(Subtitle);
 
-    int Count = sizeof(Options) / sizeof(*Options);
+    uint32_t Count = OptionCount;
     if (Count > DISPLAY_HEIGHT - 6) {
         Count = DISPLAY_HEIGHT - 6;
     }
 
-    for (int i = 0; i < Count; i++) {
+    for (uint32_t i = 0; i < Count; i++) {
         BmSetCursor(2, 5 + i);
         BmSetColor(Selection == i ? DISPLAY_COLOR_INVERSE : DISPLAY_COLOR_DEFAULT);
         BmClearLine(2, 2);
