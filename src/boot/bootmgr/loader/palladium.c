@@ -3,6 +3,8 @@
 
 #include <display.h>
 #include <keyboard.h>
+#include <memory.h>
+#include <pe.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,7 +12,7 @@
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function loads up the specified PE file, validating the target architecture, and if
- *     it's an EXE (kernel), DLL, or SYS (driver) file.
+ *     it's an EXE (kernel) or SYS (driver) file.
  *     KASLR is enabled at all times, with the high bits of the virtual address being randomized.
  *
  * PARAMETERS:
@@ -20,14 +22,49 @@
  * RETURN VALUE:
  *     Physical address of the image, or 0 if we failed to load it.
  *-----------------------------------------------------------------------------------------------*/
-static uintptr_t LoadFile(const char *Path, uintptr_t *VirtualAddress) {
+static uint64_t LoadFile(const char *Path, uint64_t *VirtualAddress) {
     FILE *Stream = fopen(Path, "rb");
     if (!Stream) {
         return 0;
     }
 
-    (void)VirtualAddress;
-    return 0;
+    /* The PE data is prefixed with a MZ header and a MS-DOS stub; The offset into the PE data is
+       guaranteed to be after the main MZ header. */
+    uint32_t Offset;
+    if (fseek(Stream, 0x3C, SEEK_SET) || fread(&Offset, sizeof(uint32_t), 1, Stream) != 1) {
+        fclose(Stream);
+        return 0;
+    }
+
+    PeHeader Header;
+    if (fseek(Stream, Offset, SEEK_SET) || fread(&Header, sizeof(PeHeader), 1, Stream) != 1) {
+        fclose(Stream);
+        return 0;
+    }
+
+    /* Following the information at https://learn.microsoft.com/en-us/windows/win32/debug/pe-format
+       for the implementation. */
+    if (memcmp(Header.Signature, PE_SIGNATURE, 4) || Header.Machine != PE_MACHINE ||
+        Header.Magic != PE_MAGIC) {
+        fclose(Stream);
+        return 0;
+    }
+
+    uint64_t LargePages = (Header.SizeOfImage + LARGE_PAGE_SIZE - 1) >> LARGE_PAGE_SHIFT;
+    void *PhysicalAddress = malloc(LargePages << LARGE_PAGE_SHIFT);
+    if (!PhysicalAddress) {
+        fclose(Stream);
+        return 0;
+    }
+
+    *VirtualAddress = BmAllocateVirtualAddress(LargePages);
+    if (!*VirtualAddress) {
+        free(PhysicalAddress);
+        fclose(Stream);
+        return 0;
+    }
+
+    return (uint64_t)PhysicalAddress;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -55,8 +92,8 @@ void BmLoadPalladium(const char *SystemFolder) {
         snprintf(KernelPath, KernelPathSize, "%s/kernel.exe", SystemFolder);
 
         /* Delegate the loading job to the common PE loader. */
-        uintptr_t KernelVirtualAddress;
-        uintptr_t KernelPhysicalAddress = LoadFile(KernelPath, &KernelVirtualAddress);
+        uint64_t KernelVirtualAddress;
+        uint64_t KernelPhysicalAddress = LoadFile(KernelPath, &KernelVirtualAddress);
         if (!KernelPhysicalAddress) {
             free(KernelPath);
             break;
