@@ -11,7 +11,7 @@
  * PURPOSE:
  *     This function loads up the specified PE file, validating the target architecture, and if
  *     it's an EXE (kernel), DLL, or SYS (driver) file.
- *     KASLR is enabled at all times, with the low bits of the virtual address being randomized.
+ *     KASLR is enabled at all times, with the high bits of the virtual address being randomized.
  *
  * PARAMETERS:
  *     Path - Full path of the file.

@@ -5,17 +5,33 @@
 #define _MEMORY_H_
 
 #include <stddef.h>
+#include <stdint.h>
 
 #if defined(ARCH_x86) || defined(ARCH_amd64)
 #define PAGE_SHIFT 12
+#define LARGE_PAGE_SHIFT 21
+#define ARENA_BASE 0xFFFF800000000000
+#define ARENA_BITS 39
 #else
 #error "Undefined ARCH for the bootmgr module!"
 #endif /* ARCH */
 
-#define PAGE_SIZE (1 << (PAGE_SHIFT))
+#define PAGE_SIZE (1ul << (PAGE_SHIFT))
+#define LARGE_PAGE_SIZE (1ull << (LARGE_PAGE_SHIFT))
+#define ARENA_SIZE (1ull << (ARENA_BITS))
+
+typedef struct MemoryArena {
+    uint64_t Base;
+    uint64_t Size;
+    struct MemoryArena *Next;
+} MemoryArena;
+
+extern MemoryArena *BmMemoryArena;
 
 void BmInitMemory(void *BootBlock);
 void *BmAllocatePages(size_t Pages);
 void BmFreePages(void *Base, size_t Pages);
+
+uint64_t BmAllocateVirtualAddress(uint64_t LargePages);
 
 #endif /* _MEMORY_H_ */

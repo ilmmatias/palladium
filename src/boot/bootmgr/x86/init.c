@@ -2,14 +2,14 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <boot.h>
+#include <crt_impl.h>
+#include <memory.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <x86/bios.h>
 
-/* We know the internals of our CRT, we can use that on our favor to initialize the whole 64-bits
-   of the internal state. */
-extern uint64_t __rand_state;
+static MemoryArena KernelRegion;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -26,8 +26,16 @@ void BmInitArch(void *BootBlock) {
     BiosBootBlock *Data = (BiosBootBlock *)BootBlock;
     BiosDetectDisks(Data);
 
-    __asm__ volatile("rdtsc" : "=A"(__rand_state));
-    if (!__rand_state) {
-        __rand_state = 1;
-    }
+    /* We're not sure if rdseed (true RNG) or rdrand is available; Seed the PRNG using the clock
+       cycle counter. */
+    uint64_t Seed;
+    __asm__ volatile("rdtsc" : "=A"(Seed));
+    __srand64(Seed);
+
+    /* Seed virtual region allocator with a single region, containing all the high/kernel
+       space. */
+    KernelRegion.Base = 0xFFFF800000000000;
+    KernelRegion.Size = ARENA_SIZE;
+    KernelRegion.Next = NULL;
+    BmMemoryArena = &KernelRegion;
 }

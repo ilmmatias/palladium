@@ -31,6 +31,7 @@ add_executable(bootmgr "kstdlib"
 
     assert.c
     main.c
+    memory.c
     menu.c
     registry.c)
 

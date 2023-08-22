@@ -30,6 +30,8 @@ set(SOURCES
     stdio/vsprintf.c
     stdio/vsscanf.c
 
+    stdlib/__rand64.c
+    stdlib/__srand64.c
     stdlib/atof.c
     stdlib/atoi.c
     stdlib/atol.c

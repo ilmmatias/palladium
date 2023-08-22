@@ -1,13 +1,14 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
-#include <crt_impl.h>
 #include <stdint.h>
 #include <stdlib.h>
 
+extern uint64_t __rand_state;
+
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function sets the current state of the pseudo random number generator, with reduced
+ *     This function sets the current state of the pseudo random number generator, with full
  *     precision.
  *
  * PARAMETERS:
@@ -16,6 +17,6 @@
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void srand(unsigned seed) {
-    __srand64(seed);
+void __srand64(uint64_t seed) {
+    __rand_state = seed ? seed : 1;
 }

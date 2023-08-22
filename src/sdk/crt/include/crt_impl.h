@@ -6,6 +6,7 @@
 
 #include <stdarg.h>
 #include <stddef.h>
+#include <stdint.h>
 
 struct FILE {
     void *handle;
@@ -28,6 +29,7 @@ struct fpos_t {
 };
 
 #ifndef __CRT_STDIO_H
+
 #define __STDIO_FLAGS_READ 0x01
 #define __STDIO_FLAGS_WRITE 0x02
 #define __STDIO_FLAGS_APPEND 0x04
@@ -59,6 +61,10 @@ int __vscanf(
 
 double __strtod_hex(const char *str, double sign);
 double __strtod_dec(const char *str, double sign);
+
+uint64_t __rand64(void);
+void __srand64(uint64_t seed);
+
 #endif /* __CRT_STDIO_H */
 
 #endif /* CRT_IMPL_H */
