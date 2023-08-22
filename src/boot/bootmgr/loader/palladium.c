@@ -36,21 +36,22 @@ static uint64_t LoadFile(const char *Path, uint64_t *VirtualAddress) {
         return 0;
     }
 
-    PeHeader Header;
-    if (fseek(Stream, Offset, SEEK_SET) || fread(&Header, sizeof(PeHeader), 1, Stream) != 1) {
+    PeHeader InitialHeader;
+    PeHeader *Header = &InitialHeader;
+    if (fseek(Stream, Offset, SEEK_SET) || fread(Header, sizeof(PeHeader), 1, Stream) != 1) {
         fclose(Stream);
         return 0;
     }
 
     /* Following the information at https://learn.microsoft.com/en-us/windows/win32/debug/pe-format
        for the implementation. */
-    if (memcmp(Header.Signature, PE_SIGNATURE, 4) || Header.Machine != PE_MACHINE ||
-        Header.Magic != PE_MAGIC) {
+    if (memcmp(Header->Signature, PE_SIGNATURE, 4) || Header->Machine != PE_MACHINE ||
+        Header->Magic != PE_MAGIC) {
         fclose(Stream);
         return 0;
     }
 
-    uint64_t LargePages = (Header.SizeOfImage + LARGE_PAGE_SIZE - 1) >> LARGE_PAGE_SHIFT;
+    uint64_t LargePages = (Header->SizeOfImage + LARGE_PAGE_SIZE - 1) >> LARGE_PAGE_SHIFT;
     void *PhysicalAddress = malloc(LargePages << LARGE_PAGE_SHIFT);
     if (!PhysicalAddress) {
         fclose(Stream);
@@ -64,6 +65,28 @@ static uint64_t LoadFile(const char *Path, uint64_t *VirtualAddress) {
         return 0;
     }
 
+    /* The kernel might use information from the base headers and section headers; SizeOfImage
+       should have given us the code/data size + all headers, so we're assuming that and loading
+       it all up to the base address. */
+    if (fseek(Stream, 0, SEEK_SET) ||
+        fread(PhysicalAddress, Header->SizeOfHeaders, 1, Stream) != 1) {
+        free(PhysicalAddress);
+        fclose(Stream);
+        return 0;
+    }
+
+    uint64_t ExpectedBase = Header->ImageBase;
+    uint64_t BaseDiff = *VirtualAddress - ExpectedBase;
+    Header = PhysicalAddress;
+    Header->ImageBase = *VirtualAddress;
+
+    /* We can be almost certain that high half > than whatever the linker put us at, but do
+       handle a possible underflow anyways. */
+    if (*VirtualAddress < ExpectedBase) {
+        BaseDiff = ExpectedBase - *VirtualAddress;
+    }
+
+    (void)BaseDiff;
     return (uint64_t)PhysicalAddress;
 }
 
