@@ -77,7 +77,7 @@ static uint64_t LoadFile(const char *Path, uint64_t *VirtualAddress) {
 
     uint64_t ExpectedBase = Header->ImageBase;
     uint64_t BaseDiff = *VirtualAddress - ExpectedBase;
-    Header = PhysicalAddress;
+    Header = (PeHeader *)((char *)PhysicalAddress + Offset);
     Header->ImageBase = *VirtualAddress;
 
     /* We can be almost certain that high half > than whatever the linker put us at, but do
@@ -86,7 +86,73 @@ static uint64_t LoadFile(const char *Path, uint64_t *VirtualAddress) {
         BaseDiff = ExpectedBase - *VirtualAddress;
     }
 
-    (void)BaseDiff;
+    PeSectionHeader *Sections =
+        (PeSectionHeader *)((char *)PhysicalAddress + Offset + Header->SizeOfOptionalHeader + 24);
+
+    for (uint16_t i = 0; i < Header->NumberOfSections; i++) {
+        if (fseek(Stream, Sections[i].PointerToRawData, SEEK_SET) ||
+            fread(
+                (char *)PhysicalAddress + Sections[i].VirtualAddress,
+                Sections[i].SizeOfRawData,
+                1,
+                Stream) != 1) {
+            free(PhysicalAddress);
+            fclose(Stream);
+            return 0;
+        }
+
+        if (Sections[i].VirtualSize > Sections[i].SizeOfRawData) {
+            memset(
+                (char *)PhysicalAddress + Sections[i].VirtualAddress + Sections[i].SizeOfRawData,
+                0,
+                Sections[i].VirtualSize - Sections[i].SizeOfRawData);
+        }
+    }
+
+    /* The relocation table is optional (it can be zero-sized if the executable is literally
+       empty/contains no code); But on most cases, we should have to do something. */
+    if (!Header->DataDirectories.BaseRelocationTable.Size) {
+        return (uint64_t)PhysicalAddress;
+    }
+
+    uint32_t Size = Header->DataDirectories.BaseRelocationTable.Size;
+    char *Relocations =
+        (char *)PhysicalAddress + Header->DataDirectories.BaseRelocationTable.VirtualAddress;
+
+    while (Size) {
+        PeBaseRelocationBlock *BaseRelocationBlock = (PeBaseRelocationBlock *)Relocations;
+        uint32_t Entries = (BaseRelocationBlock->BlockSize - sizeof(PeBaseRelocationBlock)) >> 1;
+        uint16_t *BlockRelocations = (uint16_t *)(BaseRelocationBlock + 1);
+
+        for (; Entries; Entries--) {
+            uint16_t Type = *BlockRelocations >> 12;
+            void *Offset = (char *)PhysicalAddress + (*(BlockRelocations++) & 0xFFF);
+
+            switch (Type) {
+                case IMAGE_REL_BASED_HIGH:
+                    *((uint16_t *)Offset) += BaseDiff >> 16;
+                    break;
+                case IMAGE_REL_BASED_LOW:
+                    *((uint16_t *)Offset) += BaseDiff;
+                    break;
+                case IMAGE_REL_BASED_HIGHLOW:
+                    *((uint32_t *)Offset) += BaseDiff;
+                    break;
+                case IMAGE_REL_BASED_HIGHADJ:
+                    *((uint16_t *)Offset) += BaseDiff >> 16;
+                    *((uint16_t *)((char *)PhysicalAddress + (*(BlockRelocations++) & 0xFFF))) =
+                        BaseDiff;
+                    break;
+                case IMAGE_REL_BASED_DIR64:
+                    *((uint64_t *)Offset) += BaseDiff;
+                    break;
+            }
+        }
+
+        Size -= BaseRelocationBlock->BlockSize;
+        Relocations += BaseRelocationBlock->BlockSize;
+    }
+
     return (uint64_t)PhysicalAddress;
 }
 

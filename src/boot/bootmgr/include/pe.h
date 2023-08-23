@@ -15,6 +15,17 @@
 #error "Undefined ARCH for the bootmgr module!"
 #endif
 
+#define IMAGE_REL_BASED_HIGH 1
+#define IMAGE_REL_BASED_LOW 2
+#define IMAGE_REL_BASED_HIGHLOW 3
+#define IMAGE_REL_BASED_HIGHADJ 4
+#define IMAGE_REL_BASED_DIR64 10
+
+typedef struct __attribute__((packed)) {
+    uint32_t VirtualAddress;
+    uint32_t Size;
+} PeDataDirectory;
+
 typedef struct __attribute__((packed)) {
     char Signature[4];
     uint16_t Machine;
@@ -65,6 +76,24 @@ typedef struct __attribute__((packed)) {
 #endif
     uint32_t LoaderFlags;
     uint32_t NumberOfRvaAndSizes;
+    struct {
+        PeDataDirectory ExportTable;
+        PeDataDirectory ImportTable;
+        PeDataDirectory ResourceTable;
+        PeDataDirectory ExceptionTable;
+        PeDataDirectory CertificateTable;
+        PeDataDirectory BaseRelocationTable;
+        PeDataDirectory Debug;
+        PeDataDirectory Architecture;
+        PeDataDirectory GlobalPtr;
+        PeDataDirectory TlsTable;
+        PeDataDirectory LoadConfigTable;
+        PeDataDirectory BoundImport;
+        PeDataDirectory Iat;
+        PeDataDirectory DelayImportDescriptor;
+        PeDataDirectory ClrRuntimeHeader;
+        PeDataDirectory Reserved;
+    } DataDirectories;
 } PeHeader;
 
 typedef struct __attribute__((packed)) {
@@ -79,5 +108,10 @@ typedef struct __attribute__((packed)) {
     uint16_t NumberOfLinenumbers;
     uint32_t Characteristics;
 } PeSectionHeader;
+
+typedef struct __attribute__((packed)) {
+    uint32_t PageRva;
+    uint32_t BlockSize;
+} PeBaseRelocationBlock;
 
 #endif /* _PE_H_ */
