@@ -5,7 +5,6 @@
 #include <ctype.h>
 #include <fat32.h>
 #include <file.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -384,7 +383,7 @@ int BiReadFat32File(FileContext *Context, void *Buffer, size_t Start, size_t Siz
         memcpy(Output, Current + Start, CopySize);
         Current += FsContext->BytesPerCluster;
         Output += CopySize;
-        Start -= CopySize;
+        Start = 0;
         Size -= CopySize;
         Accum += CopySize;
     }

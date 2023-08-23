@@ -189,7 +189,7 @@ SubsystemError db "The target subsystem in bootmgr.exe is wrong.", 0
 NoSectionError db "There are no sections in bootmgr.exe.", 0
 SectionError db "One of the bootmgr.exe sections doesn't fit inside the physical memory.", 0
 
-GdtDescs dq 0000000000000000h, 00CF9A000000FFFFh, 00CF92000000FFFFh, 008F9A000000FFFFh, 008F92000000FFFFh
+GdtDescs dq 0000000000000000h, 00CF9A000000FFFFh, 00CF92000000FFFFh, 008F9A000000FFFFh, 008F92000000FFFFh, 00AF9A000000FFFFh
 GdtSize dw GdtSize - GdtDescs - 1
 GdtBase dd offset GdtDescs
 

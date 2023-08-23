@@ -1,6 +1,7 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
+#include <boot.h>
 #include <display.h>
 #include <keyboard.h>
 #include <memory.h>
@@ -18,11 +19,14 @@
  * PARAMETERS:
  *     Path - Full path of the file.
  *     VirtualAddress - Output; Chosen virual address for the image.
+ *     EntryAddress - Output; Where we should jump to reach the image entry point.
+ *     ImageSize - Output; Size in bytes of the loaded image.
  *
  * RETURN VALUE:
  *     Physical address of the image, or 0 if we failed to load it.
  *-----------------------------------------------------------------------------------------------*/
-static uint64_t LoadFile(const char *Path, uint64_t *VirtualAddress) {
+static uint64_t
+LoadFile(const char *Path, uint64_t *VirtualAddress, uint64_t *EntryAddress, uint64_t *ImageSize) {
     FILE *Stream = fopen(Path, "rb");
     if (!Stream) {
         return 0;
@@ -32,14 +36,12 @@ static uint64_t LoadFile(const char *Path, uint64_t *VirtualAddress) {
        guaranteed to be after the main MZ header. */
     uint32_t Offset;
     if (fseek(Stream, 0x3C, SEEK_SET) || fread(&Offset, sizeof(uint32_t), 1, Stream) != 1) {
-        fclose(Stream);
         return 0;
     }
 
     PeHeader InitialHeader;
     PeHeader *Header = &InitialHeader;
     if (fseek(Stream, Offset, SEEK_SET) || fread(Header, sizeof(PeHeader), 1, Stream) != 1) {
-        fclose(Stream);
         return 0;
     }
 
@@ -47,21 +49,19 @@ static uint64_t LoadFile(const char *Path, uint64_t *VirtualAddress) {
        for the implementation. */
     if (memcmp(Header->Signature, PE_SIGNATURE, 4) || Header->Machine != PE_MACHINE ||
         Header->Magic != PE_MAGIC) {
-        fclose(Stream);
         return 0;
     }
 
     uint64_t LargePages = (Header->SizeOfImage + LARGE_PAGE_SIZE - 1) >> LARGE_PAGE_SHIFT;
-    void *PhysicalAddress = malloc(LargePages << LARGE_PAGE_SHIFT);
+    *ImageSize = LargePages << LARGE_PAGE_SHIFT;
+
+    void *PhysicalAddress = BmAllocatePages(*ImageSize >> PAGE_SHIFT, MEMORY_KERNEL_LARGE);
     if (!PhysicalAddress) {
-        fclose(Stream);
         return 0;
     }
 
     *VirtualAddress = BmAllocateVirtualAddress(LargePages);
     if (!*VirtualAddress) {
-        free(PhysicalAddress);
-        fclose(Stream);
         return 0;
     }
 
@@ -70,8 +70,6 @@ static uint64_t LoadFile(const char *Path, uint64_t *VirtualAddress) {
        it all up to the base address. */
     if (fseek(Stream, 0, SEEK_SET) ||
         fread(PhysicalAddress, Header->SizeOfHeaders, 1, Stream) != 1) {
-        free(PhysicalAddress);
-        fclose(Stream);
         return 0;
     }
 
@@ -79,12 +77,7 @@ static uint64_t LoadFile(const char *Path, uint64_t *VirtualAddress) {
     uint64_t BaseDiff = *VirtualAddress - ExpectedBase;
     Header = (PeHeader *)((char *)PhysicalAddress + Offset);
     Header->ImageBase = *VirtualAddress;
-
-    /* We can be almost certain that high half > than whatever the linker put us at, but do
-       handle a possible underflow anyways. */
-    if (*VirtualAddress < ExpectedBase) {
-        BaseDiff = ExpectedBase - *VirtualAddress;
-    }
+    *EntryAddress = *VirtualAddress + Header->AddressOfEntryPoint;
 
     PeSectionHeader *Sections =
         (PeSectionHeader *)((char *)PhysicalAddress + Offset + Header->SizeOfOptionalHeader + 24);
@@ -96,8 +89,6 @@ static uint64_t LoadFile(const char *Path, uint64_t *VirtualAddress) {
                 Sections[i].SizeOfRawData,
                 1,
                 Stream) != 1) {
-            free(PhysicalAddress);
-            fclose(Stream);
             return 0;
         }
 
@@ -167,7 +158,7 @@ static uint64_t LoadFile(const char *Path, uint64_t *VirtualAddress) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void BmLoadPalladium(const char *SystemFolder) {
+[[noreturn]] void BmLoadPalladium(const char *SystemFolder) {
     BmSetColor(DISPLAY_COLOR_DEFAULT);
     BmInitDisplay();
 
@@ -181,13 +172,23 @@ void BmLoadPalladium(const char *SystemFolder) {
         snprintf(KernelPath, KernelPathSize, "%s/kernel.exe", SystemFolder);
 
         /* Delegate the loading job to the common PE loader. */
-        uint64_t KernelVirtualAddress;
-        uint64_t KernelPhysicalAddress = LoadFile(KernelPath, &KernelVirtualAddress);
-        if (!KernelPhysicalAddress) {
-            free(KernelPath);
+        uint64_t VirtualAddress;
+        uint64_t EntryPoint;
+        uint64_t ImageSize;
+        uint64_t PhysicalAddress = LoadFile(KernelPath, &VirtualAddress, &EntryPoint, &ImageSize);
+        if (!PhysicalAddress) {
             break;
         }
+
+        BmTransferExecution(VirtualAddress, PhysicalAddress, ImageSize, EntryPoint);
     } while (0);
 
-    BmPollKey();
+    BmSetColor(0x4F);
+    BmInitDisplay();
+
+    BmPutString("An error occoured while trying to load the selected operating system.\n");
+    BmPutString("Please, reboot your device and try again.\n");
+
+    while (1)
+        ;
 }

@@ -9,6 +9,7 @@
 
 #define BIOS_MEMORY_REGION_TYPE_AVAILABLE 1
 #define BIOS_MEMORY_REGION_TYPE_USED 0x1000
+#define BIOS_MEMORY_REGION_TYPE_KERNEL 0x1001
 
 typedef struct __attribute__((packed)) {
     uint8_t BootDrive;

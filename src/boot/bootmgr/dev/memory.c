@@ -125,7 +125,7 @@ static AllocatorEntry *FindFreeEntry(size_t Size) {
         Entry = Entry->Next;
     }
 
-    Entry = BmAllocatePages((Size + sizeof(AllocatorEntry) + Mask) >> PAGE_SHIFT);
+    Entry = BmAllocatePages((Size + sizeof(AllocatorEntry) + Mask) >> PAGE_SHIFT, MEMORY_BOOT);
     Size = ((Size + sizeof(AllocatorEntry) + Mask) & ~Mask) - sizeof(AllocatorEntry);
 
     if (!Entry) {

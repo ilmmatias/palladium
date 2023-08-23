@@ -34,7 +34,7 @@ void BmInitArch(void *BootBlock) {
 
     /* Seed virtual region allocator with a single region, containing all the high/kernel
        space. */
-    KernelRegion.Base = 0xFFFF800000000000;
+    KernelRegion.Base = ARENA_BASE;
     KernelRegion.Size = ARENA_SIZE;
     KernelRegion.Next = NULL;
     BmMemoryArena = &KernelRegion;

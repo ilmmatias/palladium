@@ -10,7 +10,9 @@ if(ARCH STREQUAL "x86")
         ${ARCH}/display.c
         ${ARCH}/init.c
         ${ARCH}/keyboard.c
-        ${ARCH}/memory.c)
+        ${ARCH}/memory.c
+        ${ARCH}/transfer.asm
+        ${ARCH}/transfer.c)
 endif()
 
 add_executable(bootmgr "kstdlib"
@@ -27,12 +29,12 @@ add_executable(bootmgr "kstdlib"
     fs/stdio.c
     fs/vfs.c
 
+    loader/menu.c
     loader/palladium.c
 
     assert.c
     main.c
     memory.c
-    menu.c
     registry.c)
 
 target_include_directories(bootmgr PRIVATE include)

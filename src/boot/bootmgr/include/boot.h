@@ -9,10 +9,14 @@
 
 void BmInitStdio(void);
 void BmInitArch(void* BootBlock);
+[[noreturn]] void BmTransferExecution(
+    uint64_t VirtualAddress,
+    uint64_t PhysicalAddress,
+    uint64_t ImageSize,
+    uint64_t EntryPoint);
 
 void BmLoadMenuEntries(void);
 [[noreturn]] void BmEnterMenu(void);
-
-void BmLoadPalladium(const char* SystemFolder);
+[[noreturn]] void BmLoadPalladium(const char* SystemFolder);
 
 #endif /* _BOOT_H_ */
