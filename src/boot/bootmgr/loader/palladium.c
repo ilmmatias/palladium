@@ -121,12 +121,13 @@ static uint64_t LoadFile(const char *Path, uint64_t *VirtualAddress) {
 
     while (Size) {
         PeBaseRelocationBlock *BaseRelocationBlock = (PeBaseRelocationBlock *)Relocations;
-        uint32_t Entries = (BaseRelocationBlock->BlockSize - sizeof(PeBaseRelocationBlock)) >> 1;
+        char *BaseAddress = (char *)PhysicalAddress + BaseRelocationBlock->PageRva;
         uint16_t *BlockRelocations = (uint16_t *)(BaseRelocationBlock + 1);
+        uint32_t Entries = (BaseRelocationBlock->BlockSize - sizeof(PeBaseRelocationBlock)) >> 1;
 
         for (; Entries; Entries--) {
             uint16_t Type = *BlockRelocations >> 12;
-            void *Offset = (char *)PhysicalAddress + (*(BlockRelocations++) & 0xFFF);
+            void *Offset = BaseAddress + (*(BlockRelocations++) & 0xFFF);
 
             switch (Type) {
                 case IMAGE_REL_BASED_HIGH:
@@ -140,8 +141,7 @@ static uint64_t LoadFile(const char *Path, uint64_t *VirtualAddress) {
                     break;
                 case IMAGE_REL_BASED_HIGHADJ:
                     *((uint16_t *)Offset) += BaseDiff >> 16;
-                    *((uint16_t *)((char *)PhysicalAddress + (*(BlockRelocations++) & 0xFFF))) =
-                        BaseDiff;
+                    *((uint16_t *)(BaseAddress + (*(BlockRelocations++) & 0xFFF))) = BaseDiff;
                     break;
                 case IMAGE_REL_BASED_DIR64:
                     *((uint64_t *)Offset) += BaseDiff;
