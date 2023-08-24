@@ -1,8 +1,8 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
+#include <boot.h>
 #include <crt_impl.h>
-#include <display.h>
 #include <stdio.h>
 
 struct FILE *stdin = NULL;
@@ -25,14 +25,8 @@ void BmInitStdio(void) {
     stderr = fopen("console()", "w");
 
     if (!stdin || !stdout || !stderr) {
-        BmSetColor(0x4F);
-        BmInitDisplay();
-
-        BmPutString("An error occoured while trying to setup the boot manager environment.\n");
-        BmPutString("Could not setup one or more of the Standard I/O files.\n");
-
-        while (1)
-            ;
+        BmPanic("An error occoured while trying to setup the boot manager environment.\n"
+                "Could not setup one or more of the Standard I/O files.\n");
     }
 
     setbuf(stdin, NULL);

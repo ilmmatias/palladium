@@ -89,11 +89,11 @@ then
     sudo cp -Rf _root/System /mnt/mount/System 1>/dev/null
     sudo umount /mnt/mount 1>/dev/null
     echo "[5/5] Running emulator"
-    qemu-system-x86_64 -M smm=off -drive file=obj.amd64/ntfs.img,index=0,media=disk,format=raw -no-reboot 1>/dev/null
+    qemu-system-x86_64 -M smm=off -drive file=obj.amd64/ntfs.img,index=0,media=disk,format=raw -no-reboot -monitor stdio
 else
     mkisofs -iso-level 2 -R -b iso9660boot.com -no-emul-boot -o obj.amd64/iso9660.iso _root 1>/dev/null 2>&1
     echo "[5/5] Running emulator"
-    qemu-system-x86_64 -M smm=off -cdrom obj.amd64/iso9660.iso -no-reboot 1>/dev/null
+    qemu-system-x86_64 -M smm=off -cdrom obj.amd64/iso9660.iso -no-reboot -monitor stdio 1>/dev/null
 fi
 
 rm -rf _root

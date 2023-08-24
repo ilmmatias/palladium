@@ -12,6 +12,7 @@
 #define DISPLAY_COLOR_DEFAULT 0x07
 #define DISPLAY_COLOR_HIGHLIGHT 0x0F
 #define DISPLAY_COLOR_INVERSE 0x70
+#define DISPLAY_COLOR_PANIC 0x4F
 #else
 #error "Undefined ARCH for the bootmgr module!"
 #endif /* ARCH */

@@ -65,15 +65,8 @@ void BmLoadMenuEntries(void) {
     if (!TimeoutHeader || !SelectionHeader || !EntriesHeader ||
         TimeoutHeader->Type != REG_ENTRY_DWORD || SelectionHeader->Type != REG_ENTRY_DWORD ||
         EntriesHeader->Type != REG_ENTRY_KEY) {
-        BmSetColor(0x4F);
-        BmInitDisplay();
-
-        BmPutString("An error occoured while trying to setup the boot manager environment.\n");
-        BmPutString(
-            "The Boot Manager Registry file seems to be corrupt or of an invalid format.\n");
-
-        while (1)
-            ;
+        BmPanic("An error occoured while trying to setup the boot manager environment.\n"
+                "The Boot Manager Registry file seems to be corrupt or of an invalid format.\n");
     }
 
     for (int i = 0; OptionCount < 32; i++) {

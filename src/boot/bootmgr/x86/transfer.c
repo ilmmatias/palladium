@@ -1,6 +1,7 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
+#include <boot.h>
 #include <memory.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -82,6 +83,6 @@
         BiTransferExecution(Pml4, EntryPoint);
     } while (0);
 
-    while (1)
-        ;
+    BmPanic("An error occoured while trying to load the selected operating system.\n"
+            "Please, reboot your device and try again.\n");
 }

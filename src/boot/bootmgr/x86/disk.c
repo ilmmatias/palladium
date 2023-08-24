@@ -1,9 +1,9 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
+#include <boot.h>
 #include <crt_impl.h>
 #include <ctype.h>
-#include <display.h>
 #include <file.h>
 #include <stdalign.h>
 #include <stdio.h>
@@ -54,14 +54,8 @@ void BiosDetectDisks(BiosBootBlock *Data) {
     /* Sanity check, all our data should be below 640KB, but if it isn't its gonna break our
        BIOS read routines. */
     if (((uint32_t)ReadBuffer >> 4) > 0xFFFF) {
-        BmSetColor(0x4F);
-        BmInitDisplay();
-
-        BmPutString("An error occoured while trying to setup the boot manager environment.\n");
-        BmPutString("The disk read buffer is placed too high for BIOS usage.\n");
-
-        while (1)
-            ;
+        BmPanic("An error occoured while trying to setup the boot manager environment.\n"
+                "The disk read buffer is placed too high for BIOS usage.\n");
     }
 
     memset(&DriveParameters, 0, sizeof(DriveParameters));

@@ -183,12 +183,6 @@ LoadFile(const char *Path, uint64_t *VirtualAddress, uint64_t *EntryAddress, uin
         BmTransferExecution(VirtualAddress, PhysicalAddress, ImageSize, EntryPoint);
     } while (0);
 
-    BmSetColor(0x4F);
-    BmInitDisplay();
-
-    BmPutString("An error occoured while trying to load the selected operating system.\n");
-    BmPutString("Please, reboot your device and try again.\n");
-
-    while (1)
-        ;
+    BmPanic("An error occoured while trying to load the selected operating system.\n"
+            "Please, reboot your device and try again.\n");
 }

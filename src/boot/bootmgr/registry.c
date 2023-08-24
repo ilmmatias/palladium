@@ -1,7 +1,7 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
-#include <display.h>
+#include <boot.h>
 #include <registry.h>
 #include <rt.h>
 #include <stdlib.h>
@@ -22,14 +22,8 @@ RegHandle *BmBootRegistry = NULL;
 void BmInitRegistry(void) {
     BmBootRegistry = BmLoadRegistry("boot()/bootmgr.reg");
     if (!BmBootRegistry) {
-        BmSetColor(0x4F);
-        BmInitDisplay();
-
-        BmPutString("An error occoured while trying to setup the boot manager environment.\n");
-        BmPutString("Could not open the Boot Manager Registry file.\n");
-
-        while (1)
-            ;
+        BmPanic("An error occoured while trying to setup the boot manager environment.\n"
+                "Could not open the Boot Manager Registry file.\n");
     }
 }
 
