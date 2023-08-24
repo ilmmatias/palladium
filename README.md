@@ -7,9 +7,8 @@ At the moment we have no GUI, or nothing big other than a "Hello, World!" being 
 
 ## What already works
 
-1.  All the groundwork for the build system (which uses cmake) is already in place, and we can build at least the boot and sdk modules (which are the only ones we have at the moment).
-2.  We have boot sectors for ISO9660, FAT32, and exFAT; I've already experimented with EFI boot and booting other filesystems on BIOS, but for now those are the ones available in the source tree.
-3.  The startup module (which bootstraps us and gets all the PE sections loaded into the right place) is already functional, and bootmgr.exe can be loaded (though it doesn't do much yet).
+1.  We have boot sectors for ISO9660, FAT32, exFAT and NTFS; I've already experimented with EFI boot and booting other filesystems on BIOS, but for now those are the ones available in the source tree.
+3.  The boot manager (composed of the startup module and bootmgr.exe) is already functional, and can load up the kernel (while appying KASLR to the base address).
 
 ## How to build and run this?
 
