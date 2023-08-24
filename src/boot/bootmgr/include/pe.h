@@ -10,7 +10,6 @@
 
 #if defined(ARCH_x86) || defined(ARCH_amd64)
 #define PE_MACHINE 0x8664
-#define PE_MAGIC 0x20B
 #else
 #error "Undefined ARCH for the bootmgr module!"
 #endif
@@ -43,12 +42,7 @@ typedef struct __attribute__((packed)) {
     uint32_t SizeOfUninitializedData;
     uint32_t AddressOfEntryPoint;
     uint32_t BaseOfCode;
-#if defined(ARCH_x86) || defined(ARCH_amd64)
     uint64_t ImageBase;
-#else
-    uint32_t BaseOfData;
-    uint32_t ImageBase;
-#endif
     uint32_t SectionAlignment;
     uint32_t FileAlignment;
     uint16_t MajorOperatingSystemVersion;
@@ -63,17 +57,10 @@ typedef struct __attribute__((packed)) {
     uint32_t CheckSum;
     uint16_t Subsystem;
     uint16_t DllCharacteristics;
-#if defined(ARCH_x86) || defined(ARCH_amd64)
     uint64_t SizeOfStackReserve;
     uint64_t SizeOfStackCommit;
     uint64_t SizeOfHeapReserve;
     uint64_t SizeOfHeapCommit;
-#else
-    uint32_t SizeOfStackReserve;
-    uint32_t SizeOfStackCommit;
-    uint32_t SizeOfHeapReserve;
-    uint32_t SizeOfHeapCommit;
-#endif
     uint32_t LoaderFlags;
     uint32_t NumberOfRvaAndSizes;
     struct {

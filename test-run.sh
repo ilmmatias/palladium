@@ -58,7 +58,7 @@ then
     mcopy -i obj.amd64/fat32.img _root/bootmgr.reg ::/ 1>/dev/null
     mcopy -i obj.amd64/fat32.img _root/System ::/ 1>/dev/null
     echo "[5/5] Running emulator"
-    qemu-system-x86_64 -M smm=off -drive file=obj.amd64/fat32.img,index=0,media=disk,format=raw -no-reboot 1>/dev/null
+    qemu-system-x86_64 -enable-kvm -M smm=off -cpu host -drive file=obj.amd64/fat32.img,index=0,media=disk,format=raw -no-reboot 1>/dev/null
 elif [ "$1" == "exfat" ]
 then
     sudo rm -rf /mnt/mount
@@ -74,7 +74,7 @@ then
     sudo cp -Rf _root/System /mnt/mount/System 1>/dev/null
     sudo umount /mnt/mount 1>/dev/null
     echo "[5/5] Running emulator"
-    qemu-system-x86_64 -M smm=off -drive file=obj.amd64/exfat.img,index=0,media=disk,format=raw -no-reboot 1>/dev/null
+    qemu-system-x86_64 -enable-kvm -M smm=off -cpu host -drive file=obj.amd64/exfat.img,index=0,media=disk,format=raw -no-reboot 1>/dev/null
 elif [ "$1" == "ntfs" ]
 then
     sudo rm -rf /mnt/mount
@@ -89,11 +89,11 @@ then
     sudo cp -Rf _root/System /mnt/mount/System 1>/dev/null
     sudo umount /mnt/mount 1>/dev/null
     echo "[5/5] Running emulator"
-    qemu-system-x86_64 -M smm=off -drive file=obj.amd64/ntfs.img,index=0,media=disk,format=raw -no-reboot -monitor stdio
+    qemu-system-x86_64 -enable-kvm -M smm=off -cpu host -drive file=obj.amd64/ntfs.img,index=0,media=disk,format=raw -no-reboot 1>/dev/null
 else
     mkisofs -iso-level 2 -R -b iso9660boot.com -no-emul-boot -o obj.amd64/iso9660.iso _root 1>/dev/null 2>&1
     echo "[5/5] Running emulator"
-    qemu-system-x86_64 -M smm=off -cdrom obj.amd64/iso9660.iso -no-reboot -monitor stdio 1>/dev/null
+    qemu-system-x86_64 -enable-kvm -M smm=off -cpu host -cdrom obj.amd64/iso9660.iso -no-reboot 1>/dev/null
 fi
 
 rm -rf _root

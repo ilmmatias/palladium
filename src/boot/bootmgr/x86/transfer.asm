@@ -26,8 +26,8 @@ _BiTransferExecution proc
     or eax, 20h
     mov cr4, eax
 
-    ; Enable the paging flag; CR3 will be set as well, but won't take effect until we jump into
-    ; a LM descriptor.
+    ; Enable the paging flag; CR3 is set first, otherwise we'll page fault trying to resolve the
+    ; current address.
     mov eax, [esp + 4]
     mov cr3, eax
     mov eax, cr0
@@ -44,15 +44,13 @@ _BiTransferExecution$Finish:
     mov ax, 10h
     mov ds, ax
     mov es, ax
-    mov fs, ax
-    mov gs, ax
     mov ss, ax
 
     ; Grab the return address.
     db 48h, 83h, 0C4h, 08h ; add rsp, 8
     pop eax
 
-    ; Setup a proper aligned stack (16-bytes alignemnt after JMP), and jump execution.
+    ; Setup a proper aligned stack (16-bytes alignemnt), and jump execution.
     db 48h, 0C7h, 0C4h, 00h, 7Ch, 00h, 00h
     jmp eax
 _BiTransferExecution endp

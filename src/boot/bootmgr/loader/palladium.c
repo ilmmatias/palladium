@@ -48,7 +48,8 @@ LoadFile(const char *Path, uint64_t *VirtualAddress, uint64_t *EntryAddress, uin
     /* Following the information at https://learn.microsoft.com/en-us/windows/win32/debug/pe-format
        for the implementation. */
     if (memcmp(Header->Signature, PE_SIGNATURE, 4) || Header->Machine != PE_MACHINE ||
-        Header->Magic != PE_MAGIC) {
+        (Header->Characteristics & 0x2000) || Header->Magic != 0x20B || Header->Subsystem != 1 ||
+        (Header->DllCharacteristics & 0x160) != 0x160) {
         return 0;
     }
 
@@ -163,6 +164,9 @@ LoadFile(const char *Path, uint64_t *VirtualAddress, uint64_t *EntryAddress, uin
     BmInitDisplay();
 
     do {
+        /* This should BmPanic() on incompatible machines, no need for a return code. */
+        BmCheckCompatibility();
+
         size_t KernelPathSize = strlen(SystemFolder) + 12;
         char *KernelPath = malloc(KernelPathSize);
         if (!KernelPath) {

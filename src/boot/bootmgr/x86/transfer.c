@@ -37,13 +37,12 @@
         uint64_t *LateIdentPdpt = BmAllocatePages(1, MEMORY_KERNEL);
         uint64_t *KernelPdpt = BmAllocatePages(1, MEMORY_KERNEL);
         uint64_t *EarlyIdentPdt = BmAllocatePages(1, MEMORY_KERNEL);
-        uint64_t *LateIdentPdt = BmAllocatePages(512, MEMORY_KERNEL);
         uint64_t *KernelPdt = BmAllocatePages(1, MEMORY_KERNEL);
 
         /* There is really no actual problem with big image sizes, we'd just need to allocate
            more PDTs if we wanted to, but just crash/assume invalid image for now.*/
         if (!Pml4 || !EarlyIdentPdpt || !LateIdentPdpt || !KernelPdpt || !EarlyIdentPdt ||
-            !LateIdentPdt || !KernelPdt || ImageSize >= 0x40000000) {
+            !KernelPdt || ImageSize >= 0x40000000) {
             break;
         }
 
@@ -61,8 +60,8 @@
         EarlyIdentPdpt[0] = (uint64_t)EarlyIdentPdt | 0x03;
 
         memset(LateIdentPdpt, 0, PAGE_SIZE);
-        for (int i = 0; i < 512; i++) {
-            LateIdentPdpt[i] = ((uint64_t)LateIdentPdt + (i << PAGE_SHIFT)) | 0x03;
+        for (uint64_t i = 0; i < 512; i++) {
+            LateIdentPdpt[i] = (i * 0x40000000) | 0x83;
         }
 
         memset(KernelPdpt, 0, PAGE_SIZE);
@@ -70,9 +69,6 @@
 
         memset(EarlyIdentPdt, 0, PAGE_SIZE);
         EarlyIdentPdt[0] = 0x83;
-        for (int i = 0; i < 262144; i++) {
-            LateIdentPdt[i] = (i << LARGE_PAGE_SHIFT) | 0x83;
-        }
 
         memset(KernelPdt, 0, PAGE_SIZE);
         for (uint64_t i = 0; i < ImageSize >> LARGE_PAGE_SHIFT; i++) {
