@@ -5,8 +5,8 @@
 #include <string.h>
 #include <x86/bios.h>
 
-static BiosMemoryRegion *BiosMemoryMap = NULL;
-static uint32_t BiosMemoryMapEntries = 0;
+BiosMemoryRegion *BiosMemoryMap = NULL;
+uint32_t BiosMemoryMapEntries = 0;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:

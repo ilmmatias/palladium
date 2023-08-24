@@ -10,7 +10,7 @@
 #if defined(ARCH_x86) || defined(ARCH_amd64)
 #define PAGE_SHIFT 12
 #define LARGE_PAGE_SHIFT 21
-#define ARENA_BASE 0xFFFF808000000000
+#define ARENA_BASE 0xFFFF810000000000
 #define ARENA_BITS 39
 #else
 #error "Undefined ARCH for the bootmgr module!"

@@ -5,9 +5,26 @@
 #include <memory.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <x86/bios.h>
 
-[[noreturn]] void BiTransferExecution(uint64_t *Pml4, uint64_t EntryPoint);
+#define LOADER_MAGIC "BMGR"
+#define LOADER_CURRENT_VERSION 0x00
+
+typedef struct __attribute__((packed)) {
+    char Magic[4];
+    uint8_t Version;
+    struct {
+        uint64_t BaseAddress;
+        uint32_t Count;
+    } MemoryMap;
+} LoaderBootData;
+
+extern BiosMemoryRegion *BiosMemoryMap;
+extern uint32_t BiosMemoryMapEntries;
+
+[[noreturn]] void BiTransferExecution(uint64_t *Pml4, uint64_t EntryPoint, uint64_t BootData);
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -38,11 +55,12 @@
         uint64_t *KernelPdpt = BmAllocatePages(1, MEMORY_KERNEL);
         uint64_t *EarlyIdentPdt = BmAllocatePages(1, MEMORY_KERNEL);
         uint64_t *KernelPdt = BmAllocatePages(1, MEMORY_KERNEL);
+        LoaderBootData *BootData = malloc(sizeof(LoaderBootData));
 
         /* There is really no actual problem with big image sizes, we'd just need to allocate
            more PDTs if we wanted to, but just crash/assume invalid image for now.*/
         if (!Pml4 || !EarlyIdentPdpt || !LateIdentPdpt || !KernelPdpt || !EarlyIdentPdt ||
-            !KernelPdt || ImageSize >= 0x40000000) {
+            !KernelPdt || !BootData || ImageSize >= 0x40000000) {
             break;
         }
 
@@ -50,10 +68,12 @@
            crash upon entering long mode).
            Right after the higher half barrier, we have the actual identity mapping (supporting up
            to 512 GiB, all mapped by default).
+           After that, we have the recursive mapping of the paging structs (for fast access).
            The kernel is mapped at last, in whichever location the ASLR layer chose. */
         memset(Pml4, 0, PAGE_SIZE);
         Pml4[0] = (uint64_t)EarlyIdentPdpt | 0x03;
         Pml4[256] = (uint64_t)LateIdentPdpt | 0x03;
+        Pml4[257] = (uint64_t)Pml4 | 0x03;
         Pml4[(VirtualAddress >> 39) & 0x1FF] = (uint64_t)KernelPdpt | 0x03;
 
         memset(EarlyIdentPdpt, 0, PAGE_SIZE);
@@ -76,7 +96,14 @@
                 (PhysicalAddress + (i << LARGE_PAGE_SHIFT)) | 0x83;
         }
 
-        BiTransferExecution(Pml4, EntryPoint);
+        /* Mount the OS-specific boot data, and enter assembly land to get into long mode.  */
+
+        memcpy(BootData->Magic, LOADER_MAGIC, 4);
+        BootData->Version = LOADER_CURRENT_VERSION;
+        BootData->MemoryMap.BaseAddress = (uint64_t)BiosMemoryMap + 0xFFFF800000000000;
+        BootData->MemoryMap.Count = BiosMemoryMapEntries;
+
+        BiTransferExecution(Pml4, EntryPoint, (uint64_t)BootData + 0xFFFF800000000000);
     } while (0);
 
     BmPanic("An error occoured while trying to load the selected operating system.\n"

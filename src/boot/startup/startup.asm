@@ -261,13 +261,12 @@ Relocate$Load:
 Relocate$Transfer:
     pop eax
     and esp, -16
-    sub esp, 8
+    sub esp, 4
     push eax
 
     mov eax, dword ptr [ebx + 40]
     add eax, dword ptr [ebx + 52]
-    call eax
-
+    jmp eax
     jmp $
 Relocate endp
 

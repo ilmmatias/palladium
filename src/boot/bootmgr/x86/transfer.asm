@@ -10,6 +10,7 @@
 ; PARAMETERS:
 ;     Pml4 (esp + 4) - Physical address of the PML4 structure.
 ;     EntryPoint (esp + 8) - Virtual address (64-bits) where the kernel entry is located.
+;     BootData (esp + 16) - Virtual address (64-bits) where the loader boot data is located.
 ;
 ; RETURN VALUE:
 ;     Does not return.
@@ -46,9 +47,10 @@ _BiTransferExecution$Finish:
     mov es, ax
     mov ss, ax
 
-    ; Grab the return address.
+    ; Skip the return address and Pml4, so that we can grab the entry point + boot data.
     db 48h, 83h, 0C4h, 08h ; add rsp, 8
     pop eax
+    pop ecx
 
     ; Setup a proper aligned stack (16-bytes alignemnt), and jump execution.
     db 48h, 0C7h, 0C4h, 00h, 7Ch, 00h, 00h
