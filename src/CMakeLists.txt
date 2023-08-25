@@ -21,6 +21,7 @@ else()
 endif()
 
 if (NOT ARCH STREQUAL "x86")
+    add_subdirectory(drivers)
     add_subdirectory(kernel)
 endif()
 

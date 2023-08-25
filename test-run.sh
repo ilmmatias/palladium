@@ -48,6 +48,10 @@ obj.host/create-boot-registry
 cp obj.x86/boot/bootsect/iso9660boot.com _root/iso9660boot.com
 cat obj.x86/boot/startup/startup.com obj.x86/boot/bootmgr/bootmgr.exe > _root/bootmgr
 cp obj.amd64/kernel/kernel.exe _root/System/kernel.exe
+cp obj.amd64/drivers/exfat/exfat.sys _root/System/exfat.sys
+cp obj.amd64/drivers/fat32/fat32.sys _root/System/fat32.sys
+cp obj.amd64/drivers/iso9660/iso9660.sys _root/System/iso9660.sys
+cp obj.amd64/drivers/ntfs/ntfs.sys _root/System/ntfs.sys
 
 if [ "$1" == "fat32" ]
 then

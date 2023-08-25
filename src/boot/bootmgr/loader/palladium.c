@@ -197,7 +197,8 @@ static uint64_t LoadFile(
         /* This should BmPanic() on incompatible machines, no need for a return code. */
         BmCheckCompatibility();
 
-        size_t KernelPathSize = strlen(SystemFolder) + 12;
+        size_t SystemFolderSize = strlen(SystemFolder);
+        size_t KernelPathSize = SystemFolderSize + 12;
         char *KernelPath = malloc(KernelPathSize);
         char *RegistryPath = malloc(KernelPathSize);
         if (!KernelPath || !RegistryPath) {
@@ -257,6 +258,7 @@ static uint64_t LoadFile(
             &EntryPoint,
             &Images[0].ImageSize,
             &Images[0].PageFlags);
+
         if (!Images[0].PhysicalAddress) {
             Message = "An error occoured while trying to load the selected operating system.\n"
                       "The kernel file inside the System folder is invalid or corrupted.\n";
@@ -264,6 +266,10 @@ static uint64_t LoadFile(
         }
 
         /* Second pass, load up all the drivers, solving any driver->kernel imports. */
+        int Fail = 0;
+
+        DriverCount = 0;
+
         for (int i = 0;; i++) {
             RegEntryHeader *Entry = BmGetRegistryEntry(Handle, DriverEntries, i);
 
@@ -274,9 +280,36 @@ static uint64_t LoadFile(
                 !*((uint32_t *)((char *)Entry + Entry->Length - 4))) {
                 continue;
             }
+
+            size_t DriverPathSize = SystemFolderSize + strlen((char *)(Entry + 1)) + 2;
+            char *DriverPath = malloc(DriverPathSize);
+            if (!DriverPath) {
+                Fail = 1;
+                break;
+            }
+
+            snprintf(DriverPath, DriverPathSize, "%s/%s", SystemFolder, Entry + 1);
+
+            Images[DriverCount + 1].PhysicalAddress = LoadFile(
+                KernelPath,
+                &Images[DriverCount + 1].VirtualAddress,
+                NULL,
+                &Images[DriverCount + 1].ImageSize,
+                &Images[DriverCount + 1].PageFlags);
+
+            if (!Images[++DriverCount].PhysicalAddress) {
+                Message = "An error occoured while trying to load the selected operating system.\n"
+                          "One of the boot-time drivers is invalid or corrupted.\n";
+                Fail = 1;
+                break;
+            }
         }
 
-        BmTransferExecution(Images, /*DriverCount + */ 1, EntryPoint);
+        if (Fail) {
+            break;
+        }
+
+        BmTransferExecution(Images, DriverCount + 1, EntryPoint);
     } while (0);
 
     BmPanic(Message);
