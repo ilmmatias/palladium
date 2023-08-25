@@ -31,18 +31,39 @@ void BmInitArch(void *BootBlock) {
     BiosBootBlock *Data = (BiosBootBlock *)BootBlock;
     BiosDetectDisks(Data);
 
-    /* We're not sure if rdseed (true RNG) or rdrand is available; Seed the PRNG using the clock
-       cycle counter. */
-    uint64_t Seed;
-    __asm__ volatile("rdtsc" : "=A"(Seed));
-    __srand64(Seed);
-
     /* Seed virtual region allocator with a single region, containing all the high/kernel
        space. */
     KernelRegion.Base = ARENA_BASE;
     KernelRegion.Size = ARENA_SIZE;
     KernelRegion.Next = NULL;
     BmMemoryArena = &KernelRegion;
+
+    /* RDSEED is seemingly a non determistic RNG, and we can use that to seed the PRNG on any new
+       enough computer (it's VERY slow, so we should only use it as seed).
+       RDRAND is a bit more supported, but gives no direct access to the hardware RNG.
+       TSC/cycle counter is the last option, and should be supported on pretty much everything. */
+
+    uint32_t SeedLow = 1, SeedHigh = 0;
+    uint32_t Eax, Ebx, Ecx, Edx;
+
+    do {
+        __get_cpuid_count(7, 0, &Eax, &Ebx, &Ecx, &Edx);
+        if (Ebx & bit_RDSEED) {
+            __asm__ volatile("rdseed %0" : "=r"(SeedLow));
+            __asm__ volatile("rdseed %0" : "=r"(SeedHigh));
+            break;
+        }
+
+        __cpuid(1, Eax, Ebx, Ecx, Edx);
+        if (Ecx & bit_RDRND) {
+            __asm__ volatile("rdrand %0" : "=r"(SeedLow));
+            __asm__ volatile("rdrand %0" : "=r"(SeedHigh));
+        } else if (Edx & bit_TSC) {
+            __asm__ volatile("rdtsc" : "=a"(SeedLow), "=d"(SeedHigh));
+        }
+    } while (0);
+
+    __srand64(((uint64_t)SeedHigh << 32) | SeedLow);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -56,12 +77,12 @@ void BmInitArch(void *BootBlock) {
  *     None; Does not return if the host is incompatible.
  *-----------------------------------------------------------------------------------------------*/
 void BmCheckCompatibility(void) {
-    uint32_t Eax, Ebx, Ecx, Edx;
-
     /* Palladium targets at least an Intel Haswell (4th gen) processor, or an AMD Zen (1st gen)
        processor. As such, we can assume the host should have at least SSE4.2, AVX2, BMI2, LM,
        XSAVE.
        If all those features are available, we're assuming this is a support processor. */
+
+    uint32_t Eax, Ebx, Ecx, Edx;
 
     __cpuid(1, Eax, Ebx, Ecx, Edx);
     if (!(Ecx & bit_SSE42)) {

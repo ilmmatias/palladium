@@ -13,21 +13,21 @@ MemoryArena *BmMemoryArena = NULL;
  *     This function allocates a range of virtual addresses, randomizing the high bits if possible.
  *
  * PARAMETERS:
- *     LargePages - Amount of large pages, size of each one is given in memory.h.
+ *     Pages - Amount of pages, size of each one is given in memory.h.
  *
  * RETURN VALUE:
  *     Allocated address, or 0 if no address was found.
  *-----------------------------------------------------------------------------------------------*/
-uint64_t BmAllocateVirtualAddress(uint64_t LargePages) {
-    if (!LargePages) {
+uint64_t BmAllocateVirtualAddress(uint64_t Pages) {
+    if (!Pages) {
         return 0;
     }
 
     /* Generate a random sequence, fit it inside the arena size, and then strip the low page
        bits. */
     uint64_t RandomBits = __rand64();
-    uint64_t Address = ARENA_BASE + (RandomBits & ((ARENA_SIZE - 1) & ~(LARGE_PAGE_SIZE - 1)));
-    uint64_t Size = LargePages << LARGE_PAGE_SHIFT;
+    uint64_t Address = ARENA_BASE + (RandomBits & ((ARENA_SIZE - 1) & ~(PAGE_SIZE - 1)));
+    uint64_t Size = Pages << PAGE_SHIFT;
 
     MemoryArena *Entry = BmMemoryArena;
     MemoryArena *Closest = NULL;

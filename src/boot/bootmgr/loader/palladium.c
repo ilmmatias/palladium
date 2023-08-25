@@ -25,8 +25,12 @@
  * RETURN VALUE:
  *     Physical address of the image, or 0 if we failed to load it.
  *-----------------------------------------------------------------------------------------------*/
-static uint64_t
-LoadFile(const char *Path, uint64_t *VirtualAddress, uint64_t *EntryAddress, uint64_t *ImageSize) {
+static uint64_t LoadFile(
+    const char *Path,
+    uint64_t *VirtualAddress,
+    uint64_t *EntryAddress,
+    uint64_t *ImageSize,
+    int **PageFlags) {
     FILE *Stream = fopen(Path, "rb");
     if (!Stream) {
         return 0;
@@ -53,15 +57,20 @@ LoadFile(const char *Path, uint64_t *VirtualAddress, uint64_t *EntryAddress, uin
         return 0;
     }
 
-    uint64_t LargePages = (Header->SizeOfImage + LARGE_PAGE_SIZE - 1) >> LARGE_PAGE_SHIFT;
-    *ImageSize = LargePages << LARGE_PAGE_SHIFT;
+    uint64_t Pages = (Header->SizeOfImage + PAGE_SIZE - 1) >> PAGE_SHIFT;
+    *ImageSize = Pages << PAGE_SHIFT;
 
-    void *PhysicalAddress = BmAllocatePages(*ImageSize >> PAGE_SHIFT, MEMORY_KERNEL_LARGE);
+    *PageFlags = calloc(Pages, sizeof(int));
+    if (!*PageFlags) {
+        return 0;
+    }
+
+    void *PhysicalAddress = BmAllocatePages(*ImageSize >> PAGE_SHIFT, MEMORY_KERNEL);
     if (!PhysicalAddress) {
         return 0;
     }
 
-    *VirtualAddress = BmAllocateVirtualAddress(LargePages);
+    *VirtualAddress = BmAllocateVirtualAddress(Pages);
     if (!*VirtualAddress) {
         return 0;
     }
@@ -84,6 +93,20 @@ LoadFile(const char *Path, uint64_t *VirtualAddress, uint64_t *EntryAddress, uin
         (PeSectionHeader *)((char *)PhysicalAddress + Offset + Header->SizeOfOptionalHeader + 24);
 
     for (uint16_t i = 0; i < Header->NumberOfSections; i++) {
+        /* W^X, the kernel should have been compiled in a way that this is valid. */
+        int Flags = Sections[i].Characteristics & 0x20000000   ? PAGE_EXEC
+                    : Sections[i].Characteristics & 0x80000000 ? PAGE_WRITE
+                                                               : 0;
+
+        uint32_t Size = Sections[i].VirtualSize;
+        if (Sections[i].SizeOfRawData > Size) {
+            Size = Sections[i].SizeOfRawData;
+        }
+
+        for (uint32_t Page = 0; Page < ((Size + PAGE_SIZE - 1) >> PAGE_SHIFT); Page++) {
+            (*PageFlags)[(Sections[i].VirtualAddress >> PAGE_SHIFT) + Page] = Flags;
+        }
+
         if (fseek(Stream, Sections[i].PointerToRawData, SEEK_SET) ||
             fread(
                 (char *)PhysicalAddress + Sections[i].VirtualAddress,
@@ -179,12 +202,14 @@ LoadFile(const char *Path, uint64_t *VirtualAddress, uint64_t *EntryAddress, uin
         uint64_t VirtualAddress;
         uint64_t EntryPoint;
         uint64_t ImageSize;
-        uint64_t PhysicalAddress = LoadFile(KernelPath, &VirtualAddress, &EntryPoint, &ImageSize);
+        int *PageFlags;
+        uint64_t PhysicalAddress =
+            LoadFile(KernelPath, &VirtualAddress, &EntryPoint, &ImageSize, &PageFlags);
         if (!PhysicalAddress) {
             break;
         }
 
-        BmTransferExecution(VirtualAddress, PhysicalAddress, ImageSize, EntryPoint);
+        BmTransferExecution(VirtualAddress, PhysicalAddress, ImageSize, EntryPoint, PageFlags);
     } while (0);
 
     BmPanic("An error occoured while trying to load the selected operating system.\n"

@@ -59,7 +59,6 @@ void BmInitMemory(void *BootBlock) {
  *-----------------------------------------------------------------------------------------------*/
 void *BmAllocatePages(size_t Pages, int Type) {
     size_t Size = Pages << PAGE_SHIFT;
-    int IsLarge = Type == MEMORY_KERNEL_LARGE;
 
     if (Type == MEMORY_BOOT) {
         Type = BIOS_MEMORY_REGION_TYPE_USED;
@@ -70,73 +69,38 @@ void *BmAllocatePages(size_t Pages, int Type) {
     for (uint32_t i = 0; i < BiosMemoryMapEntries; i++) {
         BiosMemoryRegion *Region = &BiosMemoryMap[i];
 
-        if (Region->Type != BIOS_MEMORY_REGION_TYPE_AVAILABLE) {
+        if (Region->Type != BIOS_MEMORY_REGION_TYPE_AVAILABLE || Region->Length < Size) {
             continue;
         }
 
-        /* Large regions need to start at a 2MiB boundary; Other regions can follow the usual
-           4KiB boundary. */
-        if (Region->Length < Size) {
-            continue;
-        }
+        /* TODO: This is not the right way of doing this, we should use a linked list
+         * instead. We have three cases to take into consideration: Exact match (consuming
+         * the rest of this entry); Just flip the type to USED. End of the list; This entry
+         * becomes USED, and takes the exact size of the allocated region; A new region is
+         * added to the end, containing the remaining AVAILABLE memory. Middle of the list;
+         * We need to memmove the entire list first (this is the TODO/to optimize part),
+         * before executing the same procedure as above. */
 
-        if (!IsLarge || !(Region->BaseAddress & (LARGE_PAGE_SIZE - 1))) {
-            /* TODO: This is not the right way of doing this, we should use a linked list
-             * instead. We have three cases to take into consideration: Exact match (consuming
-             * the rest of this entry); Just flip the type to USED. End of the list; This entry
-             * becomes USED, and takes the exact size of the allocated region; A new region is
-             * added to the end, containing the remaining AVAILABLE memory. Middle of the list;
-             * We need to memmove the entire list first (this is the TODO/to optimize part),
-             * before executing the same procedure as above. */
-
-            if (Region->Length == Size) {
-                Region->Type = Type;
-                return (void *)Region->BaseAddress;
-            } else if (i != BiosMemoryMapEntries - 1) {
-                memmove(
-                    Region + 2,
-                    Region + 1,
-                    (BiosMemoryMapEntries - i - 1) * sizeof(BiosMemoryRegion));
-            }
-
-            BiosMemoryRegion *NewRegion = Region + 1;
-
-            NewRegion->BaseAddress = Region->BaseAddress + Size;
-            NewRegion->Length = Region->Length - Size;
-            NewRegion->Type = BIOS_MEMORY_REGION_TYPE_AVAILABLE;
-
-            Region->Length = Size;
+        if (Region->Length == Size) {
             Region->Type = Type;
-
-            BiosMemoryMapEntries += 1;
-
             return (void *)Region->BaseAddress;
-        }
-
-        uint64_t RequiredBaseDiff = LARGE_PAGE_SIZE - (Region->BaseAddress & (LARGE_PAGE_SIZE - 1));
-
-        if (Region->Length - RequiredBaseDiff < Size) {
-            continue;
         } else if (i != BiosMemoryMapEntries - 1) {
             memmove(
-                Region + 3, Region + 1, (BiosMemoryMapEntries - i - 1) * sizeof(BiosMemoryRegion));
+                Region + 2, Region + 1, (BiosMemoryMapEntries - i - 1) * sizeof(BiosMemoryRegion));
         }
 
-        BiosMemoryRegion *DesiredRegion = Region + 1;
-        BiosMemoryRegion *RemainingRegion = Region + 2;
-        size_t OriginalSize = Region->Length;
+        BiosMemoryRegion *NewRegion = Region + 1;
 
-        DesiredRegion->BaseAddress = Region->BaseAddress + RequiredBaseDiff;
-        DesiredRegion->Length = Size;
-        DesiredRegion->Type = Type;
+        NewRegion->BaseAddress = Region->BaseAddress + Size;
+        NewRegion->Length = Region->Length - Size;
+        NewRegion->Type = BIOS_MEMORY_REGION_TYPE_AVAILABLE;
 
-        Region->Length = RequiredBaseDiff;
+        Region->Length = Size;
+        Region->Type = Type;
 
-        RemainingRegion->BaseAddress = DesiredRegion->BaseAddress + Size;
-        RemainingRegion->Length = OriginalSize - RequiredBaseDiff - Size;
-        RemainingRegion->Type = BIOS_MEMORY_REGION_TYPE_AVAILABLE;
+        BiosMemoryMapEntries += 1;
 
-        return (void *)DesiredRegion->BaseAddress;
+        return (void *)Region->BaseAddress;
     }
 
     return NULL;
@@ -145,7 +109,7 @@ void *BmAllocatePages(size_t Pages, int Type) {
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function returns the specified range of pages for use by the allocator.
- *     The pages should have been allocated as MEMORY_BOOT instead of MEMORY_KERNEL(_LARGE).
+ *     The pages should have been allocated as MEMORY_BOOT instead of MEMORY_KERNEL.
  *
  * PARAMETERS:
  *     Base - Base address returned by BmAllocatePages.

@@ -16,10 +16,10 @@
 ;     Does not return.
 ;--------------------------------------------------------------------------------------------------
 _BiTransferExecution proc
-    ; Enable long mode in the EFER.
+    ; Enable long mode and no-execute (for W^X) in the EFER.
     mov ecx, 0C0000080h
     rdmsr
-    or eax, 100h
+    or eax, 900h
     wrmsr
 
     ; Enable PAE (physical address extension); Required for long mode.
@@ -32,7 +32,7 @@ _BiTransferExecution proc
     mov eax, [esp + 4]
     mov cr3, eax
     mov eax, cr0
-    or eax, 80000000h
+    or eax, 80010000h
     mov cr0, eax
 
     ; The GDT last 2 entries should be 64-bits descriptors, so just long ret into 64-bits mode.

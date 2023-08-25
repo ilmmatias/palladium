@@ -7,6 +7,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#define PAGE_WRITE 0x01
+#define PAGE_EXEC 0x02
+
 void BmInitStdio(void);
 void BmInitArch(void* BootBlock);
 
@@ -19,7 +22,8 @@ void BmCheckCompatibility(void);
     uint64_t VirtualAddress,
     uint64_t PhysicalAddress,
     uint64_t ImageSize,
-    uint64_t EntryPoint);
+    uint64_t EntryPoint,
+    int* PageFlags);
 
 [[noreturn]] void BmPanic(const char* Message);
 
