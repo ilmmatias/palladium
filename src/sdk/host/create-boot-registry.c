@@ -351,7 +351,7 @@ static int CreateSubKey(
  * RETURN VALUE:
  *     Non-zero on failure, zero otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int main(void) {
+int CreateBootRegistry(void) {
     FILE *Stream = CreateRegistry("_root/bootmgr.reg");
     if (!Stream) {
         return 1;
@@ -387,4 +387,55 @@ int main(void) {
 
     fclose(Stream);
     return 0;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function creates a kernel registry file, tuned for all configs supported by
+ *     test-run.sh.
+ *
+ * PARAMETERS:
+ *     None.
+ *
+ * RETURN VALUE:
+ *     Non-zero on failure, zero otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+int CreateKernelRegistry(void) {
+    FILE *Stream = CreateRegistry("_root/System/kernel.reg");
+    if (!Stream) {
+        return 1;
+    }
+
+    uint32_t Root = sizeof(RegFileHeader);
+    uint32_t Entries;
+    if (!CreateSubKey(Stream, Root, "Drivers", &Entries)) {
+        fclose(Stream);
+        return 1;
+    }
+
+    if (!CreateIntegerKey(Stream, Entries, "exfat.sys", REG_ENTRY_DWORD, 1) ||
+        !CreateIntegerKey(Stream, Entries, "fat32.sys", REG_ENTRY_DWORD, 1) ||
+        !CreateIntegerKey(Stream, Entries, "iso9660.sys", REG_ENTRY_DWORD, 1) ||
+        !CreateIntegerKey(Stream, Entries, "ntfs.sys", REG_ENTRY_DWORD, 1)) {
+        fclose(Stream);
+        return 1;
+    }
+
+    fclose(Stream);
+    return 0;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function creates a standard boot registry file, saving it to $pwd/_root/bootmgr.reg.
+ *
+ * PARAMETERS:
+ *     None.
+ *
+ * RETURN VALUE:
+ *     Non-zero on failure, zero otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+int main(void) {
+    CreateBootRegistry();
+    CreateKernelRegistry();
 }

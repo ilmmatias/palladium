@@ -28,38 +28,84 @@ extern uint32_t BiosMemoryMapEntries;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
+ *     This function maps up a kernel or kernel driver page, allocating and filling the page map
+ *     along the way.
+ *
+ * PARAMETERS:
+ *     Pml4 - Base physical address of the page map.
+ *     VirtualAddress - Virtual address/destination for the page.
+ *     PhysicalAddress - Physical page where the data is located.
+ *     PageFlags - Page flags (from boot.h), will be converted into valid flags by us.
+ *
+ * RETURN VALUE:
+ *     0 on failure, 1 otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+static int
+MapPage(uint64_t *Pml4, uint64_t VirtualAddress, uint64_t PhysicalAddress, int PageFlags) {
+    uint64_t Pml4Entry = (VirtualAddress >> 39) & 0x1FF;
+    uint64_t PdptEntry = (VirtualAddress >> 30) & 0x1FF;
+    uint64_t PdtEntry = (VirtualAddress >> 21) & 0x1FF;
+    uint64_t PtEntry = (VirtualAddress >> 12) & 0x1FF;
+
+    uint64_t *Pdpt = (uint64_t *)(Pml4[Pml4Entry] & ~0x7FF8000000000FFF);
+    if (!(Pml4[Pml4Entry] & 0x01)) {
+        Pdpt = (uint64_t *)BmAllocatePages(1, MEMORY_KERNEL);
+        Pml4[Pml4Entry] = (uint64_t)Pdpt | 0x03;
+        if (!Pdpt) {
+            return 0;
+        }
+    }
+
+    uint64_t *Pdt = (uint64_t *)(Pdpt[PdptEntry] & ~0x7FF8000000000FFF);
+    if (!(Pdpt[PdptEntry] & 0x01)) {
+        Pdt = (uint64_t *)BmAllocatePages(1, MEMORY_KERNEL);
+        Pdpt[PdptEntry] = (uint64_t)Pdt | 0x03;
+        if (!Pdt) {
+            return 0;
+        }
+    }
+
+    uint64_t *Pt = (uint64_t *)(Pdt[PdtEntry] & ~0x7FF8000000000FFF);
+    if (!(Pdt[PdtEntry] & 0x01)) {
+        Pt = (uint64_t *)BmAllocatePages(1, MEMORY_KERNEL);
+        Pdt[PdtEntry] = (uint64_t)Pt | 0x03;
+        if (!Pt) {
+            return 0;
+        }
+    }
+
+    Pt[PtEntry] = PhysicalAddress | (PageFlags & PAGE_WRITE     ? 0x8000000000000003
+                                     : !(PageFlags & PAGE_EXEC) ? 0x8000000000000001
+                                                                : 0x01);
+
+    return 1;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
  *     This function sets up the paging structures, and prepares to put the processor in the
  *     correct state to jump into the kernel.
  *
  * PARAMETERS:
- *     VirtualAddress - Higher half virtual address where the kernel should be located.
- *     PhysicalAddress - Physical location of the kernel.
- *     ImageSize - Rounded up size of all sections of the kernel + headers.
+ *     Images - List containing all memory regions we need to map.
+ *     ImageCount - How many entries the image list has.
  *     EntryPoint - Virtual address where the kernel entry point should be located.
  *
  * RETURN VALUE:
  *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
-[[noreturn]] void BmTransferExecution(
-    uint64_t VirtualAddress,
-    uint64_t PhysicalAddress,
-    uint64_t ImageSize,
-    uint64_t EntryPoint,
-    int *PageFlags) {
+[[noreturn]] void BmTransferExecution(LoadedImage *Images, size_t ImageCount, uint64_t EntryPoint) {
     /* TODO: Add support for PML5 (under compatible processors). */
 
     do {
+        int Fail = 0;
         uint64_t *Pml4 = BmAllocatePages(1, MEMORY_KERNEL);
         uint64_t *EarlyIdentPdpt = BmAllocatePages(1, MEMORY_KERNEL);
         uint64_t *LateIdentPdpt = BmAllocatePages(1, MEMORY_KERNEL);
-        uint64_t *KernelPdpt = BmAllocatePages(1, MEMORY_KERNEL);
         uint64_t *EarlyIdentPdt = BmAllocatePages(1, MEMORY_KERNEL);
-        uint64_t *KernelPdt = BmAllocatePages(1, MEMORY_KERNEL);
-        uint64_t *KernelPt = BmAllocatePages((ImageSize + 0x1FFFFF) >> 21, MEMORY_KERNEL);
         LoaderBootData *BootData = malloc(sizeof(LoaderBootData));
 
-        if (!Pml4 || !EarlyIdentPdpt || !LateIdentPdpt || !KernelPdpt || !EarlyIdentPdt ||
-            !KernelPdt || !BootData || ImageSize >= 0x40000000) {
+        if (!Pml4 || !EarlyIdentPdpt || !LateIdentPdpt || !EarlyIdentPdt || !BootData) {
             break;
         }
 
@@ -68,11 +114,11 @@ extern uint32_t BiosMemoryMapEntries;
            Right after the higher half barrier, we have the actual identity mapping (supporting up
            to 512 GiB, all mapped by default).
            After that, we have the recursive mapping of the paging structs (for fast access).
-           The kernel is mapped at last, in whichever location the ASLR layer chose. */
+           The kernel and the kernel drivers are mapped at last, in whichever locations the ASLR
+           layer chose. */
         memset(Pml4, 0, PAGE_SIZE);
         Pml4[0] = (uint64_t)EarlyIdentPdpt | 0x03;
         Pml4[256] = (uint64_t)LateIdentPdpt | 0x03;
-        Pml4[(VirtualAddress >> 39) & 0x1FF] = (uint64_t)KernelPdpt | 0x03;
 
         memset(EarlyIdentPdpt, 0, PAGE_SIZE);
         EarlyIdentPdpt[0] = (uint64_t)EarlyIdentPdt | 0x03;
@@ -82,24 +128,24 @@ extern uint32_t BiosMemoryMapEntries;
             LateIdentPdpt[i] = (i * 0x40000000) | 0x8000000000000083;
         }
 
-        memset(KernelPdpt, 0, PAGE_SIZE);
-        KernelPdpt[(VirtualAddress >> 30) & 0x1FF] = (uint64_t)KernelPdt | 0x03;
-
         memset(EarlyIdentPdt, 0, PAGE_SIZE);
         EarlyIdentPdt[0] = 0x83;
 
-        memset(KernelPdt, 0, PAGE_SIZE);
-        for (uint64_t i = 0; i < (ImageSize + 0x1FFFFF) >> 21; i++) {
-            KernelPdt[((VirtualAddress >> 21) & 0x1FF) + i] = (uint64_t)(KernelPt + i * 512) | 0x03;
+        for (size_t i = 0; !Fail && i < ImageCount; i++) {
+            for (size_t Page = 0; Page < Images[i].ImageSize >> PAGE_SHIFT; Page++) {
+                if (!MapPage(
+                        Pml4,
+                        Images[i].VirtualAddress + (Page << PAGE_SHIFT),
+                        Images[i].PhysicalAddress + (Page << PAGE_SHIFT),
+                        Images[i].PageFlags[Page])) {
+                    Fail = 1;
+                    break;
+                }
+            }
         }
 
-        memset(KernelPt, 0, PAGE_SIZE);
-        for (uint64_t i = 0; i < ImageSize >> PAGE_SHIFT; i++) {
-            KernelPt[((VirtualAddress >> 12) & 0x1FF) + i] =
-                (PhysicalAddress + (i << PAGE_SHIFT)) |
-                (PageFlags[i] & PAGE_WRITE     ? 0x8000000000000003
-                 : !(PageFlags[i] & PAGE_EXEC) ? 0x8000000000000001
-                                               : 0x01);
+        if (Fail) {
+            break;
         }
 
         /* Mount the OS-specific boot data, and enter assembly land to get into long mode.  */

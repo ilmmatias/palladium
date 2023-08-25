@@ -6,6 +6,7 @@
 #include <keyboard.h>
 #include <memory.h>
 #include <pe.h>
+#include <registry.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -87,7 +88,10 @@ static uint64_t LoadFile(
     uint64_t BaseDiff = *VirtualAddress - ExpectedBase;
     Header = (PeHeader *)((char *)PhysicalAddress + Offset);
     Header->ImageBase = *VirtualAddress;
-    *EntryAddress = *VirtualAddress + Header->AddressOfEntryPoint;
+
+    if (EntryAddress) {
+        *EntryAddress = *VirtualAddress + Header->AddressOfEntryPoint;
+    }
 
     PeSectionHeader *Sections =
         (PeSectionHeader *)((char *)PhysicalAddress + Offset + Header->SizeOfOptionalHeader + 24);
@@ -183,6 +187,9 @@ static uint64_t LoadFile(
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 [[noreturn]] void BmLoadPalladium(const char *SystemFolder) {
+    const char *Message = "An error occoured while trying to load the selected operating system.\n"
+                          "Please, reboot your device and try again.\n";
+
     BmSetColor(DISPLAY_COLOR_DEFAULT);
     BmInitDisplay();
 
@@ -192,26 +199,85 @@ static uint64_t LoadFile(
 
         size_t KernelPathSize = strlen(SystemFolder) + 12;
         char *KernelPath = malloc(KernelPathSize);
-        if (!KernelPath) {
+        char *RegistryPath = malloc(KernelPathSize);
+        if (!KernelPath || !RegistryPath) {
             break;
         }
 
         snprintf(KernelPath, KernelPathSize, "%s/kernel.exe", SystemFolder);
+        snprintf(RegistryPath, KernelPathSize, "%s/kernel.reg", SystemFolder);
 
-        /* Delegate the loading job to the common PE loader. */
-        uint64_t VirtualAddress;
-        uint64_t EntryPoint;
-        uint64_t ImageSize;
-        int *PageFlags;
-        uint64_t PhysicalAddress =
-            LoadFile(KernelPath, &VirtualAddress, &EntryPoint, &ImageSize, &PageFlags);
-        if (!PhysicalAddress) {
+        /* Load up the kernel registry, it should be located adjacent to the kernel image.
+           We need it to find all the boot-time drivers (like important FS drivers). */
+        RegHandle *Handle = BmLoadRegistry(RegistryPath);
+        if (!Handle) {
+            Message =
+                "An error occoured while trying to load the selected operating system.\n"
+                "The kernel registry file inside the System folder is invalid or corrupted.\n";
             break;
         }
 
-        BmTransferExecution(VirtualAddress, PhysicalAddress, ImageSize, EntryPoint, PageFlags);
+        /* Failing this is a probable "inaccessible boot device" error later on the kernel
+           initialization process, so crash early. */
+        RegEntryHeader *DriverEntries = BmFindRegistryEntry(Handle, NULL, "Drivers");
+        if (!DriverEntries) {
+            Message =
+                "An error occoured while trying to load the selected operating system.\n"
+                "The kernel registry file inside the System folder is invalid or corrupted.\n";
+            break;
+        }
+
+        /* First pass, collect the driver count, as we'll be allocating the LoadedImage array all
+           at once. */
+        int DriverCount = 0;
+        for (int i = 0;; i++) {
+            RegEntryHeader *Entry = BmGetRegistryEntry(Handle, DriverEntries, i);
+
+            if (!Entry) {
+                break;
+            } else if (
+                Entry->Type != REG_ENTRY_DWORD ||
+                !*((uint32_t *)((char *)Entry + Entry->Length - 4))) {
+                continue;
+            }
+
+            DriverCount++;
+        }
+
+        LoadedImage *Images = calloc(DriverCount + 1, sizeof(LoadedImage));
+        if (!Images) {
+            break;
+        }
+
+        /* Delegate the loading job to the common PE loader. */
+        uint64_t EntryPoint;
+        Images[0].PhysicalAddress = LoadFile(
+            KernelPath,
+            &Images[0].VirtualAddress,
+            &EntryPoint,
+            &Images[0].ImageSize,
+            &Images[0].PageFlags);
+        if (!Images[0].PhysicalAddress) {
+            Message = "An error occoured while trying to load the selected operating system.\n"
+                      "The kernel file inside the System folder is invalid or corrupted.\n";
+            break;
+        }
+
+        /* Second pass, load up all the drivers, solving any driver->kernel imports. */
+        for (int i = 0;; i++) {
+            RegEntryHeader *Entry = BmGetRegistryEntry(Handle, DriverEntries, i);
+
+            if (!Entry) {
+                break;
+            } else if (
+                Entry->Type != REG_ENTRY_DWORD ||
+                !*((uint32_t *)((char *)Entry + Entry->Length - 4))) {
+                continue;
+            }
+        }
+
+        BmTransferExecution(Images, /*DriverCount + */ 1, EntryPoint);
     } while (0);
 
-    BmPanic("An error occoured while trying to load the selected operating system.\n"
-            "Please, reboot your device and try again.\n");
+    BmPanic(Message);
 }
