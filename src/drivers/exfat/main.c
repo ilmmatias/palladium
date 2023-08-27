@@ -1,7 +1,7 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
-void KePlaceholder();
+void KePlaceholder(const char *Message);
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -15,5 +15,5 @@ void KePlaceholder();
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void DrvMain(void) {
-    KePlaceholder();
+    KePlaceholder("Reached DrvMain() in exfat.sys");
 }

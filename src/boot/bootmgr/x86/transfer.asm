@@ -9,8 +9,9 @@
 ;
 ; PARAMETERS:
 ;     Pml4 (esp + 4) - Physical address of the PML4 structure.
-;     EntryPoint (esp + 8) - Virtual address (64-bits) where the kernel entry is located.
-;     BootData (esp + 16) - Virtual address (64-bits) where the loader boot data is located.
+;     BootData (esp + 8) - Virtual address (64-bits) where the loader boot data is located.
+;     Images (esp + 16) - Virtual address (64-bits) where the loaded images array begins.
+;     ImageCount (esp + 24) - How many boot images were loaded.
 ;
 ; RETURN VALUE:
 ;     Does not return.
@@ -47,12 +48,33 @@ _BiTransferExecution$Finish:
     mov es, ax
     mov ss, ax
 
-    ; Skip the return address and Pml4, so that we can grab the entry point + boot data.
+    ; Skip the return address and Pml4, and start up from the 2nd entry in the image list.
+    ; The 1st should be the kernel, which is loaded at the end.
     db 48h, 83h, 0C4h, 08h ; add rsp, 8
-    pop eax
     pop ecx
+    pop edi
+    pop esi
 
-    ; Setup a proper aligned stack (16-bytes alignemnt), and jump execution.
-    db 48h, 0C7h, 0C4h, 00h, 7Ch, 00h, 00h
-    jmp eax
+    ; Setup a proper aligned stack (16-bytes alignemnt after CALL) for all the entry points.
+    db 48h, 0C7h, 0C4h, 0F8h, 7Bh, 00h, 00h ; mov rsp, 7BF8h (0x7C00 - 8)
+    push edi
+    push ecx
+_BiTransferExecution$CallDriver:
+    db 48h, 0FFh, 0CEh ; dec rsi
+    jz _BiTransferExecution$CallKernel
+
+    db 48h, 83h, 0C7h, 24h ; add rdi, 36 (sizeof LoadedImage)
+    db 48h, 8Bh, 6Fh, 18h ; mov rbp, [rdi + 24]
+    call ebp
+
+    jmp _BiTransferExecution$CallDriver
+
+_BiTransferExecution$CallKernel:
+    pop ecx
+    pop edi
+    db 48h, 8Bh, 6Fh, 18h ; mov rbp, [rdi + 24]
+    call ebp
+
+_BiTransferExecution$Loop:
+    jmp _BiTransferExecution$Loop
 _BiTransferExecution endp

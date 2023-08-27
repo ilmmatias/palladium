@@ -123,13 +123,15 @@ static uint64_t LoadFile(
             (*PageFlags)[(Sections[i].VirtualAddress >> PAGE_SHIFT) + Page] = Flags;
         }
 
-        if (fseek(Stream, Sections[i].PointerToRawData, SEEK_SET) ||
-            fread(
-                (char *)PhysicalAddress + Sections[i].VirtualAddress,
-                Sections[i].SizeOfRawData,
-                1,
-                Stream) != 1) {
-            return 0;
+        if (Sections[i].SizeOfRawData) {
+            if (fseek(Stream, Sections[i].PointerToRawData, SEEK_SET) ||
+                fread(
+                    (char *)PhysicalAddress + Sections[i].VirtualAddress,
+                    Sections[i].SizeOfRawData,
+                    1,
+                    Stream) != 1) {
+                return 0;
+            }
         }
 
         if (Sections[i].VirtualSize > Sections[i].SizeOfRawData) {
@@ -339,13 +341,12 @@ static uint64_t LoadFile(
         }
 
         /* Delegate the loading job to the common PE loader. */
-        uint64_t EntryPoint;
         ExportTable *KernelExports;
         size_t KernelExportCount;
         Images[0].PhysicalAddress = LoadFile(
             KernelPath,
             &Images[0].VirtualAddress,
-            &EntryPoint,
+            &Images[0].EntryPoint,
             &Images[0].ImageSize,
             &Images[0].PageFlags,
             1,
@@ -386,7 +387,7 @@ static uint64_t LoadFile(
             Images[DriverCount + 1].PhysicalAddress = LoadFile(
                 DriverPath,
                 &Images[DriverCount + 1].VirtualAddress,
-                NULL,
+                &Images[DriverCount + 1].EntryPoint,
                 &Images[DriverCount + 1].ImageSize,
                 &Images[DriverCount + 1].PageFlags,
                 0,
@@ -405,7 +406,7 @@ static uint64_t LoadFile(
             break;
         }
 
-        BmTransferExecution(Images, DriverCount + 1, EntryPoint);
+        BmTransferExecution(Images, DriverCount + 1);
     } while (0);
 
     BmPanic(Message);

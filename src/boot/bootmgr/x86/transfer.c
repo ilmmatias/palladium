@@ -10,21 +10,26 @@
 #include <x86/bios.h>
 
 #define LOADER_MAGIC "BMGR"
-#define LOADER_CURRENT_VERSION 0x00
+#define LOADER_CURRENT_VERSION 0x0000
 
 typedef struct __attribute__((packed)) {
     char Magic[4];
-    uint8_t Version;
+    uint16_t Version;
     struct {
         uint64_t BaseAddress;
         uint32_t Count;
     } MemoryMap;
+    struct {
+        uint64_t BaseAddress;
+        uint32_t Count;
+    } Images;
 } LoaderBootData;
 
 extern BiosMemoryRegion *BiosMemoryMap;
 extern uint32_t BiosMemoryMapEntries;
 
-[[noreturn]] void BiTransferExecution(uint64_t *Pml4, uint64_t EntryPoint, uint64_t BootData);
+[[noreturn]] void
+BiTransferExecution(uint64_t *Pml4, uint64_t BootData, uint64_t Images, uint32_t ImageCount);
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -89,12 +94,11 @@ MapPage(uint64_t *Pml4, uint64_t VirtualAddress, uint64_t PhysicalAddress, int P
  * PARAMETERS:
  *     Images - List containing all memory regions we need to map.
  *     ImageCount - How many entries the image list has.
- *     EntryPoint - Virtual address where the kernel entry point should be located.
  *
  * RETURN VALUE:
  *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
-[[noreturn]] void BmTransferExecution(LoadedImage *Images, size_t ImageCount, uint64_t EntryPoint) {
+[[noreturn]] void BmTransferExecution(LoadedImage *Images, size_t ImageCount) {
     /* TODO: Add support for PML5 (under compatible processors). */
 
     do {
@@ -154,8 +158,14 @@ MapPage(uint64_t *Pml4, uint64_t VirtualAddress, uint64_t PhysicalAddress, int P
         BootData->Version = LOADER_CURRENT_VERSION;
         BootData->MemoryMap.BaseAddress = (uint64_t)BiosMemoryMap + 0xFFFF800000000000;
         BootData->MemoryMap.Count = BiosMemoryMapEntries;
+        BootData->Images.BaseAddress = (uint64_t)Images + 0xFFFF800000000000;
+        BootData->Images.Count = ImageCount;
 
-        BiTransferExecution(Pml4, EntryPoint, (uint64_t)BootData + 0xFFFF800000000000);
+        BiTransferExecution(
+            Pml4,
+            (uint64_t)BootData + 0xFFFF800000000000,
+            (uint64_t)Images + 0xFFFF800000000000,
+            ImageCount);
     } while (0);
 
     BmPanic("An error occoured while trying to load the selected operating system.\n"

@@ -10,10 +10,11 @@
 #define PAGE_WRITE 0x01
 #define PAGE_EXEC 0x02
 
-typedef struct {
+typedef struct __attribute__((packed)) {
     uint64_t VirtualAddress;
     uint64_t PhysicalAddress;
     uint64_t ImageSize;
+    uint64_t EntryPoint;
     int* PageFlags;
 } LoadedImage;
 
@@ -25,7 +26,7 @@ void BmLoadMenuEntries(void);
 [[noreturn]] void BmLoadPalladium(const char* SystemFolder);
 
 void BmCheckCompatibility(void);
-[[noreturn]] void BmTransferExecution(LoadedImage* Images, size_t ImageCount, uint64_t EntryPoint);
+[[noreturn]] void BmTransferExecution(LoadedImage* Images, size_t ImageCount);
 
 [[noreturn]] void BmPanic(const char* Message);
 
