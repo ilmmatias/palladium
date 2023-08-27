@@ -6,6 +6,7 @@ project(os/drivers/exfat)
 add_executable(exfat "kstdlib"
     main.c)
 
+target_link_libraries(exfat kernel)
 target_include_directories(exfat PRIVATE include)
 target_compile_options(exfat PRIVATE $<$<COMPILE_LANGUAGE:C,CXX>:-ffreestanding>)
 target_link_options(exfat PRIVATE -Wl,--subsystem=native,--entry=DrvMain)

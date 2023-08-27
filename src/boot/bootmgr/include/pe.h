@@ -97,6 +97,28 @@ typedef struct __attribute__((packed)) {
 } PeSectionHeader;
 
 typedef struct __attribute__((packed)) {
+    uint32_t ExportFlags;
+    uint32_t TimeDateStamp;
+    uint16_t MajorVersion;
+    uint16_t MinorVersion;
+    uint32_t NameRva;
+    uint32_t OrdinalBase;
+    uint32_t AddressTableEntries;
+    uint32_t NumberOfNamePointers;
+    uint32_t ExportTableRva;
+    uint32_t NamePointerRva;
+    uint32_t OrdinalTableRva;
+} PeExportHeader;
+
+typedef struct __attribute__((packed)) {
+    uint32_t ImportLookupTableRva;
+    uint32_t TimeDateStamp;
+    uint32_t ForwarderChain;
+    uint32_t NameRva;
+    uint32_t ImportAddressTableRva;
+} PeImportHeader;
+
+typedef struct __attribute__((packed)) {
     uint32_t PageRva;
     uint32_t BlockSize;
 } PeBaseRelocationBlock;

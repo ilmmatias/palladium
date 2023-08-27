@@ -9,7 +9,7 @@ function(add_executable target type)
             target_link_libraries(${target} kcrt)
         elseif(type STREQUAL "ucrt")
             target_link_libraries(${target} ucrt)
-        elseif(type STREQUAL "kstdlib")
+        elseif(type STREQUAL "kstdlib" OR type STREQUAL "kernel")
             target_link_libraries(${target} kcrt krt)
         else()
             target_link_libraries(${target} ucrt urt)
@@ -33,6 +33,10 @@ function(add_executable target type)
     	--target=${TARGET_${ARCH}}-w64-mingw32
     	-fuse-ld=lld
     	/usr/local/lib/baremetal/libclang_rt.builtins-${TARGET_${ARCH}}.a)
+
+    if(type STREQUAL "kernel")
+        target_link_options(${target} PRIVATE -Wl,--out-implib,${CMAKE_CURRENT_BINARY_DIR}/${target}.lib)
+    endif()
 endfunction()
 
 function(add_library target type)

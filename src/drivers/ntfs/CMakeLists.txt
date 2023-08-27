@@ -6,6 +6,7 @@ project(os/drivers/ntfs)
 add_executable(ntfs "kstdlib"
     main.c)
 
+target_link_libraries(ntfs kernel)
 target_include_directories(ntfs PRIVATE include)
 target_compile_options(ntfs PRIVATE $<$<COMPILE_LANGUAGE:C,CXX>:-ffreestanding>)
 target_link_options(ntfs PRIVATE -Wl,--subsystem=native,--entry=DrvMain)

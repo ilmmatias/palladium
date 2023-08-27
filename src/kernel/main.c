@@ -5,6 +5,19 @@
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
+ *     Placeholder for testing; Exported in the .lib file.
+ *
+ * PARAMETERS:
+ *     None.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void KePlaceholder() {
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
  *     This function is the kernel architecture-independent entry point.
  *
  * PARAMETERS:
@@ -13,7 +26,7 @@
  * RETURN VALUE:
  *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
-[[noreturn]] void KernelMain(void) {
+[[noreturn]] void KeMain(void) {
     const char *Message = "Hello, World!";
     uint16_t *Screen = (uint16_t *)0xFFFF8000000B8000;
 
