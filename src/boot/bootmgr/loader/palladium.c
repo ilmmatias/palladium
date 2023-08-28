@@ -335,7 +335,10 @@ static uint64_t LoadFile(
             DriverCount++;
         }
 
-        LoadedImage *Images = calloc(DriverCount + 1, sizeof(LoadedImage));
+        /* We're forced to use BmAllocatePages, as we need to mark this page as KERNEL instead of
+           BOOT. */
+        LoadedImage *Images = BmAllocatePages(
+            ((DriverCount + 1) * sizeof(LoadedImage) + PAGE_SIZE - 1) >> PAGE_SHIFT, MEMORY_KERNEL);
         if (!Images) {
             break;
         }

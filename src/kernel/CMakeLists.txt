@@ -5,19 +5,21 @@ project(os/kernel)
 
 if(ARCH STREQUAL "amd64")
     set(SOURCES
-        ${ARCH}/mm.c)
+        ke/${ARCH}/driver.c
+        mm/${ARCH}/page.c)
 endif()
 
 add_executable(kernel "kernel"
     ${SOURCES}
 
+    ke/entry.c
+
     mm/allocator.c
     mm/page.c
 
-    kernel.def
-    main.c)
+    kernel.def)
 
 target_include_directories(kernel PRIVATE include)
 target_compile_options(kernel PRIVATE $<$<COMPILE_LANGUAGE:C,CXX>:-ffreestanding>)
-target_link_options(kernel PRIVATE -Wl,--subsystem=native,--entry=KeMain)
+target_link_options(kernel PRIVATE -Wl,--subsystem=native,--entry=KeSystemStartup)
 set_target_properties(kernel PROPERTIES ENABLE_EXPORTS TRUE)

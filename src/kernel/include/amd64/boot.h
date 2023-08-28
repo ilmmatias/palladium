@@ -20,6 +20,14 @@ typedef struct __attribute__((packed)) {
 } BiosMemoryRegion;
 
 typedef struct __attribute__((packed)) {
+    uint64_t VirtualAddress;
+    uint64_t PhysicalAddress;
+    uint64_t ImageSize;
+    uint64_t EntryPoint;
+    uint32_t PageFlags;
+} LoaderImage;
+
+typedef struct __attribute__((packed)) {
     char Magic[4];
     uint16_t Version;
     struct {
@@ -31,7 +39,7 @@ typedef struct __attribute__((packed)) {
         uint32_t Count;
     } MemoryMap;
     struct {
-        uint64_t BaseAddress;
+        LoaderImage *Entries;
         uint32_t Count;
     } Images;
 } LoaderBootData;

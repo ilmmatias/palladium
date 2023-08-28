@@ -5,6 +5,7 @@
 #include <mm.h>
 #include <stddef.h>
 
+extern MmPageEntry *MmPageList;
 extern MmPageEntry *MmFreePageListHead;
 extern MmPageEntry *MmFreePageListTail;
 
@@ -21,7 +22,8 @@ extern MmPageEntry *MmFreePageListTail;
  *-----------------------------------------------------------------------------------------------*/
 void MiPreparePageAllocator(void *LoaderData) {
     LoaderBootData *BootData = LoaderData;
-    MmPageEntry *Pages = (MmPageEntry *)BootData->MemoryManager.PageAllocatorBase;
+
+    MmPageList = (MmPageEntry *)BootData->MemoryManager.PageAllocatorBase;
 
     for (uint32_t i = 0; i < BootData->MemoryMap.Count; i++) {
         BiosMemoryRegion *Region = &BootData->MemoryMap.Entries[i];
@@ -56,7 +58,7 @@ void MiPreparePageAllocator(void *LoaderData) {
             continue;
         }
 
-        MmPageEntry *Group = &Pages[Region->BaseAddress >> MM_PAGE_SHIFT];
+        MmPageEntry *Group = &MmPageList[Region->BaseAddress >> MM_PAGE_SHIFT];
 
         Group->References = 0;
         Group->GroupBase = Region->BaseAddress;

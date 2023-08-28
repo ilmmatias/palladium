@@ -4,12 +4,9 @@
 #include <mm.h>
 #include <stddef.h>
 
+MmPageEntry *MmPageList = NULL;
 MmPageEntry *MmFreePageListHead = NULL;
 MmPageEntry *MmFreePageListTail = NULL;
-
-uint64_t Test(uint64_t Value) {
-    return Value;
-}
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:

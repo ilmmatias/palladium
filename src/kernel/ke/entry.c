@@ -1,12 +1,15 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
+#include <ke.h>
 #include <mm.h>
-#include <stdlib.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function is the kernel architecture-independent entry point.
+ *     This function is the kernel's architecture-independent entry point.
+ *     We're responsible for the "stage 0" of the system boot (initializing the memory manager,
+ *     IO manager, boot-start drivers, and the process manager).
+ *     The next phase of boot is done after the process manager creates the system thread.
  *
  * PARAMETERS:
  *     None.
@@ -14,8 +17,9 @@
  * RETURN VALUE:
  *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
-[[noreturn]] void KeMain(void *LoaderData) {
+[[noreturn]] void KeSystemStartup(void *LoaderData) {
     MiPreparePageAllocator(LoaderData);
+    KiRunBootStartDrivers(LoaderData);
     while (1)
         ;
 }

@@ -33,8 +33,7 @@ extern BiosMemoryRegion *BiosMemoryMap;
 extern uint32_t BiosMemoryMapEntries;
 extern uint64_t BiosMemorySize;
 
-[[noreturn]] void
-BiTransferExecution(uint64_t *Pml4, uint64_t BootData, uint64_t Images, uint64_t ImageCount);
+[[noreturn]] void BiTransferExecution(uint64_t *Pml4, uint64_t BootData, uint64_t EntryPoint);
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -180,11 +179,7 @@ MapPage(uint64_t *Pml4, uint64_t VirtualAddress, uint64_t PhysicalAddress, int P
         BootData->Images.BaseAddress = (uint64_t)Images + 0xFFFF800000000000;
         BootData->Images.Count = ImageCount;
 
-        BiTransferExecution(
-            Pml4,
-            (uint64_t)BootData + 0xFFFF800000000000,
-            (uint64_t)Images + 0xFFFF800000000000,
-            ImageCount);
+        BiTransferExecution(Pml4, (uint64_t)BootData + 0xFFFF800000000000, Images[0].EntryPoint);
     } while (0);
 
     BmPanic("An error occoured while trying to load the selected operating system.\n"

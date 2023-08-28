@@ -51,6 +51,8 @@ EXPORTS
     strncpy
     strcat
     strncat
+    strdup
+    strndup
 
     strlen
     strcmp
