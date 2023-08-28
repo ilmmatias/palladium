@@ -7,6 +7,7 @@
 
 BiosMemoryRegion *BiosMemoryMap = NULL;
 uint32_t BiosMemoryMapEntries = 0;
+uint64_t BiosMemorySize = 0;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -38,11 +39,26 @@ void BmInitMemory(void *BootBlock) {
         Region->BaseAddress = BiosMemoryMap->BaseAddress + 0x100000;
         Region->Length = BiosMemoryMap->Length - 0x100000;
         Region->Type = BIOS_MEMORY_REGION_TYPE_AVAILABLE;
+        BiosMemoryMapEntries++;
 
         BiosMemoryMap->Length = 0x100000;
         BiosMemoryMap->Type = BIOS_MEMORY_REGION_TYPE_USED;
     } else {
         BiosMemoryMap->Type = BIOS_MEMORY_REGION_TYPE_USED;
+    }
+
+    /* In the current state, free (and boot used) entries should pretty much dictate how much
+       physical memory we have.
+       Anything beyond them, we don't really care (device IO probably?). */
+    BiosMemoryRegion *Region = BiosMemoryMap;
+    for (uint32_t i = 0; i < BiosMemoryMapEntries; i++) {
+        if ((Region->Type == BIOS_MEMORY_REGION_TYPE_AVAILABLE ||
+             Region->Type >= BIOS_MEMORY_REGION_TYPE_USED) &&
+            Region->BaseAddress + Region->Length > BiosMemorySize) {
+            BiosMemorySize = Region->BaseAddress + Region->Length;
+        }
+
+        Region++;
     }
 }
 

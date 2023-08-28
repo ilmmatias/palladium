@@ -16,6 +16,10 @@ typedef struct __attribute__((packed)) {
     char Magic[4];
     uint16_t Version;
     struct {
+        uint64_t MemorySize;
+        uint64_t PageAllocatorBase;
+    } MemoryManager;
+    struct {
         uint64_t BaseAddress;
         uint32_t Count;
     } MemoryMap;
@@ -27,9 +31,10 @@ typedef struct __attribute__((packed)) {
 
 extern BiosMemoryRegion *BiosMemoryMap;
 extern uint32_t BiosMemoryMapEntries;
+extern uint64_t BiosMemorySize;
 
 [[noreturn]] void
-BiTransferExecution(uint64_t *Pml4, uint64_t BootData, uint64_t Images, uint32_t ImageCount);
+BiTransferExecution(uint64_t *Pml4, uint64_t BootData, uint64_t Images, uint64_t ImageCount);
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -101,6 +106,18 @@ MapPage(uint64_t *Pml4, uint64_t VirtualAddress, uint64_t PhysicalAddress, int P
 [[noreturn]] void BmTransferExecution(LoadedImage *Images, size_t ImageCount) {
     /* TODO: Add support for PML5 (under compatible processors). */
 
+    /* Pre-allocate the space required for the kernel's physical memory manager; This way
+       the kernel doesn't need to worry about anything but filling the info.
+       MmSize should always be `PagesOfMemory * sizeof(MmPageEntry)`, if MmPageEntry changes
+       on the kernel, the size here needs to change too! */
+    uint64_t PagesOfMemory = (BiosMemorySize + PAGE_SIZE - 1) >> PAGE_SHIFT;
+    uint64_t MmSize = PagesOfMemory * 21;
+    void *MmBase = BmAllocatePages((MmSize + PAGE_SIZE - 1) >> PAGE_SHIFT, MEMORY_KERNEL);
+    if (!MmBase) {
+        BmPanic("An error occoured while trying to load the selected operating system.\n"
+                "There is not enough RAN for the memory manager.");
+    }
+
     do {
         int Fail = 0;
         uint64_t *Pml4 = BmAllocatePages(1, MEMORY_KERNEL);
@@ -156,6 +173,8 @@ MapPage(uint64_t *Pml4, uint64_t VirtualAddress, uint64_t PhysicalAddress, int P
 
         memcpy(BootData->Magic, LOADER_MAGIC, 4);
         BootData->Version = LOADER_CURRENT_VERSION;
+        BootData->MemoryManager.MemorySize = BiosMemorySize;
+        BootData->MemoryManager.PageAllocatorBase = (uint64_t)MmBase + 0xFFFF800000000000;
         BootData->MemoryMap.BaseAddress = (uint64_t)BiosMemoryMap + 0xFFFF800000000000;
         BootData->MemoryMap.Count = BiosMemoryMapEntries;
         BootData->Images.BaseAddress = (uint64_t)Images + 0xFFFF800000000000;
