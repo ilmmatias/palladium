@@ -111,7 +111,7 @@ MapPage(uint64_t *Pml4, uint64_t VirtualAddress, uint64_t PhysicalAddress, int P
        MmSize should always be `PagesOfMemory * sizeof(MmPageEntry)`, if MmPageEntry changes
        on the kernel, the size here needs to change too! */
     uint64_t PagesOfMemory = (BiosMemorySize + PAGE_SIZE - 1) >> PAGE_SHIFT;
-    uint64_t MmSize = PagesOfMemory * 21;
+    uint64_t MmSize = PagesOfMemory * 29;
     void *MmBase = BmAllocatePages((MmSize + PAGE_SIZE - 1) >> PAGE_SHIFT, MEMORY_KERNEL);
     if (!MmBase) {
         BmPanic("An error occoured while trying to load the selected operating system.\n"

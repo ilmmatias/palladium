@@ -3,8 +3,15 @@
 
 project(os/kernel)
 
+if(ARCH STREQUAL "amd64")
+    set(SOURCES
+        ${ARCH}/mm.c)
+endif()
+
 add_executable(kernel "kernel"
     ${SOURCES}
+
+    mm/page.c
 
     kernel.def
     main.c)
