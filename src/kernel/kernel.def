@@ -1,3 +1,71 @@
 LIBRARY kernel
 EXPORTS
     MmAllocatePages
+
+    isalnum
+    isalpha
+    islower
+    isupper
+    isdigit
+    isxdigit
+    iscntrl
+    isgraph
+    isspace
+    isblank
+    isprint
+    ispunct
+
+    tolower
+    toupper
+
+    sscanf
+
+    vsscanf
+
+    sprintf
+    snprintf
+
+    vsprintf
+    vsnprintf
+
+    atof
+    atoi
+    atol
+    atoll
+    strtol
+    strtoll
+    strtoul
+    strtoull
+    strtof
+    strtod
+    strtold
+
+    malloc
+    calloc
+    free
+
+    rand
+    srand
+
+    strcpy
+    strncpy
+    strcat
+    strncat
+
+    strlen
+    strcmp
+    strncmp
+    strchr
+    strrchr
+    strspn
+    strcspn
+    strpbrk
+    strstr
+    strtok
+
+    memchr
+    memcmp
+    memset
+    memcpy
+    memmove
+    memccpy

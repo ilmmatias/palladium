@@ -3,7 +3,7 @@
 
 project(os/drivers/exfat)
 
-add_executable(exfat "kstdlib"
+add_executable(exfat "knostdlib"
     main.c)
 
 target_link_libraries(exfat kernel)

@@ -3,7 +3,7 @@
 
 project(os/drivers/fat32)
 
-add_executable(fat32 "kstdlib"
+add_executable(fat32 "knostdlib"
     main.c)
 
 target_link_libraries(fat32 kernel)

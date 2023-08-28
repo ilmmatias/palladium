@@ -8,7 +8,7 @@
 
 #ifdef ARCH_amd64
 #define MM_PAGE_SHIFT 12
-#define MI_PADDR_TO_VADDR(Page) ((Page) + 0xFFFF800000000000)
+#define MI_PADDR_TO_VADDR(Page) ((void *)((Page) + 0xFFFF800000000000))
 #endif
 
 #define MM_PAGE_SIZE (1ull << (MM_PAGE_SHIFT))

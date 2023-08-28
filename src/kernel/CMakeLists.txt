@@ -11,6 +11,7 @@ endif()
 add_executable(kernel "kernel"
     ${SOURCES}
 
+    mm/allocator.c
     mm/page.c
 
     kernel.def

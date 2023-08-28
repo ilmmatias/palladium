@@ -3,7 +3,7 @@
 
 project(os/drivers/iso9660)
 
-add_executable(iso9660 "kstdlib"
+add_executable(iso9660 "knostdlib"
     main.c)
 
 target_link_libraries(iso9660 kernel)

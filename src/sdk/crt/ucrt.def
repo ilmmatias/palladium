@@ -38,6 +38,9 @@ EXPORTS
     strtod
     strtold
 
+    rand
+    srand
+
     strcpy
     strncpy
     strcat
@@ -60,6 +63,3 @@ EXPORTS
     memcpy
     memmove
     memccpy
-
-    rand
-    srand

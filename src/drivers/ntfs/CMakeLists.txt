@@ -3,7 +3,7 @@
 
 project(os/drivers/ntfs)
 
-add_executable(ntfs "kstdlib"
+add_executable(ntfs "knostdlib"
     main.c)
 
 target_link_libraries(ntfs kernel)

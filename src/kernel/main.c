@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <mm.h>
+#include <stdlib.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:

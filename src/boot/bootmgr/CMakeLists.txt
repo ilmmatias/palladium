@@ -20,7 +20,6 @@ add_executable(bootmgr "kstdlib"
 
     dev/console.c
     dev/display.c
-    dev/memory.c
 
     fs/exfat.c
     fs/fat32.c
@@ -32,6 +31,7 @@ add_executable(bootmgr "kstdlib"
     loader/menu.c
     loader/palladium.c
 
+    allocator.c
     assert.c
     main.c
     memory.c
