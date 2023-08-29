@@ -6,4 +6,6 @@
 
 void KiRunBootStartDrivers(void *LoaderData);
 
+[[noreturn]] void KeFatalError(int Message);
+
 #endif /* _KE_H_ */

@@ -120,14 +120,24 @@ static int pad_num(
      *     Otherwise, it works just as you would expect. */
     if (prec >= 0) {
         int max_size = (prec > size ? prec : size) + (sign > 0) + alt_width;
-        space_width = width - max_size;
+
+        if (width > max_size) {
+            space_width = width - max_size;
+        }
+
         zero_width = prec - size;
     } else if (left || !zero) {
         int max_size = size + (sign > 0) + alt_width;
-        space_width = width - max_size;
+
+        if (width > max_size) {
+            space_width = width - max_size;
+        }
     } else {
         int max_size = size + (sign > 0) + alt_width;
-        zero_width = width - max_size;
+
+        if (width > max_size) {
+            zero_width = width - max_size;
+        }
     }
 
     int written_size = space_width + zero_width + alt_width + (sign > 0);
@@ -293,7 +303,7 @@ int __vprintf(
 
         if (ch != '%') {
             put_buf(&ch, 1, context);
-            size += 1;
+            size++;
             continue;
         }
 
@@ -404,7 +414,7 @@ int __vprintf(
         switch (ch) {
             case '%':
                 put_buf(format - 1, 1, context);
-                size += 1;
+                size++;
                 break;
             case 'c':
                 /* TODO: missing wide char support. */

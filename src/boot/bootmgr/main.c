@@ -6,7 +6,6 @@
 #include <keyboard.h>
 #include <memory.h>
 #include <registry.h>
-#include <stdlib.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:

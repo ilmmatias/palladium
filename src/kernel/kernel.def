@@ -1,6 +1,18 @@
 LIBRARY kernel
 EXPORTS
+    KeFatalError
+
     MmAllocatePages
+
+    VidResetDisplay
+
+    VidSetColor
+    VidGetColor
+    VidSetCursor
+    VidGetCursor
+
+    VidPutChar
+    VidPutString
 
     isalnum
     isalpha

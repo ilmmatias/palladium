@@ -3,6 +3,7 @@
 
 #include <ke.h>
 #include <mm.h>
+#include <vid.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -17,9 +18,9 @@
  * RETURN VALUE:
  *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
-[[noreturn]] void KeSystemStartup(void *LoaderData) {
+[[noreturn]] void KiSystemStartup(void *LoaderData) {
+    VidpInitialize();
     MiPreparePageAllocator(LoaderData);
     KiRunBootStartDrivers(LoaderData);
-    while (1)
-        ;
+    KeFatalError(0);
 }
