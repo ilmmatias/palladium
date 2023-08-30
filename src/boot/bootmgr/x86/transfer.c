@@ -16,6 +16,10 @@ typedef struct __attribute__((packed)) {
     char Magic[4];
     uint16_t Version;
     struct {
+        uint64_t BaseAdress;
+        int IsXsdt;
+    } Acpi;
+    struct {
         uint64_t MemorySize;
         uint64_t PageAllocatorBase;
     } MemoryManager;
@@ -28,6 +32,9 @@ typedef struct __attribute__((packed)) {
         uint32_t Count;
     } Images;
 } LoaderBootData;
+
+extern uint64_t BiosRsdtLocation;
+extern int BiosIsXsdt;
 
 extern BiosMemoryRegion *BiosMemoryMap;
 extern uint32_t BiosMemoryMapEntries;
@@ -172,6 +179,8 @@ MapPage(uint64_t *Pml4, uint64_t VirtualAddress, uint64_t PhysicalAddress, int P
 
         memcpy(BootData->Magic, LOADER_MAGIC, 4);
         BootData->Version = LOADER_CURRENT_VERSION;
+        BootData->Acpi.BaseAdress = BiosRsdtLocation;
+        BootData->Acpi.IsXsdt = BiosIsXsdt;
         BootData->MemoryManager.MemorySize = BiosMemorySize;
         BootData->MemoryManager.PageAllocatorBase = (uint64_t)MmBase + 0xFFFF800000000000;
         BootData->MemoryMap.BaseAddress = (uint64_t)BiosMemoryMap + 0xFFFF800000000000;

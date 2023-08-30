@@ -46,7 +46,11 @@ static int pad(
         size = prec;
     }
 
-    width -= size;
+    if (width > size) {
+        width -= size;
+    } else {
+        width = 0;
+    }
 
     int pad = ' ';
     int written_size = width;

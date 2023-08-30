@@ -4,6 +4,15 @@
 #ifndef _KE_H_
 #define _KE_H_
 
+#include <stdint.h>
+
+#define KI_ACPI_RDST 0
+#define KI_ACPI_XSDT 1
+
+void KiSaveAcpiData(void *LoaderData);
+uint64_t KiGetAcpiBaseAddress(void);
+int KiGetAcpiTableType(void);
+
 void KiRunBootStartDrivers(void *LoaderData);
 
 [[noreturn]] void KeFatalError(int Message);

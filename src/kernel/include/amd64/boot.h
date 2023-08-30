@@ -31,6 +31,10 @@ typedef struct __attribute__((packed)) {
     char Magic[4];
     uint16_t Version;
     struct {
+        uint64_t BaseAdress;
+        int IsXsdt;
+    } Acpi;
+    struct {
         uint64_t MemorySize;
         uint64_t PageAllocatorBase;
     } MemoryManager;

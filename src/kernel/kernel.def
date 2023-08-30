@@ -1,5 +1,11 @@
 LIBRARY kernel
 EXPORTS
+    IoCreateDevice
+    IoOpenDevice
+
+    KiGetAcpiBaseAddress
+    KiGetAcpiTableType
+
     KeFatalError
 
     MmAllocatePages

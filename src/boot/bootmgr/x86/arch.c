@@ -14,7 +14,73 @@
     "An error occoured while trying to load the selected operating system.\n" \
     "Your device does not support one or more of the required features "
 
+typedef struct __attribute__((aligned)) {
+    char Signature[8];
+    uint8_t Checksum;
+    char OemId[6];
+    uint8_t Revision;
+    uint32_t RsdtAddress;
+    uint32_t Length;
+    uint64_t XsdtAddress;
+    uint8_t ExtendedChecksum;
+    uint8_t Reserved[3];
+} RsdpHeader;
+
+uint64_t BiosRsdtLocation = 0;
+int BiosIsXsdt = 0;
+
 static MemoryArena KernelRegion;
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function searches for the RSDP signature within the specified region.
+ *
+ * PARAMETERS:
+ *     Region - Start of the search region.
+ *     End - End of the region (we'll access at most it minus 1).
+ *     IsXsdt - Output; 1 if we have ACPI 2.0+, 0 for ACPI 1.0.
+ *
+ * RETURN VALUE:
+ *     Pointer to the RSDT/XSDT if it was found within the region, NULL otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+static uint64_t SearchRsdp(char *Region, char *End, int *IsXsdt) {
+    while (1) {
+        if (Region >= End) {
+            return 0;
+        } else if (memcmp(Region, "RSD PTR ", 8)) {
+            /* According to the spec, the signature should always be in a 16-byte aligned
+               section. */
+            Region += 16;
+            continue;
+        }
+
+        break;
+    }
+
+    RsdpHeader *Rsdp = (RsdpHeader *)Region;
+    uint8_t Checksum = 0;
+    uint64_t Location;
+
+    /* The checksum can be calculated by summing all bytes of the struct; It should always equal
+       zero. */
+    if (!Rsdp->Revision) {
+        for (int i = 0; i < 20; i++) {
+            Checksum += Region[i];
+        }
+
+        Location = Rsdp->RsdtAddress;
+        *IsXsdt = 1;
+    } else {
+        for (uint32_t i = 0; i < Rsdp->Length; i++) {
+            Checksum += Region[i];
+        }
+
+        Location = Rsdp->XsdtAddress;
+        *IsXsdt = 0;
+    }
+
+    return Checksum ? 0 : Location;
+}
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -103,5 +169,28 @@ void BmCheckCompatibility(void) {
         BmPanic(BASE_MESSAGE "(LM).\n");
     } else if (!(Edx & bit_PDPE1GB)) {
         BmPanic(BASE_MESSAGE "(PDPE1GB).\n");
+    }
+
+    /* All seems well; Palladium requires ACPI support, if we already have the RSDP saved
+       somewhere, that's nice, but otherwise, search around/close to the EBDA area. */
+
+    if (BiosRsdtLocation) {
+        return;
+    }
+
+    /* This entry of the BDA USUALLY contains the EBDA base; Assume that if it is lower than the
+       other BIOS area we'll manually search, we can check the first 1KiBs of it. */
+    char *EbdaArea = (char *)((uint32_t)(*(uint16_t *)0x40E) << 4);
+
+    if (EbdaArea < (char *)0x100000) {
+        BiosRsdtLocation = SearchRsdp(EbdaArea, EbdaArea + 1024, &BiosIsXsdt);
+    }
+
+    if (!BiosRsdtLocation) {
+        BiosRsdtLocation = SearchRsdp((char *)0xE0000, (char *)0x100000, &BiosIsXsdt);
+    }
+
+    if (!BiosRsdtLocation) {
+        BmPanic(BASE_MESSAGE "(ACPI).\n");
     }
 }

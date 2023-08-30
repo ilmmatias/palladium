@@ -413,7 +413,8 @@ int CreateKernelRegistry(void) {
         return 1;
     }
 
-    if (!CreateIntegerKey(Stream, Entries, "exfat.sys", REG_ENTRY_DWORD, 1) ||
+    if (!CreateIntegerKey(Stream, Entries, "acpi.sys", REG_ENTRY_DWORD, 1) ||
+        !CreateIntegerKey(Stream, Entries, "exfat.sys", REG_ENTRY_DWORD, 1) ||
         !CreateIntegerKey(Stream, Entries, "fat32.sys", REG_ENTRY_DWORD, 1) ||
         !CreateIntegerKey(Stream, Entries, "iso9660.sys", REG_ENTRY_DWORD, 1) ||
         !CreateIntegerKey(Stream, Entries, "ntfs.sys", REG_ENTRY_DWORD, 1)) {
