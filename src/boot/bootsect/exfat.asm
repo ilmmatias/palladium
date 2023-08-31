@@ -92,14 +92,18 @@ Main$Setup:
     ; First read is different as we need to store the NoFatChain flag.
     mov bx, 600h
     mov si, bx
+    clc
     call ReadCluster
     mov al, [si + 33]
     mov [FileFlags], al
+    xor di, di
     jmp Main$Search
 
 Main$NextCluster:
     mov bx, 600h
     mov si, bx
+    xor di, di
+    clc
     call ReadCluster
 
 Main$Search:
@@ -126,6 +130,7 @@ Main$Search:
     jne Main$NextEntry
 
     push si
+    push di
     mov cx, ImageSize
     add si, 66
     mov di, offset ImageName
@@ -145,13 +150,14 @@ Main$NotLower:
     loop Main$CheckName
 
 Main$EndCheck:
+    pop di
     pop si
     je Main$Found
 
 Main$NextEntry:
     add si, 32
-    cmp si, 512
-    jne Main$Search
+    call CheckClusterBoundaries
+    jc Main$Search
     test byte ptr [FileFlags], 2
     call GetNextCluster
     jc Main$NextCluster
@@ -167,9 +173,11 @@ Main$Found:
     mov es, bx
     xor bx, bx
 
+    stc
     call ReadCluster
     mov al, [si + 33]
     mov [FileFlags], al
+    xor di, di
     jmp Main$LoopSkipRead
 
 Main$Loop:
@@ -271,7 +279,7 @@ Error$Halt:
 Error endp
 
 DiskError db "Disk error", 0
-OverflowError db "Data overflow", 0
+OverflowError db "Data error", 0
 ImageError db "BOOTMGR is missing", 0
 ImageName dw 'B', 'O', 'O', 'T', 'M', 'G', 'R'
 ImageSize equ ($ - ImageName) / 2
@@ -287,18 +295,55 @@ dw 0AA55h
 ;
 ; PARAMETERS:
 ;     Cluster (ebp) - Cluster to read.
+;     ReadWhole (flags & CF) - Set to 1 if we should read the whole cluster, to 0 if we should
+;                              only read a single sector.
 ;
 ; RETURN VALUE:
 ;     Same as ReadSectors.
 ;--------------------------------------------------------------------------------------------------
 ReadCluster proc
+    jnc ReadCluster$ReadPartial
     mov ecx, [SectorsPerCluster]
     lea eax, [ebp - 2]
     mul ecx
     add eax, [DataStart]
     call ReadSectors
     ret
+
+ReadCluster$ReadPartial:
+    mov ecx, [SectorsPerCluster]
+    lea eax, [ebp - 2]
+    mul ecx
+    add eax, [DataStart]
+    mov ecx, 1
+    call ReadSectors
+    ret
 ReadCluster endp
+
+;--------------------------------------------------------------------------------------------------
+; PURPOSE:
+;     This function validates if we're still within the current sector, increasing the current
+;     sector if required.
+;
+; PARAMETERS:
+;     CurrentOffset (si) - Offset across the current sector.
+;     CurrentSector (edi) - How many sectors deep are we.
+;
+; RETURN VALUE:
+;     Flags will be set so that `jc` will NOT JUMP if we reached the end of the cluster.
+;--------------------------------------------------------------------------------------------------
+CheckClusterBoundaries proc
+    mov ax, si
+    sub ax, 600h
+    cmp ax, [BytesPerSector]
+    jae CheckClusterBoundaries$EndOfCluster
+    stc
+    ret
+
+CheckClusterBoundaries$EndOfCluster:
+    mov ax, 0DEADh
+    jmp $
+CheckClusterBoundaries endp
 
 ;--------------------------------------------------------------------------------------------------
 ; PURPOSE:
@@ -307,7 +352,7 @@ ReadCluster endp
 ;     Afterwards, it loads the new/next cluster if possible/necessary.
 ;
 ; PARAMETERS:
-;     DirectoryEntry (esi) - Directory entry (used to determine if we need to follow the FAT).
+;     DirectoryEntry (si) - Directory entry (used to determine if we need to follow the FAT).
 ;     Cluster (ebp) - Current cluster.
 ;     NoFatChain (!(flags & ZF)) - Unset the ZF flag to follow the chain, set it if we're
 ;                                  sequential.
@@ -328,7 +373,7 @@ GetNextCluster proc
     shl eax, cl
 
     inc ebp
-    sub [esi + 56], eax
+    sub [si + 56], eax
     stc
     jns GetNextCluster$NoSign
     clc

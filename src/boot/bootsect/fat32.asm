@@ -284,7 +284,7 @@ Error$Halt:
 Error endp
 
 DiskError db "Disk error", 0
-OverflowError db "Data overflow", 0
+OverflowError db "Data error", 0
 ImageError db "BOOTMGR is missing", 0
 ImageName db "BOOTMGR    "
 
