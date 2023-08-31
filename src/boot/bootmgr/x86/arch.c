@@ -69,14 +69,14 @@ static uint64_t SearchRsdp(char *Region, char *End, int *IsXsdt) {
         }
 
         Location = Rsdp->RsdtAddress;
-        *IsXsdt = 1;
+        *IsXsdt = 0;
     } else {
         for (uint32_t i = 0; i < Rsdp->Length; i++) {
             Checksum += Region[i];
         }
 
         Location = Rsdp->XsdtAddress;
-        *IsXsdt = 0;
+        *IsXsdt = 1;
     }
 
     return Checksum ? 0 : Location;

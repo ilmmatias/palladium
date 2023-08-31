@@ -1,11 +1,8 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
+#include <acpi.h>
 #include <ke.h>
-#include <mm.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <vid.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -20,4 +17,9 @@
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void DriverEntry(void) {
+    if (KiGetAcpiTableType() == KI_ACPI_RDST) {
+        AcpipInitializeFromRsdt();
+    } else {
+        AcpipInitializeFromXsdt();
+    }
 }

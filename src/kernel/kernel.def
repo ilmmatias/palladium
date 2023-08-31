@@ -36,6 +36,8 @@ EXPORTS
     tolower
     toupper
 
+    __vprintf
+
     sscanf
 
     vsscanf

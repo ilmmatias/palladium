@@ -1,7 +1,13 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
+#include <ke.h>
 #include <vid.h>
+
+static char *Messages[] = {
+    "FATAL_ERROR",
+    "CORRUPTED_HARDWARE_STRUCTURES",
+};
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -15,13 +21,17 @@
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 [[noreturn]] void KeFatalError(int Message) {
-    (void)Message;
+    if (Message < KE_FATAL_ERROR || Message > KE_CORRUPTED_HARDWARE_STRUCTURES) {
+        Message = KE_FATAL_ERROR;
+    }
 
     VidSetColor(VID_COLOR_PANIC);
     VidResetDisplay();
 
     VidPutString("A fatal error has occoured, and the system cannot safely recover operation.\n");
-    VidPutString("You'll need to reboot your computer.");
+    VidPutString("You'll need to reboot your computer.\n");
+    VidPutString("Error Code: ");
+    VidPutString(Messages[Message]);
 
     while (1)
         ;

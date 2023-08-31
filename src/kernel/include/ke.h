@@ -9,6 +9,9 @@
 #define KI_ACPI_RDST 0
 #define KI_ACPI_XSDT 1
 
+#define KE_FATAL_ERROR 0
+#define KE_CORRUPTED_HARDWARE_STRUCTURES 1
+
 void KiSaveAcpiData(void *LoaderData);
 uint64_t KiGetAcpiBaseAddress(void);
 int KiGetAcpiTableType(void);

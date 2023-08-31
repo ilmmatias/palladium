@@ -23,5 +23,6 @@
     MiPreparePageAllocator(LoaderData);
     KiSaveAcpiData(LoaderData);
     KiRunBootStartDrivers(LoaderData);
-    KeFatalError(0);
+    while (1)
+        ;
 }
