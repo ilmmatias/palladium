@@ -37,34 +37,6 @@ void AcpipPopulateTree(const uint8_t *Code, uint32_t Length) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function enters a new method scope.
- *
- * PARAMETERS:
- *     State - AML state containing the current scope.
- *     Name - Method name (malloc'd or strdup'ed).
- *     Code - Method entry point.
- *     Length - Size of the method body.
- *
- * RETURN VALUE:
- *     New state containing the method scope, or NULL on failure.
- *-----------------------------------------------------------------------------------------------*/
-AcpipState *AcpipEnterMethod(AcpipState *State, char *Name, const uint8_t *Code, uint32_t Length) {
-    AcpipState *MethodState = malloc(sizeof(AcpipState));
-
-    if (MethodState) {
-        MethodState->Scope = Name;
-        MethodState->Code = Code;
-        MethodState->Length = Length;
-        MethodState->RemainingLength = Length;
-        MethodState->InMethod = 1;
-        MethodState->Parent = State;
-    }
-
-    return MethodState;
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
  *     This function enters a new subscope.
  *
  * PARAMETERS:
@@ -76,19 +48,53 @@ AcpipState *AcpipEnterMethod(AcpipState *State, char *Name, const uint8_t *Code,
  * RETURN VALUE:
  *     New state containing the subscope, or NULL on failure.
  *-----------------------------------------------------------------------------------------------*/
-AcpipState *
-AcpipEnterSubScope(AcpipState *State, char *Name, const uint8_t *Code, uint32_t Length) {
+AcpipState *AcpipEnterSubScope(AcpipState *State, char *Name, uint8_t NameSegs, uint32_t Length) {
     AcpipState *ScopeState = malloc(sizeof(AcpipState));
 
     if (ScopeState) {
         ScopeState->Scope = Name;
-        ScopeState->Code = Code;
+        ScopeState->ScopeSegs = NameSegs;
+        ScopeState->Code = State->Code;
         ScopeState->Length = Length;
         ScopeState->InMethod = 0;
         ScopeState->Parent = State;
     }
 
     return ScopeState;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function enters a new method scope.
+ *
+ * PARAMETERS:
+ *     State - AML state containing the current scope.
+ *     Name - Method name (malloc'd or strdup'ed).
+ *     Code - Method entry point.
+ *     Length - Size of the method body.
+ *
+ * RETURN VALUE:
+ *     New state containing the method scope, or NULL on failure.
+ *-----------------------------------------------------------------------------------------------*/
+AcpipState *AcpipEnterMethod(
+    AcpipState *State,
+    char *Name,
+    uint8_t NameSegs,
+    const uint8_t *Code,
+    uint32_t Length) {
+    AcpipState *MethodState = malloc(sizeof(AcpipState));
+
+    if (MethodState) {
+        MethodState->Scope = Name;
+        MethodState->ScopeSegs = NameSegs;
+        MethodState->Code = Code;
+        MethodState->Length = Length;
+        MethodState->RemainingLength = Length;
+        MethodState->InMethod = 1;
+        MethodState->Parent = State;
+    }
+
+    return MethodState;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -180,4 +186,152 @@ int AcpipReadQWord(AcpipState *State, uint64_t *QWord) {
     } else {
         return 0;
     }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function parses a package length field.
+ *
+ * PARAMETERS:
+ *     State - Current AML stream state.
+ *     Length - Output; What we've read, on success.
+ *
+ * RETURN VALUE:
+ *     0 on end of code, 1 otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+int AcpipReadPkgLength(AcpipState *State, uint32_t *Length) {
+    uint8_t Leading;
+    if (!AcpipReadByte(State, &Leading)) {
+        return 0;
+    }
+
+    /* High 2-bits of the leading byte specifies how many bytes we should read to get the package
+       length; For 00, the other 6 bits are the package length itself, while for 01+, we only use
+       the first 4 bits, followed by N whole bytes. */
+
+    uint8_t Part;
+    *Length = Leading & 0x0F;
+
+    switch (Leading >> 6) {
+        case 0:
+            *Length = Leading & 0x3F;
+            break;
+        case 3:
+            if (!AcpipReadByte(State, &Part)) {
+                return 0;
+            }
+
+            *Length |= (uint32_t)Part << 20;
+        case 2:
+            if (!AcpipReadByte(State, &Part)) {
+                return 0;
+            }
+
+            *Length |= (uint32_t)Part << 12;
+        case 1:
+            if (!AcpipReadByte(State, &Part)) {
+                return 0;
+            }
+
+            *Length |= (uint32_t)Part << 4;
+    }
+
+    return 1;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function parses a name string, relative to the current scope.
+ *
+ * PARAMETERS:
+ *     State - Current AML stream state.
+ *     NameString - Output; What we've read, on success.
+ *     NameSegs - Output; How many segments the name has.
+ *
+ * RETURN VALUE:
+ *     0 on end of code, 1 otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+int AcpipReadNameString(AcpipState *State, char **NameString, uint8_t *NameSegs) {
+    uint8_t Current;
+    if (!AcpipReadByte(State, &Current)) {
+        return 0;
+    }
+
+    int IsRoot = Current == '\\';
+    int Prefixes = 0;
+
+    /* Consume any and every `parent scope` prefixes, even if we don't have as many parent scopes
+       and we're consuming. */
+    if (IsRoot && !AcpipReadByte(State, &Current)) {
+        return 0;
+    } else if (!IsRoot && Current == '^') {
+        while (Current == '^') {
+            if (!AcpipReadByte(State, &Current)) {
+                return 0;
+            }
+
+            Prefixes++;
+        }
+    }
+
+    /* Follow up by making sure we're not going to far/exceeding the root scope. */
+    if (Prefixes > State->ScopeSegs) {
+        Prefixes = State->ScopeSegs;
+    }
+
+    /* The name itself is prefixed by a byte (or 2 for MultiNamePrefix) telling how many segments
+       (4 characters each) we have. */
+    *NameSegs = 0;
+
+    if (Current == 0x2E) {
+        *NameSegs = 2;
+    } else if (Current == 0x2F) {
+        if (!AcpipReadByte(State, NameSegs)) {
+            return 0;
+        }
+    } else if (Current) {
+        *NameSegs = 1;
+        State->RemainingLength--;
+        State->Code--;
+    }
+
+    if (State->RemainingLength < *NameSegs * 4) {
+        return 0;
+    }
+
+    /* If we're directly inside the root scope, our path will be `\<name segs>`, otherwise, it'll
+       be `\<scope>.<name segs>` */
+    *NameString = calloc(
+        (IsRoot || !(State->ScopeSegs - Prefixes) ? 0 : State->ScopeSegs - Prefixes + 1) +
+            *NameSegs * 4 + 2,
+        1);
+    if (!*NameString) {
+        return 0;
+    }
+
+    int NamePos = 0;
+
+    if (IsRoot || !(State->ScopeSegs - Prefixes)) {
+        (*NameString)[NamePos++] = '\\';
+    } else {
+        memcpy(*NameString + NamePos, State->Scope, (State->ScopeSegs - Prefixes) * 5);
+        NamePos += (State->ScopeSegs - Prefixes) * 5;
+        (*NameString)[NamePos++] = '.';
+    }
+
+    for (uint8_t i = 0; i < *NameSegs; i++) {
+        if (i) {
+            (*NameString)[NamePos++] = '.';
+        }
+
+        memcpy(*NameString + NamePos, State->Code, 4);
+
+        NamePos += 4;
+        State->Code += 4;
+        State->RemainingLength -= 4;
+    }
+
+    printf("%s\n", *NameString);
+
+    return 1;
 }

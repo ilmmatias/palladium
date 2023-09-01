@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-AcpiObject *AcpipExecuteTermList(AcpipState *State) {
+AcpiValue *AcpipExecuteTermList(AcpipState *State) {
     while (1) {
         if (!State->RemainingLength) {
             /* Backtrack into the previous scope, or end if we're already in the top-most
@@ -31,23 +31,99 @@ AcpiObject *AcpipExecuteTermList(AcpipState *State) {
         State->RemainingLength--;
 
         uint8_t ExtOpcode = 0;
-        if (Opcode == 0x80 && !AcpipReadByte(State, &ExtOpcode)) {
+        if (Opcode == 0x5B && !AcpipReadByte(State, &ExtOpcode)) {
             return NULL;
         }
 
         switch (Opcode | ((uint16_t)ExtOpcode << 8)) {
+            /* DefScope := ScopeOp PkgLength NameString TermList */
+            case 0x10: {
+                uint32_t Length;
+                if (!AcpipReadPkgLength(State, &Length)) {
+                    return NULL;
+                }
+
+                char *Name;
+                uint8_t NameSegs;
+                if (!AcpipReadNameString(State, &Name, &NameSegs)) {
+                    return NULL;
+                }
+
+                AcpipState *Scope = AcpipEnterSubScope(State, Name, NameSegs, Length);
+                if (!Scope) {
+                    free(Name);
+                    return NULL;
+                }
+
+                State = Scope;
+                break;
+            }
+
+            /* DefOpRegion := OpRegionOp NameString RegionSpace RegionOffset RegionLen */
+            case 0x805B: {
+                char *Name;
+                uint8_t NameSegs;
+                if (!AcpipReadNameString(State, &Name, &NameSegs)) {
+                    return NULL;
+                }
+
+                uint8_t RegionSpace;
+                if (!AcpipReadByte(State, &RegionSpace)) {
+                    free(Name);
+                    return NULL;
+                }
+
+                AcpiValue *RegionOffset = AcpipExecuteTermArg(State);
+                if (!RegionOffset) {
+                    free(Name);
+                    return NULL;
+                }
+
+                AcpiValue *RegionLen = AcpipExecuteTermArg(State);
+                if (!RegionLen) {
+                    free(Name);
+                    return NULL;
+                }
+
+                break;
+            }
+
+            /* DefField := FieldOp PkgLength NameString FieldFlags FieldList */
+            case 0x815B: {
+                uint32_t Length;
+                if (!AcpipReadPkgLength(State, &Length)) {
+                    return NULL;
+                }
+
+                char *Name;
+                uint8_t NameSegs;
+                if (!AcpipReadNameString(State, &Name, &NameSegs)) {
+                    return NULL;
+                }
+
+                printf(
+                    "unimplemented opcode: %#hx (DefField)\n", Opcode | ((uint32_t)ExtOpcode << 8));
+
+                uint8_t FieldFlags;
+                if (!AcpipReadFieldList(State, &FieldFlags)) {
+                    free(Name);
+                    return NULL;
+                }
+
+                break;
+            }
+
             default:
                 printf("unimplemented opcode: %#hx\n", Opcode | ((uint32_t)ExtOpcode << 8));
-                while (1)
-                    ;
+                return NULL;
         }
     }
 
-    AcpiObject *Object = malloc(sizeof(AcpiObject));
-    if (Object) {
-        Object->Type = ACPI_OBJECT_INTEGER;
-        Object->Value.Integer = 0;
+    AcpiValue *Value = malloc(sizeof(AcpiValue));
+    if (Value) {
+        Value->Type = ACPI_VALUE_INTEGER;
+        Value->Integer = 0;
     }
 
-    return Object;
+    return Value;
 }

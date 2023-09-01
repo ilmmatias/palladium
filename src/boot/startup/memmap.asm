@@ -60,7 +60,7 @@ TryE820$Loop:
     cmp ecx, 24
     jb TryE820$NotAcpi3
     test byte ptr es:[di + 20], 1
-    jne TryE820$Next
+    je TryE820$Next
 
 TryE820$NotAcpi3:
     mov ecx, es:[di + 8]

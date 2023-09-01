@@ -5,6 +5,7 @@ project(os/drivers/acpi)
 
 add_executable(acpi "knostdlib"
     aml.c
+    field.c
     main.c
     rsdt.c
     termarg.c
