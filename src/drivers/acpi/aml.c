@@ -1,172 +1,10 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
-#include <crt_impl.h>
-#include <stdarg.h>
-#include <stdint.h>
+#include <acpi.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <vid.h>
-
-/* stdio START; for debugging our AML interpreter. */
-static void put_buf(const void *buffer, int size, void *context) {
-    (void)context;
-    for (int i = 0; i < size; i++) {
-        VidPutChar(((const char *)buffer)[i]);
-    }
-}
-
-static int printf(const char *format, ...) {
-    va_list vlist;
-    va_start(vlist, format);
-    int len = __vprintf(format, vlist, NULL, put_buf);
-    va_end(vlist);
-    return len;
-}
-/* stdio END */
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function parses a PkgLength element.
- *
- * PARAMETERS:
- *     Code - Pointer to the current position along the AML code.
- *     Length - Pointer to the remaining length of the code.
- *
- * RETURN VALUE:
- *     Length of the package (scope, function, etc).
- *-----------------------------------------------------------------------------------------------*/
-static uint32_t ParsePkgLength(const uint8_t **Code, uint32_t *Length) {
-    if (!*Length) {
-        return 0;
-    }
-
-    /* High 2 bits of the leading byte reveals how many bytes the package length itself is
-       composed of. */
-    uint8_t Type = *((*Code)++);
-    (*Length)--;
-
-    uint32_t Result = 0;
-    switch (Type >> 6) {
-        /* For 0, the other 6 bits (of the leading byte) are used. */
-        case 0:
-            Result = Type & 0x3F;
-            break;
-        /* Otherwise, only the first 4 bits are used, followed by N whole bytes, where N is how
-           many bytes those 2 high bits told us to use. */
-        case 3:
-            if (*Length) {
-                Result |= (uint32_t)(*((*Code)++)) << 20;
-                (*Length)--;
-            }
-        case 2:
-            if (*Length) {
-                Result |= (uint32_t)(*((*Code)++)) << 12;
-                (*Length)--;
-            }
-        case 1:
-            if (*Length) {
-                Result |= (uint32_t)(*((*Code)++)) << 4;
-                (*Length)--;
-            }
-
-            Result |= Type & 0x0F;
-            break;
-    }
-
-    return Result;
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function parses a name string/segment (according to the AML spec).
- *
- * PARAMETERS:
- *     Code - Pointer to the current position along the AML code.
- *     Length - Pointer to the remaining length of the code.
- *
- * RETURN VALUE:
- *     Pointer to the output string, allocated with malloc (the caller is expected to manage it
- *     manually!); Or NULL if either the allocation failed, or we reached the end of the input
- *     buffer.
- *-----------------------------------------------------------------------------------------------*/
-static char *ParseNameString(const uint8_t **Code, uint32_t *Length) {
-    if (!*Length) {
-        return NULL;
-    }
-
-    /* We should always be prefixed by either the root character (\) or 0+ `parent scope`
-       characters (^). */
-    int Prefixes = **Code == '\\';
-    int Root = 0;
-
-    if (Prefixes) {
-        (*Length)--;
-        (*Code)++;
-        Root = 1;
-    } else {
-        while (**Code == '^' && *Length) {
-            (*Length)--;
-            (*Code)++;
-            Prefixes++;
-        }
-    }
-
-    /* We're now followed by either a NullName (0x00, aka, nothing); 2 name segments (prefixed by
-       0x2E); 3+ name segments (0x2F); Or just a single name segment. */
-    int SegCount = 0;
-
-    if (*Length) {
-        if (!**Code) {
-            (*Length)--;
-            (*Code)++;
-        } else if (**Code == 0x2E) {
-            (*Length)--;
-            (*Code)++;
-            SegCount = 2;
-        } else if (**Code == 0x2F) {
-            (*Code)++;
-            if ((*Length)--) {
-                SegCount = *((*Code)++);
-                (*Length)--;
-            }
-        } else {
-            SegCount = 1;
-        }
-    } else if (!Prefixes) {
-        return NULL;
-    }
-
-    char *NameString = malloc(Prefixes + SegCount * 4 + (SegCount ? SegCount : 1));
-    int NeedsSeparator = 0;
-    int NamePos = 0;
-
-    if (!NameString) {
-        return 0;
-    } else if (Prefixes && Root) {
-        NameString[NamePos++] = '\\';
-    } else if (Prefixes) {
-        while (Prefixes--) {
-            NameString[NamePos++] = '^';
-        }
-    }
-
-    while (*Length > 4 && SegCount--) {
-        if (NeedsSeparator) {
-            NameString[NamePos++] = '.';
-        } else {
-            NeedsSeparator = 1;
-        }
-
-        memcpy(&NameString[NamePos], *Code, 4);
-        NamePos += 4;
-        *Length -= 4;
-        *Code += 4;
-    }
-
-    NameString[NamePos] = 0;
-    return NameString;
-}
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -180,7 +18,166 @@ static char *ParseNameString(const uint8_t **Code, uint32_t *Length) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void AcpipPopulateTree(const uint8_t *Code, uint32_t Length) {
-    (void)ParsePkgLength;
-    (void)ParseNameString;
+    AcpipState State;
+
+    State.Scope = strdup("\\");
+    State.Code = Code;
+    State.Length = Length;
+    State.RemainingLength = Length;
+    State.InMethod = 0;
+    State.Parent = NULL;
+
+    if (!State.Scope) {
+        return;
+    }
+
     printf("AcpipPopulateTree(%p, %u)\n", Code, Length);
+    AcpipExecuteTermList(&State);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function enters a new method scope.
+ *
+ * PARAMETERS:
+ *     State - AML state containing the current scope.
+ *     Name - Method name (malloc'd or strdup'ed).
+ *     Code - Method entry point.
+ *     Length - Size of the method body.
+ *
+ * RETURN VALUE:
+ *     New state containing the method scope, or NULL on failure.
+ *-----------------------------------------------------------------------------------------------*/
+AcpipState *AcpipEnterMethod(AcpipState *State, char *Name, const uint8_t *Code, uint32_t Length) {
+    AcpipState *MethodState = malloc(sizeof(AcpipState));
+
+    if (MethodState) {
+        MethodState->Scope = Name;
+        MethodState->Code = Code;
+        MethodState->Length = Length;
+        MethodState->RemainingLength = Length;
+        MethodState->InMethod = 1;
+        MethodState->Parent = State;
+    }
+
+    return MethodState;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function enters a new subscope.
+ *
+ * PARAMETERS:
+ *     State - AML state containing the current scope.
+ *     Name - Scope path (malloc'd or strdup'ed).
+ *     Code - Scope entry point.
+ *     Length - Size of the scope body.
+ *
+ * RETURN VALUE:
+ *     New state containing the subscope, or NULL on failure.
+ *-----------------------------------------------------------------------------------------------*/
+AcpipState *
+AcpipEnterSubScope(AcpipState *State, char *Name, const uint8_t *Code, uint32_t Length) {
+    AcpipState *ScopeState = malloc(sizeof(AcpipState));
+
+    if (ScopeState) {
+        ScopeState->Scope = Name;
+        ScopeState->Code = Code;
+        ScopeState->Length = Length;
+        ScopeState->InMethod = 0;
+        ScopeState->Parent = State;
+    }
+
+    return ScopeState;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function reads the next byte (8-bits) from the AML code stream, validating that we're
+ *     still inside the code region.
+ *
+ * PARAMETERS:
+ *     State - Current AML stream state.
+ *     Byte - Output; What we've read, on success.
+ *
+ * RETURN VALUE:
+ *     0 on end of code, 1 otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+int AcpipReadByte(AcpipState *State, uint8_t *Byte) {
+    if (State->RemainingLength) {
+        *Byte = *(State->Code++);
+        State->RemainingLength--;
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function reads the next word (16-bits) from the AML code stream, validating that we're
+ *     still inside the code region.
+ *
+ * PARAMETERS:
+ *     State - Current AML stream state.
+ *     Word - Output; What we've read, on success.
+ *
+ * RETURN VALUE:
+ *     0 on end of code, 1 otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+int AcpipReadWord(AcpipState *State, uint16_t *Word) {
+    if (State->RemainingLength > 1) {
+        *Word = *(uint16_t *)State->Code;
+        State->Code += 2;
+        State->RemainingLength -= 2;
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function reads the next dword (32-bits) from the AML code stream, validating that
+ *     we're still inside the code region.
+ *
+ * PARAMETERS:
+ *     State - Current AML stream state.
+ *     DWord - Output; What we've read, on success.
+ *
+ * RETURN VALUE:
+ *     0 on end of code, 1 otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+int AcpipReadDWord(AcpipState *State, uint32_t *DWord) {
+    if (State->RemainingLength > 3) {
+        *DWord = *(uint32_t *)State->Code;
+        State->Code += 4;
+        State->RemainingLength -= 4;
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function reads the next qword (64-bits) from the AML code stream, validating that
+ *     we're still inside the code region.
+ *
+ * PARAMETERS:
+ *     State - Current AML stream state.
+ *     QWord - Output; What we've read, on success.
+ *
+ * RETURN VALUE:
+ *     0 on end of code, 1 otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+int AcpipReadQWord(AcpipState *State, uint64_t *QWord) {
+    if (State->RemainingLength > 7) {
+        *QWord = *(uint64_t *)State->Code;
+        State->Code += 8;
+        State->RemainingLength -= 8;
+        return 1;
+    } else {
+        return 0;
+    }
 }

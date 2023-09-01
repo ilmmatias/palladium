@@ -4,6 +4,7 @@
 #include <acpi.h>
 #include <ke.h>
 #include <mm.h>
+#include <sdt.h>
 #include <string.h>
 
 /*-------------------------------------------------------------------------------------------------
@@ -61,9 +62,9 @@ void AcpipInitializeFromRsdt() {
                 KeFatalError(KE_CORRUPTED_HARDWARE_STRUCTURES);
             }
 
-            AcpipPopulateTree((char *)(Header + 1), Header->Length - sizeof(SdtHeader));
+            AcpipPopulateTree((uint8_t *)(Header + 1), Header->Length - sizeof(SdtHeader));
         } else if (!memcmp(Header->Signature, "DSDT", 4) || !memcmp(Header->Signature, "SSDT", 4)) {
-            AcpipPopulateTree((char *)(Header + 1), Header->Length - sizeof(SdtHeader));
+            AcpipPopulateTree((uint8_t *)(Header + 1), Header->Length - sizeof(SdtHeader));
         }
     }
 }
@@ -102,9 +103,9 @@ void AcpipInitializeFromXsdt() {
                 KeFatalError(KE_CORRUPTED_HARDWARE_STRUCTURES);
             }
 
-            AcpipPopulateTree((char *)(Header + 1), Header->Length - sizeof(SdtHeader));
+            AcpipPopulateTree((uint8_t *)(Header + 1), Header->Length - sizeof(SdtHeader));
         } else if (!memcmp(Header->Signature, "DSDT", 4) || !memcmp(Header->Signature, "SSDT", 4)) {
-            AcpipPopulateTree((char *)(Header + 1), Header->Length - sizeof(SdtHeader));
+            AcpipPopulateTree((uint8_t *)(Header + 1), Header->Length - sizeof(SdtHeader));
         }
     }
 }

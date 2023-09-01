@@ -2,7 +2,27 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <acpi.h>
+#include <crt_impl.h>
 #include <ke.h>
+#include <stdarg.h>
+#include <vid.h>
+
+/* stdio START; for debugging our AML interpreter. */
+static void put_buf(const void *buffer, int size, void *context) {
+    (void)context;
+    for (int i = 0; i < size; i++) {
+        VidPutChar(((const char *)buffer)[i]);
+    }
+}
+
+int printf(const char *format, ...) {
+    va_list vlist;
+    va_start(vlist, format);
+    int len = __vprintf(format, vlist, NULL, put_buf);
+    va_end(vlist);
+    return len;
+}
+/* stdio END */
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:

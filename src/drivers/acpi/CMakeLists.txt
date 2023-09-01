@@ -6,7 +6,9 @@ project(os/drivers/acpi)
 add_executable(acpi "knostdlib"
     aml.c
     main.c
-    rsdt.c)
+    rsdt.c
+    termarg.c
+    termlist.c)
 
 target_link_libraries(acpi kernel)
 target_include_directories(acpi PRIVATE include)

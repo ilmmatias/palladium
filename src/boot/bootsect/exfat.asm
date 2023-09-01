@@ -96,13 +96,13 @@ Main$Setup:
     call ReadCluster
     mov al, [si + 33]
     mov [FileFlags], al
-    xor di, di
+    xor edi, edi
     jmp Main$Search
 
 Main$NextCluster:
     mov bx, 600h
     mov si, bx
-    xor di, di
+    xor edi, edi
     clc
     call ReadCluster
 
@@ -130,7 +130,7 @@ Main$Search:
     jne Main$NextEntry
 
     push si
-    push di
+    push edi
     mov cx, ImageSize
     add si, 66
     mov di, offset ImageName
@@ -150,7 +150,7 @@ Main$NotLower:
     loop Main$CheckName
 
 Main$EndCheck:
-    pop di
+    pop edi
     pop si
     je Main$Found
 
@@ -177,7 +177,6 @@ Main$Found:
     call ReadCluster
     mov al, [si + 33]
     mov [FileFlags], al
-    xor di, di
     jmp Main$LoopSkipRead
 
 Main$Loop:
@@ -328,6 +327,7 @@ ReadCluster endp
 ; PARAMETERS:
 ;     CurrentOffset (si) - Offset across the current sector.
 ;     CurrentSector (edi) - How many sectors deep are we.
+;     Cluster (ebp) - Cluster we're currently in.
 ;
 ; RETURN VALUE:
 ;     Flags will be set so that `jc` will NOT JUMP if we reached the end of the cluster.
@@ -336,13 +336,27 @@ CheckClusterBoundaries proc
     mov ax, si
     sub ax, 600h
     cmp ax, [BytesPerSector]
-    jae CheckClusterBoundaries$EndOfCluster
+    jae CheckClusterBoundaries$EndOfSector
     stc
     ret
 
-CheckClusterBoundaries$EndOfCluster:
-    mov ax, 0DEADh
-    jmp $
+CheckClusterBoundaries$EndOfSector:
+    inc edi
+    cmp edi, [SectorsPerCluster]
+    jb CheckClusterBoundaries$ReadNextSector
+    clc
+    ret
+
+CheckClusterBoundaries$ReadNextSector:
+    mov ecx, [SectorsPerCluster]
+    lea eax, [ebp - 2]
+    mul ecx
+    add eax, [DataStart]
+    add eax, edi
+    mov ecx, 1
+    call ReadSectors
+    stc
+    ret
 CheckClusterBoundaries endp
 
 ;--------------------------------------------------------------------------------------------------
