@@ -8,6 +8,7 @@
 BiosMemoryRegion *BiosMemoryMap = NULL;
 uint32_t BiosMemoryMapEntries = 0;
 uint64_t BiosMemorySize = 0;
+uint64_t BiosMaxAddressableMemory = 0;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -56,6 +57,10 @@ void BmInitMemory(void *BootBlock) {
              Region->Type >= BIOS_MEMORY_REGION_TYPE_USED) &&
             Region->BaseAddress + Region->Length > BiosMemorySize) {
             BiosMemorySize = Region->BaseAddress + Region->Length;
+        }
+
+        if (Region->BaseAddress + Region->Length > BiosMaxAddressableMemory) {
+            BiosMaxAddressableMemory = Region->BaseAddress + Region->Length;
         }
 
         Region++;

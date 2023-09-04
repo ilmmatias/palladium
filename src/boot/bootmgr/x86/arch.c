@@ -143,32 +143,18 @@ void BmInitArch(void *BootBlock) {
  *     None; Does not return if the host is incompatible.
  *-----------------------------------------------------------------------------------------------*/
 void BmCheckCompatibility(void) {
-    /* Palladium targets at least an Intel Haswell (4th gen) processor, or an AMD Zen (1st gen)
-       processor. As such, we can assume the host should have at least SSE4.2, AVX2, BMI2, LM,
-       XSAVE.
-       If all those features are available, we're assuming this is a support processor. */
+    /* At the moment, the two features we care the most are XSAVE and LM (which implies SSE2). */
 
     uint32_t Eax, Ebx, Ecx, Edx;
 
     __cpuid(1, Eax, Ebx, Ecx, Edx);
-    if (!(Ecx & bit_SSE42)) {
-        BmPanic(BASE_MESSAGE "(SSE42).\n");
-    } else if (!(Ecx & bit_XSAVE)) {
+    if (!(Ecx & bit_XSAVE)) {
         BmPanic(BASE_MESSAGE "(XSAVE).\n");
-    }
-
-    __get_cpuid_count(7, 0, &Eax, &Ebx, &Ecx, &Edx);
-    if (!(Ebx & bit_AVX2)) {
-        BmPanic(BASE_MESSAGE "(AVX2).\n");
-    } else if (!(Ebx & bit_BMI2)) {
-        BmPanic(BASE_MESSAGE "(BMI2).\n");
     }
 
     __cpuid(0x80000001, Eax, Ebx, Ecx, Edx);
     if (!(Edx & bit_LM)) {
         BmPanic(BASE_MESSAGE "(LM).\n");
-    } else if (!(Edx & bit_PDPE1GB)) {
-        BmPanic(BASE_MESSAGE "(PDPE1GB).\n");
     }
 
     /* All seems well; Palladium requires ACPI support, if we already have the RSDP saved

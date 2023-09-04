@@ -44,6 +44,8 @@ static uint64_t LoadFile(
     int IsKernel,
     ExportTable **KernelExports,
     size_t *KernelExportCount) {
+    printf("loading up %s\n", Path);
+
     FILE *Stream = fopen(Path, "rb");
     if (!Stream) {
         return 0;

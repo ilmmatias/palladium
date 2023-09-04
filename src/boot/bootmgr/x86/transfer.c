@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <x86/bios.h>
+#include <x86/cpuid.h>
 
 #define LOADER_MAGIC "BMGR"
 #define LOADER_CURRENT_VERSION 0x0000
@@ -39,63 +40,9 @@ extern int BiosIsXsdt;
 extern BiosMemoryRegion *BiosMemoryMap;
 extern uint32_t BiosMemoryMapEntries;
 extern uint64_t BiosMemorySize;
+extern uint64_t BiosMaxAddressableMemory;
 
 [[noreturn]] void BiTransferExecution(uint64_t *Pml4, uint64_t BootData, uint64_t EntryPoint);
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function maps up a kernel or kernel driver page, allocating and filling the page map
- *     along the way.
- *
- * PARAMETERS:
- *     Pml4 - Base physical address of the page map.
- *     VirtualAddress - Virtual address/destination for the page.
- *     PhysicalAddress - Physical page where the data is located.
- *     PageFlags - Page flags (from boot.h), will be converted into valid flags by us.
- *
- * RETURN VALUE:
- *     0 on failure, 1 otherwise.
- *-----------------------------------------------------------------------------------------------*/
-static int
-MapPage(uint64_t *Pml4, uint64_t VirtualAddress, uint64_t PhysicalAddress, int PageFlags) {
-    uint64_t Pml4Entry = (VirtualAddress >> 39) & 0x1FF;
-    uint64_t PdptEntry = (VirtualAddress >> 30) & 0x1FF;
-    uint64_t PdtEntry = (VirtualAddress >> 21) & 0x1FF;
-    uint64_t PtEntry = (VirtualAddress >> 12) & 0x1FF;
-
-    uint64_t *Pdpt = (uint64_t *)(Pml4[Pml4Entry] & ~0x7FF8000000000FFF);
-    if (!(Pml4[Pml4Entry] & 0x01)) {
-        Pdpt = (uint64_t *)BmAllocatePages(1, MEMORY_KERNEL);
-        Pml4[Pml4Entry] = (uint64_t)Pdpt | 0x03;
-        if (!Pdpt) {
-            return 0;
-        }
-    }
-
-    uint64_t *Pdt = (uint64_t *)(Pdpt[PdptEntry] & ~0x7FF8000000000FFF);
-    if (!(Pdpt[PdptEntry] & 0x01)) {
-        Pdt = (uint64_t *)BmAllocatePages(1, MEMORY_KERNEL);
-        Pdpt[PdptEntry] = (uint64_t)Pdt | 0x03;
-        if (!Pdt) {
-            return 0;
-        }
-    }
-
-    uint64_t *Pt = (uint64_t *)(Pdt[PdtEntry] & ~0x7FF8000000000FFF);
-    if (!(Pdt[PdtEntry] & 0x01)) {
-        Pt = (uint64_t *)BmAllocatePages(1, MEMORY_KERNEL);
-        Pdt[PdtEntry] = (uint64_t)Pt | 0x03;
-        if (!Pt) {
-            return 0;
-        }
-    }
-
-    Pt[PtEntry] = PhysicalAddress | (PageFlags & PAGE_WRITE     ? 0x8000000000000003
-                                     : !(PageFlags & PAGE_EXEC) ? 0x8000000000000001
-                                                                : 0x01);
-
-    return 1;
-}
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -112,6 +59,18 @@ MapPage(uint64_t *Pml4, uint64_t VirtualAddress, uint64_t PhysicalAddress, int P
 [[noreturn]] void BmTransferExecution(LoadedImage *Images, size_t ImageCount) {
     /* TODO: Add support for PML5 (under compatible processors). */
 
+    /* Currently, we load the kernel expecting at most 16TiB of addressable physical memory; Any
+       more than this, and we'll assume we're running on an incompatible platform. */
+    if (BiosMaxAddressableMemory > 0x100000000000) {
+        BmPanic("An error occoured while trying to load the selected operating system.\n"
+                "The maximum addressable RAM address in the memory map is too big.");
+    }
+
+    /* Check for 1GiB page support; If we do support it, it reduces the amount of work to map all
+       of the physical memory. */
+    uint32_t Eax, Ebx, Ecx, Edx;
+    __cpuid(0x80000001, Eax, Ebx, Ecx, Edx);
+
     /* Pre-allocate the space required for the kernel's physical memory manager; This way
        the kernel doesn't need to worry about anything but filling the info.
        MmSize should always be `PagesOfMemory * sizeof(MmPageEntry)`, if MmPageEntry changes
@@ -121,53 +80,103 @@ MapPage(uint64_t *Pml4, uint64_t VirtualAddress, uint64_t PhysicalAddress, int P
     void *MmBase = BmAllocatePages((MmSize + PAGE_SIZE - 1) >> PAGE_SHIFT, MEMORY_KERNEL);
     if (!MmBase) {
         BmPanic("An error occoured while trying to load the selected operating system.\n"
-                "There is not enough RAN for the memory manager.");
+                "There is not enough RAM for the memory manager.");
     }
+
+    uint64_t Slices512GiB = (BiosMaxAddressableMemory + 0x7FFFFFFFFF) >> 39;
+    uint64_t Slices1GiB = (BiosMaxAddressableMemory + 0x3FFFFFFF) >> 30;
+    uint64_t Slices2MiB = (BiosMaxAddressableMemory + 0x1FFFFF) >> 21;
 
     do {
         int Fail = 0;
         uint64_t *Pml4 = BmAllocatePages(1, MEMORY_KERNEL);
         uint64_t *EarlyIdentPdpt = BmAllocatePages(1, MEMORY_KERNEL);
-        uint64_t *LateIdentPdpt = BmAllocatePages(1, MEMORY_KERNEL);
+        uint64_t *LateIdentPdpt = BmAllocatePages(Slices512GiB, MEMORY_KERNEL);
+        uint64_t *KernelPdpt = BmAllocatePages(1, MEMORY_KERNEL);
         uint64_t *EarlyIdentPdt = BmAllocatePages(1, MEMORY_KERNEL);
         LoaderBootData *BootData = malloc(sizeof(LoaderBootData));
 
-        if (!Pml4 || !EarlyIdentPdpt || !LateIdentPdpt || !EarlyIdentPdt || !BootData) {
+        if (!Pml4 || !EarlyIdentPdpt || !LateIdentPdpt || !EarlyIdentPdt || !KernelPdpt ||
+            !BootData) {
             break;
         }
 
         /* First 2MiB are the early identity mapping (which contains ourselves; Required for no
            crash upon entering long mode).
            Right after the higher half barrier, we have the actual identity mapping (supporting up
-           to 512 GiB, all mapped by default).
-           After that, we have the recursive mapping of the paging structs (for fast access).
+           to 16TiB, mapped according to the max adressable memory).
            The kernel and the kernel drivers are mapped at last, in whichever locations the ASLR
            layer chose. */
         memset(Pml4, 0, PAGE_SIZE);
         Pml4[0] = (uint64_t)EarlyIdentPdpt | 0x03;
-        Pml4[256] = (uint64_t)LateIdentPdpt | 0x03;
+        Pml4[(ARENA_BASE >> 39) & 0x1FF] = (uint64_t)KernelPdpt | 0x03;
+
+        for (uint64_t i = 0; i < Slices512GiB; i++) {
+            Pml4[256 + i] = (uint64_t)(LateIdentPdpt + (i << 9)) | 0x03;
+        }
+
+        if (Edx & bit_PDPE1GB) {
+            printf("mapping %llu 1GiB slices of adressable physical memory\n", Slices1GiB);
+            memset(LateIdentPdpt, 0, Slices512GiB * PAGE_SIZE);
+            for (uint64_t i = 0; i < Slices1GiB; i++) {
+                LateIdentPdpt[i] = (i << 30) | 0x83;
+            }
+        } else {
+            uint64_t *LateIdentPdt = BmAllocatePages(Slices1GiB, MEMORY_KERNEL);
+            if (!LateIdentPdt) {
+                break;
+            }
+
+            memset(LateIdentPdpt, 0, Slices512GiB * PAGE_SIZE);
+            for (uint64_t i = 0; i < Slices1GiB; i++) {
+                LateIdentPdpt[i] = (uint64_t)(LateIdentPdt + (i << 9)) | 0x03;
+            }
+
+            printf("mapping %llu 2MiB slices of adressable physical memory\n", Slices2MiB);
+            memset(LateIdentPdt, 0, Slices1GiB * PAGE_SIZE);
+            for (uint64_t i = 0; i < Slices2MiB; i++) {
+                LateIdentPdt[i] = (i << 21) | 0x83;
+            }
+        }
 
         memset(EarlyIdentPdpt, 0, PAGE_SIZE);
         EarlyIdentPdpt[0] = (uint64_t)EarlyIdentPdt | 0x03;
 
-        memset(LateIdentPdpt, 0, PAGE_SIZE);
-        for (uint64_t i = 0; i < 512; i++) {
-            LateIdentPdpt[i] = (i * 0x40000000) | 0x8000000000000083;
-        }
-
         memset(EarlyIdentPdt, 0, PAGE_SIZE);
         EarlyIdentPdt[0] = 0x83;
 
-        for (size_t i = 0; !Fail && i < ImageCount; i++) {
-            for (size_t Page = 0; Page < Images[i].ImageSize >> PAGE_SHIFT; Page++) {
-                if (!MapPage(
-                        Pml4,
-                        Images[i].VirtualAddress + (Page << PAGE_SHIFT),
-                        Images[i].PhysicalAddress + (Page << PAGE_SHIFT),
-                        Images[i].PageFlags[Page])) {
-                    Fail = 1;
-                    break;
-                }
+        memset(KernelPdpt, 0, PAGE_SIZE);
+        for (size_t i = 0; i < ImageCount; i++) {
+            /* 1GiB should be a sane limit for a single image/driver. */
+            uint64_t ImageSlices2MiB = (Images[i].ImageSize + 0x1FFFFF) >> 21;
+            uint64_t ImageSlices4KiB = Images[i].ImageSize >> 12;
+
+            uint64_t ImagePdptBase = (Images[i].VirtualAddress >> 30) & 0x1FF;
+            uint64_t ImagePdtBase = (Images[i].VirtualAddress >> 21) & 0x1FF;
+            uint64_t ImagePtBase = (Images[i].VirtualAddress >> 12) & 0x1FF;
+
+            uint64_t *ImagePdt = BmAllocatePages(1, MEMORY_KERNEL);
+            uint64_t *ImagePt = BmAllocatePages(ImageSlices2MiB, MEMORY_KERNEL);
+
+            if (!ImagePdt || !ImagePt) {
+                break;
+            }
+
+            KernelPdpt[ImagePdptBase] = (uint64_t)ImagePdt | 0x03;
+
+            memset(ImagePdt, 0, PAGE_SIZE);
+            for (uint64_t j = 0; j < ImageSlices2MiB; j++) {
+                ImagePdt[ImagePdtBase + j] = (uint64_t)(ImagePt + (j << 9)) | 0x03;
+            }
+
+            printf("mapping %llu slices of 4KiB of image %zu\n", ImageSlices4KiB, i);
+            memset(ImagePt, 0, ImageSlices2MiB * PAGE_SIZE);
+            for (uint64_t j = 0; j < ImageSlices4KiB; j++) {
+                int Flags = Images[i].PageFlags[j];
+                ImagePt[ImagePtBase + j] = (uint64_t)(Images[i].PhysicalAddress + (j << 12)) |
+                                           (Flags & PAGE_WRITE     ? 0x8000000000000003
+                                            : !(Flags & PAGE_EXEC) ? 0x8000000000000001
+                                                                   : 0x01);
             }
         }
 

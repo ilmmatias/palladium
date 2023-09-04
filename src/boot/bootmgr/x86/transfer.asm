@@ -35,9 +35,10 @@ _BiTransferExecution proc
     or eax, 80010000h
     mov cr0, eax
 
-    ; The GDT last 2 entries should be 64-bits descriptors, so just long ret into 64-bits mode.
+    ; All we've left is loading a proper 64-bits GDT, and long ret'ing into 64-bits mode.
+    lgdt [_BiTransferExecution$GdtSize]
     mov eax, offset _BiTransferExecution$Finish
-    push 28h
+    push 08h
     push eax
     retf
 
@@ -45,6 +46,8 @@ _BiTransferExecution$Finish:
     mov ax, 10h
     mov ds, ax
     mov es, ax
+    mov fs, ax
+    mov gs, ax
     mov ss, ax
 
     ; Skip the return address and Pml4, so that we can grab the entry point + boot data.
@@ -55,4 +58,10 @@ _BiTransferExecution$Finish:
     ; Setup a proper aligned stack (16-bytes alignemnt), and jump execution.
     db 48h, 0C7h, 0C4h, 000h, 7Ch, 00h, 00h ; mov rsp, 7C00h
     jmp eax
+
+align 8
+_BiTransferExecution$GdtDescs dq 0000000000000000h, 00AF9A000000FFFFh, 00AF92000000FFFFh
+_BiTransferExecution$GdtSize dw _BiTransferExecution$GdtSize - _BiTransferExecution$GdtDescs - 1
+_BiTransferExecution$GdtBase dd _BiTransferExecution$GdtDescs, 0
+
 _BiTransferExecution endp

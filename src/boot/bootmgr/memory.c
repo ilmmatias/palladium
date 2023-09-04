@@ -26,7 +26,7 @@ uint64_t BmAllocateVirtualAddress(uint64_t Pages) {
     /* Generate a random sequence, fit it inside the arena size, and then strip the low page
        bits. */
     uint64_t RandomBits = __rand64();
-    uint64_t Address = ARENA_BASE + (RandomBits & ((ARENA_SIZE - 1) & ~(PAGE_SIZE - 1)));
+    uint64_t Address = ARENA_BASE + (RandomBits & ((ARENA_SIZE - 1) & ~(ARENA_PAGE_SIZE - 1)));
     uint64_t Size = Pages << PAGE_SHIFT;
 
     MemoryArena *Entry = BmMemoryArena;
