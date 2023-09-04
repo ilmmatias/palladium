@@ -7,6 +7,7 @@
 #include <stdlib.h>
 
 MemoryArena *BmMemoryArena = NULL;
+int BmMemoryArenaSize = 0;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -19,59 +20,38 @@ MemoryArena *BmMemoryArena = NULL;
  *     Allocated address, or 0 if no address was found.
  *-----------------------------------------------------------------------------------------------*/
 uint64_t BmAllocateVirtualAddress(uint64_t Pages) {
-    if (!Pages) {
+    if (!Pages || !BmMemoryArenaSize || (Pages << PAGE_SHIFT) > ARENA_PAGE_SIZE) {
         return 0;
     }
 
-    /* Generate a random sequence, fit it inside the arena size, and then strip the low page
-       bits. */
-    uint64_t RandomBits = __rand64();
-    uint64_t Address = ARENA_BASE + (RandomBits & ((ARENA_SIZE - 1) & ~(ARENA_PAGE_SIZE - 1)));
-    uint64_t Size = Pages << PAGE_SHIFT;
-
+    /* First stage, allocate one of the random areas; This will randomize at least a few of the
+       high bits (on amd64, it randomizes 9 bits). We just generate a random index into the arena
+       list. */
+    unsigned int RandomIndex = (unsigned int)rand() % BmMemoryArenaSize;
     MemoryArena *Entry = BmMemoryArena;
-    MemoryArena *Closest = NULL;
-    int ExactMatch = 0;
+    uint64_t Address = 0;
 
-    while (Entry != NULL) {
-        if (Entry->Base <= Address && Entry->Base + Entry->Size >= Address + Size) {
-            ExactMatch = 1;
+    if (!RandomIndex) {
+        BmMemoryArena = BmMemoryArena->Next;
+        Address = Entry->Base;
+    } else {
+        while (--RandomIndex) {
+            Entry = Entry->Next;
+        }
+
+        Address = Entry->Next->Base;
+        Entry->Next = Entry->Next->Next;
+    }
+
+    /* Second stage, 10 attempts at randomizing the remaining bits. */
+    for (int i = 0; i < 10; i++) {
+        uint64_t RandomOffset = __rand64() & (ARENA_PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
+        if (ARENA_PAGE_SIZE - RandomOffset >= (Pages << PAGE_SHIFT)) {
+            Address += RandomOffset;
             break;
         }
-
-        /* If enough memory is available, save the address and closest match and keep on searching
-           until we trip to the first entry after the chosen address. */
-        if (Entry->Size >= Size) {
-            Closest = Entry;
-
-            if (Entry->Base + Entry->Size >= Address) {
-                break;
-            }
-        }
-
-        Entry = Entry->Next;
     }
 
-    if (!ExactMatch && !Closest) {
-        return 0;
-    } else if (!ExactMatch || Entry->Base == Address) {
-        Entry->Size -= Size;
-        Address = Entry->Base;
-        Entry->Base += Size;
-        return Address;
-    }
-
-    MemoryArena *NextEntry = malloc(sizeof(MemoryArena));
-    if (!NextEntry) {
-        return 0;
-    }
-
-    NextEntry->Base = Address + Size;
-    NextEntry->Size = Entry->Size - NextEntry->Base + Entry->Base;
-    NextEntry->Next = Entry->Next;
-
-    Entry->Size = Address - Entry->Base;
-    Entry->Next = NextEntry;
-
+    BmMemoryArenaSize--;
     return Address;
 }

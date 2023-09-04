@@ -29,7 +29,7 @@ typedef struct __attribute__((aligned)) {
 uint64_t BiosRsdtLocation = 0;
 int BiosIsXsdt = 0;
 
-static MemoryArena KernelRegion;
+static MemoryArena KernelRegion[512];
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -97,12 +97,16 @@ void BmInitArch(void *BootBlock) {
     BiosBootBlock *Data = (BiosBootBlock *)BootBlock;
     BiosDetectDisks(Data);
 
-    /* Seed virtual region allocator with a single region, containing all the high/kernel
-       space. */
-    KernelRegion.Base = ARENA_BASE;
-    KernelRegion.Size = ARENA_SIZE;
-    KernelRegion.Next = NULL;
-    BmMemoryArena = &KernelRegion;
+    /* The virtual region allocators expects us to feed it with all possible regions inside the
+       arena; We're using 1GiB regions (limited to 512 images in total), fill all entries based
+       on that. */
+    for (uint64_t i = 0; i < 512; i++) {
+        KernelRegion[i].Base = ARENA_BASE + (i << 30);
+        KernelRegion[i].Next = i == 511 ? NULL : &KernelRegion[i + 1];
+    }
+
+    BmMemoryArena = KernelRegion;
+    BmMemoryArenaSize = 512;
 
     /* RDSEED is seemingly a non determistic RNG, and we can use that to seed the PRNG on any new
        enough computer (it's VERY slow, so we should only use it as seed).

@@ -9,15 +9,13 @@
 
 #if defined(ARCH_x86) || defined(ARCH_amd64)
 #define PAGE_SHIFT 12
-#define ARENA_BASE 0xFFFF900000000000
-#define ARENA_BITS 39
 #define ARENA_PAGE_SHIFT 30
+#define ARENA_BASE 0xFFFF900000000000
 #else
 #error "Undefined ARCH for the bootmgr module!"
 #endif /* ARCH */
 
 #define PAGE_SIZE (1ul << (PAGE_SHIFT))
-#define ARENA_SIZE (1ull << (ARENA_BITS))
 #define ARENA_PAGE_SIZE (1ull << (ARENA_PAGE_SHIFT))
 
 #define MEMORY_BOOT 0
@@ -25,11 +23,11 @@
 
 typedef struct MemoryArena {
     uint64_t Base;
-    uint64_t Size;
     struct MemoryArena *Next;
 } MemoryArena;
 
 extern MemoryArena *BmMemoryArena;
+extern int BmMemoryArenaSize;
 
 void BmInitMemory(void *BootBlock);
 void *BmAllocatePages(size_t Pages, int Type);
