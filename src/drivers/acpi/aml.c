@@ -21,6 +21,7 @@ void AcpipPopulateTree(const uint8_t *Code, uint32_t Length) {
     AcpipState State;
 
     State.Scope = strdup("\\");
+    State.ScopeSegs = 0;
     State.Code = Code;
     State.Length = Length;
     State.RemainingLength = Length;
@@ -56,6 +57,7 @@ AcpipState *AcpipEnterSubScope(AcpipState *State, char *Name, uint8_t NameSegs, 
         ScopeState->ScopeSegs = NameSegs;
         ScopeState->Code = State->Code;
         ScopeState->Length = Length;
+        ScopeState->RemainingLength = Length;
         ScopeState->InMethod = 0;
         ScopeState->Parent = State;
     }
@@ -291,7 +293,7 @@ int AcpipReadNameString(AcpipState *State, char **NameString, uint8_t *NameSegs)
         }
     } else if (Current) {
         *NameSegs = 1;
-        State->RemainingLength--;
+        State->RemainingLength++;
         State->Code--;
     }
 
@@ -301,10 +303,22 @@ int AcpipReadNameString(AcpipState *State, char **NameString, uint8_t *NameSegs)
 
     /* If we're directly inside the root scope, our path will be `\<name segs>`, otherwise, it'll
        be `\<scope>.<name segs>` */
-    *NameString = calloc(
-        (IsRoot || !(State->ScopeSegs - Prefixes) ? 0 : State->ScopeSegs - Prefixes + 1) +
-            *NameSegs * 4 + 2,
-        1);
+    uint32_t ParentScopeBytes = 1;
+    uint32_t ChildScopeBytes;
+
+    /* Space for the root scope + prefix scopes (and +1 for each dot separating the childs). */
+    if (!IsRoot && (State->ScopeSegs - Prefixes)) {
+        ParentScopeBytes = (State->ScopeSegs - Prefixes) * 5 + 1;
+    }
+
+    /* Space for the name segments (+1 for the dots). */
+    if (*NameSegs > 1) {
+        ChildScopeBytes = *NameSegs * 5;
+    } else {
+        ChildScopeBytes = *NameSegs * 4;
+    }
+
+    *NameString = calloc(ParentScopeBytes + ChildScopeBytes + 1, 1);
     if (!*NameString) {
         return 0;
     }
@@ -314,8 +328,8 @@ int AcpipReadNameString(AcpipState *State, char **NameString, uint8_t *NameSegs)
     if (IsRoot || !(State->ScopeSegs - Prefixes)) {
         (*NameString)[NamePos++] = '\\';
     } else {
-        memcpy(*NameString + NamePos, State->Scope, (State->ScopeSegs - Prefixes) * 5);
-        NamePos += (State->ScopeSegs - Prefixes) * 5;
+        memcpy(*NameString, State->Scope, ParentScopeBytes - 1);
+        NamePos = ParentScopeBytes - 1;
         (*NameString)[NamePos++] = '.';
     }
 
@@ -331,7 +345,9 @@ int AcpipReadNameString(AcpipState *State, char **NameString, uint8_t *NameSegs)
         State->RemainingLength -= 4;
     }
 
-    printf("%s\n", *NameString);
+    if (!IsRoot) {
+        *NameSegs += State->ScopeSegs - Prefixes;
+    }
 
     return 1;
 }

@@ -7,13 +7,14 @@
 #include <stdint.h>
 
 #define ACPI_VALUE_INTEGER 0
-#define ACPI_VALUE_REGION 1
+#define ACPI_VALUE_STRING 1
+#define ACPI_VALUE_BUFFER 2
+#define ACPI_VALUE_REGION 3
 
 #define ACPI_NAMED_FIELD 0
 #define ACPI_RESERVED_FIELD 1
 #define ACPI_ACCESS_FIELD 2
-#define ACPI_EXT_ACCESS_FIELD 3
-#define ACPI_CONNECT_FIELD 4
+#define ACPI_CONNECT_FIELD 3
 
 struct AcpiValue;
 
@@ -21,29 +22,30 @@ typedef struct AcpiFieldElement {
     int Type;
     union {
         struct {
-            char *Name;
-            uint8_t Length;
+            char Name[4];
+            uint32_t Length;
         } Named;
         struct {
-            uint8_t Length;
+            uint32_t Length;
         } Reserved;
         struct {
             uint8_t Type;
             uint8_t Attrib;
-        } Access;
-        struct {
-            uint8_t Type;
-            uint8_t Attrib;
             uint8_t Length;
-        } ExtAccess;
-        struct AcpiValue *Connect;
+        } Access;
     };
+    struct AcpiFieldElement *Next;
 } AcpiFieldElement;
 
 typedef struct AcpiValue {
     int Type;
     union {
         uint64_t Integer;
+        char *String;
+        struct {
+            uint64_t Size;
+            uint8_t *Data;
+        } Buffer;
         struct {
             uint32_t RegionSpace;
             struct AcpiValue *RegionOffset;
@@ -86,7 +88,12 @@ int AcpipReadQWord(AcpipState *State, uint64_t *QWord);
 int AcpipReadPkgLength(AcpipState *State, uint32_t *Length);
 int AcpipReadNameString(AcpipState *State, char **NameString, uint8_t *NameSegs);
 
-int AcpipReadFieldList(AcpipState *State, uint8_t *FieldFlags);
+int AcpipReadFieldList(
+    AcpipState *State,
+    uint32_t Start,
+    uint32_t Length,
+    uint8_t *FieldFlags,
+    AcpiFieldElement **Fields);
 
 AcpiValue *AcpipExecuteTermList(AcpipState *State);
 AcpiValue *AcpipExecuteTermArg(AcpipState *State);

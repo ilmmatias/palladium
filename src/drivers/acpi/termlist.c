@@ -15,7 +15,7 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
                 AcpipState *Parent = State->Parent;
 
                 if (!State->InMethod) {
-                    Parent->Code = Parent->Code;
+                    Parent->Code = State->Code;
                     Parent->RemainingLength -= State->Length;
                 }
 
@@ -35,9 +35,29 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
             return NULL;
         }
 
+        uint32_t Start = State->RemainingLength;
         switch (Opcode | ((uint16_t)ExtOpcode << 8)) {
-            /* DefScope := ScopeOp PkgLength NameString TermList */
-            case 0x10: {
+            /* DefName := NameOp NameString DataRefObject */
+            case 0x08: {
+                char *Name;
+                uint8_t NameSegs;
+                if (!AcpipReadNameString(State, &Name, &NameSegs)) {
+                    return NULL;
+                }
+
+                AcpiValue *DataRefObject = AcpipExecuteTermArg(State);
+                if (!DataRefObject) {
+                    free(Name);
+                    return NULL;
+                }
+
+                break;
+            }
+
+            /* DefScope := ScopeOp PkgLength NameString TermList
+             * DefDevice := DeviceOp PkgLength NameString TermList */
+            case 0x10:
+            case 0x825B: {
                 uint32_t Length;
                 if (!AcpipReadPkgLength(State, &Length)) {
                     return NULL;
@@ -49,13 +69,65 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
                     return NULL;
                 }
 
-                AcpipState *Scope = AcpipEnterSubScope(State, Name, NameSegs, Length);
+                uint32_t LengthSoFar = Start - State->RemainingLength;
+                if (LengthSoFar > Length || Length - LengthSoFar > State->RemainingLength) {
+                    free(Name);
+                    return NULL;
+                }
+
+                AcpipState *Scope = AcpipEnterSubScope(State, Name, NameSegs, Length - LengthSoFar);
                 if (!Scope) {
                     free(Name);
                     return NULL;
                 }
 
                 State = Scope;
+
+                break;
+            }
+
+            /* DefMethod := MethodOp PkgLength NameString MethodFlags TermList */
+            case 0x14: {
+                uint32_t Length;
+                if (!AcpipReadPkgLength(State, &Length)) {
+                    return NULL;
+                }
+
+                char *Name;
+                uint8_t NameSegs;
+                if (!AcpipReadNameString(State, &Name, &NameSegs)) {
+                    return NULL;
+                }
+
+                uint32_t LengthSoFar = Start - State->RemainingLength;
+                if (LengthSoFar >= Length || Length - LengthSoFar > State->RemainingLength) {
+                    free(Name);
+                    return NULL;
+                }
+
+                uint8_t MethodFlags = *State->Code;
+                (void)MethodFlags;
+
+                State->Code += Length - LengthSoFar;
+                State->RemainingLength -= Length - LengthSoFar;
+
+                break;
+            }
+
+            /* DefMutex := MutexOp NameString SyncFlags */
+            case 0x015B: {
+                char *Name;
+                uint8_t NameSegs;
+                if (!AcpipReadNameString(State, &Name, &NameSegs)) {
+                    return NULL;
+                }
+
+                uint8_t SyncFlags;
+                if (!AcpipReadByte(State, &SyncFlags)) {
+                    free(Name);
+                    return NULL;
+                }
+
                 break;
             }
 
@@ -101,11 +173,9 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
                     return NULL;
                 }
 
-                printf(
-                    "unimplemented opcode: %#hx (DefField)\n", Opcode | ((uint32_t)ExtOpcode << 8));
-
                 uint8_t FieldFlags;
-                if (!AcpipReadFieldList(State, &FieldFlags)) {
+                AcpiFieldElement *Fields = NULL;
+                if (!AcpipReadFieldList(State, Start, Length, &FieldFlags, &Fields)) {
                     free(Name);
                     return NULL;
                 }
@@ -114,7 +184,11 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
             }
 
             default:
-                printf("unimplemented opcode: %#hx\n", Opcode | ((uint32_t)ExtOpcode << 8));
+                printf(
+                    "unimplemented termlist opcode: %#hx; %d bytes left to parse out of %d.\n",
+                    Opcode | ((uint32_t)ExtOpcode << 8),
+                    State->RemainingLength,
+                    State->Length);
                 return NULL;
         }
     }
