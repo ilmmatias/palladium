@@ -12,10 +12,12 @@
 #define ACPI_PACKAGE 3
 #define ACPI_METHOD 4
 #define ACPI_MUTEX 5
-#define ACPI_REGION 6
-#define ACPI_SCOPE 7
-#define ACPI_DEVICE 8
-#define ACPI_PROCESSOR 9
+#define ACPI_EVENT 6
+#define ACPI_REGION 7
+#define ACPI_SCOPE 8
+#define ACPI_DEVICE 9
+#define ACPI_PROCESSOR 10
+#define ACPI_POWER 11
 
 #define ACPI_NAMED_FIELD 0
 #define ACPI_RESERVED_FIELD 1
@@ -92,6 +94,10 @@ typedef struct AcpiValue {
             uint32_t PblkAddr;
             uint8_t PblkLen;
         } Processor;
+        struct {
+            uint8_t SystemLevel;
+            uint16_t ResourceOrder;
+        } Power;
     };
 } AcpiValue;
 

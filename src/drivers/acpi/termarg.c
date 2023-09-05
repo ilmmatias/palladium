@@ -250,14 +250,25 @@ AcpiValue *AcpipExecuteTermArg(AcpipState *State) {
             break;
         }
 
-        default:
+        default: {
             printf(
                 "unimplemented termarg opcode: %#hx; %d bytes left to parse out of %d.\n",
                 Opcode,
                 State->RemainingLength,
                 State->Length);
+
+            char *Name;
+            uint8_t NameSegs;
+            if (AcpipReadNameString(State, &Name, &NameSegs)) {
+                printf("this might be a MethodInvocation, showing the path: %s\n", Name);
+                printf("if it is one, this should return a pointer: %p\n", AcpiSearchObject(Name));
+            } else {
+                printf("AcpipReadNameString() failed\n");
+            }
+
             while (1)
                 ;
+        }
     }
 
     return Value;

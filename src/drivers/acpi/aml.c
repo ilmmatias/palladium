@@ -125,13 +125,12 @@ void AcpipPopulateTree(const uint8_t *Code, uint32_t Length) {
     State.Code = Code;
     State.Length = Length;
     State.RemainingLength = Length;
-    State.InMethod = 0;
     State.Parent = NULL;
 
     if (!State.Scope) {
         return;
     } else if (!AcpipExecuteTermList(&State)) {
-        KeFatalError(KE_CORRUPTED_HARDWARE_STRUCTURES);
+        // KeFatalError(KE_CORRUPTED_HARDWARE_STRUCTURES);
     }
 }
 
@@ -220,6 +219,38 @@ int AcpipCreateObject(char *Name, AcpiValue *Value) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
+ *     This function enters a new If/Else scope.
+ *
+ * PARAMETERS:
+ *     State - AML state containing the current scope.
+ *     Length - Size of the body.
+ *
+ * RETURN VALUE:
+ *     New state containing the scope, or NULL on failure.
+ *-----------------------------------------------------------------------------------------------*/
+AcpipState *AcpipEnterIf(AcpipState *State, uint32_t Length) {
+    AcpipState *IfState = malloc(sizeof(AcpipState));
+    if (!IfState) {
+        return NULL;
+    }
+
+    IfState->Scope = strdup(State->Scope);
+    if (!IfState->Scope) {
+        free(IfState);
+        return NULL;
+    }
+
+    IfState->ScopeSegs = State->ScopeSegs;
+    IfState->Code = State->Code;
+    IfState->Length = Length;
+    IfState->RemainingLength = Length;
+    IfState->Parent = State;
+
+    return IfState;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
  *     This function enters a new subscope.
  *
  * PARAMETERS:
@@ -241,7 +272,6 @@ AcpipState *AcpipEnterSubScope(AcpipState *State, char *Name, uint8_t NameSegs, 
         ScopeState->Code = State->Code;
         ScopeState->Length = Length;
         ScopeState->RemainingLength = Length;
-        ScopeState->InMethod = 0;
         ScopeState->Parent = State;
     }
 
@@ -275,7 +305,6 @@ AcpipState *AcpipEnterMethod(
         MethodState->Code = Code;
         MethodState->Length = Length;
         MethodState->RemainingLength = Length;
-        MethodState->InMethod = 1;
         MethodState->Parent = State;
     }
 

@@ -44,4 +44,6 @@ void DriverEntry(void) {
     } else {
         AcpipInitializeFromXsdt();
     }
+
+    printf("ACPI namespace tree is setup!\n");
 }

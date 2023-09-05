@@ -12,7 +12,6 @@ typedef struct AcpipState {
     const uint8_t *Code;
     uint32_t Length;
     uint32_t RemainingLength;
-    int InMethod;
     struct AcpipState *Parent;
 } AcpipState;
 
@@ -23,6 +22,7 @@ void AcpipPopulatePredefined(void);
 void AcpipPopulateTree(const uint8_t *Code, uint32_t Length);
 int AcpipCreateObject(char *Name, AcpiValue *Value);
 
+AcpipState *AcpipEnterIf(AcpipState *State, uint32_t Length);
 AcpipState *AcpipEnterSubScope(AcpipState *State, char *Name, uint8_t NameSegs, uint32_t Length);
 AcpipState *AcpipEnterMethod(
     AcpipState *State,
