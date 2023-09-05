@@ -1,10 +1,37 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
-#include <acpi.h>
+#include <acpip.h>
+#include <ke.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+static AcpipObject *ObjectTree;
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function searches for an object/entry within the AML namespace tree.
+ *
+ * PARAMETERS:
+ *     Name - Name attached to the object.
+ *
+ * RETURN VALUE:
+ *     Pointer to the object if the entry was found, NULL otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+AcpiValue *AcpiSearchObject(const char *Name) {
+    AcpipObject *Entry = ObjectTree;
+
+    while (Entry) {
+        if (!strcmp(Entry->Name, Name)) {
+            return Entry->Value;
+        }
+
+        Entry = Entry->NextObject;
+    }
+
+    return NULL;
+}
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -30,10 +57,54 @@ void AcpipPopulateTree(const uint8_t *Code, uint32_t Length) {
 
     if (!State.Scope) {
         return;
+    } else if (!AcpipExecuteTermList(&State)) {
+        KeFatalError(KE_CORRUPTED_HARDWARE_STRUCTURES);
+    }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function adds a new object to the global tree.
+ *
+ * PARAMETERS:
+ *     Name - Name to be associated with the entry.
+ *     Value - Value of the new leaf.
+ *
+ * RETURN VALUE:
+ *     0 on failure (memory allocation error), 1 otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+int AcpipCreateObject(char *Name, AcpiValue *Value) {
+    AcpipObject *Parent = ObjectTree;
+    while (Parent) {
+        if (!strcmp(Parent->Name, Name)) {
+            free(Value);
+            free(Name);
+            return 1;
+        }
+
+        if (Parent->NextObject) {
+            Parent = Parent->NextObject;
+        } else {
+            break;
+        }
     }
 
-    printf("AcpipPopulateTree(%p, %u)\n", Code, Length);
-    AcpipExecuteTermList(&State);
+    AcpipObject *Entry = malloc(sizeof(AcpipObject));
+    if (!Entry) {
+        return 0;
+    }
+
+    Entry->Name = Name;
+    Entry->Value = Value;
+    Entry->NextObject = NULL;
+
+    if (Parent) {
+        Parent->NextObject = Entry;
+    } else {
+        ObjectTree = Entry;
+    }
+
+    return 1;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -45,6 +116,7 @@ void AcpipPopulateTree(const uint8_t *Code, uint32_t Length) {
  *     Name - Scope path (malloc'd or strdup'ed).
  *     Code - Scope entry point.
  *     Length - Size of the scope body.
+ *     Root - Root object containing the scope/device object tree.
  *
  * RETURN VALUE:
  *     New state containing the subscope, or NULL on failure.

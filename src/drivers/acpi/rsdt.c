@@ -1,7 +1,7 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
-#include <acpi.h>
+#include <acpip.h>
 #include <ke.h>
 #include <mm.h>
 #include <sdt.h>

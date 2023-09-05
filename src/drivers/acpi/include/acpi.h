@@ -6,10 +6,16 @@
 
 #include <stdint.h>
 
-#define ACPI_VALUE_INTEGER 0
-#define ACPI_VALUE_STRING 1
-#define ACPI_VALUE_BUFFER 2
-#define ACPI_VALUE_REGION 3
+#define ACPI_INTEGER 0
+#define ACPI_STRING 1
+#define ACPI_BUFFER 2
+#define ACPI_PACKAGE 3
+#define ACPI_METHOD 4
+#define ACPI_MUTEX 5
+#define ACPI_REGION 6
+#define ACPI_SCOPE 7
+#define ACPI_DEVICE 8
+#define ACPI_PROCESSOR 9
 
 #define ACPI_NAMED_FIELD 0
 #define ACPI_RESERVED_FIELD 1
@@ -37,6 +43,14 @@ typedef struct AcpiFieldElement {
     struct AcpiFieldElement *Next;
 } AcpiFieldElement;
 
+typedef struct {
+    int Type;
+    union {
+        char *String;
+        struct AcpiValue *Value;
+    };
+} AcpiPackageElement;
+
 typedef struct AcpiValue {
     int Type;
     union {
@@ -47,55 +61,33 @@ typedef struct AcpiValue {
             uint8_t *Data;
         } Buffer;
         struct {
-            uint32_t RegionSpace;
-            struct AcpiValue *RegionOffset;
-            struct AcpiValue *RegionLen;
+            uint8_t Size;
+            AcpiPackageElement *Data;
+        } Package;
+        struct {
+            const uint8_t *Start;
+            uint32_t Size;
+            uint8_t Flags;
+        } Method;
+        struct {
+            uint8_t Flags;
+        } Mutex;
+        struct {
+            uint8_t RegionSpace;
+            uint64_t RegionOffset;
+            uint64_t RegionLen;
+            int HasField;
+            uint8_t FieldFlags;
+            AcpiFieldElement *FieldList;
         } Region;
+        struct {
+            uint8_t ProcId;
+            uint32_t PblkAddr;
+            uint8_t PblkLen;
+        } Processor;
     };
 } AcpiValue;
 
-typedef struct {
-    char *Path;
-    AcpiValue Value;
-} AcpiObject;
-
-typedef struct AcpipState {
-    char *Scope;
-    uint8_t ScopeSegs;
-    const uint8_t *Code;
-    uint32_t Length;
-    uint32_t RemainingLength;
-    int InMethod;
-    struct AcpipState *Parent;
-} AcpipState;
-
-void AcpipInitializeFromRsdt(void);
-void AcpipInitializeFromXsdt(void);
-
-void AcpipPopulateTree(const uint8_t *Code, uint32_t Length);
-AcpipState *AcpipEnterSubScope(AcpipState *State, char *Name, uint8_t NameSegs, uint32_t Length);
-AcpipState *AcpipEnterMethod(
-    AcpipState *State,
-    char *Name,
-    uint8_t NameSegs,
-    const uint8_t *Code,
-    uint32_t Length);
-
-int AcpipReadByte(AcpipState *State, uint8_t *Byte);
-int AcpipReadWord(AcpipState *State, uint16_t *Word);
-int AcpipReadDWord(AcpipState *State, uint32_t *DWord);
-int AcpipReadQWord(AcpipState *State, uint64_t *QWord);
-int AcpipReadPkgLength(AcpipState *State, uint32_t *Length);
-int AcpipReadNameString(AcpipState *State, char **NameString, uint8_t *NameSegs);
-
-int AcpipReadFieldList(
-    AcpipState *State,
-    uint32_t Start,
-    uint32_t Length,
-    uint8_t *FieldFlags,
-    AcpiFieldElement **Fields);
-
-AcpiValue *AcpipExecuteTermList(AcpipState *State);
-AcpiValue *AcpipExecuteTermArg(AcpipState *State);
+AcpiValue *AcpiSearchObject(const char *Name);
 
 #endif /* _ACPI_H_ */

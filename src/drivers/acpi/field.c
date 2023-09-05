@@ -1,7 +1,7 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
-#include <acpi.h>
+#include <acpip.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -26,7 +26,7 @@ static AcpiFieldElement *CreateElement(AcpiFieldElement **Root) {
     return Element;
 }
 
-static void FreeElements(AcpiFieldElement *Root) {
+void AcpipFreeFieldList(AcpiFieldElement *Root) {
     while (Root) {
         AcpiFieldElement *Next = Root->Next;
         free(Root);
@@ -55,7 +55,7 @@ int AcpipReadFieldList(
         AcpiFieldElement *Element = CreateElement(Fields);
 
         if (!Element) {
-            FreeElements(*Fields);
+            AcpipFreeFieldList(*Fields);
             return 0;
         }
 
@@ -67,7 +67,7 @@ int AcpipReadFieldList(
 
                 Element->Type = ACPI_RESERVED_FIELD;
                 if (!AcpipReadPkgLength(State, &Element->Reserved.Length)) {
-                    FreeElements(*Fields);
+                    AcpipFreeFieldList(*Fields);
                     return 0;
                 }
 
@@ -94,7 +94,8 @@ int AcpipReadFieldList(
             /* ConnectField */
             case 0x02:
                 printf("ConnectField (unimplemented)\n");
-                return 0;
+                while (1)
+                    ;
 
             /* NamedField := NameSeg PkgLength */
             default:
@@ -104,11 +105,16 @@ int AcpipReadFieldList(
 
                 State->Code += 4;
                 if (!AcpipReadPkgLength(State, &Element->Named.Length)) {
-                    FreeElements(*Fields);
+                    AcpipFreeFieldList(*Fields);
                     return 0;
                 }
 
                 break;
+        }
+
+        if (Start - State->RemainingLength > Length) {
+            AcpipFreeFieldList(*Fields);
+            return 0;
         }
 
         Length -= Start - State->RemainingLength;

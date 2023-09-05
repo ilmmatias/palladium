@@ -1,10 +1,11 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
-#include <acpi.h>
+#include <acpip.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 AcpiValue *AcpipExecuteTermList(AcpipState *State) {
     while (1) {
@@ -19,6 +20,7 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
                     Parent->RemainingLength -= State->Length;
                 }
 
+                free(State->Scope);
                 free(State);
                 State = Parent;
                 continue;
@@ -49,6 +51,10 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
                 if (!DataRefObject) {
                     free(Name);
                     return NULL;
+                } else if (!AcpipCreateObject(Name, DataRefObject)) {
+                    free(DataRefObject);
+                    free(Name);
+                    return NULL;
                 }
 
                 break;
@@ -69,20 +75,44 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
                     return NULL;
                 }
 
+                char *ObjectName = strdup(Name);
+                if (!ObjectName) {
+                    free(Name);
+                    return NULL;
+                }
+
                 uint32_t LengthSoFar = Start - State->RemainingLength;
                 if (LengthSoFar > Length || Length - LengthSoFar > State->RemainingLength) {
+                    free(ObjectName);
                     free(Name);
                     return NULL;
                 }
 
                 AcpipState *Scope = AcpipEnterSubScope(State, Name, NameSegs, Length - LengthSoFar);
                 if (!Scope) {
+                    free(ObjectName);
+                    free(Name);
+                    return NULL;
+                }
+
+                AcpiValue *Value = malloc(sizeof(AcpiValue));
+                if (!Value) {
+                    free(Scope);
+                    free(ObjectName);
+                    free(Name);
+                    return NULL;
+                }
+
+                Value->Type = Opcode == 0x10 ? ACPI_SCOPE : ACPI_DEVICE;
+                if (!AcpipCreateObject(ObjectName, Value)) {
+                    free(Value);
+                    free(Scope);
+                    free(ObjectName);
                     free(Name);
                     return NULL;
                 }
 
                 State = Scope;
-
                 break;
             }
 
@@ -99,18 +129,36 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
                     return NULL;
                 }
 
-                uint32_t LengthSoFar = Start - State->RemainingLength;
-                if (LengthSoFar >= Length || Length - LengthSoFar > State->RemainingLength) {
+                uint8_t MethodFlags;
+                if (!AcpipReadByte(State, &MethodFlags)) {
                     free(Name);
                     return NULL;
                 }
 
-                uint8_t MethodFlags = *State->Code;
-                (void)MethodFlags;
+                uint32_t LengthSoFar = Start - State->RemainingLength;
+                if (LengthSoFar > Length || Length - LengthSoFar > State->RemainingLength) {
+                    free(Name);
+                    return NULL;
+                }
+
+                AcpiValue *Value = malloc(sizeof(AcpiValue));
+                if (!Value) {
+                    free(Name);
+                    return NULL;
+                }
+
+                Value->Type = ACPI_METHOD;
+                Value->Method.Start = State->Code;
+                Value->Method.Size = Length - LengthSoFar;
+                Value->Method.Flags = MethodFlags;
+                if (!AcpipCreateObject(Name, Value)) {
+                    free(Value);
+                    free(Name);
+                    return NULL;
+                }
 
                 State->Code += Length - LengthSoFar;
                 State->RemainingLength -= Length - LengthSoFar;
-
                 break;
             }
 
@@ -124,6 +172,20 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
 
                 uint8_t SyncFlags;
                 if (!AcpipReadByte(State, &SyncFlags)) {
+                    free(Name);
+                    return NULL;
+                }
+
+                AcpiValue *Value = malloc(sizeof(AcpiValue));
+                if (!Value) {
+                    free(Name);
+                    return NULL;
+                }
+
+                Value->Type = ACPI_MUTEX;
+                Value->Mutex.Flags = SyncFlags;
+                if (!AcpipCreateObject(Name, Value)) {
+                    free(Value);
                     free(Name);
                     return NULL;
                 }
@@ -145,14 +207,48 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
                     return NULL;
                 }
 
+                /* RegionSpace is already a guaranteed uint8_t, but the other values have to be
+                   coerced into integers; If they aren't integers, we have something wrong with
+                   the AML code. */
                 AcpiValue *RegionOffset = AcpipExecuteTermArg(State);
                 if (!RegionOffset) {
+                    free(Name);
+                    return NULL;
+                } else if (RegionOffset->Type != ACPI_INTEGER) {
+                    free(RegionOffset);
                     free(Name);
                     return NULL;
                 }
 
                 AcpiValue *RegionLen = AcpipExecuteTermArg(State);
                 if (!RegionLen) {
+                    free(RegionOffset);
+                    free(Name);
+                    return NULL;
+                } else if (RegionLen->Type != ACPI_INTEGER) {
+                    free(RegionLen);
+                    free(RegionOffset);
+                    free(Name);
+                    return NULL;
+                }
+
+                AcpiValue *Value = malloc(sizeof(AcpiValue));
+                if (!Value) {
+                    free(RegionLen);
+                    free(RegionOffset);
+                    free(Name);
+                    return NULL;
+                }
+
+                Value->Type = ACPI_REGION;
+                Value->Region.RegionSpace = RegionSpace;
+                Value->Region.RegionLen = RegionLen->Integer;
+                Value->Region.RegionOffset = RegionOffset->Integer;
+                Value->Region.HasField = 0;
+
+                free(RegionLen);
+                free(RegionOffset);
+                if (!AcpipCreateObject(Name, Value)) {
                     free(Name);
                     return NULL;
                 }
@@ -180,6 +276,96 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
                     return NULL;
                 }
 
+                AcpiValue *Object = AcpiSearchObject(Name);
+                free(Name);
+
+                if (!Object || Object->Type != ACPI_REGION) {
+                    AcpipFreeFieldList(Fields);
+                    return NULL;
+                } else if (Object->Region.HasField) {
+                    AcpipFreeFieldList(Object->Region.FieldList);
+                }
+
+                Object->Region.HasField = 1;
+                Object->Region.FieldFlags = FieldFlags;
+                Object->Region.FieldList = Fields;
+                break;
+            }
+
+            /* DefProcessor := ProcessorOp PkgLength NameString ProcID PblkAddr PblkLen TermList */
+            case 0x835B: {
+                uint32_t Length;
+                if (!AcpipReadPkgLength(State, &Length)) {
+                    return NULL;
+                }
+
+                char *Name;
+                uint8_t NameSegs;
+                if (!AcpipReadNameString(State, &Name, &NameSegs)) {
+                    return NULL;
+                }
+
+                char *ObjectName = strdup(Name);
+                if (!ObjectName) {
+                    free(Name);
+                    return NULL;
+                }
+
+                uint8_t ProcId;
+                if (!AcpipReadByte(State, &ProcId)) {
+                    free(ObjectName);
+                    free(Name);
+                    return NULL;
+                }
+
+                uint32_t PblkAddr;
+                if (!AcpipReadDWord(State, &PblkAddr)) {
+                    free(ObjectName);
+                    free(Name);
+                    return NULL;
+                }
+
+                uint8_t PblkLen;
+                if (!AcpipReadByte(State, &PblkLen)) {
+                    free(ObjectName);
+                    free(Name);
+                    return NULL;
+                }
+
+                uint32_t LengthSoFar = Start - State->RemainingLength;
+                if (LengthSoFar > Length || Length - LengthSoFar > State->RemainingLength) {
+                    free(ObjectName);
+                    free(Name);
+                    return NULL;
+                }
+
+                AcpipState *Scope = AcpipEnterSubScope(State, Name, NameSegs, Length - LengthSoFar);
+                if (!Scope) {
+                    free(ObjectName);
+                    free(Name);
+                    return NULL;
+                }
+
+                AcpiValue *Value = malloc(sizeof(AcpiValue));
+                if (!Value) {
+                    free(ObjectName);
+                    free(Name);
+                    return NULL;
+                }
+
+                Value->Type = ACPI_PROCESSOR;
+                Value->Processor.ProcId = ProcId;
+                Value->Processor.PblkAddr = PblkAddr;
+                Value->Processor.PblkLen = PblkLen;
+                if (!AcpipCreateObject(ObjectName, Value)) {
+                    free(Value);
+                    free(Scope);
+                    free(ObjectName);
+                    free(Name);
+                    return NULL;
+                }
+
+                State = Scope;
                 break;
             }
 
@@ -189,13 +375,14 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
                     Opcode | ((uint32_t)ExtOpcode << 8),
                     State->RemainingLength,
                     State->Length);
-                return NULL;
+                while (1)
+                    ;
         }
     }
 
     AcpiValue *Value = malloc(sizeof(AcpiValue));
     if (Value) {
-        Value->Type = ACPI_VALUE_INTEGER;
+        Value->Type = ACPI_INTEGER;
         Value->Integer = 0;
     }
 
