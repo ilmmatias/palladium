@@ -24,6 +24,12 @@
 
 struct AcpiValue;
 
+typedef struct AcpiObject {
+    char *Name;
+    struct AcpiValue *Value;
+    struct AcpiObject *Next;
+} AcpiObject;
+
 typedef struct AcpiFieldElement {
     int Type;
     union {
@@ -53,6 +59,7 @@ typedef struct {
 
 typedef struct AcpiValue {
     int Type;
+    AcpiObject *Objects;
     union {
         uint64_t Integer;
         char *String;
@@ -88,6 +95,6 @@ typedef struct AcpiValue {
     };
 } AcpiValue;
 
-AcpiValue *AcpiSearchObject(const char *Name);
+AcpiObject *AcpiSearchObject(const char *Name);
 
 #endif /* _ACPI_H_ */

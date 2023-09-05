@@ -7,6 +7,7 @@
 static char *Messages[] = {
     "FATAL_ERROR",
     "CORRUPTED_HARDWARE_STRUCTURES",
+    "EARLY_MEMORY_FAILURE",
 };
 
 /*-------------------------------------------------------------------------------------------------

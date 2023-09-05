@@ -104,6 +104,8 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
                 }
 
                 Value->Type = Opcode == 0x10 ? ACPI_SCOPE : ACPI_DEVICE;
+                Value->Objects = NULL;
+
                 if (!AcpipCreateObject(ObjectName, Value)) {
                     free(Value);
                     free(Scope);
@@ -276,19 +278,19 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
                     return NULL;
                 }
 
-                AcpiValue *Object = AcpiSearchObject(Name);
+                AcpiObject *Object = AcpiSearchObject(Name);
                 free(Name);
 
-                if (!Object || Object->Type != ACPI_REGION) {
+                if (!Object || Object->Value->Type != ACPI_REGION) {
                     AcpipFreeFieldList(Fields);
                     return NULL;
-                } else if (Object->Region.HasField) {
-                    AcpipFreeFieldList(Object->Region.FieldList);
+                } else if (Object->Value->Region.HasField) {
+                    AcpipFreeFieldList(Object->Value->Region.FieldList);
                 }
 
-                Object->Region.HasField = 1;
-                Object->Region.FieldFlags = FieldFlags;
-                Object->Region.FieldList = Fields;
+                Object->Value->Region.HasField = 1;
+                Object->Value->Region.FieldFlags = FieldFlags;
+                Object->Value->Region.FieldList = Fields;
                 break;
             }
 
@@ -357,6 +359,8 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
                 Value->Processor.ProcId = ProcId;
                 Value->Processor.PblkAddr = PblkAddr;
                 Value->Processor.PblkLen = PblkLen;
+                Value->Objects = NULL;
+
                 if (!AcpipCreateObject(ObjectName, Value)) {
                     free(Value);
                     free(Scope);

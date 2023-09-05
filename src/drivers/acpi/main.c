@@ -37,6 +37,8 @@ int printf(const char *format, ...) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void DriverEntry(void) {
+    AcpipPopulatePredefined();
+
     if (KiGetAcpiTableType() == KI_ACPI_RDST) {
         AcpipInitializeFromRsdt();
     } else {

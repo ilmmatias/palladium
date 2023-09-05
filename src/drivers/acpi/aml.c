@@ -7,7 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-static AcpipObject *ObjectTree;
+static AcpiObject *ObjectTree = NULL;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -19,18 +19,91 @@ static AcpipObject *ObjectTree;
  * RETURN VALUE:
  *     Pointer to the object if the entry was found, NULL otherwise.
  *-----------------------------------------------------------------------------------------------*/
-AcpiValue *AcpiSearchObject(const char *Name) {
-    AcpipObject *Entry = ObjectTree;
-
-    while (Entry) {
-        if (!strcmp(Entry->Name, Name)) {
-            return Entry->Value;
-        }
-
-        Entry = Entry->NextObject;
+AcpiObject *AcpiSearchObject(const char *Name) {
+    char *Path = strdup(Name + 1);
+    if (!Path) {
+        return NULL;
     }
 
+    AcpiObject *Parent = NULL;
+    AcpiObject *Namespace = ObjectTree;
+    char *Token = strtok(Path, ".");
+
+    /* `Name` should contain the full path/namespace for the item, and as such, we need to tokenize
+       it to find the right leaf within the namespace. */
+    while (Namespace) {
+        if (!Token) {
+            free(Path);
+            return Parent;
+        }
+
+        if (Namespace && !strcmp(Namespace->Name, Token)) {
+            Token = strtok(NULL, ".");
+
+            if (Namespace->Value->Type != ACPI_SCOPE && Namespace->Value->Type != ACPI_DEVICE &&
+                Namespace->Value->Type != ACPI_PROCESSOR) {
+                free(Path);
+                if (Token != NULL) {
+                    return NULL;
+                } else {
+                    return Namespace;
+                }
+            }
+
+            Parent = Namespace;
+            Namespace = Namespace->Value->Objects;
+            continue;
+        }
+
+        if (Namespace) {
+            Namespace = Namespace->Next;
+        }
+    }
+
+    free(Path);
     return NULL;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function creates the required predefined root namespaces.
+ *
+ * PARAMETERS:
+ *     None.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void AcpipPopulatePredefined(void) {
+#define PREDEFINED_ITEMS 5
+    static const char Names[5][PREDEFINED_ITEMS] = {
+        "_GPE",
+        "_PR_",
+        "_SB_",
+        "_SI_",
+        "_TZ_",
+    };
+
+    AcpiValue *Values = calloc(PREDEFINED_ITEMS, sizeof(AcpiValue));
+    AcpiObject *Objects = calloc(PREDEFINED_ITEMS, sizeof(AcpiObject));
+    char *DupNames = malloc(sizeof(Names));
+
+    if (!Values || !Objects || !DupNames) {
+        KeFatalError(KE_EARLY_MEMORY_FAILURE);
+    }
+
+    for (int i = 0; i < PREDEFINED_ITEMS; i++) {
+        Values[i].Type = ACPI_SCOPE;
+        Objects[i].Value = &Values[i];
+        Objects[i].Name = &DupNames[i * 5];
+        memcpy(&DupNames[i * 5], Names[i], 5);
+
+        if (i != PREDEFINED_ITEMS - 1) {
+            Objects[i].Next = &Objects[i + 1];
+        }
+    }
+
+    ObjectTree = Objects;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -74,36 +147,74 @@ void AcpipPopulateTree(const uint8_t *Code, uint32_t Length) {
  *     0 on failure (memory allocation error), 1 otherwise.
  *-----------------------------------------------------------------------------------------------*/
 int AcpipCreateObject(char *Name, AcpiValue *Value) {
-    AcpipObject *Parent = ObjectTree;
-    while (Parent) {
-        if (!strcmp(Parent->Name, Name)) {
+    AcpiValue *Parent = NULL;
+    AcpiObject *Namespace = ObjectTree;
+    char *Token = strtok(Name + 1, ".");
+
+    /* `Name` should contain the full path/namespace for the item, and as such, we need to tokenize
+       it to find the right leaf within the namespace. */
+    while (1) {
+        if (!Token) {
             free(Value);
             free(Name);
             return 1;
         }
 
-        if (Parent->NextObject) {
-            Parent = Parent->NextObject;
-        } else {
-            break;
+        if (Namespace && !strcmp(Namespace->Name, Token)) {
+            Token = strtok(NULL, ".");
+
+            if (Namespace->Value->Type != ACPI_SCOPE && Namespace->Value->Type != ACPI_DEVICE &&
+                Namespace->Value->Type != ACPI_PROCESSOR) {
+                if (Token != NULL) {
+                    return 0;
+                } else {
+                    free(Value);
+                    free(Name);
+                    return 1;
+                }
+            }
+
+            Parent = Namespace->Value;
+            Namespace = Namespace->Value->Objects;
+            continue;
         }
+
+        /* If we reached the end of the namespace leaf, we either have a situation where one of
+           the scopes doesn't exist (\A.B.C, but B wasn't defined), or we're at the end, and
+           trying to define C. */
+        if (Namespace && Namespace->Next) {
+            Namespace = Namespace->Next;
+            continue;
+        } else if (strtok(NULL, ".") != NULL) {
+            return 0;
+        }
+
+        break;
     }
 
-    AcpipObject *Entry = malloc(sizeof(AcpipObject));
+    AcpiObject *Entry = malloc(sizeof(AcpiObject));
     if (!Entry) {
         return 0;
     }
 
-    Entry->Name = Name;
+    Entry->Name = strdup(Token);
     Entry->Value = Value;
-    Entry->NextObject = NULL;
+    Entry->Next = NULL;
 
-    if (Parent) {
-        Parent->NextObject = Entry;
+    if (!Entry->Name) {
+        free(Entry);
+        return 0;
+    }
+
+    if (Namespace) {
+        Namespace->Next = Entry;
+    } else if (Parent) {
+        Parent->Objects = Entry;
     } else {
         ObjectTree = Entry;
     }
 
+    free(Name);
     return 1;
 }
 

@@ -11,6 +11,7 @@
 
 #define KE_FATAL_ERROR 0
 #define KE_CORRUPTED_HARDWARE_STRUCTURES 1
+#define KE_EARLY_MEMORY_FAILURE 2
 
 void KiSaveAcpiData(void *LoaderData);
 uint64_t KiGetAcpiBaseAddress(void);

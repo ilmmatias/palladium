@@ -6,12 +6,6 @@
 
 #include <acpi.h>
 
-typedef struct AcpipObject {
-    char *Name;
-    AcpiValue *Value;
-    struct AcpipObject *NextObject;
-} AcpipObject;
-
 typedef struct AcpipState {
     char *Scope;
     uint8_t ScopeSegs;
@@ -25,6 +19,7 @@ typedef struct AcpipState {
 void AcpipInitializeFromRsdt(void);
 void AcpipInitializeFromXsdt(void);
 
+void AcpipPopulatePredefined(void);
 void AcpipPopulateTree(const uint8_t *Code, uint32_t Length);
 int AcpipCreateObject(char *Name, AcpiValue *Value);
 
