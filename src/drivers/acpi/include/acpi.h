@@ -101,6 +101,13 @@ typedef struct AcpiValue {
     };
 } AcpiValue;
 
-AcpiObject *AcpiSearchObject(const char *Name);
+AcpiObject *AcpiSearchObject(const char *Name, uint8_t *NameSegs);
+AcpiValue *AcpiExecuteMethodFromPath(const char *Name, int ArgCount, AcpiValue *Args);
+AcpiValue *AcpiExecuteMethodFromObject(
+    AcpiObject *Object,
+    const char *Name,
+    uint8_t NameSegs,
+    int ArgCount,
+    AcpiValue *Args);
 
 #endif /* _ACPI_H_ */

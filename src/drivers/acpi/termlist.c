@@ -130,7 +130,6 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
                 if (!AcpipReadNameString(State, &Name, &NameSegs)) {
                     return NULL;
                 }
-                printf("trying to add method %s\n", Name);
 
                 uint8_t MethodFlags;
                 if (!AcpipReadByte(State, &MethodFlags)) {
@@ -154,6 +153,7 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
                 Value->Method.Start = State->Code;
                 Value->Method.Size = Length - LengthSoFar;
                 Value->Method.Flags = MethodFlags;
+
                 if (!AcpipCreateObject(Name, Value)) {
                     free(Value);
                     free(Name);
@@ -380,7 +380,7 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
                     return NULL;
                 }
 
-                AcpiObject *Object = AcpiSearchObject(Name);
+                AcpiObject *Object = AcpiSearchObject(Name, NULL);
                 free(Name);
 
                 if (!Object || Object->Value->Type != ACPI_REGION) {

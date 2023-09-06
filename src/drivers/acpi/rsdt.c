@@ -5,6 +5,7 @@
 #include <ke.h>
 #include <mm.h>
 #include <sdt.h>
+#include <stdio.h>
 #include <string.h>
 
 /*-------------------------------------------------------------------------------------------------
@@ -39,6 +40,7 @@ static int Checksum(const char *Table, uint32_t Length) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void AcpipInitializeFromRsdt() {
+    printf("Using RSDT\n");
     SdtHeader *Rsdt = MI_PADDR_TO_VADDR(KiGetAcpiBaseAddress());
     uint32_t *Tables = (uint32_t *)(Rsdt + 1);
 
@@ -56,14 +58,15 @@ void AcpipInitializeFromRsdt() {
         /* The FADT SHOULD always contain the DSDT pointer, as the DSDT table itself doesn't
            need to be contained in the RSDT. */
         if (!memcmp(Header->Signature, "FACP", 4)) {
-            Header = MI_PADDR_TO_VADDR(((FadtHeader *)Header)->Dsdt);
+            FadtHeader *Fadt = (FadtHeader *)Header;
+            Header = MI_PADDR_TO_VADDR(Fadt->Dsdt);
 
             if (!Checksum((char *)Header, Header->Length) || memcmp(Header->Signature, "DSDT", 4)) {
                 KeFatalError(KE_CORRUPTED_HARDWARE_STRUCTURES);
             }
 
             AcpipPopulateTree((uint8_t *)(Header + 1), Header->Length - sizeof(SdtHeader));
-        } else if (!memcmp(Header->Signature, "DSDT", 4) || !memcmp(Header->Signature, "SSDT", 4)) {
+        } else if (!memcmp(Header->Signature, "SSDT", 4)) {
             AcpipPopulateTree((uint8_t *)(Header + 1), Header->Length - sizeof(SdtHeader));
         }
     }
@@ -80,6 +83,7 @@ void AcpipInitializeFromRsdt() {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void AcpipInitializeFromXsdt() {
+    printf("Using XSDT\n");
     SdtHeader *Xsdt = MI_PADDR_TO_VADDR(KiGetAcpiBaseAddress());
     uint64_t *Tables = (uint64_t *)(Xsdt + 1);
 
@@ -97,7 +101,8 @@ void AcpipInitializeFromXsdt() {
         /* The FADT SHOULD always contain the DSDT pointer, as the DSDT table itself doesn't
            need to be contained in the XSDT. */
         if (!memcmp(Header->Signature, "FACP", 4)) {
-            Header = MI_PADDR_TO_VADDR(((FadtHeader *)Header)->Dsdt);
+            FadtHeader *Fadt = (FadtHeader *)Header;
+            Header = MI_PADDR_TO_VADDR(Fadt->XDsdt ? Fadt->XDsdt : Fadt->Dsdt);
 
             if (!Checksum((char *)Header, Header->Length) || memcmp(Header->Signature, "DSDT", 4)) {
                 KeFatalError(KE_CORRUPTED_HARDWARE_STRUCTURES);

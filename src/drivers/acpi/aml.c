@@ -15,11 +15,16 @@ static AcpiObject *ObjectTree = NULL;
  *
  * PARAMETERS:
  *     Name - Name attached to the object.
+ *     NameSegs - Output; How many segments the name had; Can be NULL.
  *
  * RETURN VALUE:
  *     Pointer to the object if the entry was found, NULL otherwise.
  *-----------------------------------------------------------------------------------------------*/
-AcpiObject *AcpiSearchObject(const char *Name) {
+AcpiObject *AcpiSearchObject(const char *Name, uint8_t *NameSegs) {
+    if (!Name) {
+        return NULL;
+    }
+
     char *Path = strdup(Name + 1);
     if (!Path) {
         return NULL;
@@ -28,6 +33,10 @@ AcpiObject *AcpiSearchObject(const char *Name) {
     AcpiObject *Parent = NULL;
     AcpiObject *Namespace = ObjectTree;
     char *Token = strtok(Path, ".");
+
+    if (NameSegs) {
+        *NameSegs = 0;
+    }
 
     /* `Name` should contain the full path/namespace for the item, and as such, we need to tokenize
        it to find the right leaf within the namespace. */
@@ -39,6 +48,10 @@ AcpiObject *AcpiSearchObject(const char *Name) {
 
         if (Namespace && !strcmp(Namespace->Name, Token)) {
             Token = strtok(NULL, ".");
+
+            if (NameSegs) {
+                (*NameSegs)++;
+            }
 
             if (Namespace->Value->Type != ACPI_SCOPE && Namespace->Value->Type != ACPI_DEVICE &&
                 Namespace->Value->Type != ACPI_PROCESSOR) {
@@ -62,6 +75,68 @@ AcpiObject *AcpiSearchObject(const char *Name) {
 
     free(Path);
     return NULL;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function starts execution of an AML method, based on a path.
+ *
+ * PARAMETERS:
+ *     Name - Name attached to the method.
+ *     ArgCount - Amount of arguments to pass.
+ *     Args - Data of the arguments.
+ *
+ * RETURN VALUE:
+ *     Return value of the method, or NULL if something went wrong.
+ *-----------------------------------------------------------------------------------------------*/
+AcpiValue *AcpiExecuteMethodFromPath(const char *Name, int ArgCount, AcpiValue *Args) {
+    uint8_t NameSegs;
+    AcpiObject *Object = AcpiSearchObject(Name, &NameSegs);
+    return AcpiExecuteMethodFromObject(Object, Name, NameSegs, ArgCount, Args);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function starts execution of an AML method, based on a previously searched object.
+ *
+ * PARAMETERS:
+ *     Object - Object containing the method.
+ *     Name - Name attached to the method.
+ *     NameSegs - Amount of segments the method path has.
+ *     ArgCount - Amount of arguments to pass.
+ *     Args - Data of the arguments.
+ *
+ * RETURN VALUE:
+ *     Return value of the method, or NULL if something went wrong.
+ *-----------------------------------------------------------------------------------------------*/
+AcpiValue *AcpiExecuteMethodFromObject(
+    AcpiObject *Object,
+    const char *Name,
+    uint8_t NameSegs,
+    int ArgCount,
+    AcpiValue *Args) {
+    if (!Object || !Name || Object->Value->Type != ACPI_METHOD) {
+        return NULL;
+    }
+
+    AcpipState State;
+    State.Scope = strdup(Name);
+    if (!State.Scope) {
+        return NULL;
+    }
+
+    State.ScopeSegs = NameSegs;
+    State.Code = Object->Value->Method.Start;
+    State.Length = Object->Value->Method.Size;
+    State.RemainingLength = State.Length;
+    State.Parent = NULL;
+
+    AcpiValue *Result = AcpipExecuteTermList(&State);
+    free(State.Scope);
+
+    (void)ArgCount;
+    (void)Args;
+    return Result;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -132,6 +207,8 @@ void AcpipPopulateTree(const uint8_t *Code, uint32_t Length) {
     } else if (!AcpipExecuteTermList(&State)) {
         // KeFatalError(KE_CORRUPTED_HARDWARE_STRUCTURES);
     }
+
+    free(State.Scope);
 }
 
 /*-------------------------------------------------------------------------------------------------

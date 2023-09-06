@@ -46,4 +46,5 @@ void DriverEntry(void) {
     }
 
     printf("ACPI namespace tree is setup!\n");
+    printf("%p\n", AcpiExecuteMethodFromPath("\\DBUG", 0, NULL));
 }

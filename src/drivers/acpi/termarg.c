@@ -257,11 +257,16 @@ AcpiValue *AcpipExecuteTermArg(AcpipState *State) {
                 State->RemainingLength,
                 State->Length);
 
+            State->Code--;
+            State->RemainingLength++;
+
             char *Name;
             uint8_t NameSegs;
             if (AcpipReadNameString(State, &Name, &NameSegs)) {
                 printf("this might be a MethodInvocation, showing the path: %s\n", Name);
-                printf("if it is one, this should return a pointer: %p\n", AcpiSearchObject(Name));
+                printf(
+                    "if it is one, this should return a pointer: %p\n",
+                    AcpiSearchObject(Name, NULL));
             } else {
                 printf("AcpipReadNameString() failed\n");
             }
