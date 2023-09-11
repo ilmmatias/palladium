@@ -14,10 +14,12 @@
 #define ACPI_MUTEX 5
 #define ACPI_EVENT 6
 #define ACPI_REGION 7
-#define ACPI_SCOPE 8
-#define ACPI_DEVICE 9
-#define ACPI_PROCESSOR 10
-#define ACPI_POWER 11
+#define ACPI_FIELD 8
+#define ACPI_INDEX_FIELD 9
+#define ACPI_SCOPE 10
+#define ACPI_DEVICE 11
+#define ACPI_PROCESSOR 12
+#define ACPI_POWER 13
 
 #define ACPI_NAMED_FIELD 0
 #define ACPI_RESERVED_FIELD 1
@@ -26,25 +28,6 @@
 
 struct AcpiObject;
 struct AcpiValue;
-
-typedef struct AcpiFieldElement {
-    int Type;
-    union {
-        struct {
-            char Name[4];
-            uint32_t Length;
-        } Named;
-        struct {
-            uint32_t Length;
-        } Reserved;
-        struct {
-            uint8_t Type;
-            uint8_t Attrib;
-            uint8_t Length;
-        } Access;
-    };
-    struct AcpiFieldElement *Next;
-} AcpiFieldElement;
 
 typedef struct {
     int Type;
@@ -80,10 +63,15 @@ typedef struct AcpiValue {
             uint8_t RegionSpace;
             uint64_t RegionOffset;
             uint64_t RegionLen;
-            int HasField;
-            uint8_t FieldFlags;
-            AcpiFieldElement *FieldList;
         } Region;
+        struct {
+            struct AcpiObject *Region;
+            struct AcpiObject *Index;
+            uint8_t AccessType;
+            uint8_t AccessAttrib;
+            uint8_t AccessLength;
+            uint32_t Length;
+        } Field;
         struct {
             uint8_t ProcId;
             uint32_t PblkAddr;

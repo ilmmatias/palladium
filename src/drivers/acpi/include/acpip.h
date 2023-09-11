@@ -44,14 +44,7 @@ int AcpipReadDWord(AcpipState *State, uint32_t *DWord);
 int AcpipReadQWord(AcpipState *State, uint64_t *QWord);
 int AcpipReadPkgLength(AcpipState *State, uint32_t *Length);
 AcpipName *AcpipReadName(AcpipState *State);
-
-void AcpipFreeFieldList(AcpiFieldElement *Root);
-int AcpipReadFieldList(
-    AcpipState *State,
-    uint32_t Start,
-    uint32_t Length,
-    uint8_t *FieldFlags,
-    AcpiFieldElement **Fields);
+int AcpipReadFieldList(AcpipState *State, AcpiValue *Base, uint32_t Start, uint32_t Length);
 
 AcpiValue *AcpipExecuteTermList(AcpipState *State);
 AcpiValue *AcpipExecuteTermArg(AcpipState *State);

@@ -44,14 +44,14 @@ AcpiObject *AcpiSearchObject(const char *Name) {
         if (!memcmp(Namespace->Name, Token, 4)) {
             Token = strtok(NULL, ".");
 
-            if (Namespace->Value.Type != ACPI_SCOPE && Namespace->Value.Type != ACPI_DEVICE &&
-                Namespace->Value.Type != ACPI_PROCESSOR) {
+            if (!Token) {
+                return Namespace;
+            }
+
+            if (Namespace->Value.Type != ACPI_REGION && Namespace->Value.Type != ACPI_SCOPE &&
+                Namespace->Value.Type != ACPI_DEVICE && Namespace->Value.Type != ACPI_PROCESSOR) {
                 free(Path);
-                if (Token != NULL) {
-                    return NULL;
-                } else {
-                    return Namespace;
-                }
+                return NULL;
             }
 
             Namespace = Namespace->Value.Objects;
@@ -101,8 +101,8 @@ AcpiObject *AcpipCreateObject(AcpipName *Name, AcpiValue *Value) {
             }
 
             if (!memcmp(Base->Name, Name->Start, 4)) {
-                if (Base->Value.Type != ACPI_SCOPE && Base->Value.Type != ACPI_DEVICE &&
-                    Base->Value.Type != ACPI_PROCESSOR) {
+                if (Base->Value.Type != ACPI_REGION && Base->Value.Type != ACPI_SCOPE &&
+                    Base->Value.Type != ACPI_DEVICE && Base->Value.Type != ACPI_PROCESSOR) {
                     return NULL;
                 }
 
@@ -123,6 +123,7 @@ AcpiObject *AcpipCreateObject(AcpipName *Name, AcpiValue *Value) {
     }
 
     if (!Name->SegmentCount) {
+        free(Name);
         return AcpipObjectTree;
     }
 
@@ -168,6 +169,7 @@ AcpiObject *AcpipCreateObject(AcpipName *Name, AcpiValue *Value) {
  *
  * PARAMETERS:
  *     Name - Name attached to the object.
+ *            This will be managed by us (aka free'd) in the case of a success!
  *
  * RETURN VALUE:
  *     Pointer to the object if the entry was found, NULL otherwise.
@@ -194,8 +196,8 @@ AcpiObject *AcpipResolveObject(AcpipName *Name) {
             }
 
             if (!memcmp(Base->Name, Name->Start, 4)) {
-                if (Base->Value.Type != ACPI_SCOPE && Base->Value.Type != ACPI_DEVICE &&
-                    Base->Value.Type != ACPI_PROCESSOR) {
+                if (Base->Value.Type != ACPI_REGION && Base->Value.Type != ACPI_SCOPE &&
+                    Base->Value.Type != ACPI_DEVICE && Base->Value.Type != ACPI_PROCESSOR) {
                     return NULL;
                 }
 
@@ -215,12 +217,14 @@ AcpiObject *AcpipResolveObject(AcpipName *Name) {
     }
 
     if (!Name->SegmentCount) {
+        free(Name);
         return AcpipObjectTree;
     }
 
     /* Final pass, we're returning NULL if we don't find the entry. */
     while (1) {
         if (!memcmp(Base->Name, Name->Start, 4)) {
+            free(Name);
             return Base;
         }
 

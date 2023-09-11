@@ -134,8 +134,10 @@ void AcpipPopulateTree(const uint8_t *Code, uint32_t Length) {
     State.Scope = &Scope;
 
     if (!AcpipExecuteTermList(&State)) {
-        printf("Failure on AcpipExecuteTermList()!\n");
         // KeFatalError(KE_CORRUPTED_HARDWARE_STRUCTURES);
+        printf("Failure on AcpipExecuteTermList()!\n");
+        while (1)
+            ;
     }
 }
 
@@ -307,6 +309,7 @@ int AcpipReadPkgLength(AcpipState *State, uint32_t *Length) {
     uint8_t Part;
     *Length = Leading & 0x0F;
 
+    int Shift = 4;
     switch (Leading >> 6) {
         case 0:
             *Length = Leading & 0x3F;
@@ -316,19 +319,22 @@ int AcpipReadPkgLength(AcpipState *State, uint32_t *Length) {
                 return 0;
             }
 
-            *Length |= (uint32_t)Part << 20;
+            *Length |= (uint32_t)Part << Shift;
+            Shift += 8;
         case 2:
             if (!AcpipReadByte(State, &Part)) {
                 return 0;
             }
 
-            *Length |= (uint32_t)Part << 12;
+            *Length |= (uint32_t)Part << Shift;
+            Shift += 8;
         case 1:
             if (!AcpipReadByte(State, &Part)) {
                 return 0;
             }
 
-            *Length |= (uint32_t)Part << 4;
+            *Length |= (uint32_t)Part << Shift;
+            Shift += 8;
     }
 
     return 1;

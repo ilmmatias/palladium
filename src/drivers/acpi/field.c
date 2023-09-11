@@ -6,72 +6,36 @@
 #include <stdlib.h>
 #include <string.h>
 
-static AcpiFieldElement *CreateElement(AcpiFieldElement **Root) {
-    AcpiFieldElement *Parent = *Root;
-    while (Parent && Parent->Next) {
-        Parent = Parent->Next;
-    }
-
-    AcpiFieldElement *Element = calloc(1, sizeof(AcpiFieldElement));
-    if (!Element) {
-        return NULL;
-    }
-
-    if (Parent) {
-        Parent->Next = Element;
-    } else {
-        *Root = Element;
-    }
-
-    return Element;
-}
-
-void AcpipFreeFieldList(AcpiFieldElement *Root) {
-    while (Root) {
-        AcpiFieldElement *Next = Root->Next;
-        free(Root);
-        Root = Next;
-    }
-}
-
-int AcpipReadFieldList(
-    AcpipState *State,
-    uint32_t Start,
-    uint32_t Length,
-    uint8_t *FieldFlags,
-    AcpiFieldElement **Fields) {
+int AcpipReadFieldList(AcpipState *State, AcpiValue *Base, uint32_t Start, uint32_t Length) {
     uint32_t LengthSoFar = Start - State->Scope->RemainingLength;
     if (LengthSoFar >= Length || Length - LengthSoFar > State->Scope->RemainingLength) {
         return 0;
     }
 
     /* Last part of a Field def, should always be `... FieldFlags FieldList`. */
-    *FieldFlags = *(State->Scope->Code++);
+    uint8_t AccessType = *(State->Scope->Code++);
+    uint8_t AccessAttrib = 0;
+    uint8_t AccessLength = 0;
+
     Length -= LengthSoFar + 1;
     State->Scope->RemainingLength--;
 
     while (Length) {
         uint32_t Start = State->Scope->RemainingLength;
-        AcpiFieldElement *Element = CreateElement(Fields);
-
-        if (!Element) {
-            AcpipFreeFieldList(*Fields);
-            return 0;
-        }
 
         switch (*State->Scope->Code) {
             /* ReservedField := 0x00 PkgLength */
-            case 0x00:
+            case 0x00: {
                 State->Scope->RemainingLength--;
                 State->Scope->Code++;
 
-                Element->Type = ACPI_RESERVED_FIELD;
-                if (!AcpipReadPkgLength(State, &Element->Reserved.Length)) {
-                    AcpipFreeFieldList(*Fields);
+                uint32_t Length;
+                if (!AcpipReadPkgLength(State, &Length)) {
                     return 0;
                 }
 
                 break;
+            }
 
             /* AccessField := 0x01 AccessType AccessAtrib
                ExtendedAccessField := 0x03 AccessType AccessAttrib AccessLength */
@@ -80,12 +44,11 @@ int AcpipReadFieldList(
                 State->Scope->RemainingLength -= 3;
                 State->Scope->Code++;
 
-                Element->Type = ACPI_ACCESS_FIELD;
-                Element->Access.Type = *(State->Scope->Code++);
-                Element->Access.Attrib = *(State->Scope->Code++);
+                AccessType = *(State->Scope->Code++);
+                AccessAttrib = *(State->Scope->Code++);
 
-                if (*(State->Scope->Code - 1) == 0x03) {
-                    Element->Access.Length = *(State->Scope->Code++);
+                if (*(State->Scope->Code - 3) == 0x03) {
+                    AccessLength = *(State->Scope->Code++);
                     State->Scope->RemainingLength--;
                 }
 
@@ -98,22 +61,39 @@ int AcpipReadFieldList(
                     ;
 
             /* NamedField := NameSeg PkgLength */
-            default:
-                State->Scope->RemainingLength -= 4;
-                Element->Type = ACPI_NAMED_FIELD;
-                memcpy(Element->Named.Name, State->Scope->Code, 4);
+            default: {
+                /* Just a single NameSeg is equivalent to a normal NamePath, so we can use
+                   ReadName). */
+                AcpipName *Name = AcpipReadName(State);
+                if (!Name) {
+                    return 0;
+                }
 
-                State->Scope->Code += 4;
-                if (!AcpipReadPkgLength(State, &Element->Named.Length)) {
-                    AcpipFreeFieldList(*Fields);
+                uint32_t Length;
+                if (!AcpipReadPkgLength(State, &Length)) {
+                    free(Name);
+                    return 0;
+                }
+
+                AcpiValue Value;
+                memcpy(&Value, Base, sizeof(AcpiValue));
+                Value.Field.AccessType = AccessType;
+                Value.Field.AccessAttrib = AccessAttrib;
+                Value.Field.AccessLength = AccessLength;
+                Value.Field.Length = Length;
+
+                /* We just need to re-attach the name it to the correct region/parent. */
+                Name->LinkedObject = Base->Field.Region;
+                if (!AcpipCreateObject(Name, &Value)) {
+                    free(Name);
                     return 0;
                 }
 
                 break;
+            }
         }
 
         if (Start - State->Scope->RemainingLength > Length) {
-            AcpipFreeFieldList(*Fields);
             return 0;
         }
 

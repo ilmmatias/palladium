@@ -295,10 +295,10 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
 
                 AcpiValue Value;
                 Value.Type = ACPI_REGION;
+                Value.Objects = NULL;
                 Value.Region.RegionSpace = RegionSpace;
                 Value.Region.RegionLen = RegionLen->Integer;
                 Value.Region.RegionOffset = RegionOffset->Integer;
-                Value.Region.HasField = 0;
 
                 free(RegionLen);
                 free(RegionOffset);
@@ -322,26 +322,21 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
                     return NULL;
                 }
 
-                uint8_t FieldFlags;
-                AcpiFieldElement *Fields = NULL;
-                if (!AcpipReadFieldList(State, Start, Length, &FieldFlags, &Fields)) {
+                AcpiObject *Object = AcpipResolveObject(Name);
+                if (!Object) {
                     free(Name);
                     return NULL;
-                }
-
-                AcpiObject *Object = AcpipResolveObject(Name);
-                free(Name);
-
-                if (!Object || Object->Value.Type != ACPI_REGION) {
-                    AcpipFreeFieldList(Fields);
+                } else if (Object->Value.Type != ACPI_REGION) {
                     return NULL;
-                } else if (Object->Value.Region.HasField) {
-                    AcpipFreeFieldList(Object->Value.Region.FieldList);
                 }
 
-                Object->Value.Region.HasField = 1;
-                Object->Value.Region.FieldFlags = FieldFlags;
-                Object->Value.Region.FieldList = Fields;
+                AcpiValue Base;
+                Base.Type = ACPI_FIELD;
+                Base.Field.Region = Object;
+                if (!AcpipReadFieldList(State, &Base, Start, Length)) {
+                    return NULL;
+                }
+
                 break;
             }
 
@@ -426,6 +421,31 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
 
                 State->Scope = Scope;
                 break;
+            }
+
+            /* DefIndexField := IndexFieldOp PkgLength NameString NameString FieldFlags FieldList */
+            case 0x865B: {
+                uint32_t Length;
+                if (!AcpipReadPkgLength(State, &Length)) {
+                    return NULL;
+                }
+
+                AcpipName *Index = AcpipReadName(State);
+                if (!Index) {
+                    return NULL;
+                }
+
+                AcpipName *Data = AcpipReadName(State);
+                if (!Data) {
+                    free(Index);
+                    return NULL;
+                }
+
+                printf("Next 16 characters of Index: %.16s\n", Index->Start);
+                printf("Next 16 characters of Data: %.16s\n", Data->Start);
+
+                while (1)
+                    ;
             }
 
             default:
