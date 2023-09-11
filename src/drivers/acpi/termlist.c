@@ -9,41 +9,39 @@
 
 AcpiValue *AcpipExecuteTermList(AcpipState *State) {
     while (1) {
-        if (!State->RemainingLength) {
+        if (!State->Scope->RemainingLength) {
             /* Backtrack into the previous scope, or end if we're already in the top-most
                scope. */
-            if (!State->Parent) {
+            if (!State->Scope->Parent) {
                 break;
             }
 
-            AcpipState *Parent = State->Parent;
-            Parent->Code = State->Code;
-            Parent->RemainingLength -= State->Length;
+            AcpipScope *Parent = State->Scope->Parent;
+            Parent->Code = State->Scope->Code;
+            Parent->RemainingLength -= State->Scope->Length;
 
             free(State->Scope);
-            free(State);
+            State->Scope = Parent;
 
-            State = Parent;
             continue;
         }
 
-        uint8_t Opcode = *(State->Code++);
-        State->RemainingLength--;
+        uint8_t Opcode = *(State->Scope->Code++);
+        State->Scope->RemainingLength--;
 
         uint8_t ExtOpcode = 0;
         if (Opcode == 0x5B && !AcpipReadByte(State, &ExtOpcode)) {
             return NULL;
         }
 
-        uint32_t Start = State->RemainingLength;
-        const uint8_t *StartCode = State->Code;
+        uint32_t Start = State->Scope->RemainingLength;
+        const uint8_t *StartCode = State->Scope->Code;
 
         switch (Opcode | ((uint16_t)ExtOpcode << 8)) {
             /* DefName := NameOp NameString DataRefObject */
             case 0x08: {
-                char *Name;
-                uint8_t NameSegs;
-                if (!AcpipReadNameString(State, &Name, &NameSegs)) {
+                AcpipName *Name = AcpipReadName(State);
+                if (!Name) {
                     return NULL;
                 }
 
@@ -51,12 +49,16 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
                 if (!DataRefObject) {
                     free(Name);
                     return NULL;
-                } else if (!AcpipCreateObject(Name, DataRefObject)) {
+                }
+
+                AcpiObject *Object = AcpipCreateObject(Name, DataRefObject);
+                if (!Object) {
                     free(DataRefObject);
                     free(Name);
                     return NULL;
                 }
 
+                free(DataRefObject);
                 break;
             }
 
@@ -69,52 +71,33 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
                     return NULL;
                 }
 
-                char *Name;
-                uint8_t NameSegs;
-                if (!AcpipReadNameString(State, &Name, &NameSegs)) {
+                AcpipName *Name = AcpipReadName(State);
+                if (!Name) {
                     return NULL;
                 }
 
-                char *ObjectName = strdup(Name);
-                if (!ObjectName) {
+                uint32_t LengthSoFar = Start - State->Scope->RemainingLength;
+                if (LengthSoFar > Length || Length - LengthSoFar > State->Scope->RemainingLength) {
                     free(Name);
                     return NULL;
                 }
 
-                uint32_t LengthSoFar = Start - State->RemainingLength;
-                if (LengthSoFar > Length || Length - LengthSoFar > State->RemainingLength) {
-                    free(ObjectName);
+                AcpiValue Value;
+                Value.Type = Opcode == 0x10 ? ACPI_SCOPE : ACPI_DEVICE;
+                Value.Objects = NULL;
+
+                AcpiObject *Object = AcpipCreateObject(Name, &Value);
+                if (!Object) {
                     free(Name);
                     return NULL;
                 }
 
-                AcpipState *Scope = AcpipEnterSubScope(State, Name, NameSegs, Length - LengthSoFar);
+                AcpipScope *Scope = AcpipEnterScope(State, Object, Length - LengthSoFar);
                 if (!Scope) {
-                    free(ObjectName);
-                    free(Name);
                     return NULL;
                 }
 
-                AcpiValue *Value = malloc(sizeof(AcpiValue));
-                if (!Value) {
-                    free(Scope);
-                    free(ObjectName);
-                    free(Name);
-                    return NULL;
-                }
-
-                Value->Type = Opcode == 0x10 ? ACPI_SCOPE : ACPI_DEVICE;
-                Value->Objects = NULL;
-
-                if (!AcpipCreateObject(ObjectName, Value)) {
-                    free(Value);
-                    free(Scope);
-                    free(ObjectName);
-                    free(Name);
-                    return NULL;
-                }
-
-                State = Scope;
+                State->Scope = Scope;
                 break;
             }
 
@@ -125,43 +108,73 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
                     return NULL;
                 }
 
-                char *Name;
-                uint8_t NameSegs;
-                if (!AcpipReadNameString(State, &Name, &NameSegs)) {
+                AcpipName *Name = AcpipReadName(State);
+                if (!Name) {
                     return NULL;
                 }
 
-                uint8_t MethodFlags;
-                if (!AcpipReadByte(State, &MethodFlags)) {
+                uint32_t LengthSoFar = Start - State->Scope->RemainingLength;
+                if (LengthSoFar >= Length || Length - LengthSoFar > State->Scope->RemainingLength) {
                     free(Name);
                     return NULL;
                 }
 
-                uint32_t LengthSoFar = Start - State->RemainingLength;
-                if (LengthSoFar > Length || Length - LengthSoFar > State->RemainingLength) {
+                AcpiValue Value;
+                Value.Type = ACPI_METHOD;
+                Value.Method.Start = State->Scope->Code + 1;
+                Value.Method.Size = Length - LengthSoFar;
+                Value.Method.Flags = *State->Scope->Code;
+
+                if (!AcpipCreateObject(Name, &Value)) {
                     free(Name);
                     return NULL;
                 }
 
-                AcpiValue *Value = malloc(sizeof(AcpiValue));
-                if (!Value) {
+                State->Scope->Code += Length - LengthSoFar;
+                State->Scope->RemainingLength -= Length - LengthSoFar;
+                break;
+            }
+
+            /* DefMutex := MutexOp NameString SyncFlags */
+            case 0x015B: {
+                AcpipName *Name = AcpipReadName(State);
+                if (!Name) {
+                    return NULL;
+                }
+
+                uint8_t SyncFlags;
+                if (!AcpipReadByte(State, &SyncFlags)) {
                     free(Name);
                     return NULL;
                 }
 
-                Value->Type = ACPI_METHOD;
-                Value->Method.Start = State->Code;
-                Value->Method.Size = Length - LengthSoFar;
-                Value->Method.Flags = MethodFlags;
+                AcpiValue Value;
+                Value.Type = ACPI_MUTEX;
+                Value.Mutex.Flags = SyncFlags;
 
-                if (!AcpipCreateObject(Name, Value)) {
-                    free(Value);
+                if (!AcpipCreateObject(Name, &Value)) {
                     free(Name);
                     return NULL;
                 }
 
-                State->Code += Length - LengthSoFar;
-                State->RemainingLength -= Length - LengthSoFar;
+                break;
+            }
+
+            /* DefEvent := EventOp NameString */
+            case 0x025B: {
+                AcpipName *Name = AcpipReadName(State);
+                if (!Name) {
+                    return NULL;
+                }
+
+                AcpiValue Value;
+                Value.Type = ACPI_EVENT;
+
+                if (!AcpipCreateObject(Name, &Value)) {
+                    free(Name);
+                    return NULL;
+                }
+
                 break;
             }
 
@@ -183,50 +196,50 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
                 uint64_t PredicateValue = Predicate->Integer;
                 free(Predicate);
 
-                uint32_t LengthSoFar = Start - State->RemainingLength;
-                if (LengthSoFar > Length || Length - LengthSoFar > State->RemainingLength) {
+                uint32_t LengthSoFar = Start - State->Scope->RemainingLength;
+                if (LengthSoFar > Length || Length - LengthSoFar > State->Scope->RemainingLength) {
                     return NULL;
                 }
 
                 if (PredicateValue) {
-                    AcpipState *Scope = AcpipEnterIf(State, Length - LengthSoFar);
+                    AcpipScope *Scope = AcpipEnterIf(State, Length - LengthSoFar);
                     if (!Scope) {
                         return NULL;
                     }
 
-                    State = Scope;
+                    State->Scope = Scope;
                     break;
                 }
 
-                State->Code += Length - LengthSoFar;
-                State->RemainingLength -= Length - LengthSoFar;
+                State->Scope->Code += Length - LengthSoFar;
+                State->Scope->RemainingLength -= Length - LengthSoFar;
 
                 /* DefElse only really matter for If(false), and we ignore it anywhere else;
                    Here, we try reading up the code (and entering the else scope) after
                    If(false). */
-                if (!State->RemainingLength || *State->Code != 0xA1) {
+                if (!State->Scope->RemainingLength || *State->Scope->Code != 0xA1) {
                     break;
                 }
 
-                State->Code++;
-                State->RemainingLength--;
-                Start = State->RemainingLength;
+                State->Scope->Code++;
+                State->Scope->RemainingLength--;
+                Start = State->Scope->RemainingLength;
 
                 if (!AcpipReadPkgLength(State, &Length)) {
                     return NULL;
                 }
 
-                LengthSoFar = Start - State->RemainingLength;
-                if (LengthSoFar > Length || Length - LengthSoFar > State->RemainingLength) {
+                LengthSoFar = Start - State->Scope->RemainingLength;
+                if (LengthSoFar > Length || Length - LengthSoFar > State->Scope->RemainingLength) {
                     return NULL;
                 }
 
-                AcpipState *Scope = AcpipEnterIf(State, Length - LengthSoFar);
+                AcpipScope *Scope = AcpipEnterIf(State, Length - LengthSoFar);
                 if (!Scope) {
                     return NULL;
                 }
 
-                State = Scope;
+                State->Scope = Scope;
                 break;
             }
 
@@ -237,71 +250,15 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
                     return NULL;
                 }
 
-                State->Code = StartCode + Length;
-                State->RemainingLength = Start - Length;
-                break;
-            }
-
-            /* DefMutex := MutexOp NameString SyncFlags */
-            case 0x015B: {
-                char *Name;
-                uint8_t NameSegs;
-                if (!AcpipReadNameString(State, &Name, &NameSegs)) {
-                    return NULL;
-                }
-
-                uint8_t SyncFlags;
-                if (!AcpipReadByte(State, &SyncFlags)) {
-                    free(Name);
-                    return NULL;
-                }
-
-                AcpiValue *Value = malloc(sizeof(AcpiValue));
-                if (!Value) {
-                    free(Name);
-                    return NULL;
-                }
-
-                Value->Type = ACPI_MUTEX;
-                Value->Mutex.Flags = SyncFlags;
-                if (!AcpipCreateObject(Name, Value)) {
-                    free(Value);
-                    free(Name);
-                    return NULL;
-                }
-
-                break;
-            }
-
-            /* DefEvent := EventOp NameString */
-            case 0x025B: {
-                char *Name;
-                uint8_t NameSegs;
-                if (!AcpipReadNameString(State, &Name, &NameSegs)) {
-                    return NULL;
-                }
-
-                AcpiValue *Value = malloc(sizeof(AcpiValue));
-                if (!Value) {
-                    free(Name);
-                    return NULL;
-                }
-
-                Value->Type = ACPI_EVENT;
-                if (!AcpipCreateObject(Name, Value)) {
-                    free(Value);
-                    free(Name);
-                    return NULL;
-                }
-
+                State->Scope->Code = StartCode + Length;
+                State->Scope->RemainingLength = Start - Length;
                 break;
             }
 
             /* DefOpRegion := OpRegionOp NameString RegionSpace RegionOffset RegionLen */
             case 0x805B: {
-                char *Name;
-                uint8_t NameSegs;
-                if (!AcpipReadNameString(State, &Name, &NameSegs)) {
+                AcpipName *Name = AcpipReadName(State);
+                if (!Name) {
                     return NULL;
                 }
 
@@ -336,23 +293,16 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
                     return NULL;
                 }
 
-                AcpiValue *Value = malloc(sizeof(AcpiValue));
-                if (!Value) {
-                    free(RegionLen);
-                    free(RegionOffset);
-                    free(Name);
-                    return NULL;
-                }
-
-                Value->Type = ACPI_REGION;
-                Value->Region.RegionSpace = RegionSpace;
-                Value->Region.RegionLen = RegionLen->Integer;
-                Value->Region.RegionOffset = RegionOffset->Integer;
-                Value->Region.HasField = 0;
+                AcpiValue Value;
+                Value.Type = ACPI_REGION;
+                Value.Region.RegionSpace = RegionSpace;
+                Value.Region.RegionLen = RegionLen->Integer;
+                Value.Region.RegionOffset = RegionOffset->Integer;
+                Value.Region.HasField = 0;
 
                 free(RegionLen);
                 free(RegionOffset);
-                if (!AcpipCreateObject(Name, Value)) {
+                if (!AcpipCreateObject(Name, &Value)) {
                     free(Name);
                     return NULL;
                 }
@@ -367,9 +317,8 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
                     return NULL;
                 }
 
-                char *Name;
-                uint8_t NameSegs;
-                if (!AcpipReadNameString(State, &Name, &NameSegs)) {
+                AcpipName *Name = AcpipReadName(State);
+                if (!Name) {
                     return NULL;
                 }
 
@@ -380,19 +329,19 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
                     return NULL;
                 }
 
-                AcpiObject *Object = AcpiSearchObject(Name, NULL);
+                AcpiObject *Object = AcpipResolveObject(Name);
                 free(Name);
 
-                if (!Object || Object->Value->Type != ACPI_REGION) {
+                if (!Object || Object->Value.Type != ACPI_REGION) {
                     AcpipFreeFieldList(Fields);
                     return NULL;
-                } else if (Object->Value->Region.HasField) {
-                    AcpipFreeFieldList(Object->Value->Region.FieldList);
+                } else if (Object->Value.Region.HasField) {
+                    AcpipFreeFieldList(Object->Value.Region.FieldList);
                 }
 
-                Object->Value->Region.HasField = 1;
-                Object->Value->Region.FieldFlags = FieldFlags;
-                Object->Value->Region.FieldList = Fields;
+                Object->Value.Region.HasField = 1;
+                Object->Value.Region.FieldFlags = FieldFlags;
+                Object->Value.Region.FieldList = Fields;
                 break;
             }
 
@@ -403,75 +352,38 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
                     return NULL;
                 }
 
-                char *Name;
-                uint8_t NameSegs;
-                if (!AcpipReadNameString(State, &Name, &NameSegs)) {
+                AcpipName *Name = AcpipReadName(State);
+                if (!Name) {
                     return NULL;
                 }
 
-                char *ObjectName = strdup(Name);
-                if (!ObjectName) {
+                uint32_t LengthSoFar = Start - State->Scope->RemainingLength + 6;
+                if (LengthSoFar > Length || Length - LengthSoFar > State->Scope->RemainingLength) {
                     free(Name);
                     return NULL;
                 }
 
-                uint8_t ProcId;
-                if (!AcpipReadByte(State, &ProcId)) {
-                    free(ObjectName);
+                AcpiValue Value;
+                Value.Type = ACPI_PROCESSOR;
+                Value.Processor.ProcId = *(State->Scope->Code);
+                Value.Processor.PblkAddr = *(uint32_t *)(State->Scope->Code + 1);
+                Value.Processor.PblkLen = *(State->Scope->Code + 5);
+
+                State->Scope->Code += 6;
+                State->Scope->RemainingLength -= 6;
+
+                AcpiObject *Object = AcpipCreateObject(Name, &Value);
+                if (!Object) {
                     free(Name);
                     return NULL;
                 }
 
-                uint32_t PblkAddr;
-                if (!AcpipReadDWord(State, &PblkAddr)) {
-                    free(ObjectName);
-                    free(Name);
-                    return NULL;
-                }
-
-                uint8_t PblkLen;
-                if (!AcpipReadByte(State, &PblkLen)) {
-                    free(ObjectName);
-                    free(Name);
-                    return NULL;
-                }
-
-                uint32_t LengthSoFar = Start - State->RemainingLength;
-                if (LengthSoFar > Length || Length - LengthSoFar > State->RemainingLength) {
-                    free(ObjectName);
-                    free(Name);
-                    return NULL;
-                }
-
-                AcpipState *Scope = AcpipEnterSubScope(State, Name, NameSegs, Length - LengthSoFar);
+                AcpipScope *Scope = AcpipEnterScope(State, Object, Length - LengthSoFar);
                 if (!Scope) {
-                    free(ObjectName);
-                    free(Name);
                     return NULL;
                 }
 
-                AcpiValue *Value = malloc(sizeof(AcpiValue));
-                if (!Value) {
-                    free(ObjectName);
-                    free(Name);
-                    return NULL;
-                }
-
-                Value->Type = ACPI_PROCESSOR;
-                Value->Processor.ProcId = ProcId;
-                Value->Processor.PblkAddr = PblkAddr;
-                Value->Processor.PblkLen = PblkLen;
-                Value->Objects = NULL;
-
-                if (!AcpipCreateObject(ObjectName, Value)) {
-                    free(Value);
-                    free(Scope);
-                    free(ObjectName);
-                    free(Name);
-                    return NULL;
-                }
-
-                State = Scope;
+                State->Scope = Scope;
                 break;
             }
 
@@ -482,67 +394,37 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
                     return NULL;
                 }
 
-                char *Name;
-                uint8_t NameSegs;
-                if (!AcpipReadNameString(State, &Name, &NameSegs)) {
+                AcpipName *Name = AcpipReadName(State);
+                if (!Name) {
                     return NULL;
                 }
 
-                char *ObjectName = strdup(Name);
-                if (!ObjectName) {
+                uint32_t LengthSoFar = Start - State->Scope->RemainingLength + 3;
+                if (LengthSoFar > Length || Length - LengthSoFar > State->Scope->RemainingLength) {
                     free(Name);
                     return NULL;
                 }
 
-                uint8_t SystemLevel;
-                if (!AcpipReadByte(State, &SystemLevel)) {
-                    free(ObjectName);
+                AcpiValue Value;
+                Value.Type = ACPI_POWER;
+                Value.Power.SystemLevel = *(State->Scope->Code);
+                Value.Power.ResourceOrder = *(uint16_t *)(State->Scope->Code + 1);
+
+                State->Scope->Code += 3;
+                State->Scope->RemainingLength -= 3;
+
+                AcpiObject *Object = AcpipCreateObject(Name, &Value);
+                if (!Object) {
                     free(Name);
                     return NULL;
                 }
 
-                uint16_t ResourceOrder;
-                if (!AcpipReadWord(State, &ResourceOrder)) {
-                    free(ObjectName);
-                    free(Name);
-                    return NULL;
-                }
-
-                uint32_t LengthSoFar = Start - State->RemainingLength;
-                if (LengthSoFar > Length || Length - LengthSoFar > State->RemainingLength) {
-                    free(ObjectName);
-                    free(Name);
-                    return NULL;
-                }
-
-                AcpipState *Scope = AcpipEnterSubScope(State, Name, NameSegs, Length - LengthSoFar);
+                AcpipScope *Scope = AcpipEnterScope(State, Object, Length - LengthSoFar);
                 if (!Scope) {
-                    free(ObjectName);
-                    free(Name);
                     return NULL;
                 }
 
-                AcpiValue *Value = malloc(sizeof(AcpiValue));
-                if (!Value) {
-                    free(ObjectName);
-                    free(Name);
-                    return NULL;
-                }
-
-                Value->Type = ACPI_POWER;
-                Value->Power.SystemLevel = SystemLevel;
-                Value->Power.ResourceOrder = ResourceOrder;
-                Value->Objects = NULL;
-
-                if (!AcpipCreateObject(ObjectName, Value)) {
-                    free(Value);
-                    free(Scope);
-                    free(ObjectName);
-                    free(Name);
-                    return NULL;
-                }
-
-                State = Scope;
+                State->Scope = Scope;
                 break;
             }
 
@@ -550,8 +432,8 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
                 printf(
                     "unimplemented termlist opcode: %#hx; %d bytes left to parse out of %d.\n",
                     Opcode | ((uint32_t)ExtOpcode << 8),
-                    State->RemainingLength,
-                    State->Length);
+                    State->Scope->RemainingLength,
+                    State->Scope->Length);
                 while (1)
                     ;
         }

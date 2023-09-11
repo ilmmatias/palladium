@@ -40,18 +40,18 @@ int AcpipReadFieldList(
     uint32_t Length,
     uint8_t *FieldFlags,
     AcpiFieldElement **Fields) {
-    uint32_t LengthSoFar = Start - State->RemainingLength;
-    if (LengthSoFar >= Length || Length - LengthSoFar > State->RemainingLength) {
+    uint32_t LengthSoFar = Start - State->Scope->RemainingLength;
+    if (LengthSoFar >= Length || Length - LengthSoFar > State->Scope->RemainingLength) {
         return 0;
     }
 
     /* Last part of a Field def, should always be `... FieldFlags FieldList`. */
-    *FieldFlags = *(State->Code++);
+    *FieldFlags = *(State->Scope->Code++);
     Length -= LengthSoFar + 1;
-    State->RemainingLength--;
+    State->Scope->RemainingLength--;
 
     while (Length) {
-        uint32_t Start = State->RemainingLength;
+        uint32_t Start = State->Scope->RemainingLength;
         AcpiFieldElement *Element = CreateElement(Fields);
 
         if (!Element) {
@@ -59,11 +59,11 @@ int AcpipReadFieldList(
             return 0;
         }
 
-        switch (*State->Code) {
+        switch (*State->Scope->Code) {
             /* ReservedField := 0x00 PkgLength */
             case 0x00:
-                State->RemainingLength--;
-                State->Code++;
+                State->Scope->RemainingLength--;
+                State->Scope->Code++;
 
                 Element->Type = ACPI_RESERVED_FIELD;
                 if (!AcpipReadPkgLength(State, &Element->Reserved.Length)) {
@@ -77,16 +77,16 @@ int AcpipReadFieldList(
                ExtendedAccessField := 0x03 AccessType AccessAttrib AccessLength */
             case 0x01:
             case 0x03:
-                State->RemainingLength -= 3;
-                State->Code++;
+                State->Scope->RemainingLength -= 3;
+                State->Scope->Code++;
 
                 Element->Type = ACPI_ACCESS_FIELD;
-                Element->Access.Type = *(State->Code++);
-                Element->Access.Attrib = *(State->Code++);
+                Element->Access.Type = *(State->Scope->Code++);
+                Element->Access.Attrib = *(State->Scope->Code++);
 
-                if (*(State->Code - 1) == 0x03) {
-                    Element->Access.Length = *(State->Code++);
-                    State->RemainingLength--;
+                if (*(State->Scope->Code - 1) == 0x03) {
+                    Element->Access.Length = *(State->Scope->Code++);
+                    State->Scope->RemainingLength--;
                 }
 
                 break;
@@ -99,11 +99,11 @@ int AcpipReadFieldList(
 
             /* NamedField := NameSeg PkgLength */
             default:
-                State->RemainingLength -= 4;
+                State->Scope->RemainingLength -= 4;
                 Element->Type = ACPI_NAMED_FIELD;
-                memcpy(Element->Named.Name, State->Code, 4);
+                memcpy(Element->Named.Name, State->Scope->Code, 4);
 
-                State->Code += 4;
+                State->Scope->Code += 4;
                 if (!AcpipReadPkgLength(State, &Element->Named.Length)) {
                     AcpipFreeFieldList(*Fields);
                     return 0;
@@ -112,12 +112,12 @@ int AcpipReadFieldList(
                 break;
         }
 
-        if (Start - State->RemainingLength > Length) {
+        if (Start - State->Scope->RemainingLength > Length) {
             AcpipFreeFieldList(*Fields);
             return 0;
         }
 
-        Length -= Start - State->RemainingLength;
+        Length -= Start - State->Scope->RemainingLength;
     }
 
     return 1;

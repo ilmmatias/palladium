@@ -24,13 +24,8 @@
 #define ACPI_ACCESS_FIELD 2
 #define ACPI_CONNECT_FIELD 3
 
+struct AcpiObject;
 struct AcpiValue;
-
-typedef struct AcpiObject {
-    char *Name;
-    struct AcpiValue *Value;
-    struct AcpiObject *Next;
-} AcpiObject;
 
 typedef struct AcpiFieldElement {
     int Type;
@@ -61,7 +56,7 @@ typedef struct {
 
 typedef struct AcpiValue {
     int Type;
-    AcpiObject *Objects;
+    struct AcpiObject *Objects;
     union {
         uint64_t Integer;
         char *String;
@@ -101,13 +96,15 @@ typedef struct AcpiValue {
     };
 } AcpiValue;
 
-AcpiObject *AcpiSearchObject(const char *Name, uint8_t *NameSegs);
-AcpiValue *AcpiExecuteMethodFromPath(const char *Name, int ArgCount, AcpiValue *Args);
-AcpiValue *AcpiExecuteMethodFromObject(
-    AcpiObject *Object,
-    const char *Name,
-    uint8_t NameSegs,
-    int ArgCount,
-    AcpiValue *Args);
+typedef struct AcpiObject {
+    char Name[4];
+    struct AcpiValue Value;
+    struct AcpiObject *Next;
+    struct AcpiObject *Parent;
+} AcpiObject;
+
+AcpiObject *AcpiSearchObject(const char *Name);
+AcpiValue *AcpiExecuteMethodFromPath(const char *Name, int ArgCount, AcpiValue *Arguments);
+AcpiValue *AcpiExecuteMethodFromObject(AcpiObject *Object, int ArgCount, AcpiValue *Arguments);
 
 #endif /* _ACPI_H_ */

@@ -31,7 +31,7 @@ AcpiValue *AcpipExecuteTermArg(AcpipState *State) {
         return NULL;
     }
 
-    uint32_t Start = State->RemainingLength;
+    uint32_t Start = State->Scope->RemainingLength;
     switch (Opcode) {
         /* ZeroOp */
         case 0x00: {
@@ -88,11 +88,11 @@ AcpiValue *AcpipExecuteTermArg(AcpipState *State) {
             Value->Type = ACPI_STRING;
 
             size_t StringSize = 0;
-            while (StringSize < State->RemainingLength && State->Code[StringSize]) {
+            while (StringSize < State->Scope->RemainingLength && State->Scope->Code[StringSize]) {
                 StringSize++;
             }
 
-            if (StringSize > State->RemainingLength) {
+            if (StringSize > State->Scope->RemainingLength) {
                 free(Value);
                 return NULL;
             }
@@ -103,9 +103,9 @@ AcpiValue *AcpipExecuteTermArg(AcpipState *State) {
                 return NULL;
             }
 
-            memcpy(Value->String, State->Code, StringSize);
-            State->Code += StringSize + 1;
-            State->RemainingLength -= StringSize + 1;
+            memcpy(Value->String, State->Scope->Code, StringSize);
+            State->Scope->Code += StringSize + 1;
+            State->Scope->RemainingLength -= StringSize + 1;
 
             break;
         }
@@ -153,8 +153,9 @@ AcpiValue *AcpipExecuteTermArg(AcpipState *State) {
                 return NULL;
             }
 
-            uint32_t LengthSoFar = Start - State->RemainingLength;
-            if (LengthSoFar > PkgLength || PkgLength - LengthSoFar > State->RemainingLength ||
+            uint32_t LengthSoFar = Start - State->Scope->RemainingLength;
+            if (LengthSoFar > PkgLength ||
+                PkgLength - LengthSoFar > State->Scope->RemainingLength ||
                 PkgLength - LengthSoFar > Value->Buffer.Size) {
                 free(Value->Buffer.Data);
                 free(Value);
@@ -162,8 +163,8 @@ AcpiValue *AcpipExecuteTermArg(AcpipState *State) {
             }
 
             for (uint32_t i = 0; i < PkgLength - LengthSoFar; i++) {
-                Value->Buffer.Data[i] = *(State->Code++);
-                State->RemainingLength--;
+                Value->Buffer.Data[i] = *(State->Scope->Code++);
+                State->Scope->RemainingLength--;
             }
 
             break;
@@ -180,8 +181,9 @@ AcpiValue *AcpipExecuteTermArg(AcpipState *State) {
                 return NULL;
             }
 
-            uint32_t LengthSoFar = Start - State->RemainingLength;
-            if (LengthSoFar >= PkgLength || PkgLength - LengthSoFar > State->RemainingLength) {
+            uint32_t LengthSoFar = Start - State->Scope->RemainingLength;
+            if (LengthSoFar >= PkgLength ||
+                PkgLength - LengthSoFar > State->Scope->RemainingLength) {
                 free(Value);
                 return NULL;
             }
@@ -200,23 +202,22 @@ AcpiValue *AcpipExecuteTermArg(AcpipState *State) {
                     return NULL;
                 }
 
-                uint32_t Start = State->RemainingLength;
-                uint8_t NameSegs;
-
-                uint8_t Opcode = *State->Code;
+                uint32_t Start = State->Scope->RemainingLength;
+                uint8_t Opcode = *State->Scope->Code;
                 uint8_t ExtOpcode = 0;
+
                 if (Opcode == 0x5B) {
-                    if (State->RemainingLength < 2) {
+                    if (State->Scope->RemainingLength < 2) {
                         FreeElements(Value, i);
                         return NULL;
                     }
 
-                    ExtOpcode = *(State->Code + 1);
+                    ExtOpcode = *(State->Scope->Code + 1);
                 }
 
                 /* Each PackageElement is either a DataRefObject (which we just call ExecuteTermArg
                    to handle), or a NameString; We just determine if we're a DataRefObject, and if
-                   not, call ReadNameString. */
+                   not, call ReadName. */
                 if (Opcode <= 0x01 || Opcode == 0x0A || Opcode == 0x0B || Opcode == 0x0C ||
                     Opcode == 0x0D || Opcode == 0x0E || Opcode == 0x11 || Opcode == 0x12 ||
                     Opcode == 0x13 || Opcode == 0xFF || (Opcode == 0x5B && ExtOpcode == 0x30)) {
@@ -226,18 +227,18 @@ AcpiValue *AcpipExecuteTermArg(AcpipState *State) {
                         FreeElements(Value, i);
                         return NULL;
                     }
-                } else if (!AcpipReadNameString(State, &Value->Package.Data[i].String, &NameSegs)) {
+                } else if (!AcpipReadName(State)) {
                     FreeElements(Value, i);
                     return NULL;
                 }
 
                 i++;
-                if (Start - State->RemainingLength > PkgLength) {
+                if (Start - State->Scope->RemainingLength > PkgLength) {
                     FreeElements(Value, i);
                     return NULL;
                 }
 
-                PkgLength -= Start - State->RemainingLength;
+                PkgLength -= Start - State->Scope->RemainingLength;
             }
 
             break;
@@ -254,23 +255,8 @@ AcpiValue *AcpipExecuteTermArg(AcpipState *State) {
             printf(
                 "unimplemented termarg opcode: %#hx; %d bytes left to parse out of %d.\n",
                 Opcode,
-                State->RemainingLength,
-                State->Length);
-
-            State->Code--;
-            State->RemainingLength++;
-
-            char *Name;
-            uint8_t NameSegs;
-            if (AcpipReadNameString(State, &Name, &NameSegs)) {
-                printf("this might be a MethodInvocation, showing the path: %s\n", Name);
-                printf(
-                    "if it is one, this should return a pointer: %p\n",
-                    AcpiSearchObject(Name, NULL));
-            } else {
-                printf("AcpipReadNameString() failed\n");
-            }
-
+                State->Scope->RemainingLength,
+                State->Scope->Length);
             while (1)
                 ;
         }

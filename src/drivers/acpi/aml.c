@@ -7,75 +7,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-static AcpiObject *ObjectTree = NULL;
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function searches for an object/entry within the AML namespace tree.
- *
- * PARAMETERS:
- *     Name - Name attached to the object.
- *     NameSegs - Output; How many segments the name had; Can be NULL.
- *
- * RETURN VALUE:
- *     Pointer to the object if the entry was found, NULL otherwise.
- *-----------------------------------------------------------------------------------------------*/
-AcpiObject *AcpiSearchObject(const char *Name, uint8_t *NameSegs) {
-    if (!Name) {
-        return NULL;
-    }
-
-    char *Path = strdup(Name + 1);
-    if (!Path) {
-        return NULL;
-    }
-
-    AcpiObject *Parent = NULL;
-    AcpiObject *Namespace = ObjectTree;
-    char *Token = strtok(Path, ".");
-
-    if (NameSegs) {
-        *NameSegs = 0;
-    }
-
-    /* `Name` should contain the full path/namespace for the item, and as such, we need to tokenize
-       it to find the right leaf within the namespace. */
-    while (Namespace) {
-        if (!Token) {
-            free(Path);
-            return Parent;
-        }
-
-        if (Namespace && !strcmp(Namespace->Name, Token)) {
-            Token = strtok(NULL, ".");
-
-            if (NameSegs) {
-                (*NameSegs)++;
-            }
-
-            if (Namespace->Value->Type != ACPI_SCOPE && Namespace->Value->Type != ACPI_DEVICE &&
-                Namespace->Value->Type != ACPI_PROCESSOR) {
-                free(Path);
-                if (Token != NULL) {
-                    return NULL;
-                } else {
-                    return Namespace;
-                }
-            }
-
-            Parent = Namespace;
-            Namespace = Namespace->Value->Objects;
-            continue;
-        }
-
-        if (Namespace) {
-            Namespace = Namespace->Next;
-        }
-    }
-
-    free(Path);
-    return NULL;
-}
+static AcpiObject ObjectTreeRoot;
+extern AcpiObject *AcpipObjectTree;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -84,15 +17,14 @@ AcpiObject *AcpiSearchObject(const char *Name, uint8_t *NameSegs) {
  * PARAMETERS:
  *     Name - Name attached to the method.
  *     ArgCount - Amount of arguments to pass.
- *     Args - Data of the arguments.
+ *     Arguments - Data of the arguments.
  *
  * RETURN VALUE:
  *     Return value of the method, or NULL if something went wrong.
  *-----------------------------------------------------------------------------------------------*/
-AcpiValue *AcpiExecuteMethodFromPath(const char *Name, int ArgCount, AcpiValue *Args) {
-    uint8_t NameSegs;
-    AcpiObject *Object = AcpiSearchObject(Name, &NameSegs);
-    return AcpiExecuteMethodFromObject(Object, Name, NameSegs, ArgCount, Args);
+AcpiValue *AcpiExecuteMethodFromPath(const char *Name, int ArgCount, AcpiValue *Arguments) {
+    AcpiObject *Object = AcpiSearchObject(Name);
+    return AcpiExecuteMethodFromObject(Object, ArgCount, Arguments);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -101,42 +33,36 @@ AcpiValue *AcpiExecuteMethodFromPath(const char *Name, int ArgCount, AcpiValue *
  *
  * PARAMETERS:
  *     Object - Object containing the method.
- *     Name - Name attached to the method.
- *     NameSegs - Amount of segments the method path has.
  *     ArgCount - Amount of arguments to pass.
- *     Args - Data of the arguments.
+ *     Arguments - Data of the arguments.
  *
  * RETURN VALUE:
  *     Return value of the method, or NULL if something went wrong.
  *-----------------------------------------------------------------------------------------------*/
-AcpiValue *AcpiExecuteMethodFromObject(
-    AcpiObject *Object,
-    const char *Name,
-    uint8_t NameSegs,
-    int ArgCount,
-    AcpiValue *Args) {
-    if (!Object || !Name || Object->Value->Type != ACPI_METHOD) {
+AcpiValue *AcpiExecuteMethodFromObject(AcpiObject *Object, int ArgCount, AcpiValue *Arguments) {
+    if (!Object || Object->Value.Type != ACPI_METHOD) {
         return NULL;
+    } else if (ArgCount < 0) {
+        ArgCount = 0;
+    } else if (ArgCount > 7) {
+        ArgCount = 7;
     }
 
     AcpipState State;
-    State.Scope = strdup(Name);
-    if (!State.Scope) {
-        return NULL;
-    }
+    AcpipScope Scope;
 
-    State.ScopeSegs = NameSegs;
-    State.Code = Object->Value->Method.Start;
-    State.Length = Object->Value->Method.Size;
-    State.RemainingLength = State.Length;
-    State.Parent = NULL;
+    Scope.LinkedObject = Object;
+    Scope.Code = Object->Value.Method.Start;
+    Scope.Length = Object->Value.Method.Size;
+    Scope.RemainingLength = Object->Value.Method.Size;
+    Scope.Parent = NULL;
 
-    AcpiValue *Result = AcpipExecuteTermList(&State);
-    free(State.Scope);
+    memset(&State, 0, sizeof(State));
+    memcpy(State.Arguments, Arguments, ArgCount * sizeof(AcpiValue));
+    State.IsMethod = 1;
+    State.Scope = &Scope;
 
-    (void)ArgCount;
-    (void)Args;
-    return Result;
+    return AcpipExecuteTermList(&State);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -159,26 +85,27 @@ void AcpipPopulatePredefined(void) {
         "_TZ_",
     };
 
-    AcpiValue *Values = calloc(PREDEFINED_ITEMS, sizeof(AcpiValue));
     AcpiObject *Objects = calloc(PREDEFINED_ITEMS, sizeof(AcpiObject));
-    char *DupNames = malloc(sizeof(Names));
-
-    if (!Values || !Objects || !DupNames) {
+    if (!Objects) {
         KeFatalError(KE_EARLY_MEMORY_FAILURE);
     }
 
     for (int i = 0; i < PREDEFINED_ITEMS; i++) {
-        Values[i].Type = ACPI_SCOPE;
-        Objects[i].Value = &Values[i];
-        Objects[i].Name = &DupNames[i * 5];
-        memcpy(&DupNames[i * 5], Names[i], 5);
+        memcpy(Objects[i].Name, Names[i], 4);
+        Objects[i].Value.Type = ACPI_SCOPE;
+        Objects[i].Parent = &ObjectTreeRoot;
 
         if (i != PREDEFINED_ITEMS - 1) {
             Objects[i].Next = &Objects[i + 1];
         }
     }
 
-    ObjectTree = Objects;
+    memcpy(ObjectTreeRoot.Name, "____", 4);
+    ObjectTreeRoot.Value.Type = ACPI_SCOPE;
+    ObjectTreeRoot.Value.Objects = Objects;
+    ObjectTreeRoot.Next = NULL;
+    ObjectTreeRoot.Parent = NULL;
+    AcpipObjectTree = &ObjectTreeRoot;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -194,104 +121,22 @@ void AcpipPopulatePredefined(void) {
  *-----------------------------------------------------------------------------------------------*/
 void AcpipPopulateTree(const uint8_t *Code, uint32_t Length) {
     AcpipState State;
+    AcpipScope Scope;
 
-    State.Scope = strdup("\\");
-    State.ScopeSegs = 0;
-    State.Code = Code;
-    State.Length = Length;
-    State.RemainingLength = Length;
-    State.Parent = NULL;
+    Scope.LinkedObject = AcpipObjectTree;
+    Scope.Code = Code;
+    Scope.Length = Length;
+    Scope.RemainingLength = Length;
+    Scope.Parent = NULL;
 
-    if (!State.Scope) {
-        return;
-    } else if (!AcpipExecuteTermList(&State)) {
+    memset(&State, 0, sizeof(State));
+    State.IsMethod = 0;
+    State.Scope = &Scope;
+
+    if (!AcpipExecuteTermList(&State)) {
+        printf("Failure on AcpipExecuteTermList()!\n");
         // KeFatalError(KE_CORRUPTED_HARDWARE_STRUCTURES);
     }
-
-    free(State.Scope);
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function adds a new object to the global tree.
- *
- * PARAMETERS:
- *     Name - Name to be associated with the entry.
- *     Value - Value of the new leaf.
- *
- * RETURN VALUE:
- *     0 on failure (memory allocation error), 1 otherwise.
- *-----------------------------------------------------------------------------------------------*/
-int AcpipCreateObject(char *Name, AcpiValue *Value) {
-    AcpiValue *Parent = NULL;
-    AcpiObject *Namespace = ObjectTree;
-    char *Token = strtok(Name + 1, ".");
-
-    /* `Name` should contain the full path/namespace for the item, and as such, we need to tokenize
-       it to find the right leaf within the namespace. */
-    while (1) {
-        if (!Token) {
-            free(Value);
-            free(Name);
-            return 1;
-        }
-
-        if (Namespace && !strcmp(Namespace->Name, Token)) {
-            Token = strtok(NULL, ".");
-
-            if (Namespace->Value->Type != ACPI_SCOPE && Namespace->Value->Type != ACPI_DEVICE &&
-                Namespace->Value->Type != ACPI_PROCESSOR) {
-                if (Token != NULL) {
-                    return 0;
-                } else {
-                    free(Value);
-                    free(Name);
-                    return 1;
-                }
-            }
-
-            Parent = Namespace->Value;
-            Namespace = Namespace->Value->Objects;
-            continue;
-        }
-
-        /* If we reached the end of the namespace leaf, we either have a situation where one of
-           the scopes doesn't exist (\A.B.C, but B wasn't defined), or we're at the end, and
-           trying to define C. */
-        if (Namespace && Namespace->Next) {
-            Namespace = Namespace->Next;
-            continue;
-        } else if (strtok(NULL, ".") != NULL) {
-            return 0;
-        }
-
-        break;
-    }
-
-    AcpiObject *Entry = malloc(sizeof(AcpiObject));
-    if (!Entry) {
-        return 0;
-    }
-
-    Entry->Name = strdup(Token);
-    Entry->Value = Value;
-    Entry->Next = NULL;
-
-    if (!Entry->Name) {
-        free(Entry);
-        return 0;
-    }
-
-    if (Namespace) {
-        Namespace->Next = Entry;
-    } else if (Parent) {
-        Parent->Objects = Entry;
-    } else {
-        ObjectTree = Entry;
-    }
-
-    free(Name);
-    return 1;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -305,25 +150,18 @@ int AcpipCreateObject(char *Name, AcpiValue *Value) {
  * RETURN VALUE:
  *     New state containing the scope, or NULL on failure.
  *-----------------------------------------------------------------------------------------------*/
-AcpipState *AcpipEnterIf(AcpipState *State, uint32_t Length) {
-    AcpipState *IfState = malloc(sizeof(AcpipState));
-    if (!IfState) {
-        return NULL;
+AcpipScope *AcpipEnterIf(AcpipState *State, uint32_t Length) {
+    AcpipScope *Scope = malloc(sizeof(AcpipScope));
+
+    if (Scope) {
+        Scope->LinkedObject = State->Scope->LinkedObject;
+        Scope->Code = State->Scope->Code;
+        Scope->Length = Length;
+        Scope->RemainingLength = Length;
+        Scope->Parent = State->Scope;
     }
 
-    IfState->Scope = strdup(State->Scope);
-    if (!IfState->Scope) {
-        free(IfState);
-        return NULL;
-    }
-
-    IfState->ScopeSegs = State->ScopeSegs;
-    IfState->Code = State->Code;
-    IfState->Length = Length;
-    IfState->RemainingLength = Length;
-    IfState->Parent = State;
-
-    return IfState;
+    return Scope;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -340,52 +178,18 @@ AcpipState *AcpipEnterIf(AcpipState *State, uint32_t Length) {
  * RETURN VALUE:
  *     New state containing the subscope, or NULL on failure.
  *-----------------------------------------------------------------------------------------------*/
-AcpipState *AcpipEnterSubScope(AcpipState *State, char *Name, uint8_t NameSegs, uint32_t Length) {
-    AcpipState *ScopeState = malloc(sizeof(AcpipState));
+AcpipScope *AcpipEnterScope(AcpipState *State, AcpiObject *Object, uint32_t Length) {
+    AcpipScope *Scope = malloc(sizeof(AcpipScope));
 
-    if (ScopeState) {
-        ScopeState->Scope = Name;
-        ScopeState->ScopeSegs = NameSegs;
-        ScopeState->Code = State->Code;
-        ScopeState->Length = Length;
-        ScopeState->RemainingLength = Length;
-        ScopeState->Parent = State;
+    if (Scope) {
+        Scope->LinkedObject = Object;
+        Scope->Code = State->Scope->Code;
+        Scope->Length = Length;
+        Scope->RemainingLength = Length;
+        Scope->Parent = State->Scope;
     }
 
-    return ScopeState;
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function enters a new method scope.
- *
- * PARAMETERS:
- *     State - AML state containing the current scope.
- *     Name - Method name (malloc'd or strdup'ed).
- *     Code - Method entry point.
- *     Length - Size of the method body.
- *
- * RETURN VALUE:
- *     New state containing the method scope, or NULL on failure.
- *-----------------------------------------------------------------------------------------------*/
-AcpipState *AcpipEnterMethod(
-    AcpipState *State,
-    char *Name,
-    uint8_t NameSegs,
-    const uint8_t *Code,
-    uint32_t Length) {
-    AcpipState *MethodState = malloc(sizeof(AcpipState));
-
-    if (MethodState) {
-        MethodState->Scope = Name;
-        MethodState->ScopeSegs = NameSegs;
-        MethodState->Code = Code;
-        MethodState->Length = Length;
-        MethodState->RemainingLength = Length;
-        MethodState->Parent = State;
-    }
-
-    return MethodState;
+    return Scope;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -401,9 +205,9 @@ AcpipState *AcpipEnterMethod(
  *     0 on end of code, 1 otherwise.
  *-----------------------------------------------------------------------------------------------*/
 int AcpipReadByte(AcpipState *State, uint8_t *Byte) {
-    if (State->RemainingLength) {
-        *Byte = *(State->Code++);
-        State->RemainingLength--;
+    if (State->Scope->RemainingLength) {
+        *Byte = *(State->Scope->Code++);
+        State->Scope->RemainingLength--;
         return 1;
     } else {
         return 0;
@@ -423,10 +227,10 @@ int AcpipReadByte(AcpipState *State, uint8_t *Byte) {
  *     0 on end of code, 1 otherwise.
  *-----------------------------------------------------------------------------------------------*/
 int AcpipReadWord(AcpipState *State, uint16_t *Word) {
-    if (State->RemainingLength > 1) {
-        *Word = *(uint16_t *)State->Code;
-        State->Code += 2;
-        State->RemainingLength -= 2;
+    if (State->Scope->RemainingLength > 1) {
+        *Word = *(uint16_t *)State->Scope->Code;
+        State->Scope->Code += 2;
+        State->Scope->RemainingLength -= 2;
         return 1;
     } else {
         return 0;
@@ -446,10 +250,10 @@ int AcpipReadWord(AcpipState *State, uint16_t *Word) {
  *     0 on end of code, 1 otherwise.
  *-----------------------------------------------------------------------------------------------*/
 int AcpipReadDWord(AcpipState *State, uint32_t *DWord) {
-    if (State->RemainingLength > 3) {
-        *DWord = *(uint32_t *)State->Code;
-        State->Code += 4;
-        State->RemainingLength -= 4;
+    if (State->Scope->RemainingLength > 3) {
+        *DWord = *(uint32_t *)State->Scope->Code;
+        State->Scope->Code += 4;
+        State->Scope->RemainingLength -= 4;
         return 1;
     } else {
         return 0;
@@ -469,10 +273,10 @@ int AcpipReadDWord(AcpipState *State, uint32_t *DWord) {
  *     0 on end of code, 1 otherwise.
  *-----------------------------------------------------------------------------------------------*/
 int AcpipReadQWord(AcpipState *State, uint64_t *QWord) {
-    if (State->RemainingLength > 7) {
-        *QWord = *(uint64_t *)State->Code;
-        State->Code += 8;
-        State->RemainingLength -= 8;
+    if (State->Scope->RemainingLength > 7) {
+        *QWord = *(uint64_t *)State->Scope->Code;
+        State->Scope->Code += 8;
+        State->Scope->RemainingLength -= 8;
         return 1;
     } else {
         return 0;
@@ -536,107 +340,63 @@ int AcpipReadPkgLength(AcpipState *State, uint32_t *Length) {
  *
  * PARAMETERS:
  *     State - Current AML stream state.
- *     NameString - Output; What we've read, on success.
- *     NameSegs - Output; How many segments the name has.
  *
  * RETURN VALUE:
  *     0 on end of code, 1 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int AcpipReadNameString(AcpipState *State, char **NameString, uint8_t *NameSegs) {
+AcpipName *AcpipReadName(AcpipState *State) {
     uint8_t Current;
     if (!AcpipReadByte(State, &Current)) {
-        return 0;
+        return NULL;
     }
 
     int IsRoot = Current == '\\';
-    int Prefixes = 0;
+    int BacktrackCount = 0;
 
     /* Consume any and every `parent scope` prefixes, even if we don't have as many parent scopes
        and we're consuming. */
     if (IsRoot && !AcpipReadByte(State, &Current)) {
-        return 0;
+        return NULL;
     } else if (!IsRoot && Current == '^') {
         while (Current == '^') {
             if (!AcpipReadByte(State, &Current)) {
-                return 0;
+                return NULL;
             }
 
-            Prefixes++;
+            BacktrackCount++;
         }
-    }
-
-    /* Follow up by making sure we're not going to far/exceeding the root scope. */
-    if (Prefixes > State->ScopeSegs) {
-        Prefixes = State->ScopeSegs;
     }
 
     /* The name itself is prefixed by a byte (or 2 for MultiNamePrefix) telling how many segments
        (4 characters each) we have. */
-    *NameSegs = 0;
-
+    uint8_t SegmentCount = 0;
     if (Current == 0x2E) {
-        *NameSegs = 2;
+        SegmentCount = 2;
     } else if (Current == 0x2F) {
-        if (!AcpipReadByte(State, NameSegs)) {
-            return 0;
+        if (!AcpipReadByte(State, &SegmentCount)) {
+            return NULL;
         }
     } else if (Current) {
-        *NameSegs = 1;
-        State->RemainingLength++;
-        State->Code--;
+        SegmentCount = 1;
+        State->Scope->RemainingLength++;
+        State->Scope->Code--;
     }
 
-    if (State->RemainingLength < *NameSegs * 4) {
-        return 0;
+    if (State->Scope->RemainingLength < SegmentCount * 4) {
+        return NULL;
     }
 
-    /* If we're directly inside the root scope, our path will be `\<name segs>`, otherwise, it'll
-       be `\<scope>.<name segs>` */
-    uint32_t ParentScopeBytes = 1;
-    uint32_t ChildScopeBytes;
-
-    /* Space for the root scope + prefix scopes (and +1 for each dot separating the childs). */
-    if (!IsRoot && (State->ScopeSegs - Prefixes)) {
-        ParentScopeBytes = (State->ScopeSegs - Prefixes) * 5 + 1;
+    AcpipName *Name = malloc(sizeof(AcpipName));
+    if (!Name) {
+        return NULL;
     }
 
-    /* Space for the name segments (+1 for the dots). */
-    if (*NameSegs > 1) {
-        ChildScopeBytes = *NameSegs * 5;
-    } else {
-        ChildScopeBytes = *NameSegs * 4;
-    }
+    Name->LinkedObject = IsRoot ? NULL : State->Scope->LinkedObject;
+    Name->Start = State->Scope->Code;
+    Name->BacktrackCount = BacktrackCount;
+    Name->SegmentCount = SegmentCount;
+    State->Scope->Code += SegmentCount * 4;
+    State->Scope->RemainingLength -= SegmentCount * 4;
 
-    *NameString = calloc(ParentScopeBytes + ChildScopeBytes + 1, 1);
-    if (!*NameString) {
-        return 0;
-    }
-
-    int NamePos = 0;
-
-    if (IsRoot || !(State->ScopeSegs - Prefixes)) {
-        (*NameString)[NamePos++] = '\\';
-    } else {
-        memcpy(*NameString, State->Scope, ParentScopeBytes - 1);
-        NamePos = ParentScopeBytes - 1;
-        (*NameString)[NamePos++] = '.';
-    }
-
-    for (uint8_t i = 0; i < *NameSegs; i++) {
-        if (i) {
-            (*NameString)[NamePos++] = '.';
-        }
-
-        memcpy(*NameString + NamePos, State->Code, 4);
-
-        NamePos += 4;
-        State->Code += 4;
-        State->RemainingLength -= 4;
-    }
-
-    if (!IsRoot) {
-        *NameSegs += State->ScopeSegs - Prefixes;
-    }
-
-    return 1;
+    return Name;
 }
