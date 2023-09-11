@@ -38,6 +38,39 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
         const uint8_t *StartCode = State->Scope->Code;
 
         switch (Opcode | ((uint16_t)ExtOpcode << 8)) {
+            /* DefAlias := AliasOp NameString NameString */
+            case 0x06: {
+                AcpipName *SourceName = AcpipReadName(State);
+                if (!SourceName) {
+                    return NULL;
+                }
+
+                AcpipName *AliasName = AcpipReadName(State);
+                if (!AliasName) {
+                    free(SourceName);
+                    return NULL;
+                }
+
+                AcpiObject *SourceObject = AcpipResolveObject(SourceName);
+                if (!SourceObject) {
+                    free(AliasName);
+                    free(SourceName);
+                    return NULL;
+                }
+
+                AcpiValue Value;
+                Value.Type = ACPI_ALIAS;
+                Value.Alias = SourceObject;
+
+                AcpiObject *Object = AcpipCreateObject(AliasName, &Value);
+                if (!Object) {
+                    free(AliasName);
+                    return NULL;
+                }
+
+                break;
+            }
+
             /* DefName := NameOp NameString DataRefObject */
             case 0x08: {
                 AcpipName *Name = AcpipReadName(State);

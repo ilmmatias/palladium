@@ -6,20 +6,21 @@
 
 #include <stdint.h>
 
-#define ACPI_INTEGER 0
-#define ACPI_STRING 1
-#define ACPI_BUFFER 2
-#define ACPI_PACKAGE 3
-#define ACPI_METHOD 4
+#define ACPI_ALIAS 0
+#define ACPI_INTEGER 1
+#define ACPI_STRING 2
+#define ACPI_BUFFER 3
+#define ACPI_PACKAGE 4
 #define ACPI_MUTEX 5
 #define ACPI_EVENT 6
-#define ACPI_REGION 7
-#define ACPI_FIELD 8
-#define ACPI_INDEX_FIELD 9
-#define ACPI_SCOPE 10
-#define ACPI_DEVICE 11
-#define ACPI_PROCESSOR 12
-#define ACPI_POWER 13
+#define ACPI_METHOD 7
+#define ACPI_REGION 8
+#define ACPI_FIELD 9
+#define ACPI_INDEX_FIELD 10
+#define ACPI_SCOPE 11
+#define ACPI_DEVICE 12
+#define ACPI_PROCESSOR 13
+#define ACPI_POWER 14
 
 #define ACPI_NAMED_FIELD 0
 #define ACPI_RESERVED_FIELD 1
@@ -41,6 +42,7 @@ typedef struct AcpiValue {
     int Type;
     struct AcpiObject *Objects;
     union {
+        struct AcpiObject *Alias;
         uint64_t Integer;
         char *String;
         struct {
