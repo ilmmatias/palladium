@@ -44,4 +44,12 @@ void DriverEntry(void) {
     } else {
         AcpipInitializeFromXsdt();
     }
+
+    AcpiValue Arguments[1];
+    Arguments[0].Type = ACPI_STRING;
+    Arguments[0].String = "Hello, World!\n";
+
+    if (!AcpiExecuteMethodFromPath("\\DBUG", 1, Arguments)) {
+        printf("The \\DBUG method doesn't exist (this probably isn't QEMU...)\n");
+    }
 }

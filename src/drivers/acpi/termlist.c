@@ -168,45 +168,214 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
                 break;
             }
 
-            /* DefMutex := MutexOp NameString SyncFlags */
-            case 0x015B: {
-                AcpipName *Name = AcpipReadName(State);
-                if (!Name) {
+            /* DefStore := StoreOp TermArg SuperName */
+            case 0x70: {
+                AcpiValue *Value = AcpipExecuteTermArg(State);
+                if (!Value) {
                     return NULL;
                 }
 
-                uint8_t SyncFlags;
-                if (!AcpipReadByte(State, &SyncFlags)) {
-                    free(Name);
+                AcpipTarget *Target = AcpipExecuteSuperName(State);
+                if (!Target) {
+                    free(Value);
                     return NULL;
                 }
 
-                AcpiValue Value;
-                Value.Type = ACPI_MUTEX;
-                Value.Mutex.Flags = SyncFlags;
-
-                if (!AcpipCreateObject(Name, &Value)) {
-                    free(Name);
-                    return NULL;
-                }
+                AcpipStoreTarget(State, Target, Value);
+                free(Target);
+                free(Value);
 
                 break;
             }
 
-            /* DefEvent := EventOp NameString */
-            case 0x025B: {
-                AcpipName *Name = AcpipReadName(State);
-                if (!Name) {
+            /* DefSubtract := SubtractOp Operand Operand Target */
+            case 0x74: {
+                AcpiValue *Left = AcpipExecuteTermArg(State);
+                if (!Left) {
+                    return NULL;
+                } else if (Left->Type != ACPI_INTEGER) {
+                    free(Left);
+                    return NULL;
+                }
+
+                AcpiValue *Right = AcpipExecuteTermArg(State);
+                if (!Right) {
+                    free(Left);
+                    return NULL;
+                } else if (Right->Type != ACPI_INTEGER) {
+                    free(Right);
+                    free(Left);
+                    return NULL;
+                }
+
+                AcpipTarget *Target = AcpipExecuteTarget(State);
+                if (!Target) {
+                    free(Right);
+                    free(Left);
                     return NULL;
                 }
 
                 AcpiValue Value;
-                Value.Type = ACPI_EVENT;
+                Value.Type = ACPI_INDEX_FIELD;
+                Value.Integer = Left->Integer - Right->Integer;
 
-                if (!AcpipCreateObject(Name, &Value)) {
-                    free(Name);
+                AcpipStoreTarget(State, Target, &Value);
+                free(Target);
+                free(Right);
+                free(Left);
+
+                break;
+            }
+
+            /* DefToBuffer := ToBufferOp Operand Target */
+            case 0x96: {
+                AcpiValue *Operand = AcpipExecuteTermArg(State);
+                if (!Operand) {
                     return NULL;
                 }
+
+                AcpipTarget *Target = AcpipExecuteTarget(State);
+                if (!Target) {
+                    return NULL;
+                }
+
+                AcpiValue Value;
+                Value.Type = ACPI_BUFFER;
+
+                /* Strings mostly pass through, except for 0-length, they just become 0-sized
+                   buffers (instead of length==1). */
+                if (Operand->Type == ACPI_STRING) {
+                    size_t StringSize = strlen(Operand->String);
+                    if (StringSize) {
+                        Value.Buffer.Size = StringSize + 1;
+                        Value.Buffer.Data = (uint8_t *)strdup(Operand->String);
+                        if (!Value.Buffer.Data) {
+                            free(Target);
+                            free(Operand);
+                            return NULL;
+                        }
+                    }
+                }
+
+                /* Buffers just pass straight through (no copy is done if its 0-sized). */
+                if (Operand->Type == ACPI_BUFFER && Operand->Buffer.Size) {
+                    Value.Buffer.Size = Operand->Buffer.Size;
+                    Value.Buffer.Data = malloc(Operand->Buffer.Size);
+
+                    if (!Value.Buffer.Data) {
+                        free(Target);
+                        free(Operand);
+                        return NULL;
+                    }
+
+                    memcpy(Value.Buffer.Data, Operand->Buffer.Data, Operand->Buffer.Size);
+                }
+
+                /* At last, integers get their underlying in-memory representation copied as an
+                   8-byte buffer. */
+                if (Operand->Type == ACPI_INTEGER) {
+                    Value.Buffer.Size = 16;
+                    Value.Buffer.Data = malloc(16);
+
+                    if (!Value.Buffer.Data) {
+                        free(Target);
+                        free(Operand);
+                        return NULL;
+                    }
+
+                    *((uint64_t *)Value.Buffer.Data) = Operand->Integer;
+                }
+
+                AcpipStoreTarget(State, Target, &Value);
+                free(Operand);
+                free(Target);
+
+                break;
+            }
+
+            /* DefToHexString := ToHexStringOp Operand Target */
+            case 0x98: {
+                AcpiValue *Operand = AcpipExecuteTermArg(State);
+                if (!Operand) {
+                    return NULL;
+                } else if (
+                    Operand->Type != ACPI_INTEGER && Operand->Type != ACPI_STRING &&
+                    Operand->Type != ACPI_BUFFER) {
+                    free(Operand);
+                    return NULL;
+                }
+
+                AcpipTarget *Target = AcpipExecuteTarget(State);
+                if (!Target) {
+                    return NULL;
+                }
+
+                AcpiValue Value;
+                Value.Type = ACPI_STRING;
+
+                /* Strings pass through even if they aren't really hex strings. */
+                if (Operand->Type == ACPI_STRING) {
+                    Value.String = strdup(Operand->String);
+                    if (!Value.String) {
+                        free(Target);
+                        free(Operand);
+                        return NULL;
+                    }
+                }
+
+                /* Integers get converted using snprintf (just to make sure we're not overflowing
+                   the buffer). */
+                if (Operand->Type == ACPI_INTEGER) {
+                    Value.String = malloc(17);
+                    if (!Value.String) {
+                        free(Target);
+                        free(Operand);
+                        return NULL;
+                    }
+
+                    if (snprintf(Value.String, 17, "%016llX", Operand->Integer) != 16) {
+                        free(Value.String);
+                        free(Target);
+                        free(Operand);
+                        return NULL;
+                    }
+                }
+
+                /* At last/remaining, we have buffers; They become a list of comma separated
+                   2-digit hex strings.  */
+                if (Operand->Type == ACPI_BUFFER) {
+                    Value.String = malloc(Operand->Buffer.Size * 5);
+                    if (!Value.String) {
+                        free(Target);
+                        free(Operand);
+                        return NULL;
+                    }
+
+                    for (uint64_t i = 0; i < Operand->Buffer.Size; i++) {
+                        int PrintfSize = 5;
+                        const char *PrintfFormat = "0x%02hhX";
+
+                        if (i < Operand->Buffer.Size - 1) {
+                            PrintfSize = 6;
+                            PrintfFormat = "0x%02hhX,";
+                        }
+
+                        if (snprintf(
+                                Value.String + i * 5,
+                                PrintfSize,
+                                PrintfFormat,
+                                Operand->Buffer.Data[i]) != PrintfSize - 1) {
+                            free(Value.String);
+                            free(Target);
+                            free(Operand);
+                            return NULL;
+                        }
+                    }
+                }
+
+                AcpipStoreTarget(State, Target, &Value);
+                free(Operand);
+                free(Target);
 
                 break;
             }
@@ -285,6 +454,49 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
 
                 State->Scope->Code = StartCode + Length;
                 State->Scope->RemainingLength = Start - Length;
+                break;
+            }
+
+            /* DefMutex := MutexOp NameString SyncFlags */
+            case 0x015B: {
+                AcpipName *Name = AcpipReadName(State);
+                if (!Name) {
+                    return NULL;
+                }
+
+                uint8_t SyncFlags;
+                if (!AcpipReadByte(State, &SyncFlags)) {
+                    free(Name);
+                    return NULL;
+                }
+
+                AcpiValue Value;
+                Value.Type = ACPI_MUTEX;
+                Value.Mutex.Flags = SyncFlags;
+
+                if (!AcpipCreateObject(Name, &Value)) {
+                    free(Name);
+                    return NULL;
+                }
+
+                break;
+            }
+
+            /* DefEvent := EventOp NameString */
+            case 0x025B: {
+                AcpipName *Name = AcpipReadName(State);
+                if (!Name) {
+                    return NULL;
+                }
+
+                AcpiValue Value;
+                Value.Type = ACPI_EVENT;
+
+                if (!AcpipCreateObject(Name, &Value)) {
+                    free(Name);
+                    return NULL;
+                }
+
                 break;
             }
 

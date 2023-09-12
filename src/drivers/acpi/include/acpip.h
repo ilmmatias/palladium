@@ -6,6 +6,15 @@
 
 #include <acpi.h>
 
+#define ACPI_TARGET_LOCAL 0
+
+typedef struct {
+    int Type;
+    union {
+        int LocalIndex;
+    };
+} AcpipTarget;
+
 typedef struct {
     AcpiObject *LinkedObject;
     const uint8_t *Start;
@@ -23,7 +32,8 @@ typedef struct AcpipScope {
 
 typedef struct AcpipState {
     int IsMethod;
-    AcpiObject Arguments[7];
+    AcpiValue Arguments[7];
+    AcpiValue Locals[7];
     AcpipScope *Scope;
 } AcpipState;
 
@@ -48,5 +58,9 @@ int AcpipReadFieldList(AcpipState *State, AcpiValue *Base, uint32_t Start, uint3
 
 AcpiValue *AcpipExecuteTermList(AcpipState *State);
 AcpiValue *AcpipExecuteTermArg(AcpipState *State);
+AcpipTarget *AcpipExecuteSuperName(AcpipState *State);
+AcpipTarget *AcpipExecuteTarget(AcpipState *State);
+AcpiValue *AcpipReadTarget(AcpipState *State, AcpipTarget *Target);
+void AcpipStoreTarget(AcpipState *State, AcpipTarget *Target, AcpiValue *Value);
 
 #endif /* _ACPIP_H_ */

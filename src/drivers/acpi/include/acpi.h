@@ -6,21 +6,22 @@
 
 #include <stdint.h>
 
-#define ACPI_ALIAS 0
-#define ACPI_INTEGER 1
-#define ACPI_STRING 2
-#define ACPI_BUFFER 3
-#define ACPI_PACKAGE 4
-#define ACPI_MUTEX 5
-#define ACPI_EVENT 6
-#define ACPI_METHOD 7
-#define ACPI_REGION 8
-#define ACPI_FIELD 9
-#define ACPI_INDEX_FIELD 10
-#define ACPI_SCOPE 11
-#define ACPI_DEVICE 12
-#define ACPI_PROCESSOR 13
-#define ACPI_POWER 14
+#define ACPI_EMPTY 0
+#define ACPI_ALIAS 1
+#define ACPI_INTEGER 2
+#define ACPI_STRING 3
+#define ACPI_BUFFER 4
+#define ACPI_PACKAGE 5
+#define ACPI_MUTEX 6
+#define ACPI_EVENT 7
+#define ACPI_METHOD 8
+#define ACPI_REGION 9
+#define ACPI_FIELD 10
+#define ACPI_INDEX_FIELD 11
+#define ACPI_SCOPE 12
+#define ACPI_DEVICE 13
+#define ACPI_PROCESSOR 14
+#define ACPI_POWER 15
 
 #define ACPI_NAMED_FIELD 0
 #define ACPI_RESERVED_FIELD 1

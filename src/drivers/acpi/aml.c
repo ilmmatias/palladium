@@ -58,9 +58,12 @@ AcpiValue *AcpiExecuteMethodFromObject(AcpiObject *Object, int ArgCount, AcpiVal
     Scope.Parent = NULL;
 
     memset(&State, 0, sizeof(State));
-    memcpy(State.Arguments, Arguments, ArgCount * sizeof(AcpiValue));
     State.IsMethod = 1;
     State.Scope = &Scope;
+
+    if (ArgCount) {
+        memcpy(State.Arguments, Arguments, ArgCount * sizeof(AcpiValue));
+    }
 
     return AcpipExecuteTermList(&State);
 }

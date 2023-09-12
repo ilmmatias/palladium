@@ -244,6 +244,60 @@ AcpiValue *AcpipExecuteTermArg(AcpipState *State) {
             break;
         }
 
+        /* LocalObj (Local0-6) */
+        case 0x60:
+        case 0x61:
+        case 0x62:
+        case 0x63:
+        case 0x64:
+        case 0x65:
+        case 0x66: {
+            memcpy(Value, &State->Locals[Opcode - 0x60], sizeof(AcpiValue));
+            break;
+        }
+
+        /* ArgObj (Arg0-6) */
+        case 0x68:
+        case 0x69:
+        case 0x6A:
+        case 0x6B:
+        case 0x6C:
+        case 0x6D:
+        case 0x6E: {
+            memcpy(Value, &State->Arguments[Opcode - 0x68], sizeof(AcpiValue));
+            break;
+        }
+
+        /* DefSizeOf := SizeOfOp SuperName */
+        case 0x87: {
+            AcpipTarget *SuperName = AcpipExecuteSuperName(State);
+            if (!SuperName) {
+                free(Value);
+                return NULL;
+            }
+
+            AcpiValue *Target = AcpipReadTarget(State, SuperName);
+            free(SuperName);
+            if (!Target) {
+                free(Value);
+                return NULL;
+            }
+
+            Value->Type = ACPI_INTEGER;
+            if (Target->Type == ACPI_STRING) {
+                Value->Integer = strlen(Target->String);
+            } else if (Target->Type == ACPI_BUFFER) {
+                Value->Integer = Target->Buffer.Size;
+            } else if (Target->Type == ACPI_PACKAGE) {
+                Value->Integer = Target->Package.Size;
+            } else {
+                free(Value);
+                return NULL;
+            }
+
+            break;
+        }
+
         /* OnesOp */
         case 0xFF: {
             Value->Type = ACPI_INTEGER;
@@ -253,7 +307,7 @@ AcpiValue *AcpipExecuteTermArg(AcpipState *State) {
 
         default: {
             printf(
-                "unimplemented termarg opcode: %#hx; %d bytes left to parse out of %d.\n",
+                "unimplemented termarg opcode: %#hhx; %d bytes left to parse out of %d.\n",
                 Opcode,
                 State->Scope->RemainingLength,
                 State->Scope->Length);

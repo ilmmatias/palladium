@@ -9,6 +9,7 @@ add_executable(acpi "knostdlib"
     main.c
     object.c
     rsdt.c
+    target.c
     termarg.c
     termlist.c)
 
