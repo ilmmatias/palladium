@@ -10,22 +10,23 @@
 
 static char *Types[] = {
     "[Uninitialized Object]",
-    "[Alias]",
     "[Integer]",
     "[String]",
     "[Buffer]",
     "[Package]",
-    "[Mutex]",
-    "[Event]",
-    "[Reference]",
-    "[Control Method]",
-    "[Operation Region]",
     "[Field]",
-    "[Field]",
-    "[Scope]",
     "[Device]",
-    "[Processor]",
+    "[Event]",
+    "[Control Method]",
+    "[Mutex]",
+    "[Operation Region]",
     "[Power Resource]",
+    "[Processor]",
+    "[Thermal Zone]",
+    "[Buffer Field]",
+    "[Reserved]",
+    "[Debug Object]",
+    "[Scope]",
 };
 
 /*-------------------------------------------------------------------------------------------------

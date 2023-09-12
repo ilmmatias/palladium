@@ -226,7 +226,7 @@ AcpiObject *AcpipResolveObject(AcpipName *Name) {
     while (1) {
         if (!memcmp(Base->Name, Name->Start, 4)) {
             free(Name);
-            return Base;
+            return Base->Value.Type == ACPI_ALIAS ? Base->Value.Alias : Base;
         }
 
         if (Base->Next) {

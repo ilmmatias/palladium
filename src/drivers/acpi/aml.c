@@ -350,35 +350,20 @@ int AcpipReadPkgLength(AcpipState *State, uint32_t *Length) {
        length; For 00, the other 6 bits are the package length itself, while for 01+, we only use
        the first 4 bits, followed by N whole bytes. */
 
-    uint8_t Part;
+    if (!(Leading >> 6)) {
+        *Length = Leading & 0x3F;
+        return 1;
+    }
+
     *Length = Leading & 0x0F;
 
-    int Shift = 4;
-    switch (Leading >> 6) {
-        case 0:
-            *Length = Leading & 0x3F;
-            break;
-        case 3:
-            if (!AcpipReadByte(State, &Part)) {
-                return 0;
-            }
+    for (int i = 0; i < Leading >> 6; i++) {
+        uint8_t Part;
+        if (!AcpipReadByte(State, &Part)) {
+            return 0;
+        }
 
-            *Length |= (uint32_t)Part << Shift;
-            Shift += 8;
-        case 2:
-            if (!AcpipReadByte(State, &Part)) {
-                return 0;
-            }
-
-            *Length |= (uint32_t)Part << Shift;
-            Shift += 8;
-        case 1:
-            if (!AcpipReadByte(State, &Part)) {
-                return 0;
-            }
-
-            *Length |= (uint32_t)Part << Shift;
-            Shift += 8;
+        *Length |= (uint32_t)Part << (i * 8 + 4);
     }
 
     return 1;

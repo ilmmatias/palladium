@@ -9,22 +9,24 @@
 #define ACPI_REVISION 0x0000000000000000
 
 #define ACPI_EMPTY 0
-#define ACPI_ALIAS 1
-#define ACPI_INTEGER 2
-#define ACPI_STRING 3
-#define ACPI_BUFFER 4
-#define ACPI_PACKAGE 5
-#define ACPI_MUTEX 6
+#define ACPI_INTEGER 1
+#define ACPI_STRING 2
+#define ACPI_BUFFER 3
+#define ACPI_PACKAGE 4
+#define ACPI_FIELD_UNIT 5
+#define ACPI_DEVICE 6
 #define ACPI_EVENT 7
-#define ACPI_REFERENCE 8
-#define ACPI_METHOD 9
+#define ACPI_METHOD 8
+#define ACPI_MUTEX 9
 #define ACPI_REGION 10
-#define ACPI_FIELD 11
-#define ACPI_INDEX_FIELD 12
-#define ACPI_SCOPE 13
-#define ACPI_DEVICE 14
-#define ACPI_PROCESSOR 15
-#define ACPI_POWER 16
+#define ACPI_POWER 11
+#define ACPI_PROCESSOR 12
+#define ACPI_ALIAS 17
+#define ACPI_SCOPE 18
+#define ACPI_REFERENCE 19
+
+#define ACPI_FIELD 0
+#define ACPI_INDEX_FIELD 1
 
 struct AcpiPackageElement;
 struct AcpiObject;
@@ -59,6 +61,7 @@ typedef struct AcpiValue {
             uint64_t RegionLen;
         } Region;
         struct {
+            int FieldType;
             union {
                 struct AcpiObject *Region;
                 struct AcpiObject *Index;
