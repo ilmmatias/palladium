@@ -24,6 +24,8 @@ typedef struct {
 
 typedef struct AcpipScope {
     AcpiObject *LinkedObject;
+    const uint8_t *Predicate;
+    uint32_t PredicateBacktrack;
     const uint8_t *Code;
     uint32_t Length;
     uint32_t RemainingLength;
@@ -45,8 +47,13 @@ void AcpipPopulateTree(const uint8_t *Code, uint32_t Length);
 AcpiObject *AcpipCreateObject(AcpipName *Name, AcpiValue *Value);
 AcpiObject *AcpipResolveObject(AcpipName *Name);
 
-AcpipScope *AcpipEnterIf(AcpipState *State, uint32_t Length);
 AcpipScope *AcpipEnterScope(AcpipState *State, AcpiObject *Object, uint32_t Length);
+AcpipScope *AcpipEnterIf(AcpipState *State, uint32_t Length);
+AcpipScope *AcpipEnterWhile(
+    AcpipState *State,
+    const uint8_t *Predicate,
+    uint32_t PredicateBacktrack,
+    uint32_t Length);
 
 int AcpipReadByte(AcpipState *State, uint8_t *Byte);
 int AcpipReadWord(AcpipState *State, uint16_t *Word);
@@ -56,8 +63,14 @@ int AcpipReadPkgLength(AcpipState *State, uint32_t *Length);
 AcpipName *AcpipReadName(AcpipState *State);
 int AcpipReadFieldList(AcpipState *State, AcpiValue *Base, uint32_t Start, uint32_t Length);
 
+int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Value);
+int AcpipExecuteInteger(AcpipState *State, uint64_t *Result);
+
+int AcpipCastToInteger(AcpiValue *Value, uint64_t *Result);
+int AcpipCastToString(AcpiValue *Value, int ImplicitCast);
+int AcpipCastToBuffer(AcpiValue *Value);
+
 AcpiValue *AcpipExecuteTermList(AcpipState *State);
-AcpiValue *AcpipExecuteTermArg(AcpipState *State);
 AcpipTarget *AcpipExecuteSuperName(AcpipState *State);
 AcpipTarget *AcpipExecuteTarget(AcpipState *State);
 AcpiValue *AcpipReadTarget(AcpipState *State, AcpipTarget *Target);

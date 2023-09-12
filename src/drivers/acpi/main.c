@@ -5,6 +5,7 @@
 #include <crt_impl.h>
 #include <ke.h>
 #include <stdarg.h>
+#include <string.h>
 #include <vid.h>
 
 /* stdio START; for debugging our AML interpreter. */
@@ -47,7 +48,10 @@ void DriverEntry(void) {
 
     AcpiValue Arguments[1];
     Arguments[0].Type = ACPI_STRING;
-    Arguments[0].String = "Hello, World!\n";
+    Arguments[0].String = strdup("Hello, World!\n");
+    if (!Arguments[0].String) {
+        KeFatalError(KE_EARLY_MEMORY_FAILURE);
+    }
 
     if (!AcpiExecuteMethodFromPath("\\DBUG", 1, Arguments)) {
         printf("The \\DBUG method doesn't exist (this probably isn't QEMU...)\n");

@@ -12,13 +12,29 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
         if (!State->Scope->RemainingLength) {
             /* Backtrack into the previous scope, or end if we're already in the top-most
                scope. */
-            if (!State->Scope->Parent) {
+            AcpipScope *Parent = State->Scope->Parent;
+            if (!Parent) {
                 break;
             }
 
-            AcpipScope *Parent = State->Scope->Parent;
             Parent->Code = State->Scope->Code;
             Parent->RemainingLength -= State->Scope->Length;
+
+            /* Solve the predicate on while loops, repeating the loop iteration if required. */
+            if (State->Scope->Predicate) {
+                State->Scope->Code = State->Scope->Predicate;
+                State->Scope->RemainingLength = State->Scope->PredicateBacktrack;
+
+                uint64_t Predicate;
+                if (!AcpipExecuteInteger(State, &Predicate)) {
+                    return NULL;
+                }
+
+                if (Predicate) {
+                    Parent->Code = State->Scope->Code;
+                    Parent->RemainingLength = State->Scope->RemainingLength;
+                }
+            }
 
             free(State->Scope);
             State->Scope = Parent;
@@ -78,20 +94,19 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
                     return NULL;
                 }
 
-                AcpiValue *DataRefObject = AcpipExecuteTermArg(State);
-                if (!DataRefObject) {
+                AcpiValue DataRefObject;
+                if (!AcpipExecuteOpcode(State, &DataRefObject)) {
                     free(Name);
                     return NULL;
                 }
 
-                AcpiObject *Object = AcpipCreateObject(Name, DataRefObject);
+                AcpiObject *Object = AcpipCreateObject(Name, &DataRefObject);
                 if (!Object) {
-                    free(DataRefObject);
+                    AcpiFreeValueData(&DataRefObject);
                     free(Name);
                     return NULL;
                 }
 
-                free(DataRefObject);
                 break;
             }
 
@@ -170,124 +185,70 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
 
             /* DefStore := StoreOp TermArg SuperName */
             case 0x70: {
-                AcpiValue *Value = AcpipExecuteTermArg(State);
-                if (!Value) {
+                AcpiValue Value;
+                if (!AcpipExecuteOpcode(State, &Value)) {
                     return NULL;
                 }
 
                 AcpipTarget *Target = AcpipExecuteSuperName(State);
                 if (!Target) {
-                    free(Value);
+                    AcpiFreeValueData(&Value);
                     return NULL;
                 }
 
-                AcpipStoreTarget(State, Target, Value);
+                AcpipStoreTarget(State, Target, &Value);
                 free(Target);
-                free(Value);
 
                 break;
             }
 
             /* DefSubtract := SubtractOp Operand Operand Target */
             case 0x74: {
-                AcpiValue *Left = AcpipExecuteTermArg(State);
-                if (!Left) {
-                    return NULL;
-                } else if (Left->Type != ACPI_INTEGER) {
-                    free(Left);
+                uint64_t Left;
+                if (!AcpipExecuteInteger(State, &Left)) {
                     return NULL;
                 }
 
-                AcpiValue *Right = AcpipExecuteTermArg(State);
-                if (!Right) {
-                    free(Left);
-                    return NULL;
-                } else if (Right->Type != ACPI_INTEGER) {
-                    free(Right);
-                    free(Left);
+                uint64_t Right;
+                if (!AcpipExecuteInteger(State, &Right)) {
                     return NULL;
                 }
 
                 AcpipTarget *Target = AcpipExecuteTarget(State);
                 if (!Target) {
-                    free(Right);
-                    free(Left);
                     return NULL;
                 }
 
                 AcpiValue Value;
-                Value.Type = ACPI_INDEX_FIELD;
-                Value.Integer = Left->Integer - Right->Integer;
+                Value.Type = ACPI_INTEGER;
+                Value.Integer = Left - Right;
 
                 AcpipStoreTarget(State, Target, &Value);
                 free(Target);
-                free(Right);
-                free(Left);
 
                 break;
             }
 
             /* DefToBuffer := ToBufferOp Operand Target */
             case 0x96: {
-                AcpiValue *Operand = AcpipExecuteTermArg(State);
-                if (!Operand) {
+                AcpiValue Operand;
+                if (!AcpipExecuteOpcode(State, &Operand)) {
                     return NULL;
                 }
 
                 AcpipTarget *Target = AcpipExecuteTarget(State);
                 if (!Target) {
+                    AcpiFreeValueData(&Operand);
                     return NULL;
                 }
 
-                AcpiValue Value;
-                Value.Type = ACPI_BUFFER;
-
-                /* Strings mostly pass through, except for 0-length, they just become 0-sized
-                   buffers (instead of length==1). */
-                if (Operand->Type == ACPI_STRING) {
-                    size_t StringSize = strlen(Operand->String);
-                    if (StringSize) {
-                        Value.Buffer.Size = StringSize + 1;
-                        Value.Buffer.Data = (uint8_t *)strdup(Operand->String);
-                        if (!Value.Buffer.Data) {
-                            free(Target);
-                            free(Operand);
-                            return NULL;
-                        }
-                    }
+                if (!AcpipCastToBuffer(&Operand)) {
+                    free(Target);
+                    AcpiFreeValueData(&Operand);
+                    return NULL;
                 }
 
-                /* Buffers just pass straight through (no copy is done if its 0-sized). */
-                if (Operand->Type == ACPI_BUFFER && Operand->Buffer.Size) {
-                    Value.Buffer.Size = Operand->Buffer.Size;
-                    Value.Buffer.Data = malloc(Operand->Buffer.Size);
-
-                    if (!Value.Buffer.Data) {
-                        free(Target);
-                        free(Operand);
-                        return NULL;
-                    }
-
-                    memcpy(Value.Buffer.Data, Operand->Buffer.Data, Operand->Buffer.Size);
-                }
-
-                /* At last, integers get their underlying in-memory representation copied as an
-                   8-byte buffer. */
-                if (Operand->Type == ACPI_INTEGER) {
-                    Value.Buffer.Size = 16;
-                    Value.Buffer.Data = malloc(16);
-
-                    if (!Value.Buffer.Data) {
-                        free(Target);
-                        free(Operand);
-                        return NULL;
-                    }
-
-                    *((uint64_t *)Value.Buffer.Data) = Operand->Integer;
-                }
-
-                AcpipStoreTarget(State, Target, &Value);
-                free(Operand);
+                AcpipStoreTarget(State, Target, &Operand);
                 free(Target);
 
                 break;
@@ -295,86 +256,24 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
 
             /* DefToHexString := ToHexStringOp Operand Target */
             case 0x98: {
-                AcpiValue *Operand = AcpipExecuteTermArg(State);
-                if (!Operand) {
-                    return NULL;
-                } else if (
-                    Operand->Type != ACPI_INTEGER && Operand->Type != ACPI_STRING &&
-                    Operand->Type != ACPI_BUFFER) {
-                    free(Operand);
+                AcpiValue Operand;
+                if (!AcpipExecuteOpcode(State, &Operand)) {
                     return NULL;
                 }
 
                 AcpipTarget *Target = AcpipExecuteTarget(State);
                 if (!Target) {
+                    AcpiFreeValueData(&Operand);
                     return NULL;
                 }
 
-                AcpiValue Value;
-                Value.Type = ACPI_STRING;
-
-                /* Strings pass through even if they aren't really hex strings. */
-                if (Operand->Type == ACPI_STRING) {
-                    Value.String = strdup(Operand->String);
-                    if (!Value.String) {
-                        free(Target);
-                        free(Operand);
-                        return NULL;
-                    }
+                if (!AcpipCastToString(&Operand, 0)) {
+                    free(Target);
+                    AcpiFreeValueData(&Operand);
+                    return NULL;
                 }
 
-                /* Integers get converted using snprintf (just to make sure we're not overflowing
-                   the buffer). */
-                if (Operand->Type == ACPI_INTEGER) {
-                    Value.String = malloc(17);
-                    if (!Value.String) {
-                        free(Target);
-                        free(Operand);
-                        return NULL;
-                    }
-
-                    if (snprintf(Value.String, 17, "%016llX", Operand->Integer) != 16) {
-                        free(Value.String);
-                        free(Target);
-                        free(Operand);
-                        return NULL;
-                    }
-                }
-
-                /* At last/remaining, we have buffers; They become a list of comma separated
-                   2-digit hex strings.  */
-                if (Operand->Type == ACPI_BUFFER) {
-                    Value.String = malloc(Operand->Buffer.Size * 5);
-                    if (!Value.String) {
-                        free(Target);
-                        free(Operand);
-                        return NULL;
-                    }
-
-                    for (uint64_t i = 0; i < Operand->Buffer.Size; i++) {
-                        int PrintfSize = 5;
-                        const char *PrintfFormat = "0x%02hhX";
-
-                        if (i < Operand->Buffer.Size - 1) {
-                            PrintfSize = 6;
-                            PrintfFormat = "0x%02hhX,";
-                        }
-
-                        if (snprintf(
-                                Value.String + i * 5,
-                                PrintfSize,
-                                PrintfFormat,
-                                Operand->Buffer.Data[i]) != PrintfSize - 1) {
-                            free(Value.String);
-                            free(Target);
-                            free(Operand);
-                            return NULL;
-                        }
-                    }
-                }
-
-                AcpipStoreTarget(State, Target, &Value);
-                free(Operand);
+                AcpipStoreTarget(State, Target, &Operand);
                 free(Target);
 
                 break;
@@ -387,23 +286,17 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
                     return NULL;
                 }
 
-                AcpiValue *Predicate = AcpipExecuteTermArg(State);
-                if (!Predicate) {
-                    return NULL;
-                } else if (Predicate->Type != ACPI_INTEGER) {
-                    free(Predicate);
+                uint64_t Predicate;
+                if (!AcpipExecuteInteger(State, &Predicate)) {
                     return NULL;
                 }
-
-                uint64_t PredicateValue = Predicate->Integer;
-                free(Predicate);
 
                 uint32_t LengthSoFar = Start - State->Scope->RemainingLength;
                 if (LengthSoFar > Length || Length - LengthSoFar > State->Scope->RemainingLength) {
                     return NULL;
                 }
 
-                if (PredicateValue) {
+                if (Predicate) {
                     AcpipScope *Scope = AcpipEnterIf(State, Length - LengthSoFar);
                     if (!Scope) {
                         return NULL;
@@ -454,6 +347,41 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
 
                 State->Scope->Code = StartCode + Length;
                 State->Scope->RemainingLength = Start - Length;
+                break;
+            }
+
+            /* DefWhile := WhileOp PkgLength Predicate TermList */
+            case 0xA2: {
+                uint32_t Length;
+                if (!AcpipReadPkgLength(State, &Length)) {
+                    return NULL;
+                }
+
+                const uint8_t *PredicateStart = State->Scope->Code;
+                uint32_t PredicateBacktrack = State->Scope->RemainingLength;
+
+                uint64_t Predicate;
+                if (!AcpipExecuteInteger(State, &Predicate)) {
+                    return NULL;
+                }
+
+                uint32_t LengthSoFar = Start - State->Scope->RemainingLength;
+                if (LengthSoFar > Length || Length - LengthSoFar > State->Scope->RemainingLength) {
+                    return NULL;
+                }
+
+                if (!Predicate) {
+                    State->Scope->Code += Length - LengthSoFar;
+                    State->Scope->RemainingLength -= Length - LengthSoFar;
+                    break;
+                }
+
+                AcpipScope *Scope = AcpipEnterWhile(
+                    State, PredicateStart, PredicateBacktrack, Length - LengthSoFar);
+                if (!Scope) {
+                    return NULL;
+                }
+
                 break;
             }
 
@@ -513,27 +441,14 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
                     return NULL;
                 }
 
-                /* RegionSpace is already a guaranteed uint8_t, but the other values have to be
-                   coerced into integers; If they aren't integers, we have something wrong with
-                   the AML code. */
-                AcpiValue *RegionOffset = AcpipExecuteTermArg(State);
-                if (!RegionOffset) {
-                    free(Name);
-                    return NULL;
-                } else if (RegionOffset->Type != ACPI_INTEGER) {
-                    free(RegionOffset);
+                uint64_t RegionOffset;
+                if (!AcpipExecuteInteger(State, &RegionOffset)) {
                     free(Name);
                     return NULL;
                 }
 
-                AcpiValue *RegionLen = AcpipExecuteTermArg(State);
-                if (!RegionLen) {
-                    free(RegionOffset);
-                    free(Name);
-                    return NULL;
-                } else if (RegionLen->Type != ACPI_INTEGER) {
-                    free(RegionLen);
-                    free(RegionOffset);
+                uint64_t RegionLen;
+                if (!AcpipExecuteInteger(State, &RegionLen)) {
                     free(Name);
                     return NULL;
                 }
@@ -542,11 +457,9 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
                 Value.Type = ACPI_REGION;
                 Value.Objects = NULL;
                 Value.Region.RegionSpace = RegionSpace;
-                Value.Region.RegionLen = RegionLen->Integer;
-                Value.Region.RegionOffset = RegionOffset->Integer;
+                Value.Region.RegionLen = RegionLen;
+                Value.Region.RegionOffset = RegionOffset;
 
-                free(RegionLen);
-                free(RegionOffset);
                 if (!AcpipCreateObject(Name, &Value)) {
                     free(Name);
                     return NULL;
@@ -675,22 +588,38 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
                     return NULL;
                 }
 
-                AcpipName *Index = AcpipReadName(State);
-                if (!Index) {
+                AcpipName *IndexName = AcpipReadName(State);
+                if (!IndexName) {
                     return NULL;
                 }
 
-                AcpipName *Data = AcpipReadName(State);
-                if (!Data) {
-                    free(Index);
+                AcpiObject *IndexObject = AcpipResolveObject(IndexName);
+                if (!IndexObject) {
+                    free(IndexName);
                     return NULL;
                 }
 
-                printf("Next 16 characters of Index: %.16s\n", Index->Start);
-                printf("Next 16 characters of Data: %.16s\n", Data->Start);
+                AcpipName *DataName = AcpipReadName(State);
+                if (!DataName) {
+                    free(IndexName);
+                    return NULL;
+                }
 
-                while (1)
-                    ;
+                AcpiObject *DataObject = AcpipResolveObject(DataName);
+                if (!DataObject) {
+                    free(DataName);
+                    return NULL;
+                }
+
+                AcpiValue Base;
+                Base.Type = ACPI_INDEX_FIELD;
+                Base.Field.Index = IndexObject;
+                Base.Field.Data = DataObject;
+                if (!AcpipReadFieldList(State, &Base, Start, Length)) {
+                    return NULL;
+                }
+
+                break;
             }
 
             default:

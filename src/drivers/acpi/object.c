@@ -221,19 +221,26 @@ AcpiObject *AcpipResolveObject(AcpipName *Name) {
         return AcpipObjectTree;
     }
 
-    /* Final pass, we're returning NULL if we don't find the entry. */
+    /* Final pass, we need to search in the current entry, returning the object if we find it.
+       If we can't find it, we fallback to the parent scope, up until we reach the root. */
     while (1) {
         if (!memcmp(Base->Name, Name->Start, 4)) {
             free(Name);
             return Base;
         }
 
-        if (!Base->Next) {
-            break;
+        if (Base->Next) {
+            Base = Base->Next;
+        } else {
+            /* Base->Parent should give us the object/scope that contains the current tree leaf,
+               and it should be safe to assume it exists; ->Parent->Parent should give us the
+               previous scope. */
+            Parent = Base->Parent->Parent;
+            if (Parent) {
+                Base = Parent->Value.Objects;
+            } else {
+                return NULL;
+            }
         }
-
-        Base = Base->Next;
     }
-
-    return NULL;
 }

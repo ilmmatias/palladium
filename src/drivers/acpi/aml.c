@@ -52,6 +52,8 @@ AcpiValue *AcpiExecuteMethodFromObject(AcpiObject *Object, int ArgCount, AcpiVal
     AcpipScope Scope;
 
     Scope.LinkedObject = Object;
+    Scope.Predicate = NULL;
+    Scope.PredicateBacktrack = 0;
     Scope.Code = Object->Value.Method.Start;
     Scope.Length = Object->Value.Method.Size;
     Scope.RemainingLength = Object->Value.Method.Size;
@@ -127,6 +129,8 @@ void AcpipPopulateTree(const uint8_t *Code, uint32_t Length) {
     AcpipScope Scope;
 
     Scope.LinkedObject = AcpipObjectTree;
+    Scope.Predicate = NULL;
+    Scope.PredicateBacktrack = 0;
     Scope.Code = Code;
     Scope.Length = Length;
     Scope.RemainingLength = Length;
@@ -142,31 +146,6 @@ void AcpipPopulateTree(const uint8_t *Code, uint32_t Length) {
         while (1)
             ;
     }
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function enters a new If/Else scope.
- *
- * PARAMETERS:
- *     State - AML state containing the current scope.
- *     Length - Size of the body.
- *
- * RETURN VALUE:
- *     New state containing the scope, or NULL on failure.
- *-----------------------------------------------------------------------------------------------*/
-AcpipScope *AcpipEnterIf(AcpipState *State, uint32_t Length) {
-    AcpipScope *Scope = malloc(sizeof(AcpipScope));
-
-    if (Scope) {
-        Scope->LinkedObject = State->Scope->LinkedObject;
-        Scope->Code = State->Scope->Code;
-        Scope->Length = Length;
-        Scope->RemainingLength = Length;
-        Scope->Parent = State->Scope;
-    }
-
-    return Scope;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -188,6 +167,68 @@ AcpipScope *AcpipEnterScope(AcpipState *State, AcpiObject *Object, uint32_t Leng
 
     if (Scope) {
         Scope->LinkedObject = Object;
+        Scope->Predicate = NULL;
+        Scope->PredicateBacktrack = 0;
+        Scope->Code = State->Scope->Code;
+        Scope->Length = Length;
+        Scope->RemainingLength = Length;
+        Scope->Parent = State->Scope;
+    }
+
+    return Scope;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function enters a new If/Else scope.
+ *
+ * PARAMETERS:
+ *     State - AML state containing the current scope.
+ *     Length - Size of the body.
+ *
+ * RETURN VALUE:
+ *     New state containing the scope, or NULL on failure.
+ *-----------------------------------------------------------------------------------------------*/
+AcpipScope *AcpipEnterIf(AcpipState *State, uint32_t Length) {
+    AcpipScope *Scope = malloc(sizeof(AcpipScope));
+
+    if (Scope) {
+        Scope->LinkedObject = State->Scope->LinkedObject;
+        Scope->Predicate = NULL;
+        Scope->PredicateBacktrack = 0;
+        Scope->Code = State->Scope->Code;
+        Scope->Length = Length;
+        Scope->RemainingLength = Length;
+        Scope->Parent = State->Scope;
+    }
+
+    return Scope;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function enters a new While scope.
+ *
+ * PARAMETERS:
+ *     State - AML state containing the current scope.
+ *     Predicate - Start position of the predicate (to be checked before each loop iteration).
+ *     PredicateBacktrack - .RemainingPosition for the specified Predicate.
+ *     Length - Size of the body.
+ *
+ * RETURN VALUE:
+ *     New state containing the scope, or NULL on failure.
+ *-----------------------------------------------------------------------------------------------*/
+AcpipScope *AcpipEnterWhile(
+    AcpipState *State,
+    const uint8_t *Predicate,
+    uint32_t PredicateBacktrack,
+    uint32_t Length) {
+    AcpipScope *Scope = malloc(sizeof(AcpipScope));
+
+    if (Scope) {
+        Scope->LinkedObject = State->Scope->LinkedObject;
+        Scope->Predicate = Predicate;
+        Scope->PredicateBacktrack = PredicateBacktrack;
         Scope->Code = State->Scope->Code;
         Scope->Length = Length;
         Scope->RemainingLength = Length;

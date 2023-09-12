@@ -16,6 +16,7 @@ int AcpipReadFieldList(AcpipState *State, AcpiValue *Base, uint32_t Start, uint3
     uint8_t AccessType = *(State->Scope->Code++);
     uint8_t AccessAttrib = 0;
     uint8_t AccessLength = 0;
+    uint32_t Offset = 0;
 
     Length -= LengthSoFar + 1;
     State->Scope->RemainingLength--;
@@ -80,10 +81,10 @@ int AcpipReadFieldList(AcpipState *State, AcpiValue *Base, uint32_t Start, uint3
                 Value.Field.AccessType = AccessType;
                 Value.Field.AccessAttrib = AccessAttrib;
                 Value.Field.AccessLength = AccessLength;
+                Value.Field.Offset = Offset;
                 Value.Field.Length = Length;
+                Offset += Length;
 
-                /* We just need to re-attach the name it to the correct region/parent. */
-                Name->LinkedObject = Base->Field.Region;
                 if (!AcpipCreateObject(Name, &Value)) {
                     free(Name);
                     return 0;

@@ -6,6 +6,8 @@
 
 #include <stdint.h>
 
+#define ACPI_REVISION 0x0000000000000000
+
 #define ACPI_EMPTY 0
 #define ACPI_ALIAS 1
 #define ACPI_INTEGER 2
@@ -14,36 +16,25 @@
 #define ACPI_PACKAGE 5
 #define ACPI_MUTEX 6
 #define ACPI_EVENT 7
-#define ACPI_METHOD 8
-#define ACPI_REGION 9
-#define ACPI_FIELD 10
-#define ACPI_INDEX_FIELD 11
-#define ACPI_SCOPE 12
-#define ACPI_DEVICE 13
-#define ACPI_PROCESSOR 14
-#define ACPI_POWER 15
+#define ACPI_REFERENCE 8
+#define ACPI_METHOD 9
+#define ACPI_REGION 10
+#define ACPI_FIELD 11
+#define ACPI_INDEX_FIELD 12
+#define ACPI_SCOPE 13
+#define ACPI_DEVICE 14
+#define ACPI_PROCESSOR 15
+#define ACPI_POWER 16
 
-#define ACPI_NAMED_FIELD 0
-#define ACPI_RESERVED_FIELD 1
-#define ACPI_ACCESS_FIELD 2
-#define ACPI_CONNECT_FIELD 3
-
+struct AcpiPackageElement;
 struct AcpiObject;
-struct AcpiValue;
-
-typedef struct {
-    int Type;
-    union {
-        char *String;
-        struct AcpiValue *Value;
-    };
-} AcpiPackageElement;
 
 typedef struct AcpiValue {
     int Type;
     struct AcpiObject *Objects;
     union {
         struct AcpiObject *Alias;
+        struct AcpiObject *Reference;
         uint64_t Integer;
         char *String;
         struct {
@@ -52,7 +43,7 @@ typedef struct AcpiValue {
         } Buffer;
         struct {
             uint8_t Size;
-            AcpiPackageElement *Data;
+            struct AcpiPackageElement *Data;
         } Package;
         struct {
             const uint8_t *Start;
@@ -68,11 +59,15 @@ typedef struct AcpiValue {
             uint64_t RegionLen;
         } Region;
         struct {
-            struct AcpiObject *Region;
-            struct AcpiObject *Index;
+            union {
+                struct AcpiObject *Region;
+                struct AcpiObject *Index;
+            };
+            struct AcpiObject *Data;
             uint8_t AccessType;
             uint8_t AccessAttrib;
             uint8_t AccessLength;
+            uint32_t Offset;
             uint32_t Length;
         } Field;
         struct {
@@ -87,6 +82,14 @@ typedef struct AcpiValue {
     };
 } AcpiValue;
 
+typedef struct AcpiPackageElement {
+    int Type;
+    union {
+        char *String;
+        AcpiValue Value;
+    };
+} AcpiPackageElement;
+
 typedef struct AcpiObject {
     char Name[4];
     struct AcpiValue Value;
@@ -97,5 +100,8 @@ typedef struct AcpiObject {
 AcpiObject *AcpiSearchObject(const char *Name);
 AcpiValue *AcpiExecuteMethodFromPath(const char *Name, int ArgCount, AcpiValue *Arguments);
 AcpiValue *AcpiExecuteMethodFromObject(AcpiObject *Object, int ArgCount, AcpiValue *Arguments);
+
+void AcpiFreeValueData(AcpiValue *Value);
+void AcpiFreeValue(AcpiValue *Value);
 
 #endif /* _ACPI_H_ */
