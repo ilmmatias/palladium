@@ -21,6 +21,7 @@
 #define ACPI_REGION 10
 #define ACPI_POWER 11
 #define ACPI_PROCESSOR 12
+#define ACPI_THERMAL 13
 #define ACPI_ALIAS 17
 #define ACPI_SCOPE 18
 #define ACPI_REFERENCE 19
@@ -44,7 +45,7 @@ typedef struct AcpiValue {
             uint8_t *Data;
         } Buffer;
         struct {
-            uint8_t Size;
+            uint64_t Size;
             struct AcpiPackageElement *Data;
         } Package;
         struct {

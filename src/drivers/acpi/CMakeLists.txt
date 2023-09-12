@@ -5,8 +5,11 @@ project(os/drivers/acpi)
 
 add_executable(acpi "knostdlib"
     aml.c
+    dataobj.c
     field.c
     main.c
+    namedobj.c
+    nsmod.c
     object.c
     opcode.c
     rsdt.c

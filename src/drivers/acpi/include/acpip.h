@@ -64,6 +64,10 @@ AcpipName *AcpipReadName(AcpipState *State);
 int AcpipReadFieldList(AcpipState *State, AcpiValue *Base, uint32_t Start, uint32_t Length);
 
 int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Value);
+int AcpipExecuteDataObjOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value);
+int AcpipExecuteFieldOpcode(AcpipState *State, uint16_t Opcode);
+int AcpipExecuteNamedObjOpcode(AcpipState *State, uint16_t Opcode);
+int AcpipExecuteNsModOpcode(AcpipState *State, uint16_t Opcode);
 int AcpipExecuteInteger(AcpipState *State, uint64_t *Result);
 
 int AcpipCastToInteger(AcpiValue *Value, uint64_t *Result);

@@ -6,6 +6,20 @@
 #include <stdlib.h>
 #include <string.h>
 
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function tries reading the field list attached to the current field or bank/index
+ *     field.
+ *
+ * PARAMETERS:
+ *     State - AML state containing the current scope.
+ *     Base - Value to be used as base for each field unit.
+ *     Start - RemainingLength after reading just the opcode.
+ *     Length - Length of this package.
+ *
+ * RETURN VALUE:
+ *     1 on success, 0 otherwise.
+ *-----------------------------------------------------------------------------------------------*/
 int AcpipReadFieldList(AcpipState *State, AcpiValue *Base, uint32_t Start, uint32_t Length) {
     uint32_t LengthSoFar = Start - State->Scope->RemainingLength;
     if (LengthSoFar >= Length || Length - LengthSoFar > State->Scope->RemainingLength) {
@@ -99,6 +113,104 @@ int AcpipReadFieldList(AcpipState *State, AcpiValue *Base, uint32_t Start, uint3
         }
 
         Length -= Start - State->Scope->RemainingLength;
+    }
+
+    return 1;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function tries the execute the given opcode as a Field opcode.
+ *     This contains all field related ops from the `20.2.5.2. Named Objects Encoding` section in
+ *     the AML spec.
+ *
+ * PARAMETERS:
+ *     State - AML state containing the current scope.
+ *     Opcode - Opcode to be executed; The high bits contain the extended opcode number (when the
+ *              lower opcode is 0x5B).
+ *
+ * RETURN VALUE:
+ *     Positive number on success, negative on "this isn't a field op", 0 on failure.
+ *-----------------------------------------------------------------------------------------------*/
+int AcpipExecuteFieldOpcode(AcpipState *State, uint16_t Opcode) {
+    uint32_t Start = State->Scope->RemainingLength;
+
+    switch (Opcode) {
+        /* DefField := FieldOp PkgLength NameString FieldFlags FieldList */
+        case 0x815B: {
+            uint32_t Length;
+            if (!AcpipReadPkgLength(State, &Length)) {
+                return 0;
+            }
+
+            AcpipName *Name = AcpipReadName(State);
+            if (!Name) {
+                return 0;
+            }
+
+            AcpiObject *Object = AcpipResolveObject(Name);
+            if (!Object) {
+                free(Name);
+                return 0;
+            } else if (Object->Value.Type != ACPI_REGION) {
+                return 0;
+            }
+
+            AcpiValue Base;
+            Base.Type = ACPI_FIELD_UNIT;
+            Base.Field.FieldType = ACPI_FIELD;
+            Base.Field.Region = Object;
+            if (!AcpipReadFieldList(State, &Base, Start, Length)) {
+                return 0;
+            }
+
+            break;
+        }
+
+        /* DefIndexField := IndexFieldOp PkgLength NameString NameString FieldFlags FieldList */
+        case 0x865B: {
+            uint32_t Length;
+            if (!AcpipReadPkgLength(State, &Length)) {
+                return 0;
+            }
+
+            AcpipName *IndexName = AcpipReadName(State);
+            if (!IndexName) {
+                return 0;
+            }
+
+            AcpiObject *IndexObject = AcpipResolveObject(IndexName);
+            if (!IndexObject) {
+                free(IndexName);
+                return 0;
+            }
+
+            AcpipName *DataName = AcpipReadName(State);
+            if (!DataName) {
+                free(IndexName);
+                return 0;
+            }
+
+            AcpiObject *DataObject = AcpipResolveObject(DataName);
+            if (!DataObject) {
+                free(DataName);
+                return 0;
+            }
+
+            AcpiValue Base;
+            Base.Type = ACPI_FIELD_UNIT;
+            Base.Field.FieldType = ACPI_INDEX_FIELD;
+            Base.Field.Index = IndexObject;
+            Base.Field.Data = DataObject;
+            if (!AcpipReadFieldList(State, &Base, Start, Length)) {
+                return 0;
+            }
+
+            break;
+        }
+
+        default:
+            return -1;
     }
 
     return 1;
