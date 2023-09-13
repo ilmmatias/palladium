@@ -8,6 +8,14 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define TRY_EXECUTE_OPCODE(Function, ...)                \
+    Status = Function(State, FullOpcode, ##__VA_ARGS__); \
+    if (!Status) {                                       \
+        return 0;                                        \
+    } else if (Status > 0) {                             \
+        break;                                           \
+    }
+
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function executes the whichever AML opcode the current scope points to, updating the
@@ -39,33 +47,12 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
     memset(&Value, 0, sizeof(AcpiValue));
 
     do {
-        int Status = AcpipExecuteDataObjOpcode(State, FullOpcode, &Value);
-        if (!Status) {
-            return 0;
-        } else if (Status > 0) {
-            break;
-        }
-
-        Status = AcpipExecuteFieldOpcode(State, FullOpcode);
-        if (!Status) {
-            return 0;
-        } else if (Status > 0) {
-            break;
-        }
-
-        Status = AcpipExecuteNamedObjOpcode(State, FullOpcode);
-        if (!Status) {
-            return 0;
-        } else if (Status > 0) {
-            break;
-        }
-
-        Status = AcpipExecuteNsModOpcode(State, FullOpcode);
-        if (!Status) {
-            return 0;
-        } else if (Status > 0) {
-            break;
-        }
+        int Status;
+        TRY_EXECUTE_OPCODE(AcpipExecuteDataObjOpcode, &Value);
+        TRY_EXECUTE_OPCODE(AcpipExecuteFieldOpcode);
+        TRY_EXECUTE_OPCODE(AcpipExecuteMathOpcode, &Value);
+        TRY_EXECUTE_OPCODE(AcpipExecuteNamedObjOpcode);
+        TRY_EXECUTE_OPCODE(AcpipExecuteNsModOpcode);
 
         switch (FullOpcode) {
             /* LocalObj (Local0-6) */
@@ -102,76 +89,6 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
                 if (!Target) {
                     AcpiFreeValueData(&Value);
                     return 0;
-                }
-
-                AcpipStoreTarget(State, Target, &Value);
-                free(Target);
-
-                break;
-            }
-
-            /* Binary operations with target (all follow the format: Op Operand Operand Target). */
-            case 0x72:
-            case 0x74:
-            case 0x77:
-            case 0x79:
-            case 0x7A:
-            case 0x7B:
-            case 0x7C:
-            case 0x7D:
-            case 0x7E:
-            case 0x7F:
-            case 0x85: {
-                uint64_t Left;
-                if (!AcpipExecuteInteger(State, &Left)) {
-                    return 0;
-                }
-
-                uint64_t Right;
-                if (!AcpipExecuteInteger(State, &Right)) {
-                    return 0;
-                }
-
-                AcpipTarget *Target = AcpipExecuteTarget(State);
-                if (!Target) {
-                    return 0;
-                }
-
-                Value.Type = ACPI_INTEGER;
-                switch (Opcode) {
-                    case 0x72:
-                        Value.Integer = Left + Right;
-                        break;
-                    case 0x74:
-                        Value.Integer = Left - Right;
-                        break;
-                    case 0x77:
-                        Value.Integer = Left * Right;
-                        break;
-                    case 0x79:
-                        Value.Integer = Left << Right;
-                        break;
-                    case 0x7A:
-                        Value.Integer = Left >> Right;
-                        break;
-                    case 0x7B:
-                        Value.Integer = Left & Right;
-                        break;
-                    case 0x7C:
-                        Value.Integer = Left & ~Right;
-                        break;
-                    case 0x7D:
-                        Value.Integer = Left | Right;
-                        break;
-                    case 0x7E:
-                        Value.Integer = Left | ~Right;
-                        break;
-                    case 0x7F:
-                        Value.Integer = Left ^ Right;
-                        break;
-                    case 0x85:
-                        Value.Integer = Left % Right;
-                        break;
                 }
 
                 AcpipStoreTarget(State, Target, &Value);
@@ -281,6 +198,35 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
 
                 AcpipStoreTarget(State, Target, &Value);
                 free(Target);
+
+                break;
+            }
+
+            /* DefSizeOf := SizeOfOp SuperName */
+            case 0x87: {
+                AcpipTarget *SuperName = AcpipExecuteSuperName(State);
+                if (!SuperName) {
+                    return 0;
+                }
+
+                AcpiValue *Target = AcpipReadTarget(State, SuperName);
+                if (!Target) {
+                    free(SuperName);
+                    return 0;
+                }
+
+                free(SuperName);
+                Value.Type = ACPI_INTEGER;
+
+                if (Target->Type == ACPI_STRING) {
+                    Value.Integer = strlen(Target->String);
+                } else if (Target->Type == ACPI_BUFFER) {
+                    Value.Integer = Target->Buffer.Size;
+                } else if (Target->Type == ACPI_PACKAGE) {
+                    Value.Integer = Target->Package.Size;
+                } else {
+                    return 0;
+                }
 
                 break;
             }

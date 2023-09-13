@@ -4,18 +4,21 @@
 project(os/drivers/acpi)
 
 add_executable(acpi "knostdlib"
-    aml.c
-    dataobj.c
-    field.c
+    interp/aml.c
+    interp/object.c
+    interp/termarg.c
+    interp/termlist.c
+
+    opcode/dataobj.c
+    opcode/field.c
+    opcode/math.c
+    opcode/namedobj.c
+    opcode/nsmod.c
+    opcode/opcode.c
+    opcode/target.c
+
     main.c
-    namedobj.c
-    nsmod.c
-    object.c
-    opcode.c
-    rsdt.c
-    target.c
-    termarg.c
-    termlist.c)
+    rsdt.c)
 
 target_link_libraries(acpi kernel)
 target_include_directories(acpi PRIVATE include)
