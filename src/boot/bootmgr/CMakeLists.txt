@@ -6,13 +6,13 @@ project(os/boot/bootmgr)
 if(ARCH STREQUAL "x86")
     set(SOURCES
         ${ARCH}/arch.c
-        ${ARCH}/bios.asm
+        ${ARCH}/bios.S
         ${ARCH}/disk.c
         ${ARCH}/display.c
         ${ARCH}/keyboard.c
         ${ARCH}/memory.c
-        ${ARCH}/transfer.asm
-        ${ARCH}/transfer.c)
+        ${ARCH}/transfer.c
+        ${ARCH}/transfer.S)
 endif()
 
 add_executable(bootmgr "kstdlib"

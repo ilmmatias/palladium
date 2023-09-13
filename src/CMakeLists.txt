@@ -13,12 +13,7 @@ if(ARCH STREQUAL "x86" OR ARCH STREQUAL "amd64")
 endif()
 
 project(os)
-
-if(ARCH STREQUAL "x86" OR ARCH STREQUAL "amd64")
-    enable_language(ASM_MASM C CXX RC)
-else()
-    enable_language(ASM C CXX RC)
-endif()
+enable_language(ASM C CXX RC)
 
 if (NOT ARCH STREQUAL "x86")
     add_subdirectory(drivers)

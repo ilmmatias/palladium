@@ -193,7 +193,6 @@ align 8
 GdtDescs dq 0000000000000000h, 00CF9A000000FFFFh, 00CF92000000FFFFh, 008F9A000000FFFFh, 008F92000000FFFFh
 GdtSize dw GdtSize - GdtDescs - 1
 GdtBase dd offset GdtDescs
-        dd 0
 
 BootBlock:
     BootBlock$BootDrive db 0
