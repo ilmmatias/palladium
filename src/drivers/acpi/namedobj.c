@@ -140,6 +140,45 @@ int AcpipExecuteNamedObjOpcode(AcpipState *State, uint16_t Opcode) {
             break;
         }
 
+        /* DefDevice := DeviceOp PkgLength NameString TermList
+           DefThermalZone := ThermalZoneOp PkgLength NameString TermList */
+        case 0x825B:
+        case 0x855B: {
+            uint32_t Length;
+            if (!AcpipReadPkgLength(State, &Length)) {
+                return 0;
+            }
+
+            AcpipName *Name = AcpipReadName(State);
+            if (!Name) {
+                return 0;
+            }
+
+            uint32_t LengthSoFar = Start - State->Scope->RemainingLength;
+            if (LengthSoFar > Length || Length - LengthSoFar > State->Scope->RemainingLength) {
+                free(Name);
+                return 0;
+            }
+
+            AcpiValue Value;
+            Value.Type = Opcode == 0x825B ? ACPI_DEVICE : ACPI_THERMAL;
+            Value.Objects = NULL;
+
+            AcpiObject *Object = AcpipCreateObject(Name, &Value);
+            if (!Object) {
+                free(Name);
+                return 0;
+            }
+
+            AcpipScope *Scope = AcpipEnterScope(State, Object, Length - LengthSoFar);
+            if (!Scope) {
+                return 0;
+            }
+
+            State->Scope = Scope;
+            break;
+        }
+
         /* DefProcessor := ProcessorOp PkgLength NameString ProcID PblkAddr PblkLen TermList */
         case 0x835B: {
             uint32_t Length;
@@ -160,6 +199,7 @@ int AcpipExecuteNamedObjOpcode(AcpipState *State, uint16_t Opcode) {
 
             AcpiValue Value;
             Value.Type = ACPI_PROCESSOR;
+            Value.Objects = NULL;
             Value.Processor.ProcId = *(State->Scope->Code);
             Value.Processor.PblkAddr = *(uint32_t *)(State->Scope->Code + 1);
             Value.Processor.PblkLen = *(State->Scope->Code + 5);
@@ -202,6 +242,7 @@ int AcpipExecuteNamedObjOpcode(AcpipState *State, uint16_t Opcode) {
 
             AcpiValue Value;
             Value.Type = ACPI_POWER;
+            Value.Objects = NULL;
             Value.Power.SystemLevel = *(State->Scope->Code);
             Value.Power.ResourceOrder = *(uint16_t *)(State->Scope->Code + 1);
 

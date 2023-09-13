@@ -439,51 +439,6 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
                 break;
             }
 
-            /* DefDevice := DeviceOp PkgLength NameString TermList
-               DefThermalZone := ThermalZoneOp PkgLength NameString TermList
-
-               Memory problems/something wrong with our mappings? Moving this to namedobj.c seems
-               to crash QEMU.
-
-               Urgent TODO: Setup an IDT on the late boot stage (before JMPing to the kernel), and
-               investigate this. */
-            case 0x825B:
-            case 0x855B: {
-                uint32_t Length;
-                if (!AcpipReadPkgLength(State, &Length)) {
-                    return 0;
-                }
-
-                AcpipName *Name = AcpipReadName(State);
-                if (!Name) {
-                    return 0;
-                }
-
-                uint32_t LengthSoFar = Start - State->Scope->RemainingLength;
-                if (LengthSoFar > Length || Length - LengthSoFar > State->Scope->RemainingLength) {
-                    free(Name);
-                    return 0;
-                }
-
-                AcpiValue Value;
-                Value.Type = ExtOpcode == 0x82 ? ACPI_DEVICE : ACPI_THERMAL;
-                Value.Objects = NULL;
-
-                AcpiObject *Object = AcpipCreateObject(Name, &Value);
-                if (!Object) {
-                    free(Name);
-                    return 0;
-                }
-
-                AcpipScope *Scope = AcpipEnterScope(State, Object, Length - LengthSoFar);
-                if (!Scope) {
-                    return 0;
-                }
-
-                State->Scope = Scope;
-                break;
-            }
-
             default: {
                 State->Scope->Code--;
                 State->Scope->RemainingLength++;

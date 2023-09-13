@@ -29,16 +29,14 @@ int AcpipExecuteNsModOpcode(AcpipState *State, uint16_t Opcode) {
                 return 0;
             }
 
-            AcpipName *AliasName = AcpipReadName(State);
-            if (!AliasName) {
+            AcpiObject *SourceObject = AcpipResolveObject(SourceName);
+            if (!SourceObject) {
                 free(SourceName);
                 return 0;
             }
 
-            AcpiObject *SourceObject = AcpipResolveObject(SourceName);
-            if (!SourceObject) {
-                free(AliasName);
-                free(SourceName);
+            AcpipName *AliasName = AcpipReadName(State);
+            if (!AliasName) {
                 return 0;
             }
 

@@ -61,7 +61,6 @@ int AcpipReadDWord(AcpipState *State, uint32_t *DWord);
 int AcpipReadQWord(AcpipState *State, uint64_t *QWord);
 int AcpipReadPkgLength(AcpipState *State, uint32_t *Length);
 AcpipName *AcpipReadName(AcpipState *State);
-int AcpipReadFieldList(AcpipState *State, AcpiValue *Base, uint32_t Start, uint32_t Length);
 
 int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Value);
 int AcpipExecuteDataObjOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value);
