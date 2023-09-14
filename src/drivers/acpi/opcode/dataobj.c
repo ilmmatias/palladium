@@ -144,6 +144,7 @@ int AcpipExecuteDataObjOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Val
         case 0x12:
         case 0x13: {
             Value->Type = ACPI_PACKAGE;
+            Value->References = 1;
 
             uint32_t PkgLength;
             if (!AcpipReadPkgLength(State, &PkgLength)) {
@@ -191,19 +192,22 @@ int AcpipExecuteDataObjOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Val
                     !isupper(Opcode) && Opcode != '_') {
                     Value->Package.Data[i].Type = 1;
                     if (!AcpipExecuteOpcode(State, &Value->Package.Data[i].Value)) {
-                        free(Value->Package.Data);
+                        Value->Package.Size = i ? i - 1 : 0;
+                        AcpiRemoveReference(Value, 0);
                         return 0;
                     }
                 } else {
                     if (!AcpipReadName(State)) {
-                        free(Value->Package.Data);
+                        Value->Package.Size = i ? i - 1 : 0;
+                        AcpiRemoveReference(Value, 0);
                         return 0;
                     }
                 }
 
                 i++;
                 if (Start - State->Scope->RemainingLength > PkgLength) {
-                    free(Value->Package.Data);
+                    Value->Package.Size = i - 1;
+                    AcpiRemoveReference(Value, 0);
                     return 0;
                 }
 

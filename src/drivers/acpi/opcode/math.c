@@ -101,11 +101,11 @@ int AcpipExecuteMathOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
             }
 
             uint64_t TargetInteger;
-            AcpiValue *TargetValue = AcpipReadTarget(State, Target);
-            if (!TargetValue) {
+            AcpiValue TargetValue;
+            if (!AcpipReadTarget(State, Target, &TargetValue)) {
                 free(Target);
                 return 0;
-            } else if (!AcpipCastToInteger(TargetValue, &TargetInteger)) {
+            } else if (!AcpipCastToInteger(&TargetValue, &TargetInteger)) {
                 free(Target);
                 return 0;
             }

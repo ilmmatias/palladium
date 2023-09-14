@@ -150,6 +150,7 @@ AcpiObject *AcpipCreateObject(AcpipName *Name, AcpiValue *Value) {
 
     memcpy(Entry->Name, Name->Start, 4);
     memcpy(&Entry->Value, Value, sizeof(AcpiValue));
+    Entry->Value.References = 1;
     Entry->Next = NULL;
     Entry->Parent = Parent;
 

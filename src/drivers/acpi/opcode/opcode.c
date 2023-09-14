@@ -87,24 +87,29 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
                     return 0;
                 }
 
-                AcpiValue *Target = AcpipReadTarget(State, SuperName);
-                if (!Target) {
+                AcpiValue Target;
+                if (!AcpipReadTarget(State, SuperName, &Target)) {
                     free(SuperName);
                     return 0;
                 }
 
                 free(SuperName);
                 Value.Type = ACPI_INTEGER;
+                Value.References = 1;
 
-                if (Target->Type == ACPI_STRING) {
-                    Value.Integer = strlen(Target->String);
-                } else if (Target->Type == ACPI_BUFFER) {
-                    Value.Integer = Target->Buffer.Size;
-                } else if (Target->Type == ACPI_PACKAGE) {
-                    Value.Integer = Target->Package.Size;
+                AcpiValue *TargetValue =
+                    Target.Type == ACPI_REFERENCE ? &Target.Reference->Value : &Target;
+                if (TargetValue->Type == ACPI_STRING) {
+                    Value.Integer = strlen(TargetValue->String);
+                } else if (TargetValue->Type == ACPI_BUFFER) {
+                    Value.Integer = TargetValue->Buffer.Size;
+                } else if (TargetValue->Type == ACPI_PACKAGE) {
+                    Value.Integer = TargetValue->Package.Size;
                 } else {
                     return 0;
                 }
+
+                AcpiRemoveReference(&Target, 0);
 
                 break;
             }
@@ -141,15 +146,9 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
                 /* MethodInvocation is valid on non-method items, where we just return their
                    value. */
                 if (Object->Value.Type != ACPI_METHOD) {
-                    if (Object->Value.Type <= ACPI_FIELD_UNIT ||
-                        Object->Value.Type == ACPI_REFERENCE ||
-                        Object->Value.Type == ACPI_BUFFER_FIELD) {
-                        memcpy(&Value, &Object->Value, sizeof(AcpiValue));
-                    } else {
-                        Value.Type = ACPI_REFERENCE;
-                        Value.Reference = Object;
-                    }
-
+                    Value.Type = ACPI_REFERENCE;
+                    Value.References = 1;
+                    Value.Reference = Object;
                     break;
                 }
 
@@ -165,14 +164,14 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
                     }
                 }
 
-                AcpiValue *ReturnValue = AcpiExecuteMethodFromObject(
-                    Object, Object->Value.Method.Flags & 0x07, Arguments);
-                if (!ReturnValue) {
+                if (!AcpiExecuteMethodFromObject(
+                        Object, Object->Value.Method.Flags & 0x07, Arguments)) {
                     return 0;
                 }
 
-                memcpy(&Value, ReturnValue, sizeof(AcpiValue));
-                free(ReturnValue);
+                for (int i = 0; i < (Object->Value.Method.Flags & 0x07); i++) {
+                    AcpiRemoveReference(&Arguments[i], 0);
+                }
 
                 break;
             }

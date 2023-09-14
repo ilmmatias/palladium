@@ -158,8 +158,10 @@ int AcpipExecuteFieldOpcode(AcpipState *State, uint16_t Opcode) {
 
             AcpiValue Base;
             Base.Type = ACPI_FIELD_UNIT;
+            Base.References = 1;
             Base.FieldUnit.FieldType = ACPI_FIELD;
             Base.FieldUnit.Region = Object;
+            Base.FieldUnit.Data = NULL;
             if (!ReadFieldList(State, &Base, Start, Length)) {
                 return 0;
             }
@@ -198,8 +200,9 @@ int AcpipExecuteFieldOpcode(AcpipState *State, uint16_t Opcode) {
 
             AcpiValue Base;
             Base.Type = ACPI_FIELD_UNIT;
+            Base.References = 1;
             Base.FieldUnit.FieldType = ACPI_INDEX_FIELD;
-            Base.FieldUnit.Index = IndexObject;
+            Base.FieldUnit.Region = IndexObject;
             Base.FieldUnit.Data = DataObject;
             if (!ReadFieldList(State, &Base, Start, Length)) {
                 return 0;

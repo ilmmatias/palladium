@@ -84,13 +84,18 @@ AcpipTarget *AcpipExecuteTarget(AcpipState *State) {
     return Target;
 }
 
-AcpiValue *AcpipReadTarget(AcpipState *State, AcpipTarget *Target) {
+int AcpipReadTarget(AcpipState *State, AcpipTarget *Target, AcpiValue *Value) {
+    AcpiValue *Source;
+
     switch (Target->Type) {
         case ACPI_TARGET_LOCAL:
-            return &State->Locals[Target->LocalIndex];
+            Source = &State->Locals[Target->LocalIndex];
+            break;
         default:
-            return NULL;
+            return 0;
     }
+
+    return AcpiCopyValue(Source, Value);
 }
 
 void AcpipStoreTarget(AcpipState *State, AcpipTarget *Target, AcpiValue *Value) {

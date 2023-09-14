@@ -49,9 +49,11 @@ int AcpipExecuteConvOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
         case 0x98: {
             if (!AcpipExecuteOpcode(State, Value)) {
                 return 0;
-            } else if (
-                Value->Type != ACPI_INTEGER && Value->Type != ACPI_STRING &&
-                Value->Type != ACPI_BUFFER) {
+            }
+
+            AcpiValue *Source = Value->Type == ACPI_REFERENCE ? &Value->Reference->Value : Value;
+            if (Source->Type != ACPI_INTEGER && Source->Type != ACPI_STRING &&
+                Source->Type != ACPI_BUFFER) {
                 return 0;
             }
 

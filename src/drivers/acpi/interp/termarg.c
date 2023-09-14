@@ -32,27 +32,31 @@ static char *Types[] = {
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function tries casting the result of a previous ExecuteOpcode into an integer.
+ *     This will discard the `Value` automatically on success.
  *
  * PARAMETERS:
  *     Value - Result of ExecuteOpcode.
+ *             This is assumed to be stack allocated.
  *     Result - Output as an integer.
  *
  * RETURN VALUE:
  *     1 on success, 0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
 int AcpipCastToInteger(AcpiValue *Value, uint64_t *Result) {
-    if (Value->Type == ACPI_INTEGER) {
-        *Result = Value->Integer;
+    AcpiValue *Source = Value->Type == ACPI_REFERENCE ? &Value->Reference->Value : Value;
+    if (Source->Type == ACPI_INTEGER) {
+        *Result = Source->Integer;
+        AcpiRemoveReference(Value, 0);
         return 1;
     }
 
     *Result = 0;
-    switch (Value->Type) {
+    switch (Source->Type) {
         /* The contents of the buffer should be copied 1-to-1 into the integer, making sure to
            validate the size of the buffer. */
         case ACPI_BUFFER:
-            for (uint64_t i = 0; i < (Value->Buffer.Size > 8 ? 8 : Value->Buffer.Size); i++) {
-                *Result |= Value->Buffer.Data[i] << (i * 8);
+            for (uint64_t i = 0; i < (Source->Buffer.Size > 8 ? 8 : Source->Buffer.Size); i++) {
+                *Result |= Source->Buffer.Data[i] << (i * 8);
             }
 
             break;
@@ -60,7 +64,7 @@ int AcpipCastToInteger(AcpiValue *Value, uint64_t *Result) {
         /* The string is copied assuming every position is a hex-character; We have strtoull, which
            does the conversion for us. */
         case ACPI_STRING:
-            *Result = strtoull(Value->String, NULL, 16);
+            *Result = strtoull(Source->String, NULL, 16);
             break;
 
         default:
@@ -84,24 +88,25 @@ int AcpipCastToInteger(AcpiValue *Value, uint64_t *Result) {
  *     1 on success, 0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
 int AcpipCastToString(AcpiValue *Value, int ImplicitCast, int Decimal) {
-    if (Value->Type == ACPI_STRING) {
+    AcpiValue *Source = Value->Type == ACPI_REFERENCE ? &Value->Reference->Value : Value;
+    if (Source->Type == ACPI_STRING) {
         return 1;
     }
 
     char *String;
-    switch (Value->Type) {
+    switch (Source->Type) {
         /* Integers have two conversion paths:
                For hexadecimal, they get converted using snprintf into 16 hex digits.
                For decimal, we need snprintf to get the output size, then we convert it. */
         case ACPI_INTEGER: {
             if (Decimal) {
-                int Size = snprintf(NULL, 0, "%lld", Value->Integer);
+                int Size = snprintf(NULL, 0, "%lld", Source->Integer);
                 String = malloc(Size + 1);
                 if (!String) {
                     return 0;
                 }
 
-                if (snprintf(String, Size + 1, "%lld", Value->Integer) != Size) {
+                if (snprintf(String, Size + 1, "%lld", Source->Integer) != Size) {
                     free(String);
                     return 0;
                 }
@@ -111,7 +116,7 @@ int AcpipCastToString(AcpiValue *Value, int ImplicitCast, int Decimal) {
                     return 0;
                 }
 
-                if (snprintf(String, 17, "%016llX", Value->Integer) != 16) {
+                if (snprintf(String, 17, "%016llX", Source->Integer) != 16) {
                     free(String);
                     return 0;
                 }
@@ -129,14 +134,14 @@ int AcpipCastToString(AcpiValue *Value, int ImplicitCast, int Decimal) {
             if (Decimal) {
                 int Size = 0;
 
-                for (uint64_t i = 0; i < Value->Buffer.Size; i++) {
+                for (uint64_t i = 0; i < Source->Buffer.Size; i++) {
                     const char *PrintfFormat = "%lld";
 
-                    if (i < Value->Buffer.Size - 1) {
+                    if (i < Source->Buffer.Size - 1) {
                         PrintfFormat = ImplicitCast ? "%lld " : "%lld,";
                     }
 
-                    Size += snprintf(NULL, 0, PrintfFormat, Value->Buffer.Data[i]);
+                    Size += snprintf(NULL, 0, PrintfFormat, Source->Buffer.Data[i]);
                 }
 
                 String = malloc(Size + 1);
@@ -145,36 +150,36 @@ int AcpipCastToString(AcpiValue *Value, int ImplicitCast, int Decimal) {
                 }
 
                 int Offset = 0;
-                for (uint64_t i = 0; i < Value->Buffer.Size; i++) {
+                for (uint64_t i = 0; i < Source->Buffer.Size; i++) {
                     const char *PrintfFormat = "%lld";
 
-                    if (i < Value->Buffer.Size - 1) {
+                    if (i < Source->Buffer.Size - 1) {
                         PrintfFormat = ImplicitCast ? "%lld " : "%lld,";
                     }
 
                     Offset += snprintf(
-                        String + Offset, Size - Offset + 1, PrintfFormat, Value->Buffer.Data[i]);
+                        String + Offset, Size - Offset + 1, PrintfFormat, Source->Buffer.Data[i]);
                 }
             } else {
-                String = malloc(Value->Buffer.Size * 5);
+                String = malloc(Source->Buffer.Size * 5);
                 if (!String) {
                     return 0;
                 }
 
-                for (uint64_t i = 0; i < Value->Buffer.Size; i++) {
+                for (uint64_t i = 0; i < Source->Buffer.Size; i++) {
                     int PrintfSize = 5;
                     const char *PrintfFormat = "0x%02hhX";
 
-                    if (i < Value->Buffer.Size - 1) {
+                    if (i < Source->Buffer.Size - 1) {
                         PrintfSize = 6;
                         PrintfFormat = ImplicitCast ? "0x%02hhX " : "0x%02hhX,";
                     }
 
                     if (snprintf(
-                            Value->String + i * 5,
+                            Source->String + i * 5,
                             PrintfSize,
                             PrintfFormat,
-                            Value->Buffer.Data[i]) != PrintfSize - 1) {
+                            Source->Buffer.Data[i]) != PrintfSize - 1) {
                         free(String);
                         return 0;
                     }
@@ -187,7 +192,7 @@ int AcpipCastToString(AcpiValue *Value, int ImplicitCast, int Decimal) {
         /* For everything else, we'll just be converting their type into a string, and returning
            that. */
         default: {
-            String = strdup(Types[Value->Type]);
+            String = strdup(Types[Source->Type]);
             if (!String) {
                 return 0;
             }
@@ -196,6 +201,7 @@ int AcpipCastToString(AcpiValue *Value, int ImplicitCast, int Decimal) {
         }
     }
 
+    AcpiRemoveReference(Value, 0);
     Value->Type = ACPI_STRING;
     Value->String = String;
 
@@ -213,14 +219,15 @@ int AcpipCastToString(AcpiValue *Value, int ImplicitCast, int Decimal) {
  *     1 on success, 0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
 int AcpipCastToBuffer(AcpiValue *Value) {
-    if (Value->Type == ACPI_BUFFER) {
+    AcpiValue *Source = Value->Type == ACPI_REFERENCE ? &Value->Reference->Value : Value;
+    if (Source->Type == ACPI_BUFFER) {
         return 1;
     }
 
     uint64_t BufferSize = 0;
     uint8_t *Buffer = NULL;
 
-    switch (Value->Type) {
+    switch (Source->Type) {
         /* Integers get their underlying in-memory representation copied as an 8-byte buffer. */
         case ACPI_INTEGER: {
             BufferSize = 16;
@@ -230,18 +237,18 @@ int AcpipCastToBuffer(AcpiValue *Value) {
                 return 0;
             }
 
-            *((uint64_t *)Buffer) = Value->Integer;
+            *((uint64_t *)Buffer) = Source->Integer;
             break;
         }
 
         /* Strings mostly pass through, except for 0-length, they just become 0-sized buffers
            (instead of length==1). */
         case ACPI_STRING: {
-            size_t StringSize = strlen(Value->String);
+            size_t StringSize = strlen(Source->String);
 
             if (StringSize) {
                 BufferSize = StringSize + 1;
-                Buffer = (uint8_t *)strdup(Value->String);
+                Buffer = (uint8_t *)strdup(Source->String);
                 if (!Buffer) {
                     return 0;
                 }
@@ -254,6 +261,7 @@ int AcpipCastToBuffer(AcpiValue *Value) {
             return 0;
     }
 
+    AcpiRemoveReference(Value, 0);
     Value->Type = ACPI_BUFFER;
     Value->Buffer.Size = BufferSize;
     Value->Buffer.Data = Buffer;

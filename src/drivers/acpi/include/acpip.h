@@ -78,10 +78,10 @@ int AcpipCastToBuffer(AcpiValue *Value);
 
 int AcpipExecuteInteger(AcpipState *State, uint64_t *Result);
 
-AcpiValue *AcpipExecuteTermList(AcpipState *State);
+int AcpipExecuteTermList(AcpipState *State);
 AcpipTarget *AcpipExecuteSuperName(AcpipState *State);
 AcpipTarget *AcpipExecuteTarget(AcpipState *State);
-AcpiValue *AcpipReadTarget(AcpipState *State, AcpipTarget *Target);
+int AcpipReadTarget(AcpipState *State, AcpipTarget *Target, AcpiValue *Value);
 void AcpipStoreTarget(AcpipState *State, AcpipTarget *Target, AcpiValue *Value);
 
 #endif /* _ACPIP_H_ */

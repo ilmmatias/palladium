@@ -35,6 +35,7 @@ struct AcpiObject;
 
 typedef struct AcpiValue {
     int Type;
+    int References;
     struct AcpiObject *Objects;
     union {
         struct AcpiObject *Alias;
@@ -64,10 +65,7 @@ typedef struct AcpiValue {
         } Region;
         struct {
             int FieldType;
-            union {
-                struct AcpiObject *Region;
-                struct AcpiObject *Index;
-            };
+            struct AcpiObject *Region;
             struct AcpiObject *Data;
             uint8_t AccessType;
             uint8_t AccessAttrib;
@@ -76,8 +74,7 @@ typedef struct AcpiValue {
             uint32_t Length;
         } FieldUnit;
         struct {
-            int FieldType;
-            void *FieldSource;
+            struct AcpiValue *FieldSource;
             uint64_t Index;
         } BufferField;
         struct {
@@ -108,7 +105,10 @@ typedef struct AcpiObject {
 } AcpiObject;
 
 AcpiObject *AcpiSearchObject(const char *Name);
-AcpiValue *AcpiExecuteMethodFromPath(const char *Name, int ArgCount, AcpiValue *Arguments);
-AcpiValue *AcpiExecuteMethodFromObject(AcpiObject *Object, int ArgCount, AcpiValue *Arguments);
+int AcpiExecuteMethodFromPath(const char *Name, int ArgCount, AcpiValue *Arguments);
+int AcpiExecuteMethodFromObject(AcpiObject *Object, int ArgCount, AcpiValue *Arguments);
+
+int AcpiCopyValue(AcpiValue *Source, AcpiValue *Target);
+void AcpiRemoveReference(AcpiValue *Value, int CleanupPointer);
 
 #endif /* _ACPI_H_ */

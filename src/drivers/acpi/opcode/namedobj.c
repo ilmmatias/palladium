@@ -43,6 +43,7 @@ int AcpipExecuteNamedObjOpcode(AcpipState *State, uint16_t Opcode) {
 
             AcpiValue Value;
             Value.Type = ACPI_METHOD;
+            Value.References = 1;
             Value.Method.Start = State->Scope->Code + 1;
             Value.Method.Size = Length - LengthSoFar;
             Value.Method.Flags = *State->Scope->Code;
@@ -72,6 +73,7 @@ int AcpipExecuteNamedObjOpcode(AcpipState *State, uint16_t Opcode) {
 
             AcpiValue Value;
             Value.Type = ACPI_MUTEX;
+            Value.References = 1;
             Value.Mutex.Flags = SyncFlags;
 
             if (!AcpipCreateObject(Name, &Value)) {
@@ -91,6 +93,7 @@ int AcpipExecuteNamedObjOpcode(AcpipState *State, uint16_t Opcode) {
 
             AcpiValue Value;
             Value.Type = ACPI_EVENT;
+            Value.References = 1;
 
             if (!AcpipCreateObject(Name, &Value)) {
                 free(Name);
@@ -127,6 +130,7 @@ int AcpipExecuteNamedObjOpcode(AcpipState *State, uint16_t Opcode) {
 
             AcpiValue Value;
             Value.Type = ACPI_REGION;
+            Value.References = 1;
             Value.Objects = NULL;
             Value.Region.RegionSpace = RegionSpace;
             Value.Region.RegionLen = RegionLen;
@@ -162,6 +166,7 @@ int AcpipExecuteNamedObjOpcode(AcpipState *State, uint16_t Opcode) {
 
             AcpiValue Value;
             Value.Type = Opcode == 0x825B ? ACPI_DEVICE : ACPI_THERMAL;
+            Value.References = 1;
             Value.Objects = NULL;
 
             AcpiObject *Object = AcpipCreateObject(Name, &Value);
@@ -199,6 +204,7 @@ int AcpipExecuteNamedObjOpcode(AcpipState *State, uint16_t Opcode) {
 
             AcpiValue Value;
             Value.Type = ACPI_PROCESSOR;
+            Value.References = 1;
             Value.Objects = NULL;
             Value.Processor.ProcId = *(State->Scope->Code);
             Value.Processor.PblkAddr = *(uint32_t *)(State->Scope->Code + 1);
@@ -242,6 +248,7 @@ int AcpipExecuteNamedObjOpcode(AcpipState *State, uint16_t Opcode) {
 
             AcpiValue Value;
             Value.Type = ACPI_POWER;
+            Value.References = 1;
             Value.Objects = NULL;
             Value.Power.SystemLevel = *(State->Scope->Code);
             Value.Power.ResourceOrder = *(uint16_t *)(State->Scope->Code + 1);

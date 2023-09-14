@@ -50,6 +50,7 @@ int AcpipExecuteConcatOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Valu
                     }
 
                     Value->Type = ACPI_BUFFER;
+                    Value->References = 1;
                     Value->Buffer.Size = 16;
                     Value->Buffer.Data = malloc(16);
                     if (!Value->Buffer.Data) {
@@ -69,6 +70,7 @@ int AcpipExecuteConcatOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Valu
                     }
 
                     Value->Type = ACPI_BUFFER;
+                    Value->References = 1;
                     Value->Buffer.Size = Left.Buffer.Size + Right.Buffer.Size;
                     Value->Buffer.Data = malloc(Value->Buffer.Size);
                     if (!Value->Buffer.Data) {
@@ -91,6 +93,7 @@ int AcpipExecuteConcatOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Valu
                     }
 
                     Value->Type = ACPI_STRING;
+                    Value->References = 1;
                     Value->String = malloc(strlen(Left.String) + strlen(Right.String) + 1);
                     if (!Value->String) {
                         return 0;
@@ -104,6 +107,8 @@ int AcpipExecuteConcatOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Valu
             }
 
             AcpipStoreTarget(State, Target, Value);
+            AcpiRemoveReference(&Left, 0);
+            AcpiRemoveReference(&Right, 0);
             free(Target);
 
             break;

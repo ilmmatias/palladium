@@ -43,6 +43,7 @@ int AcpipExecuteNsModOpcode(AcpipState *State, uint16_t Opcode) {
 
             AcpiValue Value;
             Value.Type = ACPI_ALIAS;
+            Value.References = 1;
             Value.Alias = SourceObject;
 
             AcpiObject *Object = AcpipCreateObject(AliasName, &Value);
@@ -96,6 +97,7 @@ int AcpipExecuteNsModOpcode(AcpipState *State, uint16_t Opcode) {
 
             AcpiValue Value;
             Value.Type = ACPI_SCOPE;
+            Value.References = 1;
             Value.Objects = NULL;
 
             AcpiObject *Object = AcpipCreateObject(Name, &Value);

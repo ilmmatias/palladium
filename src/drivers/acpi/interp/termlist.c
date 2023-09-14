@@ -7,13 +7,26 @@
 #include <stdlib.h>
 #include <string.h>
 
-AcpiValue *AcpipExecuteTermList(AcpipState *State) {
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function executes all operations within the current scope.
+ *
+ * PARAMETERS:
+ *     State - AML state containing the current scope.
+ *
+ * RETURN VALUE:
+ *     1 on success, 0 otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+int AcpipExecuteTermList(AcpipState *State) {
+    int Status = 0;
+
     while (1) {
         if (!State->Scope->RemainingLength) {
             /* Backtrack into the previous scope, or end if we're already in the top-most
                scope. */
             AcpipScope *Parent = State->Scope->Parent;
             if (!Parent) {
+                Status = 1;
                 break;
             }
 
@@ -27,7 +40,7 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
 
                 uint64_t Predicate;
                 if (!AcpipExecuteInteger(State, &Predicate)) {
-                    return NULL;
+                    break;
                 }
 
                 if (Predicate) {
@@ -43,15 +56,20 @@ AcpiValue *AcpipExecuteTermList(AcpipState *State) {
         }
 
         if (!AcpipExecuteOpcode(State, NULL)) {
-            return NULL;
+            break;
         }
     }
 
-    AcpiValue *Value = malloc(sizeof(AcpiValue));
-    if (Value) {
-        Value->Type = ACPI_INTEGER;
-        Value->Integer = 0;
+    /* Base of the scope stack should be a stack-allocated scope (instead of heap-allocated), so
+       we can't free that; But we do need to free anything left in case of an early exit (because
+       of a Return). */
+    while (State->Scope->Parent) {
+        AcpipScope *Parent = State->Scope->Parent;
+        free(State->Scope);
+        State->Scope = Parent;
     }
 
-    return Value;
+    /* State should also be stack-allocated (and it contains the return value anyways), so we
+       can't free it either. */
+    return Status;
 }

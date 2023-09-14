@@ -48,6 +48,7 @@ void DriverEntry(void) {
 
     AcpiValue Arguments[1];
     Arguments[0].Type = ACPI_STRING;
+    Arguments[0].References = 1;
     Arguments[0].String = strdup("Hello, World!\n");
     if (!Arguments[0].String) {
         KeFatalError(KE_EARLY_MEMORY_FAILURE);

@@ -22,7 +22,7 @@ extern AcpiObject *AcpipObjectTree;
  * RETURN VALUE:
  *     Return value of the method, or NULL if something went wrong.
  *-----------------------------------------------------------------------------------------------*/
-AcpiValue *AcpiExecuteMethodFromPath(const char *Name, int ArgCount, AcpiValue *Arguments) {
+int AcpiExecuteMethodFromPath(const char *Name, int ArgCount, AcpiValue *Arguments) {
     AcpiObject *Object = AcpiSearchObject(Name);
     return AcpiExecuteMethodFromObject(Object, ArgCount, Arguments);
 }
@@ -39,9 +39,9 @@ AcpiValue *AcpiExecuteMethodFromPath(const char *Name, int ArgCount, AcpiValue *
  * RETURN VALUE:
  *     Return value of the method, or NULL if something went wrong.
  *-----------------------------------------------------------------------------------------------*/
-AcpiValue *AcpiExecuteMethodFromObject(AcpiObject *Object, int ArgCount, AcpiValue *Arguments) {
+int AcpiExecuteMethodFromObject(AcpiObject *Object, int ArgCount, AcpiValue *Arguments) {
     if (!Object || Object->Value.Type != ACPI_METHOD) {
-        return NULL;
+        return 0;
     } else if (ArgCount < 0) {
         ArgCount = 0;
     } else if (ArgCount > 7) {
@@ -72,6 +72,132 @@ AcpiValue *AcpiExecuteMethodFromObject(AcpiObject *Object, int ArgCount, AcpiVal
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
+ *     This function does a copy of the specified object (including anything malloc'ed inside it).
+ *
+ * PARAMETERS:
+ *     Source - Value to be copied.
+ *     Target - Destination of the copy.
+ *
+ * RETURN VALUE:
+ *     1 on success, 0 otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+int AcpiCopyValue(AcpiValue *Source, AcpiValue *Target) {
+    if (!Source || !Target) {
+        return 0;
+    }
+
+    memcpy(Target, Source, sizeof(AcpiValue));
+    Target->References = 1;
+
+    switch (Source->Type) {
+        case ACPI_STRING:
+            Target->String = strdup(Source->String);
+            if (!Target->String) {
+                return 0;
+            }
+
+            break;
+
+        case ACPI_BUFFER:
+            Target->Buffer.Data = malloc(Source->Buffer.Size);
+            if (!Target->Buffer.Data) {
+                return 0;
+            }
+
+            memcpy(Target->Buffer.Data, Source->Buffer.Data, Source->Buffer.Size);
+            break;
+
+        case ACPI_PACKAGE:
+            Target->Package.Data = malloc(Source->Package.Size * sizeof(AcpiPackageElement));
+            if (!Target->Package.Data) {
+                return 0;
+            }
+
+            for (uint64_t i = 0; i < Source->Package.Size; i++) {
+                Target->Package.Data[i].Type = Source->Package.Data[i].Type;
+                if (Source->Package.Data[i].Type &&
+                    !AcpiCopyValue(
+                        &Source->Package.Data[i].Value, &Target->Package.Data[i].Value)) {
+                    /* Recursive cleanup on failure (if we processed any items). */
+                    Target->Package.Size = i ? i - 1 : 0;
+                    AcpiRemoveReference(Target, 0);
+                    return 0;
+                }
+            }
+
+            break;
+
+        case ACPI_BUFFER_FIELD:
+            Source->BufferField.FieldSource->References++;
+            break;
+    }
+
+    return 1;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function decreases the reference counter for the given value (and anything it
+ *     references), freeing up any values that reach 0 references.
+ *
+ * PARAMETERS:
+ *     Value - Pointer to the value to be freed.
+ *     CleanupPointer - Set to 0 if this is a heap allocated pointer, or if you wish to reuse it
+ *                      after freeing it.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void AcpiRemoveReference(AcpiValue *Value, int CleanupPointer) {
+    if (!Value) {
+        return;
+    }
+
+    int NeedsCleanup = --Value->References <= 0;
+
+    switch (Value->Type) {
+        case ACPI_STRING:
+            if (NeedsCleanup && Value->String) {
+                free(Value->String);
+            }
+
+            break;
+
+        case ACPI_BUFFER:
+            if (NeedsCleanup && Value->Buffer.Data) {
+                free(Value->Buffer.Data);
+            }
+
+            break;
+
+        case ACPI_PACKAGE:
+            if (NeedsCleanup) {
+                for (uint64_t i = 0; i < Value->Package.Size; i++) {
+                    if (Value->Package.Data[i].Type) {
+                        AcpiRemoveReference(&Value->Package.Data[i].Value, 0);
+                    }
+                }
+
+                free(Value->Package.Data);
+            }
+
+            break;
+
+        case ACPI_BUFFER_FIELD:
+            if (NeedsCleanup) {
+                AcpiRemoveReference(Value->BufferField.FieldSource, 1);
+            }
+
+            break;
+    }
+
+    if (NeedsCleanup && CleanupPointer) {
+        free(Value);
+    }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
  *     This function creates the required predefined root namespaces.
  *
  * PARAMETERS:
@@ -98,6 +224,9 @@ void AcpipPopulatePredefined(void) {
     for (int i = 0; i < PREDEFINED_ITEMS; i++) {
         memcpy(Objects[i].Name, Names[i], 4);
         Objects[i].Value.Type = ACPI_SCOPE;
+        Objects[i].Value.References = 1;
+        Objects[i].Value.Objects = NULL;
+        Objects[i].Next = NULL;
         Objects[i].Parent = &ObjectTreeRoot;
 
         if (i != PREDEFINED_ITEMS - 1) {
@@ -107,6 +236,7 @@ void AcpipPopulatePredefined(void) {
 
     memcpy(ObjectTreeRoot.Name, "____", 4);
     ObjectTreeRoot.Value.Type = ACPI_SCOPE;
+    ObjectTreeRoot.Value.References = 1;
     ObjectTreeRoot.Value.Objects = Objects;
     ObjectTreeRoot.Next = NULL;
     ObjectTreeRoot.Parent = NULL;
@@ -141,7 +271,6 @@ void AcpipPopulateTree(const uint8_t *Code, uint32_t Length) {
     State.Scope = &Scope;
 
     if (!AcpipExecuteTermList(&State)) {
-        // KeFatalError(KE_CORRUPTED_HARDWARE_STRUCTURES);
         printf("Failure on AcpipExecuteTermList()!\n");
         while (1)
             ;
