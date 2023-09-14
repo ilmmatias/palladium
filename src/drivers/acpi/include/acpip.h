@@ -77,6 +77,7 @@ int AcpipCastToString(AcpiValue *Value, int ImplicitCast, int Decimal);
 int AcpipCastToBuffer(AcpiValue *Value);
 
 int AcpipExecuteInteger(AcpipState *State, uint64_t *Result);
+int AcpipExecuteBuffer(AcpipState *State, AcpiValue *Result);
 
 int AcpipExecuteTermList(AcpipState *State);
 AcpipTarget *AcpipExecuteSuperName(AcpipState *State);

@@ -90,6 +90,10 @@ int AcpipCastToInteger(AcpiValue *Value, uint64_t *Result) {
 int AcpipCastToString(AcpiValue *Value, int ImplicitCast, int Decimal) {
     AcpiValue *Source = Value->Type == ACPI_REFERENCE ? &Value->Reference->Value : Value;
     if (Source->Type == ACPI_STRING) {
+        if (Value != Source) {
+            AcpiCopyValue(Source, Value);
+        }
+
         return 1;
     }
 
@@ -221,6 +225,10 @@ int AcpipCastToString(AcpiValue *Value, int ImplicitCast, int Decimal) {
 int AcpipCastToBuffer(AcpiValue *Value) {
     AcpiValue *Source = Value->Type == ACPI_REFERENCE ? &Value->Reference->Value : Value;
     if (Source->Type == ACPI_BUFFER) {
+        if (Value != Source) {
+            AcpiCopyValue(Source, Value);
+        }
+
         return 1;
     }
 
@@ -275,7 +283,7 @@ int AcpipCastToBuffer(AcpiValue *Value) {
  *
  * PARAMETERS:
  *     State - AML state containing the current scope.
- *     Value - Output as an integer.
+ *     Result - Output as an integer.
  *
  * RETURN VALUE:
  *     1 on success, 0 otherwise.
@@ -287,4 +295,19 @@ int AcpipExecuteInteger(AcpipState *State, uint64_t *Result) {
     }
 
     return AcpipCastToInteger(&Value, Result);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function tries executing the next termarg in the scope.
+ *
+ * PARAMETERS:
+ *     State - AML state containing the current scope.
+ *     Value - Output as a buffer.
+ *
+ * RETURN VALUE:
+ *     1 on success, 0 otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+int AcpipExecuteBuffer(AcpipState *State, AcpiValue *Result) {
+    return AcpipExecuteOpcode(State, Result) && AcpipCastToBuffer(Result);
 }

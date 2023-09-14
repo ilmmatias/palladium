@@ -76,6 +76,7 @@ typedef struct AcpiValue {
         struct {
             struct AcpiValue *FieldSource;
             uint64_t Index;
+            int Size;
         } BufferField;
         struct {
             uint8_t ProcId;

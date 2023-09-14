@@ -136,6 +136,61 @@ int AcpipExecuteFieldOpcode(AcpipState *State, uint16_t Opcode) {
     uint32_t Start = State->Scope->RemainingLength;
 
     switch (Opcode) {
+        /* DefCreateDWordField := CreateDWordFieldOp SourceBuff ByteIndex NameString
+           DefCreateWordField := CreateWordFieldOp SourceBuff ByteIndex NameString
+           DefCreateByteField := CreateByteFieldOp SourceBuff ByteIndex NameString
+           DefCreateQWordField := CreateQWordFieldOp SourceBuff ByteIndex NameString */
+        case 0x8A:
+        case 0x8B:
+        case 0x8C:
+        case 0x8F: {
+            AcpiValue SourceBuff;
+            if (!AcpipExecuteBuffer(State, &SourceBuff)) {
+                return 0;
+            }
+
+            uint64_t ByteIndex;
+            if (!AcpipExecuteInteger(State, &ByteIndex)) {
+                AcpiRemoveReference(&SourceBuff, 0);
+                return 0;
+            }
+
+            AcpipName *Name = AcpipReadName(State);
+            if (!Name) {
+                AcpiRemoveReference(&SourceBuff, 0);
+                return 0;
+            }
+
+            /* .BufferField.FieldSource is a pointer into the heap, so let's allocate somewhere to
+               store SourceBuff. */
+            AcpiValue *Buffer = malloc(sizeof(AcpiValue));
+            if (!Buffer) {
+                free(Name);
+                AcpiRemoveReference(&SourceBuff, 0);
+                return 0;
+            }
+
+            memcpy(Buffer, &SourceBuff, sizeof(AcpiValue));
+
+            AcpiValue Value;
+            Value.Type = ACPI_BUFFER_FIELD;
+            Value.References = 1;
+            Value.BufferField.FieldSource = Buffer;
+            Value.BufferField.Index = ByteIndex * 8;
+            Value.BufferField.Size = Opcode == 0x8A   ? 32
+                                     : Opcode == 0x8B ? 16
+                                     : Opcode == 0x8C ? 8
+                                                      : 64;
+
+            if (!AcpipCreateObject(Name, &Value)) {
+                free(Name);
+                AcpiRemoveReference(&SourceBuff, 0);
+                return 0;
+            }
+
+            break;
+        }
+
         /* DefField := FieldOp PkgLength NameString FieldFlags FieldList */
         case 0x815B: {
             uint32_t Length;
