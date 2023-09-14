@@ -9,6 +9,7 @@
 #include <string.h>
 #include <x86/bios.h>
 #include <x86/cpuid.h>
+#include <x86/idt.h>
 
 #define LOADER_MAGIC "BMGR"
 #define LOADER_CURRENT_VERSION 0x0000
@@ -43,6 +44,27 @@ extern uint64_t BiosMemorySize;
 extern uint64_t BiosMaxAddressableMemory;
 
 [[noreturn]] void BiTransferExecution(uint64_t *Pml4, uint64_t BootData, uint64_t EntryPoint);
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function sets up a new handler within the IDT.
+ *
+ * PARAMETERS:
+ *     Number - Index within the IDT to setup the handler at.
+ *     Handler - Virtual address of the handler function.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+static void InstallIdtHandler(int Number, uint64_t Handler) {
+    IdtDescs[Number].OffsetLow = Handler;
+    IdtDescs[Number].Segment = 0x08;
+    IdtDescs[Number].Ist = 0;
+    IdtDescs[Number].TypeAttributes = 0x8E;
+    IdtDescs[Number].OffsetMid = Handler >> 16;
+    IdtDescs[Number].OffsetHigh = Handler >> 32;
+    IdtDescs[Number].Reserved = 0;
+}
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -182,6 +204,17 @@ extern uint64_t BiosMaxAddressableMemory;
 
         if (Fail) {
             break;
+        }
+
+        /* Setup the IDT, mapping all exception handlers properly, and anything higher than
+           32 (aka not an exception) to IRQ 0. */
+
+        for (int i = 0; i < 32; i++) {
+            InstallIdtHandler(i, IrqStubTable[i]);
+        }
+
+        for (int i = 32; i < 256; i++) {
+            InstallIdtHandler(i, IrqStubTable[32]);
         }
 
         /* Mount the OS-specific boot data, and enter assembly land to get into long mode.  */
