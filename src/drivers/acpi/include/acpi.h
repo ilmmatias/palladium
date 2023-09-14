@@ -22,6 +22,7 @@
 #define ACPI_POWER 11
 #define ACPI_PROCESSOR 12
 #define ACPI_THERMAL 13
+#define ACPI_BUFFER_FIELD 14
 #define ACPI_ALIAS 17
 #define ACPI_SCOPE 18
 #define ACPI_REFERENCE 19
@@ -73,7 +74,12 @@ typedef struct AcpiValue {
             uint8_t AccessLength;
             uint32_t Offset;
             uint32_t Length;
-        } Field;
+        } FieldUnit;
+        struct {
+            int FieldType;
+            void *FieldSource;
+            uint64_t Index;
+        } BufferField;
         struct {
             uint8_t ProcId;
             uint32_t PblkAddr;
@@ -104,8 +110,5 @@ typedef struct AcpiObject {
 AcpiObject *AcpiSearchObject(const char *Name);
 AcpiValue *AcpiExecuteMethodFromPath(const char *Name, int ArgCount, AcpiValue *Arguments);
 AcpiValue *AcpiExecuteMethodFromObject(AcpiObject *Object, int ArgCount, AcpiValue *Arguments);
-
-void AcpiFreeValueData(AcpiValue *Value);
-void AcpiFreeValue(AcpiValue *Value);
 
 #endif /* _ACPI_H_ */

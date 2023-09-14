@@ -106,7 +106,6 @@ int AcpipExecuteMathOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
                 free(Target);
                 return 0;
             } else if (!AcpipCastToInteger(TargetValue, &TargetInteger)) {
-                AcpiFreeValue(TargetValue);
                 free(Target);
                 return 0;
             }

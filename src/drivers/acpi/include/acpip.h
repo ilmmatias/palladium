@@ -63,16 +63,20 @@ int AcpipReadPkgLength(AcpipState *State, uint32_t *Length);
 AcpipName *AcpipReadName(AcpipState *State);
 
 int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Value);
+int AcpipExecuteConcatOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value);
+int AcpipExecuteConvOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value);
 int AcpipExecuteDataObjOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value);
 int AcpipExecuteFieldOpcode(AcpipState *State, uint16_t Opcode);
 int AcpipExecuteMathOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value);
 int AcpipExecuteNamedObjOpcode(AcpipState *State, uint16_t Opcode);
 int AcpipExecuteNsModOpcode(AcpipState *State, uint16_t Opcode);
-int AcpipExecuteInteger(AcpipState *State, uint64_t *Result);
+int AcpipExecuteStmtOpcode(AcpipState *State, uint16_t Opcode);
 
 int AcpipCastToInteger(AcpiValue *Value, uint64_t *Result);
-int AcpipCastToString(AcpiValue *Value, int ImplicitCast);
+int AcpipCastToString(AcpiValue *Value, int ImplicitCast, int Decimal);
 int AcpipCastToBuffer(AcpiValue *Value);
+
+int AcpipExecuteInteger(AcpipState *State, uint64_t *Result);
 
 AcpiValue *AcpipExecuteTermList(AcpipState *State);
 AcpipTarget *AcpipExecuteSuperName(AcpipState *State);

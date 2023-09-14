@@ -92,11 +92,11 @@ static int ReadFieldList(AcpipState *State, AcpiValue *Base, uint32_t Start, uin
 
                 AcpiValue Value;
                 memcpy(&Value, Base, sizeof(AcpiValue));
-                Value.Field.AccessType = AccessType;
-                Value.Field.AccessAttrib = AccessAttrib;
-                Value.Field.AccessLength = AccessLength;
-                Value.Field.Offset = Offset;
-                Value.Field.Length = Length;
+                Value.FieldUnit.AccessType = AccessType;
+                Value.FieldUnit.AccessAttrib = AccessAttrib;
+                Value.FieldUnit.AccessLength = AccessLength;
+                Value.FieldUnit.Offset = Offset;
+                Value.FieldUnit.Length = Length;
                 Offset += Length;
 
                 if (!AcpipCreateObject(Name, &Value)) {
@@ -158,8 +158,8 @@ int AcpipExecuteFieldOpcode(AcpipState *State, uint16_t Opcode) {
 
             AcpiValue Base;
             Base.Type = ACPI_FIELD_UNIT;
-            Base.Field.FieldType = ACPI_FIELD;
-            Base.Field.Region = Object;
+            Base.FieldUnit.FieldType = ACPI_FIELD;
+            Base.FieldUnit.Region = Object;
             if (!ReadFieldList(State, &Base, Start, Length)) {
                 return 0;
             }
@@ -198,9 +198,9 @@ int AcpipExecuteFieldOpcode(AcpipState *State, uint16_t Opcode) {
 
             AcpiValue Base;
             Base.Type = ACPI_FIELD_UNIT;
-            Base.Field.FieldType = ACPI_INDEX_FIELD;
-            Base.Field.Index = IndexObject;
-            Base.Field.Data = DataObject;
+            Base.FieldUnit.FieldType = ACPI_INDEX_FIELD;
+            Base.FieldUnit.Index = IndexObject;
+            Base.FieldUnit.Data = DataObject;
             if (!ReadFieldList(State, &Base, Start, Length)) {
                 return 0;
             }

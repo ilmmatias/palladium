@@ -125,13 +125,13 @@ static AllocatorEntry *FindFreeEntry(size_t Size) {
         Entry = Entry->Next;
     }
 
-    Entry =
-        MI_PADDR_TO_VADDR(MmAllocatePages((Size + sizeof(AllocatorEntry) + Mask) >> MM_PAGE_SHIFT));
-    Size = ((Size + sizeof(AllocatorEntry) + Mask) & ~Mask) - sizeof(AllocatorEntry);
-
-    if (!Entry) {
+    uint64_t EntryPage = MmAllocatePages((Size + sizeof(AllocatorEntry) + Mask) >> MM_PAGE_SHIFT);
+    if (!EntryPage) {
         return NULL;
     }
+
+    Entry = MI_PADDR_TO_VADDR(EntryPage);
+    Size = ((Size + sizeof(AllocatorEntry) + Mask) & ~Mask) - sizeof(AllocatorEntry);
 
     Entry->Used = 1;
     Entry->Size = Size;

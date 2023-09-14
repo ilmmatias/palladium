@@ -9,27 +9,6 @@
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function cleans up the elements of a Def(Var)Package after a failure.
- *
- * PARAMETERS:
- *     Value - Value pointer containing the package.
- *     Size - How many items were already wrote.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-static void FreeElements(AcpiValue *Value, int Size) {
-    for (uint8_t i = 0; i < Size; i++) {
-        if (Value->Package.Data[i].Type) {
-            AcpiFreeValueData(&Value->Package.Data[i].Value);
-        }
-    }
-
-    free(Value->Package.Data);
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
  *     This function tries the execute the given opcode as a Data Object opcode.
  *
  * PARAMETERS:
@@ -199,7 +178,7 @@ int AcpipExecuteDataObjOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Val
             uint8_t i = 0;
             while (PkgLength) {
                 if (i >= Value->Package.Size) {
-                    FreeElements(Value, i);
+                    free(Value->Package.Data);
                     return 0;
                 }
 
@@ -212,19 +191,19 @@ int AcpipExecuteDataObjOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Val
                     !isupper(Opcode) && Opcode != '_') {
                     Value->Package.Data[i].Type = 1;
                     if (!AcpipExecuteOpcode(State, &Value->Package.Data[i].Value)) {
-                        FreeElements(Value, i);
+                        free(Value->Package.Data);
                         return 0;
                     }
                 } else {
                     if (!AcpipReadName(State)) {
-                        FreeElements(Value, i);
+                        free(Value->Package.Data);
                         return 0;
                     }
                 }
 
                 i++;
                 if (Start - State->Scope->RemainingLength > PkgLength) {
-                    FreeElements(Value, i);
+                    free(Value->Package.Data);
                     return 0;
                 }
 

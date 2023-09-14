@@ -69,7 +69,6 @@ int AcpipExecuteNsModOpcode(AcpipState *State, uint16_t Opcode) {
 
             AcpiObject *Object = AcpipCreateObject(Name, &DataRefObject);
             if (!Object) {
-                AcpiFreeValueData(&DataRefObject);
                 free(Name);
                 return 0;
             }

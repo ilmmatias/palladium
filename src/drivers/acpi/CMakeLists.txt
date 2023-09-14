@@ -9,12 +9,15 @@ add_executable(acpi "knostdlib"
     interp/termarg.c
     interp/termlist.c
 
+    opcode/concat.c
+    opcode/conv.c
     opcode/dataobj.c
     opcode/field.c
     opcode/math.c
     opcode/namedobj.c
     opcode/nsmod.c
     opcode/opcode.c
+    opcode/stmt.c
     opcode/target.c
 
     main.c

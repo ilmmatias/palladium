@@ -31,62 +31,6 @@ static char *Types[] = {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function frees the inside of a term arg/value.
- *
- * PARAMETERS:
- *     Value - Value returned by AcpipExecuteOpcode.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-void AcpiFreeValueData(AcpiValue *Value) {
-    switch (Value->Type) {
-        case ACPI_STRING:
-            free(Value->String);
-            break;
-
-        case ACPI_BUFFER:
-            /* NULL buffers are allowed for 0-sized data. */
-            if (Value->Buffer.Data) {
-                free(Value->Buffer.Data);
-            }
-
-            break;
-
-        case ACPI_PACKAGE:
-            for (uint8_t i = 0; i < Value->Package.Size; i++) {
-                if (Value->Package.Data[i].Type) {
-                    AcpiFreeValueData(&Value->Package.Data[i].Value);
-                }
-            }
-
-            free(Value->Package.Data);
-            break;
-
-        /* Anything else really shouldn't be freed at all, as it is either integers, something
-           that doesn't need to be freed, or something that isn't a term arg. */
-        default:
-            break;
-    }
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function frees an entire term arg/value, including the AcpiValue pointer itself.
- *
- * PARAMETERS:
- *     Value - Value returned by AcpipExecuteOpcode; It will be invalid after this call.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-void AcpiFreeValue(AcpiValue *Value) {
-    AcpiFreeValueData(Value);
-    free(Value);
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
  *     This function tries casting the result of a previous ExecuteOpcode into an integer.
  *
  * PARAMETERS:
@@ -133,55 +77,107 @@ int AcpipCastToInteger(AcpiValue *Value, uint64_t *Result) {
  * PARAMETERS:
  *     Value - I/O; Result of ExecuteOpcode; Will become the converted string after the cast.
  *     ImplicitCast - Set this to 0 if you only want explicit casts, or to 1 otherwise.
+ *     Decimal - Set this to 0 if you want decimal digits instead of hexadecimal, or to 1
+ *               otherwise.
  *
  * RETURN VALUE:
  *     1 on success, 0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int AcpipCastToString(AcpiValue *Value, int ImplicitCast) {
+int AcpipCastToString(AcpiValue *Value, int ImplicitCast, int Decimal) {
     if (Value->Type == ACPI_STRING) {
         return 1;
     }
 
     char *String;
     switch (Value->Type) {
-        /* Integers get converted using snprintf into 16 hex digits. */
+        /* Integers have two conversion paths:
+               For hexadecimal, they get converted using snprintf into 16 hex digits.
+               For decimal, we need snprintf to get the output size, then we convert it. */
         case ACPI_INTEGER: {
-            String = malloc(17);
-            if (!String) {
-                return 0;
-            }
+            if (Decimal) {
+                int Size = snprintf(NULL, 0, "%lld", Value->Integer);
+                String = malloc(Size + 1);
+                if (!String) {
+                    return 0;
+                }
 
-            if (snprintf(String, 17, "%016llX", Value->Integer) != 16) {
-                free(String);
-                return 0;
+                if (snprintf(String, Size + 1, "%lld", Value->Integer) != Size) {
+                    free(String);
+                    return 0;
+                }
+            } else {
+                String = malloc(17);
+                if (!String) {
+                    return 0;
+                }
+
+                if (snprintf(String, 17, "%016llX", Value->Integer) != 16) {
+                    free(String);
+                    return 0;
+                }
             }
 
             break;
         }
 
-        /* Buffers should be converted into a list of either space or comma separated pairs of 2
-           hex chars (prefixed with 0x); We use space for implicit conversion, and comma for
-           explicit. */
+        /* Buffers should be converted into a list of either space or comma separated pairs of
+           digits; We use space for implicit conversion, and comma for explicit. */
         case ACPI_BUFFER: {
-            String = malloc(Value->Buffer.Size * 5);
-            if (!String) {
-                return 0;
-            }
+            /* Hexadecimal is the easier case, as we know we should always have 4 digits per
+               buffer item; For decimal, we're not sure of the size until we run snprintf, so
+               we need two loops using snprintf. */
+            if (Decimal) {
+                int Size = 0;
 
-            for (uint64_t i = 0; i < Value->Buffer.Size; i++) {
-                int PrintfSize = 5;
-                const char *PrintfFormat = "0x%02hhX";
+                for (uint64_t i = 0; i < Value->Buffer.Size; i++) {
+                    const char *PrintfFormat = "%lld";
 
-                if (i < Value->Buffer.Size - 1) {
-                    PrintfSize = 6;
-                    PrintfFormat = ImplicitCast ? "0x%02hhX " : "0x%02hhX,";
+                    if (i < Value->Buffer.Size - 1) {
+                        PrintfFormat = ImplicitCast ? "%lld " : "%lld,";
+                    }
+
+                    Size += snprintf(NULL, 0, PrintfFormat, Value->Buffer.Data[i]);
                 }
 
-                if (snprintf(
-                        Value->String + i * 5, PrintfSize, PrintfFormat, Value->Buffer.Data[i]) !=
-                    PrintfSize - 1) {
-                    free(String);
+                String = malloc(Size + 1);
+                if (!String) {
                     return 0;
+                }
+
+                int Offset = 0;
+                for (uint64_t i = 0; i < Value->Buffer.Size; i++) {
+                    const char *PrintfFormat = "%lld";
+
+                    if (i < Value->Buffer.Size - 1) {
+                        PrintfFormat = ImplicitCast ? "%lld " : "%lld,";
+                    }
+
+                    Offset += snprintf(
+                        String + Offset, Size - Offset + 1, PrintfFormat, Value->Buffer.Data[i]);
+                }
+            } else {
+                String = malloc(Value->Buffer.Size * 5);
+                if (!String) {
+                    return 0;
+                }
+
+                for (uint64_t i = 0; i < Value->Buffer.Size; i++) {
+                    int PrintfSize = 5;
+                    const char *PrintfFormat = "0x%02hhX";
+
+                    if (i < Value->Buffer.Size - 1) {
+                        PrintfSize = 6;
+                        PrintfFormat = ImplicitCast ? "0x%02hhX " : "0x%02hhX,";
+                    }
+
+                    if (snprintf(
+                            Value->String + i * 5,
+                            PrintfSize,
+                            PrintfFormat,
+                            Value->Buffer.Data[i]) != PrintfSize - 1) {
+                        free(String);
+                        return 0;
+                    }
                 }
             }
 
@@ -200,7 +196,6 @@ int AcpipCastToString(AcpiValue *Value, int ImplicitCast) {
         }
     }
 
-    AcpiFreeValueData(Value);
     Value->Type = ACPI_STRING;
     Value->String = String;
 
@@ -259,7 +254,6 @@ int AcpipCastToBuffer(AcpiValue *Value) {
             return 0;
     }
 
-    AcpiFreeValueData(Value);
     Value->Type = ACPI_BUFFER;
     Value->Buffer.Size = BufferSize;
     Value->Buffer.Data = Buffer;
@@ -284,8 +278,5 @@ int AcpipExecuteInteger(AcpipState *State, uint64_t *Result) {
         return 0;
     }
 
-    int ReturnValue = AcpipCastToInteger(&Value, Result);
-    AcpiFreeValueData(&Value);
-
-    return ReturnValue;
+    return AcpipCastToInteger(&Value, Result);
 }
