@@ -146,9 +146,34 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
                 /* MethodInvocation is valid on non-method items, where we just return their
                    value. */
                 if (Object->Value.Type != ACPI_METHOD) {
-                    Value.Type = ACPI_REFERENCE;
-                    Value.References = 1;
-                    Value.Reference = Object;
+                    switch (Object->Value.Type) {
+                        /* Basic constants (aka integers) get directly copied. */
+                        case ACPI_INTEGER:
+                            memcpy(&Value, &Object->Value, sizeof(AcpiValue));
+                            break;
+
+                        /* Buffer fields get their backing buffer dereferenced. */
+                        case ACPI_BUFFER_FIELD:
+                            printf("read buffer field\n");
+                            while (1)
+                                ;
+
+                        /* Field units will get redirected to the right read type (MMIO, PCI,
+                           etc). */
+                        case ACPI_FIELD_UNIT:
+                            if (!AcpipReadField(&Object->Value, &Value)) {
+                                return 0;
+                            }
+
+                            break;
+
+                        /* Anything else we just mount a reference to. */
+                        default:
+                            Value.Type = ACPI_REFERENCE;
+                            Value.Reference = Object;
+                            break;
+                    }
+
                     break;
                 }
 

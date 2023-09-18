@@ -41,8 +41,8 @@ typedef struct AcpipState {
 
 void AcpipInitializeFromRsdt(void);
 void AcpipInitializeFromXsdt(void);
-
 void AcpipPopulatePredefined(void);
+
 void AcpipPopulateTree(const uint8_t *Code, uint32_t Length);
 AcpiObject *AcpipCreateObject(AcpipName *Name, AcpiValue *Value);
 AcpiObject *AcpipResolveObject(AcpipName *Name);
@@ -61,6 +61,8 @@ int AcpipReadDWord(AcpipState *State, uint32_t *DWord);
 int AcpipReadQWord(AcpipState *State, uint64_t *QWord);
 int AcpipReadPkgLength(AcpipState *State, uint32_t *Length);
 AcpipName *AcpipReadName(AcpipState *State);
+
+int AcpipReadField(AcpiValue *Source, AcpiValue *Target);
 
 int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Value);
 int AcpipExecuteConcatOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value);
