@@ -106,8 +106,7 @@ typedef struct AcpiObject {
 } AcpiObject;
 
 AcpiObject *AcpiSearchObject(const char *Name);
-int AcpiExecuteMethodFromPath(const char *Name, int ArgCount, AcpiValue *Arguments);
-int AcpiExecuteMethodFromObject(AcpiObject *Object, int ArgCount, AcpiValue *Arguments);
+int AcpiExecuteMethod(AcpiObject *Object, int ArgCount, AcpiValue *Arguments, AcpiValue *Result);
 
 int AcpiCopyValue(AcpiValue *Source, AcpiValue *Target);
 void AcpiRemoveReference(AcpiValue *Value, int CleanupPointer);

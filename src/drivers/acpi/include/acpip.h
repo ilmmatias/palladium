@@ -6,7 +6,8 @@
 
 #include <acpi.h>
 
-#define ACPI_TARGET_LOCAL 0
+#define ACPI_TARGET_NONE 0
+#define ACPI_TARGET_LOCAL 1
 
 typedef struct {
     int Type;
@@ -34,8 +35,10 @@ typedef struct AcpipScope {
 
 typedef struct AcpipState {
     int IsMethod;
+    int HasReturned;
     AcpiValue Arguments[7];
     AcpiValue Locals[7];
+    AcpiValue ReturnValue;
     AcpipScope *Scope;
 } AcpipState;
 

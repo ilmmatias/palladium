@@ -58,6 +58,13 @@ AcpipTarget *AcpipExecuteTarget(AcpipState *State) {
     }
 
     switch (Opcode) {
+        /* Assume writes to constant objects are to be ignore. */
+        case 0x00:
+        case 0x01:
+        case 0x0F:
+            Target->Type = ACPI_TARGET_NONE;
+            break;
+
         /* LocalObj (Local0-6) */
         case 0x60:
         case 0x61:

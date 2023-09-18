@@ -58,6 +58,11 @@ int AcpipExecuteTermList(AcpipState *State) {
         if (!AcpipExecuteOpcode(State, NULL)) {
             break;
         }
+
+        if (State->HasReturned) {
+            Status = 1;
+            break;
+        }
     }
 
     /* Base of the scope stack should be a stack-allocated scope (instead of heap-allocated), so

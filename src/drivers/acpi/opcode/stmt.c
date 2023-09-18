@@ -135,6 +135,16 @@ int AcpipExecuteStmtOpcode(AcpipState *State, uint16_t Opcode) {
         case 0xCC:
             break;
 
+        /* DefReturn ArgObject */
+        case 0xA4: {
+            if (!AcpipExecuteOpcode(State, &State->ReturnValue)) {
+                return 0;
+            }
+
+            State->HasReturned = 1;
+            break;
+        }
+
         /* DefBreak */
         case 0xA5: {
             if (State->Scope->Predicate) {

@@ -225,6 +225,16 @@ AcpiObject *AcpipResolveObject(AcpipName *Name) {
     /* Final pass, we need to search in the current entry, returning the object if we find it.
        If we can't find it, we fallback to the parent scope, up until we reach the root. */
     while (1) {
+        if (!Base) {
+            Parent = Parent->Parent;
+            if (!Parent) {
+                return NULL;
+            }
+
+            Base = Parent->Value.Objects;
+            continue;
+        }
+
         if (!memcmp(Base->Name, Name->Start, 4)) {
             free(Name);
             return Base->Value.Type == ACPI_ALIAS ? Base->Value.Alias : Base;

@@ -44,6 +44,7 @@ int AcpipExecuteNamedObjOpcode(AcpipState *State, uint16_t Opcode) {
             AcpiValue Value;
             Value.Type = ACPI_METHOD;
             Value.References = 1;
+            Value.Objects = NULL;
             Value.Method.Start = State->Scope->Code + 1;
             Value.Method.Size = Length - LengthSoFar;
             Value.Method.Flags = *State->Scope->Code;

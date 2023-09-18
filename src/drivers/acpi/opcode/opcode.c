@@ -80,6 +80,25 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
                 break;
             }
 
+            /* DefStore := StoreOp TermArg SuperName */
+            case 0x70: {
+                AcpiValue Source;
+                if (!AcpipExecuteOpcode(State, &Source)) {
+                    return 0;
+                }
+
+                AcpipTarget *Target = AcpipExecuteSuperName(State);
+                if (!Target) {
+                    AcpiRemoveReference(&Source, 0);
+                    return 0;
+                }
+
+                printf("%d %d\n", Source.Type, Target->Type);
+
+                while (1)
+                    ;
+            }
+
             /* DefSizeOf := SizeOfOp SuperName */
             case 0x87: {
                 AcpipTarget *SuperName = AcpipExecuteSuperName(State);
@@ -189,8 +208,8 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
                     }
                 }
 
-                if (!AcpiExecuteMethodFromObject(
-                        Object, Object->Value.Method.Flags & 0x07, Arguments)) {
+                if (!AcpiExecuteMethod(
+                        Object, Object->Value.Method.Flags & 0x07, Arguments, &Value)) {
                     return 0;
                 }
 

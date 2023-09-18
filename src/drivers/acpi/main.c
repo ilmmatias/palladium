@@ -46,15 +46,11 @@ void DriverEntry(void) {
         AcpipInitializeFromXsdt();
     }
 
-    AcpiValue Arguments[1];
-    Arguments[0].Type = ACPI_STRING;
-    Arguments[0].References = 1;
-    Arguments[0].String = strdup("Hello, World!\n");
-    if (!Arguments[0].String) {
-        KeFatalError(KE_EARLY_MEMORY_FAILURE);
+    AcpiObject *Method = AcpiSearchObject("\\_SB_.HPET._STA");
+    if (!Method) {
+        printf("The \\_SB_.HPET._STA objects doesn't seem to exist\n");
+        return;
     }
 
-    if (!AcpiExecuteMethodFromPath("\\DBUG", 1, Arguments)) {
-        printf("The \\DBUG method doesn't exist (this probably isn't QEMU...)\n");
-    }
+    printf("%d\n", AcpiExecuteMethod(Method, 0, NULL, NULL));
 }

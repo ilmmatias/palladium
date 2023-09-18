@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <acpip.h>
+#include <mm.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -15,14 +16,33 @@
  *     Source - AML value containing a region field.
  *     Offset - Offset within the region field; Expected to be a byte offset, so shift it right
  *              by 3 first!
+ *     Size - How many bytes we should read; It should be the size of a Byte/Word/DWord/QWord.
+ *            If its not, we'll assume it's a byte.
  *
  * RETURN VALUE:
  *     Requested data.
  *-----------------------------------------------------------------------------------------------*/
-static uint64_t ReadRegionField(AcpiValue *Source, int Offset) {
-    printf("ReadRegionField(%p, %u)\n", Source, Offset);
-    while (1)
-        ;
+static uint64_t ReadRegionField(AcpiValue *Source, int Offset, int Size) {
+    switch (Source->Region.RegionSpace) {
+        /* SystemMemory; We'll be reading a physical memory address. */
+        case 0: {
+            void *Address = MI_PADDR_TO_VADDR(Source->Region.RegionOffset + Offset);
+            return Size == 2   ? *(uint16_t *)Address
+                   : Size == 4 ? *(uint32_t *)Address
+                   : Size == 8 ? *(uint64_t *)Address
+                               : *(uint8_t *)Address;
+        }
+
+        default:
+            printf(
+                "ReadRegionField(%p, %u, %u), RegionSpace = %hhu\n",
+                Source,
+                Offset,
+                Size,
+                Source->Region.RegionSpace);
+            while (1)
+                ;
+    }
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -34,13 +54,15 @@ static uint64_t ReadRegionField(AcpiValue *Source, int Offset) {
  *     Source - AML value containing a region field.
  *     Offset - Offset within the region field; Expected to be a byte offset, so shift it right
  *              by 3 first!
+ *     Size - How many bytes we should write; Any value other than <1 or >8 will be assumed to be
+ *            1.
  *     Data - What data to store in the offset.
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-static void WriteRegionField(AcpiValue *Source, int Offset, uint64_t Data) {
-    printf("WriteRegionField(%p, %u, 0x%016llx)\n", Source, Offset, Data);
+static void WriteRegionField(AcpiValue *Source, int Offset, int Size, uint64_t Data) {
+    printf("WriteRegionField(%p, %u, %u, %llu)\n", Source, Offset, Size, Data);
     while (1)
         ;
 }
@@ -62,37 +84,40 @@ int AcpipReadField(AcpiValue *Source, AcpiValue *Target) {
     }
 
     /* Anything over 64-bits doesn't fit inside an integer; Otherwise, we don't need to allocate
-       any extra memory.
-       Index fields are always equal to 64 bits (the access width instead says )*/
-    uint64_t *Buffer;
-    if (Source->FieldUnit.Length > 64 && Source->FieldUnit.FieldType != ACPI_INDEX_FIELD) {
+       any extra memory. */
+    uint8_t *Buffer;
+    if (Source->FieldUnit.Length > 64) {
         Target->Type = ACPI_BUFFER;
-        Target->Buffer.Size = (Source->FieldUnit.Length + 63) >> 3;
+        Target->Buffer.Size = (Source->FieldUnit.Length + AccessWidth - 1) >> 3;
         Target->Buffer.Data = malloc(Target->Buffer.Size);
 
         if (!Target->Buffer.Data) {
             return 0;
         }
 
-        memset(Target->Buffer.Data, 0, (Source->FieldUnit.Length + 63) >> 3);
-        Buffer = (uint64_t *)Target->Buffer.Data;
+        memset(Target->Buffer.Data, 0, (Source->FieldUnit.Length + AccessWidth - 1) >> 3);
+        Buffer = Target->Buffer.Data;
     } else {
         Target->Type = ACPI_INTEGER;
         Target->Integer = 0;
-        Buffer = &Target->Integer;
+        Buffer = (uint8_t *)&Target->Integer;
     }
 
     /* We need to respect the access width, and as such, read item by item from the region,
        merging them into the buffer as we proceed. */
-    int ItemCount = (Source->FieldUnit.Length + AccessWidth - 1) / AccessWidth;
+
+    int UnalignedOffset = Source->FieldUnit.Offset & (AccessWidth - 1);
+    int ItemCount = (Source->FieldUnit.Length + UnalignedOffset + AccessWidth - 1) / AccessWidth;
+
     uint64_t Item = 0;
+
     for (int i = 0; i < ItemCount; i++) {
-        int Offset = (AccessWidth >> 3) * i;
+        int Offset = (Source->FieldUnit.Offset >> 3) + (AccessWidth >> 3) * i;
         uint64_t Value;
 
         switch (Source->FieldUnit.FieldType) {
             case ACPI_FIELD:
-                Value = ReadRegionField(Source, Offset);
+                Value = ReadRegionField(&Source->FieldUnit.Region->Value, Offset, AccessWidth >> 3);
                 break;
 
             case ACPI_INDEX_FIELD:
@@ -101,18 +126,15 @@ int AcpipReadField(AcpiValue *Source, AcpiValue *Target) {
                    but it needs to be converted into the granularity that the DefIndexField op gave
                    us. */
 
-                WriteRegionField(
-                    &Source->FieldUnit.Region->Value,
-                    0,
-                    Offset + ((Source->FieldUnit.Offset / AccessWidth) >> 3));
+                WriteRegionField(&Source->FieldUnit.Region->Value, 0, Offset, sizeof(uint64_t));
+                Value = ReadRegionField(&Source->FieldUnit.Data->Value, 0, AccessWidth >> 3);
 
-                Value = ReadRegionField(&Source->FieldUnit.Data->Value, 0);
                 break;
         }
 
         /* Unaligned start, if we have more data, save into a temporary variable, as we need to
            merge with the next item. */
-        if (!i && (Source->FieldUnit.Offset & 7)) {
+        if (!i && UnalignedOffset) {
             Value >>= Source->FieldUnit.Offset & 7;
 
             if (i + 1 < ItemCount) {
@@ -121,11 +143,12 @@ int AcpipReadField(AcpiValue *Source, AcpiValue *Target) {
             }
         }
 
-        if (i == 1 && (Source->FieldUnit.Offset & 7)) {
-            Value = (Value << (8 - (Source->FieldUnit.Offset & 7))) | Item;
+        if (i == 1 && UnalignedOffset) {
+            Value = (Value << (AccessWidth - UnalignedOffset)) | Item;
         }
 
-        *(Buffer++) = Value;
+        memcpy(Buffer, &Value, AccessWidth >> 3);
+        Buffer += AccessWidth >> 3;
     }
 
     return 1;

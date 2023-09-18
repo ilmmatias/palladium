@@ -12,34 +12,19 @@ extern AcpiObject *AcpipObjectTree;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function starts execution of an AML method, based on a path.
- *
- * PARAMETERS:
- *     Name - Name attached to the method.
- *     ArgCount - Amount of arguments to pass.
- *     Arguments - Data of the arguments.
- *
- * RETURN VALUE:
- *     Return value of the method, or NULL if something went wrong.
- *-----------------------------------------------------------------------------------------------*/
-int AcpiExecuteMethodFromPath(const char *Name, int ArgCount, AcpiValue *Arguments) {
-    AcpiObject *Object = AcpiSearchObject(Name);
-    return AcpiExecuteMethodFromObject(Object, ArgCount, Arguments);
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
  *     This function starts execution of an AML method, based on a previously searched object.
  *
  * PARAMETERS:
  *     Object - Object containing the method.
  *     ArgCount - Amount of arguments to pass.
  *     Arguments - Data of the arguments.
+ *     Result - Output; Where to store the return value of the method; Optional, will be ignored
+ *              if NULL.
  *
  * RETURN VALUE:
  *     Return value of the method, or NULL if something went wrong.
  *-----------------------------------------------------------------------------------------------*/
-int AcpiExecuteMethodFromObject(AcpiObject *Object, int ArgCount, AcpiValue *Arguments) {
+int AcpiExecuteMethod(AcpiObject *Object, int ArgCount, AcpiValue *Arguments, AcpiValue *Result) {
     if (!Object || Object->Value.Type != ACPI_METHOD) {
         return 0;
     } else if (ArgCount < 0) {
@@ -67,7 +52,25 @@ int AcpiExecuteMethodFromObject(AcpiObject *Object, int ArgCount, AcpiValue *Arg
         memcpy(State.Arguments, Arguments, ArgCount * sizeof(AcpiValue));
     }
 
-    return AcpipExecuteTermList(&State);
+    int Status = AcpipExecuteTermList(&State);
+
+    /* Objects defined inside methods have temporary scopes (they live as long as the method
+       doesn't return), so we still need to cleanup (even on failure). */
+    AcpiObject *Base = Object->Value.Objects;
+    Object->Value.Objects = NULL;
+
+    while (Base != NULL) {
+        AcpiObject *Next = Base->Next;
+        AcpiRemoveReference(&Base->Value, 0);
+        free(Base);
+        Base = Next;
+    }
+
+    if (Result && Status) {
+        memcpy(Result, &State.ReturnValue, sizeof(AcpiValue));
+    }
+
+    return Status;
 }
 
 /*-------------------------------------------------------------------------------------------------
