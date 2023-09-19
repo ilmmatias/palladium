@@ -46,11 +46,20 @@ void DriverEntry(void) {
         AcpipInitializeFromXsdt();
     }
 
-    AcpiObject *Method = AcpiSearchObject("\\_SB_.HPET._STA");
+    AcpiValue Argument;
+    Argument.Type = ACPI_INTEGER;
+    Argument.Integer = 0xDEADBEEF;
+
+    AcpiObject *Method = AcpiSearchObject("\\DBUG");
     if (!Method) {
-        printf("The \\_SB_.HPET._STA objects doesn't seem to exist\n");
+        printf("The \\DBUG object doesn't seem to exist\n");
         return;
     }
 
-    printf("%d\n", AcpiExecuteMethod(Method, 0, NULL, NULL));
+    if (!AcpiExecuteMethod(Method, 1, &Argument, NULL)) {
+        printf("\\DBUG failed to execute\n");
+        return;
+    }
+
+    printf("\\DBUG seems to have executed\n");
 }

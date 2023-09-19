@@ -66,6 +66,7 @@ int AcpipReadPkgLength(AcpipState *State, uint32_t *Length);
 AcpipName *AcpipReadName(AcpipState *State);
 
 int AcpipReadField(AcpiValue *Source, AcpiValue *Target);
+int AcpipWriteField(AcpiValue *Target, AcpiValue *Value);
 
 int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Value);
 int AcpipExecuteConcatOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value);

@@ -93,10 +93,8 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
                     return 0;
                 }
 
-                printf("%d %d\n", Source.Type, Target->Type);
-
-                while (1)
-                    ;
+                AcpipStoreTarget(State, Target, &Source);
+                break;
             }
 
             /* DefSizeOf := SizeOfOp SuperName */

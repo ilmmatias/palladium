@@ -22,15 +22,21 @@
  * RETURN VALUE:
  *     Requested data.
  *-----------------------------------------------------------------------------------------------*/
-static uint64_t ReadRegionField(AcpiValue *Source, int Offset, int Size) {
+static uint64_t ReadRegion(AcpiValue *Source, int Offset, int Size) {
     switch (Source->Region.RegionSpace) {
         /* SystemMemory; We'll be reading a physical memory address. */
         case 0: {
             void *Address = MI_PADDR_TO_VADDR(Source->Region.RegionOffset + Offset);
-            return Size == 2   ? *(uint16_t *)Address
-                   : Size == 4 ? *(uint32_t *)Address
-                   : Size == 8 ? *(uint64_t *)Address
-                               : *(uint8_t *)Address;
+            switch (Size) {
+                case 2:
+                    return *(uint16_t *)Address;
+                case 4:
+                    return *(uint32_t *)Address;
+                case 8:
+                    return *(uint64_t *)Address;
+                default:
+                    return *(uint8_t *)Address;
+            }
         }
 
         default:
@@ -61,12 +67,124 @@ static uint64_t ReadRegionField(AcpiValue *Source, int Offset, int Size) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-static void WriteRegionField(AcpiValue *Source, int Offset, int Size, uint64_t Data) {
-    printf("WriteRegionField(%p, %u, %u, %llu)\n", Source, Offset, Size, Data);
-    while (1)
-        ;
+static void WriteRegion(AcpiValue *Source, int Offset, int Size, uint64_t Data) {
+    switch (Source->Region.RegionSpace) {
+        /* SystemMemory; We'll be writing into a physical memory address. */
+        case 0: {
+            void *Address = MI_PADDR_TO_VADDR(Source->Region.RegionOffset + Offset);
+            switch (Size) {
+                case 2:
+                    *(uint16_t *)Address = Data;
+                    break;
+                case 4:
+                    *(uint32_t *)Address = Data;
+                    break;
+                case 8:
+                    *(uint64_t *)Address = Data;
+                    break;
+                default:
+                    *(uint8_t *)Address = Data;
+                    break;
+            }
+        }
+
+        default:
+            printf(
+                "WriteRegionField(%p, %u, %u, %llu), RegionSpace = %hhu\n",
+                Source,
+                Offset,
+                Size,
+                Data,
+                Source->Region.RegionSpace);
+            while (1)
+                ;
+    }
 }
 
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     Internal function to read field data; Used within the main loop of AcpipRead/WriteField.
+ *
+ * PARAMETERS:
+ *     Source - AML value containing a region field.
+ *     Offset - Byte offset within the region.
+ *     AccessWidth - How many bits we're trying to read.
+ *
+ * RETURN VALUE:
+ *     Requested data.
+ *-----------------------------------------------------------------------------------------------*/
+static uint64_t ReadField(AcpiValue *Source, int Offset, int AccessWidth) {
+    switch (Source->FieldUnit.FieldType) {
+        case ACPI_FIELD:
+            return ReadRegion(&Source->FieldUnit.Region->Value, Offset, AccessWidth >> 3);
+
+        case ACPI_INDEX_FIELD: {
+            /* Index field means we need to write into the index location, followed by R/W'ing
+               from/into the data location. */
+
+            AcpiValue Index;
+            Index.Type = ACPI_INTEGER;
+            Index.Integer = Offset;
+            AcpipWriteField(&Source->FieldUnit.Region->Value, &Index);
+
+            AcpiValue Target;
+            AcpipReadField(&Source->FieldUnit.Data->Value, &Target);
+
+            return Target.Integer;
+        }
+    }
+
+    return 0;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     Internal function to write field data; Used within the main loop of AcpipWriteField.
+ *
+ * PARAMETERS:
+ *     Source - AML value containing a region field.
+ *     Offset - Byte offset within the region.
+ *     AccessWidth - How many bits we're trying to write.
+ *     Data - The value we're trying to write.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+static void WriteField(AcpiValue *Target, int Offset, int AccessWidth, uint64_t Data) {
+    switch (Target->FieldUnit.FieldType) {
+        case ACPI_FIELD:
+            return WriteRegion(&Target->FieldUnit.Region->Value, Offset, AccessWidth >> 3, Data);
+
+        case ACPI_INDEX_FIELD: {
+            /* Index field means we need to write into the index location, followed by R/W'ing
+               from/into the data location. */
+
+            AcpiValue Index;
+            Index.Type = ACPI_INTEGER;
+            Index.Integer = Offset;
+            AcpipWriteField(&Target->FieldUnit.Region->Value, &Index);
+
+            AcpiValue Value;
+            Value.Type = ACPI_INTEGER;
+            Value.Integer = Data;
+            AcpipWriteField(&Target->FieldUnit.Data->Value, &Value);
+
+            break;
+        }
+    }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function reads the data inside a given region field; Do not use this for buffer fields.
+ *
+ * PARAMETERS:
+ *     Source - AML value containing a region field.
+ *     Target - Where to save the requested data.
+ *
+ * RETURN VALUE:
+ *     1 on success, 0 otherwise.
+ *-----------------------------------------------------------------------------------------------*/
 int AcpipReadField(AcpiValue *Source, AcpiValue *Target) {
     /* We need to check for access width > 1 byte; Any invalid value will also be assumed to be 1
        byte. */
@@ -104,52 +222,64 @@ int AcpipReadField(AcpiValue *Source, AcpiValue *Target) {
     }
 
     /* We need to respect the access width, and as such, read item by item from the region,
-       merging them into the buffer as we proceed. */
+       merging them into the buffer as we proceed.
+       The buffer might start unaligned, and as such, we might need to read two entries before
+       writing into the buffer. We'll just assume we always need to do that. */
+
+    int AlignedItemCount = (Source->FieldUnit.Length + AccessWidth - 1) / AccessWidth;
 
     int UnalignedOffset = Source->FieldUnit.Offset & (AccessWidth - 1);
-    int ItemCount = (Source->FieldUnit.Length + UnalignedOffset + AccessWidth - 1) / AccessWidth;
+    int UnalignedLength = Source->FieldUnit.Length & (AccessWidth - 1);
+    int UnalignedItemCount =
+        (Source->FieldUnit.Length + UnalignedOffset + AccessWidth - 1) / AccessWidth;
 
-    uint64_t Item = 0;
+    uint64_t Item =
+        ReadField(Source, (Source->FieldUnit.Offset >> 3), AccessWidth) >> UnalignedOffset;
 
-    for (int i = 0; i < ItemCount; i++) {
+    for (int i = 1; i < UnalignedItemCount; i++) {
         int Offset = (Source->FieldUnit.Offset >> 3) + (AccessWidth >> 3) * i;
-        uint64_t Value;
+        uint64_t Value = ReadField(Source, Offset, AccessWidth);
 
-        switch (Source->FieldUnit.FieldType) {
-            case ACPI_FIELD:
-                Value = ReadRegionField(&Source->FieldUnit.Region->Value, Offset, AccessWidth >> 3);
-                break;
-
-            case ACPI_INDEX_FIELD:
-                /* Index field means we need to write into the index location, followed by R/W'ing
-                   from/into the data location; The given offset inside the index field is in bits,
-                   but it needs to be converted into the granularity that the DefIndexField op gave
-                   us. */
-
-                WriteRegionField(&Source->FieldUnit.Region->Value, 0, Offset, sizeof(uint64_t));
-                Value = ReadRegionField(&Source->FieldUnit.Data->Value, 0, AccessWidth >> 3);
-
-                break;
+        /* Unaligned start, merge with previous item. */
+        if (UnalignedOffset) {
+            Item |= Value << (AccessWidth - UnalignedOffset);
         }
 
-        /* Unaligned start, if we have more data, save into a temporary variable, as we need to
-           merge with the next item. */
-        if (!i && UnalignedOffset) {
-            Value >>= Source->FieldUnit.Offset & 7;
-
-            if (i + 1 < ItemCount) {
-                Item = Value;
-                continue;
-            }
+        /* On unaligned buffers, we'll overshoot as we need one extra entry to mount the item;
+           Break out if that's the case and we already got the required extra entry. */
+        if (i == AlignedItemCount) {
+            break;
         }
 
-        if (i == 1 && UnalignedOffset) {
-            Value = (Value << (AccessWidth - UnalignedOffset)) | Item;
-        }
-
-        memcpy(Buffer, &Value, AccessWidth >> 3);
+        memcpy(Buffer, &Item, AccessWidth >> 3);
         Buffer += AccessWidth >> 3;
+        Item = Value >> UnalignedOffset;
     }
 
+    /* Mask-off anything beyond our length, in case we have an unaligned size. */
+    if (UnalignedLength) {
+        Item &= (2ull << (UnalignedLength - 1)) - 1;
+    }
+
+    memcpy(Buffer, &Item, AccessWidth >> 3);
     return 1;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function writes the data from the given buffer into the given region field; Do not use
+ *     this for buffer fields.
+ *
+ * PARAMETERS:
+ *     Source - AML value containing a region field.
+ *     Data - What to write into the field.
+ *
+ * RETURN VALUE:
+ *     1 on success, 0 otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+int AcpipWriteField(AcpiValue *Target, AcpiValue *Data) {
+    (void)WriteField;
+    printf("AcpipWriteField(%p, %p)\n", Target, Data);
+    while (1)
+        ;
 }
