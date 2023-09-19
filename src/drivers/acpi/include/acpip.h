@@ -8,11 +8,13 @@
 
 #define ACPI_TARGET_NONE 0
 #define ACPI_TARGET_LOCAL 1
+#define ACPI_TARGET_NAMED 2
 
 typedef struct {
     int Type;
     union {
         int LocalIndex;
+        AcpiObject *Object;
     };
 } AcpipTarget;
 
@@ -89,6 +91,6 @@ int AcpipExecuteTermList(AcpipState *State);
 AcpipTarget *AcpipExecuteSuperName(AcpipState *State);
 AcpipTarget *AcpipExecuteTarget(AcpipState *State);
 int AcpipReadTarget(AcpipState *State, AcpipTarget *Target, AcpiValue *Value);
-void AcpipStoreTarget(AcpipState *State, AcpipTarget *Target, AcpiValue *Value);
+int AcpipStoreTarget(AcpipState *State, AcpipTarget *Target, AcpiValue *Value);
 
 #endif /* _ACPIP_H_ */

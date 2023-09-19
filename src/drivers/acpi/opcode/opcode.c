@@ -93,7 +93,13 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
                     return 0;
                 }
 
-                AcpipStoreTarget(State, Target, &Source);
+                int Status = AcpipStoreTarget(State, Target, &Source);
+                free(Target);
+
+                if (!Status) {
+                    return 0;
+                }
+
                 break;
             }
 

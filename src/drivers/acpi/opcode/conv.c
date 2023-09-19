@@ -37,8 +37,12 @@ int AcpipExecuteConvOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
                 return 0;
             }
 
-            AcpipStoreTarget(State, Target, Value);
+            int Status = AcpipStoreTarget(State, Target, Value);
             free(Target);
+
+            if (!Status) {
+                return 0;
+            }
 
             break;
         }
@@ -67,8 +71,12 @@ int AcpipExecuteConvOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
                 return 0;
             }
 
-            AcpipStoreTarget(State, Target, Value);
+            int Status = AcpipStoreTarget(State, Target, Value);
             free(Target);
+
+            if (!Status) {
+                return 0;
+            }
 
             break;
         }
