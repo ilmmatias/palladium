@@ -143,17 +143,44 @@ static uint64_t ReadField(AcpiValue *Source, int Offset, int AccessWidth) {
  *
  * PARAMETERS:
  *     Source - AML value containing a region field.
- *     Offset - Byte offset within the region.
+ *     RegionOffset - Byte offset within the region.
  *     AccessWidth - How many bits we're trying to write.
  *     Data - The value we're trying to write.
+ *     Mask - Base mask used when setting up the actual value to be written into the region.
+ *            A `MaskedBase` value will be calculated as `Base & Mask`, while the value to be
+ *            written into the region will be calculated as `MaskedBase | Data`.
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-static void WriteField(AcpiValue *Target, int Offset, int AccessWidth, uint64_t Data) {
+static void
+WriteField(AcpiValue *Target, int Offset, int AccessWidth, uint64_t Data, uint64_t Mask) {
+    uint64_t Base;
+    switch ((Target->FieldUnit.AccessType >> 5) & 0x0F) {
+        /* Preserve */
+        case 0: {
+            Base = ReadField(Target, Offset, AccessWidth);
+            break;
+        }
+
+        /* WriteAsOnes */
+        case 1:
+            Base = UINT64_MAX;
+            break;
+
+        /* WriteAsZeros */
+        default:
+            Base = 0;
+            break;
+    }
+
+    uint64_t MaskedBase = Base & Mask;
+    uint64_t MaskedValue = MaskedBase | Data;
+
     switch (Target->FieldUnit.FieldType) {
         case ACPI_FIELD:
-            return WriteRegion(&Target->FieldUnit.Region->Value, Offset, AccessWidth >> 3, Data);
+            return WriteRegion(
+                &Target->FieldUnit.Region->Value, Offset, AccessWidth >> 3, MaskedValue);
 
         case ACPI_INDEX_FIELD: {
             /* Index field means we need to write into the index location, followed by R/W'ing
@@ -166,11 +193,61 @@ static void WriteField(AcpiValue *Target, int Offset, int AccessWidth, uint64_t 
 
             AcpiValue Value;
             Value.Type = ACPI_INTEGER;
-            Value.Integer = Data;
+            Value.Integer = MaskedValue;
             AcpipWriteField(&Target->FieldUnit.Data->Value, &Value);
 
             break;
         }
+    }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     Internal function to safely read data from a buffer; Used within the main loop of
+ *     AcpipWriteField, as it might try to read ahead of the buffer end.
+ *
+ * PARAMETERS:
+ *     Buffer - Start of the buffer were trying to read.
+ *     Offset - Byte offset within the buffer.
+ *     BufferWidth - Size (in bits) of the buffer.
+ *     AccessWidth - How many bits we're trying to read.
+ *
+ * RETURN VALUE:
+ *     Data from the buffer.
+ *-----------------------------------------------------------------------------------------------*/
+static uint64_t
+SafeBufferRead(const uint8_t *Buffer, uint64_t Offset, int BufferWidth, int AccessWidth) {
+    int RemainingBits = BufferWidth - Offset * 8;
+    Buffer += Offset;
+
+    /* This should be guaranteed to be a multiple of 8 (and limited between 0-64). */
+    uint64_t Value = 0;
+    switch (RemainingBits > AccessWidth ? AccessWidth : RemainingBits) {
+        /* Somewhat fixed values (they have no complex logic). */
+        case 8:
+            return *Buffer;
+        case 64:
+            return *(uint64_t *)Buffer;
+
+        /* 16-24, read up any bits after the 16th, and join them together. */
+        case 24:
+            Value |= (uint32_t)(*(Buffer + 2)) << 16;
+        case 16:
+            return *(uint16_t *)Buffer | Value;
+
+        /* 32-56, read up any bits after the 32nd, and join them together. */
+        case 56:
+            Value |= (uint64_t)(*(Buffer + 6)) << 48;
+        case 48:
+            Value |= (uint64_t)(*(Buffer + 5)) << 40;
+        case 40:
+            Value |= (uint64_t)(*(Buffer + 4)) << 32;
+        case 32:
+            return *(uint32_t *)Buffer | Value;
+
+        /* Assume anything else (including 0), is just zero. */
+        default:
+            return 0;
     }
 }
 
@@ -278,8 +355,103 @@ int AcpipReadField(AcpiValue *Source, AcpiValue *Target) {
  *     1 on success, 0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
 int AcpipWriteField(AcpiValue *Target, AcpiValue *Data) {
-    (void)WriteField;
-    printf("AcpipWriteField(%p, %p)\n", Target, Data);
-    while (1)
-        ;
+    /* We need to check for access width > 1 byte; Any invalid value will also be assumed to be 1
+       byte. */
+    int AccessWidth = 8;
+    switch (Target->FieldUnit.AccessType & 0x0F) {
+        case 2:
+            AccessWidth = 16;
+            break;
+        case 3:
+            AccessWidth = 32;
+            break;
+        case 4:
+            AccessWidth = 64;
+            break;
+    }
+
+    /* All accepted data/inputs should already be in a "buffer-like" type, so no need for
+       conversions. */
+
+    const uint8_t *Buffer;
+    int BufferWidth;
+
+    if (Data->Type == ACPI_INTEGER) {
+        Buffer = (const uint8_t *)&Data->Integer;
+        BufferWidth = 64;
+    } else if (Data->Type == ACPI_STRING) {
+        Buffer = (const uint8_t *)&Data->String;
+        BufferWidth = (strlen(Data->String) << 3) + 8;
+    } else {
+        Buffer = Data->Buffer.Data;
+        BufferWidth = Data->Buffer.Size << 3;
+    }
+
+    /* We need to respect the access width, and as such, write item by item into the region,
+       reading (and merging) the input into a temporary buffer as we proceed.
+       The buffer might start unaligned, and as such, we might need to read two entries before
+       writing into the region. We'll just assume we always need to do that. */
+
+    int AlignedItemCount = (Target->FieldUnit.Length + AccessWidth - 1) / AccessWidth;
+
+    int UnalignedOffset = Target->FieldUnit.Offset & (AccessWidth - 1);
+    int UnalignedLength = Target->FieldUnit.Length & (AccessWidth - 1);
+    int UnalignedItemCount =
+        (Target->FieldUnit.Length + UnalignedOffset + AccessWidth - 1) / AccessWidth;
+
+    /* Always take caution with the buffer width when reading anything; Running over it is UB,
+       and would probably access memory not belonging to us (or even unmapped).
+       SafeBufferRead() should handle that for us. */
+    uint64_t Item = SafeBufferRead(Buffer, 0, BufferWidth, AccessWidth) >> UnalignedOffset;
+    int FieldOffset = Target->FieldUnit.Offset >> 3;
+    int BufferOffset = AccessWidth >> 3;
+
+    for (int i = 1; i < UnalignedItemCount; i++) {
+        uint64_t Value = SafeBufferRead(Buffer, BufferOffset, BufferWidth, AccessWidth);
+
+        /* Unaligned start, merge with previous item. */
+        if (UnalignedOffset) {
+            Item |= Value << (AccessWidth - UnalignedOffset);
+        }
+
+        /* On unaligned buffers, we'll overshoot as we need one extra entry to mount the item;
+           Break out if that's the case and we already got the required extra entry. */
+        if (i == AlignedItemCount) {
+            break;
+        }
+
+        int RemainingBufferWidth = BufferWidth - (BufferOffset << 3);
+        if (RemainingBufferWidth < 0) {
+            RemainingBufferWidth = 0;
+        }
+
+        /* On the unaligned loop, we just need to mask off any bits higher than the remaining
+           buffer size. */
+        uint64_t Mask = UINT64_MAX;
+        Mask >>= AccessWidth - RemainingBufferWidth;
+
+        WriteField(Target, FieldOffset, AccessWidth, Item, ~Mask);
+        Buffer += AccessWidth >> 3;
+        FieldOffset += AccessWidth >> 3;
+        BufferOffset += AccessWidth >> 3;
+        Item = Value >> UnalignedOffset;
+    }
+
+    int RemainingBufferWidth = BufferWidth - (BufferOffset << 3);
+
+    if (UnalignedLength < RemainingBufferWidth) {
+        RemainingBufferWidth = UnalignedLength;
+    }
+
+    if (RemainingBufferWidth < 0) {
+        RemainingBufferWidth = 0;
+    }
+
+    /* Outside the loop, mask off anything that either goes off the buffer, or off the remaining
+       field width. */
+    uint64_t Mask = UINT64_MAX;
+    Mask >>= AccessWidth - RemainingBufferWidth;
+
+    WriteField(Target, FieldOffset, AccessWidth, Item, Mask);
+    return 1;
 }
