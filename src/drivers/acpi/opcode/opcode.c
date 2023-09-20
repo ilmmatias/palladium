@@ -155,14 +155,13 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
                         ;
                 }
 
-                AcpipName *Name = AcpipReadName(State);
-                if (!Name) {
+                AcpipName Name;
+                if (!AcpipReadName(State, &Name)) {
                     return 0;
                 }
 
-                AcpiObject *Object = AcpipResolveObject(Name);
+                AcpiObject *Object = AcpipResolveObject(&Name);
                 if (!Object) {
-                    free(Name);
                     return 0;
                 }
 

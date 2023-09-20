@@ -71,7 +71,6 @@ AcpiObject *AcpiSearchObject(const char *Name) {
  *
  * PARAMETERS:
  *     Name - Name to be associated with the entry.
- *            This will be managed by us (aka free'd) in the case of a success!
  *     Value - Pointer to the data that will be copied into the object if the same has to be
  *             allocated anew.
  *
@@ -123,7 +122,6 @@ AcpiObject *AcpipCreateObject(AcpipName *Name, AcpiValue *Value) {
     }
 
     if (!Name->SegmentCount) {
-        free(Name);
         return AcpipObjectTree;
     }
 
@@ -160,7 +158,6 @@ AcpiObject *AcpipCreateObject(AcpipName *Name, AcpiValue *Value) {
         Parent->Value.Objects = Entry;
     }
 
-    free(Name);
     return Entry;
 }
 
@@ -170,7 +167,6 @@ AcpiObject *AcpipCreateObject(AcpipName *Name, AcpiValue *Value) {
  *
  * PARAMETERS:
  *     Name - Name attached to the object.
- *            This will be managed by us (aka free'd) in the case of a success!
  *
  * RETURN VALUE:
  *     Pointer to the object if the entry was found, NULL otherwise.
@@ -218,7 +214,6 @@ AcpiObject *AcpipResolveObject(AcpipName *Name) {
     }
 
     if (!Name->SegmentCount) {
-        free(Name);
         return AcpipObjectTree;
     }
 
@@ -236,7 +231,6 @@ AcpiObject *AcpipResolveObject(AcpipName *Name) {
         }
 
         if (!memcmp(Base->Name, Name->Start, 4)) {
-            free(Name);
             return Base->Value.Type == ACPI_ALIAS ? Base->Value.Alias : Base;
         }
 

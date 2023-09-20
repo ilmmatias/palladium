@@ -9,6 +9,89 @@
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
+ *     This function resolves an object, either casting it directly into an integer, or executing
+ *     it as a method (and trying casting its return value into an integer), depending on the
+ *     type of the object.
+ *     We use this to resolve all the required objects for PCI config related setup.
+ *
+ * PARAMETERS:
+ *     Object - Base object; PCI config region.
+ *     Name - Name of the object to be resolved.
+ *     Result - Output; Will be set to whatever integer we read on success.
+ *
+ * RETURN VALUE:
+ *     1 on success, 0 otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+static int ReadInteger(AcpiObject *Object, const char *Name, uint64_t *Result) {
+    AcpipName RawName;
+    RawName.LinkedObject = Object;
+    RawName.Start = (const uint8_t *)Name;
+    RawName.BacktrackCount = 0;
+    RawName.SegmentCount = 1;
+
+    Object = AcpipResolveObject(&RawName);
+    if (!Object) {
+        return 0;
+    }
+
+    if (Object->Value.Type != ACPI_METHOD) {
+        return AcpipCastToInteger(&Object->Value, Result, 0);
+    }
+
+    AcpiValue Value;
+    if (!AcpiExecuteMethod(Object, 0, NULL, &Value)) {
+        return 0;
+    }
+
+    return AcpipCastToInteger(&Value, Result, 1);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function sets up a region for reading/writing into the PCI configuration space.
+ *     We're a noop if the region isn't PCI_Config, or if we have already cached the required
+ *     values.
+ *
+ * PARAMETERS:
+ *     Object - AML object containing the region.
+ *
+ * RETURN VALUE:
+ *     1 on success, 0 otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+static int SetupPciConfigRegion(AcpiObject *Object) {
+    if (Object->Value.Region.RegionSpace != 2 || Object->Value.Region.PciReady) {
+        return 1;
+    }
+
+    /* _ADR is the only required symbol, as it the device and function values (which we can't
+       obtain any other way, and can't assume to be zero).
+       _SEG and _BBN will be also used if they're found, but they'll be taken as 0 (root bus)
+       otherwise. */
+
+    uint64_t AdrValue;
+    if (!ReadInteger(Object, "_ADR", &AdrValue)) {
+        return 0;
+    }
+
+    uint64_t SegValue;
+    if (ReadInteger(Object, "_SEG", &SegValue)) {
+        Object->Value.Region.PciSegment = SegValue;
+    }
+
+    uint64_t BbnValue;
+    if (ReadInteger(Object, "_BBN", &BbnValue)) {
+        Object->Value.Region.PciBus = BbnValue;
+    }
+
+    /* Everything seems to be valid, break down the _ADR value, and set this region as ready. */
+    Object->Value.Region.PciDevice = (AdrValue >> 16) & UINT16_MAX;
+    Object->Value.Region.PciFunction = AdrValue & UINT16_MAX;
+    Object->Value.Region.PciReady = 1;
+    return 1;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
  *     This function reads data from the given region, using the given offset and the offset of
  *     the region field itself.
  *
@@ -38,6 +121,18 @@ static uint64_t ReadRegion(AcpiValue *Source, int Offset, int Size) {
                     return *(uint8_t *)Address;
             }
         }
+
+        /* PCI_Config; We need to read from the PCI configuration space; This is OS/architecture
+           specific, so redirect to the correct handler. */
+        case 2:
+            printf("Read from the PCI configuration space\n");
+            printf("    PciReady    = %u\n", Source->Region.PciReady);
+            printf("    PciDevice   = %u\n", Source->Region.PciDevice);
+            printf("    PciFunction = %u\n", Source->Region.PciFunction);
+            printf("    PciSegment  = %u\n", Source->Region.PciSegment);
+            printf("    PciBus      = %u\n", Source->Region.PciBus);
+            while (1)
+                ;
 
         default:
             printf(
@@ -87,6 +182,18 @@ static void WriteRegion(AcpiValue *Source, int Offset, int Size, uint64_t Data) 
                     break;
             }
         }
+
+        /* PCI_Config; We need to write into the PCI configuration space; This is OS/architecture
+           specific, so redirect to the correct handler. */
+        case 2:
+            printf("Write into the PCI configuration space\n");
+            printf("    PciReady    = %u\n", Source->Region.PciReady);
+            printf("    PciDevice   = %u\n", Source->Region.PciDevice);
+            printf("    PciFunction = %u\n", Source->Region.PciFunction);
+            printf("    PciSegment  = %u\n", Source->Region.PciSegment);
+            printf("    PciBus      = %u\n", Source->Region.PciBus);
+            while (1)
+                ;
 
         default:
             printf(
@@ -278,6 +385,13 @@ int AcpipReadField(AcpiValue *Source, AcpiValue *Target) {
             break;
     }
 
+    /* We need some extra work for PCI Config regions, but we'll be caching it afterwards. */
+    if (Source->FieldUnit.FieldType == ACPI_FIELD) {
+        if (!SetupPciConfigRegion(Source->FieldUnit.Region)) {
+            return 0;
+        }
+    }
+
     /* Anything over 64-bits doesn't fit inside an integer; Otherwise, we don't need to allocate
        any extra memory. */
     uint8_t *Buffer;
@@ -368,6 +482,13 @@ int AcpipWriteField(AcpiValue *Target, AcpiValue *Data) {
         case 4:
             AccessWidth = 64;
             break;
+    }
+
+    /* We need some extra work for PCI Config regions, but we'll be caching it afterwards. */
+    if (Target->FieldUnit.FieldType == ACPI_FIELD) {
+        if (!SetupPciConfigRegion(Target->FieldUnit.Region)) {
+            return 0;
+        }
     }
 
     /* All accepted data/inputs should already be in a "buffer-like" type, so no need for

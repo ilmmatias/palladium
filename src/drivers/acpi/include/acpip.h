@@ -65,7 +65,7 @@ int AcpipReadWord(AcpipState *State, uint16_t *Word);
 int AcpipReadDWord(AcpipState *State, uint32_t *DWord);
 int AcpipReadQWord(AcpipState *State, uint64_t *QWord);
 int AcpipReadPkgLength(AcpipState *State, uint32_t *Length);
-AcpipName *AcpipReadName(AcpipState *State);
+int AcpipReadName(AcpipState *State, AcpipName *Name);
 
 int AcpipReadField(AcpiValue *Source, AcpiValue *Target);
 int AcpipWriteField(AcpiValue *Target, AcpiValue *Value);
@@ -80,7 +80,7 @@ int AcpipExecuteNamedObjOpcode(AcpipState *State, uint16_t Opcode);
 int AcpipExecuteNsModOpcode(AcpipState *State, uint16_t Opcode);
 int AcpipExecuteStmtOpcode(AcpipState *State, uint16_t Opcode);
 
-int AcpipCastToInteger(AcpiValue *Value, uint64_t *Result);
+int AcpipCastToInteger(AcpiValue *Value, uint64_t *Result, int Cleanup);
 int AcpipCastToString(AcpiValue *Value, int ImplicitCast, int Decimal);
 int AcpipCastToBuffer(AcpiValue *Value);
 

@@ -197,7 +197,8 @@ int AcpipExecuteDataObjOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Val
                         return 0;
                     }
                 } else {
-                    if (!AcpipReadName(State)) {
+                    AcpipName Name;
+                    if (!AcpipReadName(State, &Name)) {
                         Value->Package.Size = i ? i - 1 : 0;
                         AcpiRemoveReference(Value, 0);
                         return 0;

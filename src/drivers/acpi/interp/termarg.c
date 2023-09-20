@@ -38,15 +38,15 @@ static char *Types[] = {
  *     Value - Result of ExecuteOpcode.
  *             This is assumed to be stack allocated.
  *     Result - Output as an integer.
+ *     Cleanup - Set this to one if we should RemoveReference buffers/strings.
  *
  * RETURN VALUE:
  *     1 on success, 0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int AcpipCastToInteger(AcpiValue *Value, uint64_t *Result) {
+int AcpipCastToInteger(AcpiValue *Value, uint64_t *Result, int Cleanup) {
     AcpiValue *Source = Value->Type == ACPI_REFERENCE ? &Value->Reference->Value : Value;
     if (Source->Type == ACPI_INTEGER) {
         *Result = Source->Integer;
-        AcpiRemoveReference(Value, 0);
         return 1;
     }
 
@@ -69,6 +69,10 @@ int AcpipCastToInteger(AcpiValue *Value, uint64_t *Result) {
 
         default:
             return 0;
+    }
+
+    if (Cleanup) {
+        AcpiRemoveReference(Value, 0);
     }
 
     return 1;
@@ -294,7 +298,7 @@ int AcpipExecuteInteger(AcpipState *State, uint64_t *Result) {
         return 0;
     }
 
-    return AcpipCastToInteger(&Value, Result);
+    return AcpipCastToInteger(&Value, Result, 1);
 }
 
 /*-------------------------------------------------------------------------------------------------

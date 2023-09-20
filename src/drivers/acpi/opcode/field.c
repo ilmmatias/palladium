@@ -79,14 +79,13 @@ static int ReadFieldList(AcpipState *State, AcpiValue *Base, uint32_t Start, uin
             default: {
                 /* Just a single NameSeg is equivalent to a normal NamePath, so we can use
                    ReadName). */
-                AcpipName *Name = AcpipReadName(State);
-                if (!Name) {
+                AcpipName Name;
+                if (!AcpipReadName(State, &Name)) {
                     return 0;
                 }
 
                 uint32_t Length;
                 if (!AcpipReadPkgLength(State, &Length)) {
-                    free(Name);
                     return 0;
                 }
 
@@ -99,8 +98,7 @@ static int ReadFieldList(AcpipState *State, AcpiValue *Base, uint32_t Start, uin
                 Value.FieldUnit.Length = Length;
                 Offset += Length;
 
-                if (!AcpipCreateObject(Name, &Value)) {
-                    free(Name);
+                if (!AcpipCreateObject(&Name, &Value)) {
                     return 0;
                 }
 
@@ -155,8 +153,8 @@ int AcpipExecuteFieldOpcode(AcpipState *State, uint16_t Opcode) {
                 return 0;
             }
 
-            AcpipName *Name = AcpipReadName(State);
-            if (!Name) {
+            AcpipName Name;
+            if (!AcpipReadName(State, &Name)) {
                 AcpiRemoveReference(&SourceBuff, 0);
                 return 0;
             }
@@ -165,7 +163,6 @@ int AcpipExecuteFieldOpcode(AcpipState *State, uint16_t Opcode) {
                store SourceBuff. */
             AcpiValue *Buffer = malloc(sizeof(AcpiValue));
             if (!Buffer) {
-                free(Name);
                 AcpiRemoveReference(&SourceBuff, 0);
                 return 0;
             }
@@ -182,8 +179,7 @@ int AcpipExecuteFieldOpcode(AcpipState *State, uint16_t Opcode) {
                                      : Opcode == 0x8C ? 8
                                                       : 64;
 
-            if (!AcpipCreateObject(Name, &Value)) {
-                free(Name);
+            if (!AcpipCreateObject(&Name, &Value)) {
                 AcpiRemoveReference(&SourceBuff, 0);
                 return 0;
             }
@@ -198,14 +194,13 @@ int AcpipExecuteFieldOpcode(AcpipState *State, uint16_t Opcode) {
                 return 0;
             }
 
-            AcpipName *Name = AcpipReadName(State);
-            if (!Name) {
+            AcpipName Name;
+            if (!AcpipReadName(State, &Name)) {
                 return 0;
             }
 
-            AcpiObject *Object = AcpipResolveObject(Name);
+            AcpiObject *Object = AcpipResolveObject(&Name);
             if (!Object) {
-                free(Name);
                 return 0;
             } else if (Object->Value.Type != ACPI_REGION) {
                 return 0;
@@ -231,25 +226,23 @@ int AcpipExecuteFieldOpcode(AcpipState *State, uint16_t Opcode) {
                 return 0;
             }
 
-            AcpipName *IndexName = AcpipReadName(State);
-            if (!IndexName) {
+            AcpipName IndexName;
+            if (!AcpipReadName(State, &IndexName)) {
                 return 0;
             }
 
-            AcpiObject *IndexObject = AcpipResolveObject(IndexName);
+            AcpiObject *IndexObject = AcpipResolveObject(&IndexName);
             if (!IndexObject) {
-                free(IndexName);
                 return 0;
             }
 
-            AcpipName *DataName = AcpipReadName(State);
-            if (!DataName) {
+            AcpipName DataName;
+            if (!AcpipReadName(State, &DataName)) {
                 return 0;
             }
 
-            AcpiObject *DataObject = AcpipResolveObject(DataName);
+            AcpiObject *DataObject = AcpipResolveObject(&DataName);
             if (!DataObject) {
-                free(DataName);
                 return 0;
             }
 

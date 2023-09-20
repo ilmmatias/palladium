@@ -109,7 +109,7 @@ int AcpipExecuteMathOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
             if (!AcpipReadTarget(State, Target, &TargetValue)) {
                 free(Target);
                 return 0;
-            } else if (!AcpipCastToInteger(&TargetValue, &TargetInteger)) {
+            } else if (!AcpipCastToInteger(&TargetValue, &TargetInteger, 1)) {
                 free(Target);
                 return 0;
             }

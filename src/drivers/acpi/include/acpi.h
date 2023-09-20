@@ -62,6 +62,11 @@ typedef struct AcpiValue {
             uint8_t RegionSpace;
             uint64_t RegionOffset;
             uint64_t RegionLen;
+            int PciReady;
+            uint16_t PciDevice;
+            uint16_t PciFunction;
+            uint16_t PciSegment;
+            uint16_t PciBus;
         } Region;
         struct {
             int FieldType;

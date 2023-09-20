@@ -44,7 +44,7 @@ int AcpipExecuteConcatOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Valu
                 case ACPI_INTEGER: {
                     uint64_t LeftValue = Left.Integer;
                     uint64_t RightValue;
-                    int Result = AcpipCastToInteger(&Right, &RightValue);
+                    int Result = AcpipCastToInteger(&Right, &RightValue, 1);
                     if (!Result) {
                         return 0;
                     }

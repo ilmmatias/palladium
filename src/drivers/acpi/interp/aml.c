@@ -507,14 +507,15 @@ int AcpipReadPkgLength(AcpipState *State, uint32_t *Length) {
  *
  * PARAMETERS:
  *     State - Current AML stream state.
+ *     Name - Output; Will contain the name string data in case of a success.
  *
  * RETURN VALUE:
  *     0 on end of code, 1 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-AcpipName *AcpipReadName(AcpipState *State) {
+int AcpipReadName(AcpipState *State, AcpipName *Name) {
     uint8_t Current;
     if (!AcpipReadByte(State, &Current)) {
-        return NULL;
+        return 0;
     }
 
     int IsRoot = Current == '\\';
@@ -523,11 +524,11 @@ AcpipName *AcpipReadName(AcpipState *State) {
     /* Consume any and every `parent scope` prefixes, even if we don't have as many parent scopes
        and we're consuming. */
     if (IsRoot && !AcpipReadByte(State, &Current)) {
-        return NULL;
+        return 0;
     } else if (!IsRoot && Current == '^') {
         while (Current == '^') {
             if (!AcpipReadByte(State, &Current)) {
-                return NULL;
+                return 0;
             }
 
             BacktrackCount++;
@@ -541,7 +542,7 @@ AcpipName *AcpipReadName(AcpipState *State) {
         SegmentCount = 2;
     } else if (Current == 0x2F) {
         if (!AcpipReadByte(State, &SegmentCount)) {
-            return NULL;
+            return 0;
         }
     } else if (Current) {
         SegmentCount = 1;
@@ -550,12 +551,7 @@ AcpipName *AcpipReadName(AcpipState *State) {
     }
 
     if (State->Scope->RemainingLength < SegmentCount * 4) {
-        return NULL;
-    }
-
-    AcpipName *Name = malloc(sizeof(AcpipName));
-    if (!Name) {
-        return NULL;
+        return 0;
     }
 
     Name->LinkedObject = IsRoot ? NULL : State->Scope->LinkedObject;
@@ -565,5 +561,5 @@ AcpipName *AcpipReadName(AcpipState *State) {
     State->Scope->Code += SegmentCount * 4;
     State->Scope->RemainingLength -= SegmentCount * 4;
 
-    return Name;
+    return 1;
 }

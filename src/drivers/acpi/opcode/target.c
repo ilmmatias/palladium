@@ -31,14 +31,13 @@ static int ExecuteSuperName(AcpipState *State, uint8_t Opcode, AcpipTarget *Targ
             State->Scope->Code--;
             State->Scope->RemainingLength++;
 
-            AcpipName *Name = AcpipReadName(State);
-            if (!Name) {
+            AcpipName Name;
+            if (!AcpipReadName(State, &Name)) {
                 return 0;
             }
 
-            AcpiObject *Object = AcpipResolveObject(Name);
+            AcpiObject *Object = AcpipResolveObject(&Name);
             if (!Object) {
-                free(Name);
                 return 0;
             } else if (
                 Object->Value.Type > ACPI_FIELD_UNIT && Object->Value.Type != ACPI_BUFFER_FIELD) {
@@ -146,12 +145,11 @@ int AcpipStoreTarget(AcpipState *State, AcpipTarget *Target, AcpiValue *Value) {
             memcpy(&State->Locals[Target->LocalIndex], Value, sizeof(AcpiValue));
             break;
         case ACPI_TARGET_NAMED:
-            printf("storing into named field (type %u)\n", Target->Object->Value.Type);
             switch (Target->Object->Value.Type) {
                 /* Integers, strings, and buffers are allowed to be implicitly cast into. */
                 case ACPI_INTEGER: {
                     uint64_t IntegerValue;
-                    if (!AcpipCastToInteger(Value, &IntegerValue)) {
+                    if (!AcpipCastToInteger(Value, &IntegerValue, 1)) {
                         return 0;
                     }
 

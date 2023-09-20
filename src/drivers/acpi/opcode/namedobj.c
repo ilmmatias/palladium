@@ -30,14 +30,13 @@ int AcpipExecuteNamedObjOpcode(AcpipState *State, uint16_t Opcode) {
                 return 0;
             }
 
-            AcpipName *Name = AcpipReadName(State);
-            if (!Name) {
+            AcpipName Name;
+            if (!AcpipReadName(State, &Name)) {
                 return 0;
             }
 
             uint32_t LengthSoFar = Start - State->Scope->RemainingLength;
             if (LengthSoFar >= Length || Length - LengthSoFar > State->Scope->RemainingLength) {
-                free(Name);
                 return 0;
             }
 
@@ -49,8 +48,7 @@ int AcpipExecuteNamedObjOpcode(AcpipState *State, uint16_t Opcode) {
             Value.Method.Size = Length - LengthSoFar;
             Value.Method.Flags = *State->Scope->Code;
 
-            if (!AcpipCreateObject(Name, &Value)) {
-                free(Name);
+            if (!AcpipCreateObject(&Name, &Value)) {
                 return 0;
             }
 
@@ -61,14 +59,13 @@ int AcpipExecuteNamedObjOpcode(AcpipState *State, uint16_t Opcode) {
 
         /* DefMutex := MutexOp NameString SyncFlags */
         case 0x015B: {
-            AcpipName *Name = AcpipReadName(State);
-            if (!Name) {
+            AcpipName Name;
+            if (!AcpipReadName(State, &Name)) {
                 return 0;
             }
 
             uint8_t SyncFlags;
             if (!AcpipReadByte(State, &SyncFlags)) {
-                free(Name);
                 return 0;
             }
 
@@ -77,8 +74,7 @@ int AcpipExecuteNamedObjOpcode(AcpipState *State, uint16_t Opcode) {
             Value.References = 1;
             Value.Mutex.Flags = SyncFlags;
 
-            if (!AcpipCreateObject(Name, &Value)) {
-                free(Name);
+            if (!AcpipCreateObject(&Name, &Value)) {
                 return 0;
             }
 
@@ -87,8 +83,8 @@ int AcpipExecuteNamedObjOpcode(AcpipState *State, uint16_t Opcode) {
 
         /* DefEvent := EventOp NameString */
         case 0x025B: {
-            AcpipName *Name = AcpipReadName(State);
-            if (!Name) {
+            AcpipName Name;
+            if (!AcpipReadName(State, &Name)) {
                 return 0;
             }
 
@@ -96,8 +92,7 @@ int AcpipExecuteNamedObjOpcode(AcpipState *State, uint16_t Opcode) {
             Value.Type = ACPI_EVENT;
             Value.References = 1;
 
-            if (!AcpipCreateObject(Name, &Value)) {
-                free(Name);
+            if (!AcpipCreateObject(&Name, &Value)) {
                 return 0;
             }
 
@@ -106,26 +101,23 @@ int AcpipExecuteNamedObjOpcode(AcpipState *State, uint16_t Opcode) {
 
         /* DefOpRegion := OpRegionOp NameString RegionSpace RegionOffset RegionLen */
         case 0x805B: {
-            AcpipName *Name = AcpipReadName(State);
-            if (!Name) {
+            AcpipName Name;
+            if (!AcpipReadName(State, &Name)) {
                 return 0;
             }
 
             uint8_t RegionSpace;
             if (!AcpipReadByte(State, &RegionSpace)) {
-                free(Name);
                 return 0;
             }
 
             uint64_t RegionOffset;
             if (!AcpipExecuteInteger(State, &RegionOffset)) {
-                free(Name);
                 return 0;
             }
 
             uint64_t RegionLen;
             if (!AcpipExecuteInteger(State, &RegionLen)) {
-                free(Name);
                 return 0;
             }
 
@@ -136,9 +128,13 @@ int AcpipExecuteNamedObjOpcode(AcpipState *State, uint16_t Opcode) {
             Value.Region.RegionSpace = RegionSpace;
             Value.Region.RegionLen = RegionLen;
             Value.Region.RegionOffset = RegionOffset;
+            Value.Region.PciReady = 0;
+            Value.Region.PciDevice = 0;
+            Value.Region.PciFunction = 0;
+            Value.Region.PciSegment = 0;
+            Value.Region.PciBus = 0;
 
-            if (!AcpipCreateObject(Name, &Value)) {
-                free(Name);
+            if (!AcpipCreateObject(&Name, &Value)) {
                 return 0;
             }
 
@@ -154,14 +150,13 @@ int AcpipExecuteNamedObjOpcode(AcpipState *State, uint16_t Opcode) {
                 return 0;
             }
 
-            AcpipName *Name = AcpipReadName(State);
-            if (!Name) {
+            AcpipName Name;
+            if (!AcpipReadName(State, &Name)) {
                 return 0;
             }
 
             uint32_t LengthSoFar = Start - State->Scope->RemainingLength;
             if (LengthSoFar > Length || Length - LengthSoFar > State->Scope->RemainingLength) {
-                free(Name);
                 return 0;
             }
 
@@ -170,9 +165,8 @@ int AcpipExecuteNamedObjOpcode(AcpipState *State, uint16_t Opcode) {
             Value.References = 1;
             Value.Objects = NULL;
 
-            AcpiObject *Object = AcpipCreateObject(Name, &Value);
+            AcpiObject *Object = AcpipCreateObject(&Name, &Value);
             if (!Object) {
-                free(Name);
                 return 0;
             }
 
@@ -192,14 +186,13 @@ int AcpipExecuteNamedObjOpcode(AcpipState *State, uint16_t Opcode) {
                 return 0;
             }
 
-            AcpipName *Name = AcpipReadName(State);
-            if (!Name) {
+            AcpipName Name;
+            if (!AcpipReadName(State, &Name)) {
                 return 0;
             }
 
             uint32_t LengthSoFar = Start - State->Scope->RemainingLength + 6;
             if (LengthSoFar > Length || Length - LengthSoFar > State->Scope->RemainingLength) {
-                free(Name);
                 return 0;
             }
 
@@ -214,9 +207,8 @@ int AcpipExecuteNamedObjOpcode(AcpipState *State, uint16_t Opcode) {
             State->Scope->Code += 6;
             State->Scope->RemainingLength -= 6;
 
-            AcpiObject *Object = AcpipCreateObject(Name, &Value);
+            AcpiObject *Object = AcpipCreateObject(&Name, &Value);
             if (!Object) {
-                free(Name);
                 return 0;
             }
 
@@ -236,14 +228,13 @@ int AcpipExecuteNamedObjOpcode(AcpipState *State, uint16_t Opcode) {
                 return 0;
             }
 
-            AcpipName *Name = AcpipReadName(State);
-            if (!Name) {
+            AcpipName Name;
+            if (!AcpipReadName(State, &Name)) {
                 return 0;
             }
 
             uint32_t LengthSoFar = Start - State->Scope->RemainingLength + 3;
             if (LengthSoFar > Length || Length - LengthSoFar > State->Scope->RemainingLength) {
-                free(Name);
                 return 0;
             }
 
@@ -257,9 +248,8 @@ int AcpipExecuteNamedObjOpcode(AcpipState *State, uint16_t Opcode) {
             State->Scope->Code += 3;
             State->Scope->RemainingLength -= 3;
 
-            AcpiObject *Object = AcpipCreateObject(Name, &Value);
+            AcpiObject *Object = AcpipCreateObject(&Name, &Value);
             if (!Object) {
-                free(Name);
                 return 0;
             }
 
