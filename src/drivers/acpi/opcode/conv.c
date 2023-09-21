@@ -27,20 +27,16 @@ int AcpipExecuteConvOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
                 return 0;
             }
 
-            AcpipTarget *Target = AcpipExecuteTarget(State);
-            if (!Target) {
+            AcpipTarget Target;
+            if (!AcpipExecuteTarget(State, &Target)) {
                 return 0;
             }
 
             if (!AcpipCastToBuffer(Value)) {
-                free(Target);
                 return 0;
             }
 
-            int Status = AcpipStoreTarget(State, Target, Value);
-            free(Target);
-
-            if (!Status) {
+            if (!AcpipStoreTarget(State, &Target, Value)) {
                 return 0;
             }
 
@@ -61,20 +57,16 @@ int AcpipExecuteConvOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
                 return 0;
             }
 
-            AcpipTarget *Target = AcpipExecuteTarget(State);
-            if (!Target) {
+            AcpipTarget Target;
+            if (!AcpipExecuteTarget(State, &Target)) {
                 return 0;
             }
 
             if (!AcpipCastToString(Value, 0, Opcode == 0x97)) {
-                free(Target);
                 return 0;
             }
 
-            int Status = AcpipStoreTarget(State, Target, Value);
-            free(Target);
-
-            if (!Status) {
+            if (!AcpipStoreTarget(State, &Target, Value)) {
                 return 0;
             }
 

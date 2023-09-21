@@ -53,23 +53,17 @@ static int ExecuteSuperName(AcpipState *State, uint8_t Opcode, AcpipTarget *Targ
     return 1;
 }
 
-AcpipTarget *AcpipExecuteSuperName(AcpipState *State) {
+int AcpipExecuteSuperName(AcpipState *State, AcpipTarget *Target) {
     uint8_t Opcode;
     if (!AcpipReadByte(State, &Opcode)) {
-        return NULL;
-    }
-
-    AcpipTarget *Target = malloc(sizeof(AcpipTarget));
-    if (!Target) {
-        return NULL;
+        return 0;
     }
 
     int Status = ExecuteSuperName(State, Opcode, Target);
     if (!Status) {
-        free(Target);
         return 0;
     } else if (Status > 0) {
-        return Target;
+        return 1;
     }
 
     printf(
@@ -81,23 +75,17 @@ AcpipTarget *AcpipExecuteSuperName(AcpipState *State) {
         ;
 }
 
-AcpipTarget *AcpipExecuteTarget(AcpipState *State) {
+int AcpipExecuteTarget(AcpipState *State, AcpipTarget *Target) {
     uint8_t Opcode;
     if (!AcpipReadByte(State, &Opcode)) {
-        return NULL;
-    }
-
-    AcpipTarget *Target = malloc(sizeof(AcpipTarget));
-    if (!Target) {
-        return NULL;
+        return 0;
     }
 
     int Status = ExecuteSuperName(State, Opcode, Target);
     if (!Status) {
-        free(Target);
         return 0;
     } else if (Status > 0) {
-        return Target;
+        return 1;
     }
 
     switch (Opcode) {
@@ -117,7 +105,7 @@ AcpipTarget *AcpipExecuteTarget(AcpipState *State) {
         }
     }
 
-    return Target;
+    return 1;
 }
 
 int AcpipReadTarget(AcpipState *State, AcpipTarget *Target, AcpiValue *Value) {

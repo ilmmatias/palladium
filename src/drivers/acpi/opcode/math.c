@@ -43,8 +43,8 @@ int AcpipExecuteMathOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
                 return 0;
             }
 
-            AcpipTarget *Target = AcpipExecuteTarget(State);
-            if (!Target) {
+            AcpipTarget Target;
+            if (!AcpipExecuteTarget(State, &Target)) {
                 return 0;
             }
 
@@ -85,10 +85,7 @@ int AcpipExecuteMathOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
                     break;
             }
 
-            int Status = AcpipStoreTarget(State, Target, Value);
-            free(Target);
-
-            if (!Status) {
+            if (!AcpipStoreTarget(State, &Target, Value)) {
                 return 0;
             }
 
@@ -99,18 +96,16 @@ int AcpipExecuteMathOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
            SuperName). */
         case 0x75:
         case 0x76: {
-            AcpipTarget *Target = AcpipExecuteSuperName(State);
-            if (!Target) {
+            AcpipTarget Target;
+            if (!AcpipExecuteSuperName(State, &Target)) {
                 return 0;
             }
 
             uint64_t TargetInteger;
             AcpiValue TargetValue;
-            if (!AcpipReadTarget(State, Target, &TargetValue)) {
-                free(Target);
+            if (!AcpipReadTarget(State, &Target, &TargetValue)) {
                 return 0;
             } else if (!AcpipCastToInteger(&TargetValue, &TargetInteger, 1)) {
-                free(Target);
                 return 0;
             }
 
@@ -124,10 +119,7 @@ int AcpipExecuteMathOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
                     break;
             }
 
-            int Status = AcpipStoreTarget(State, Target, Value);
-            free(Target);
-
-            if (!Status) {
+            if (!AcpipStoreTarget(State, &Target, Value)) {
                 return 0;
             }
 
@@ -169,6 +161,7 @@ int AcpipExecuteMathOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
                     break;
             }
 
+            Value->Integer = Value->Integer ? UINT64_MAX : 0;
             break;
         }
 
@@ -180,7 +173,7 @@ int AcpipExecuteMathOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
             }
 
             Value->Type = ACPI_INTEGER;
-            Value->Integer = !Operand;
+            Value->Integer = Operand ? 0 : UINT64_MAX;
 
             break;
         }

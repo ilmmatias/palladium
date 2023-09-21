@@ -3,7 +3,15 @@
 
 project(os/drivers/acpi)
 
+if(ARCH STREQUAL "amd64")
+    set(SOURCES
+        ${ARCH}/pci.c
+        ${ARCH}/port.c)
+endif()
+
 add_executable(acpi "knostdlib"
+    ${SOURCES}
+
     interp/aml.c
     interp/field.c
     interp/object.c

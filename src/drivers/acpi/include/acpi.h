@@ -26,6 +26,7 @@
 #define ACPI_ALIAS 17
 #define ACPI_SCOPE 18
 #define ACPI_REFERENCE 19
+#define ACPI_INDEX 20
 
 #define ACPI_FIELD 0
 #define ACPI_INDEX_FIELD 1
@@ -83,6 +84,10 @@ typedef struct AcpiValue {
             uint64_t Index;
             int Size;
         } BufferField;
+        struct {
+            struct AcpiValue *Source;
+            uint64_t Index;
+        } Index;
         struct {
             uint8_t ProcId;
             uint32_t PblkAddr;

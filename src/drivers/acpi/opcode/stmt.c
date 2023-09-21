@@ -126,6 +126,7 @@ int AcpipExecuteStmtOpcode(AcpipState *State, uint16_t Opcode) {
                 return 0;
             }
 
+            State->Scope = Scope;
             break;
         }
 

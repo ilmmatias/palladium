@@ -34,8 +34,8 @@ int AcpipExecuteConcatOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Valu
                 return 0;
             }
 
-            AcpipTarget *Target = AcpipExecuteTarget(State);
-            if (!Target) {
+            AcpipTarget Target;
+            if (!AcpipExecuteTarget(State, &Target)) {
                 return 0;
             }
 
@@ -106,10 +106,9 @@ int AcpipExecuteConcatOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Valu
                 }
             }
 
-            int Status = AcpipStoreTarget(State, Target, Value);
+            int Status = AcpipStoreTarget(State, &Target, Value);
             AcpiRemoveReference(&Left, 0);
             AcpiRemoveReference(&Right, 0);
-            free(Target);
 
             if (!Status) {
                 return 0;

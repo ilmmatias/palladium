@@ -70,6 +70,11 @@ int AcpipReadName(AcpipState *State, AcpipName *Name);
 int AcpipReadField(AcpiValue *Source, AcpiValue *Target);
 int AcpipWriteField(AcpiValue *Target, AcpiValue *Value);
 
+uint64_t AcpipReadPciConfigSpace(AcpiValue *Source, int Offset, int Size);
+void AcpipWritePciConfigSpace(AcpiValue *Source, int Offset, int Size, uint64_t Data);
+uint64_t AcpipReadIoSpace(int Offset, int Size);
+void AcpipWriteIoSpace(int Offset, int Size, uint64_t Data);
+
 int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Value);
 int AcpipExecuteConcatOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value);
 int AcpipExecuteConvOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value);
@@ -88,8 +93,8 @@ int AcpipExecuteInteger(AcpipState *State, uint64_t *Result);
 int AcpipExecuteBuffer(AcpipState *State, AcpiValue *Result);
 
 int AcpipExecuteTermList(AcpipState *State);
-AcpipTarget *AcpipExecuteSuperName(AcpipState *State);
-AcpipTarget *AcpipExecuteTarget(AcpipState *State);
+int AcpipExecuteSuperName(AcpipState *State, AcpipTarget *Target);
+int AcpipExecuteTarget(AcpipState *State, AcpipTarget *Target);
 int AcpipReadTarget(AcpipState *State, AcpipTarget *Target, AcpiValue *Value);
 int AcpipStoreTarget(AcpipState *State, AcpipTarget *Target, AcpiValue *Value);
 

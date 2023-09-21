@@ -30,9 +30,6 @@ int AcpipExecuteTermList(AcpipState *State) {
                 break;
             }
 
-            Parent->Code = State->Scope->Code;
-            Parent->RemainingLength -= State->Scope->Length;
-
             /* Solve the predicate on while loops, repeating the loop iteration if required. */
             if (State->Scope->Predicate) {
                 State->Scope->Code = State->Scope->Predicate;
@@ -44,10 +41,15 @@ int AcpipExecuteTermList(AcpipState *State) {
                 }
 
                 if (Predicate) {
-                    Parent->Code = State->Scope->Code;
-                    Parent->RemainingLength = State->Scope->RemainingLength;
+                    State->Scope->RemainingLength = State->Scope->Length;
+                    continue;
                 }
+
+                State->Scope->Code += State->Scope->Length;
             }
+
+            Parent->Code = State->Scope->Code;
+            Parent->RemainingLength -= State->Scope->Length;
 
             free(State->Scope);
             State->Scope = Parent;

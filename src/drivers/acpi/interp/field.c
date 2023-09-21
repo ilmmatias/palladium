@@ -122,17 +122,15 @@ static uint64_t ReadRegion(AcpiValue *Source, int Offset, int Size) {
             }
         }
 
+        /* SystemIO; We have no idea how the target architecture handles IO, redirect it to the
+           OS/arch-specific handler. */
+        case 1:
+            return AcpipReadIoSpace(Source->Region.RegionOffset + Offset, Size);
+
         /* PCI_Config; We need to read from the PCI configuration space; This is OS/architecture
            specific, so redirect to the correct handler. */
         case 2:
-            printf("Read from the PCI configuration space\n");
-            printf("    PciReady    = %u\n", Source->Region.PciReady);
-            printf("    PciDevice   = %u\n", Source->Region.PciDevice);
-            printf("    PciFunction = %u\n", Source->Region.PciFunction);
-            printf("    PciSegment  = %u\n", Source->Region.PciSegment);
-            printf("    PciBus      = %u\n", Source->Region.PciBus);
-            while (1)
-                ;
+            return AcpipReadPciConfigSpace(Source, Source->Region.RegionOffset + Offset, Size);
 
         default:
             printf(
@@ -163,6 +161,8 @@ static uint64_t ReadRegion(AcpiValue *Source, int Offset, int Size) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 static void WriteRegion(AcpiValue *Source, int Offset, int Size, uint64_t Data) {
+    printf("Writing %x (%c)\n", Data, (char)Data);
+
     switch (Source->Region.RegionSpace) {
         /* SystemMemory; We'll be writing into a physical memory address. */
         case 0: {
@@ -183,17 +183,17 @@ static void WriteRegion(AcpiValue *Source, int Offset, int Size, uint64_t Data) 
             }
         }
 
+        /* SystemIO; We have no idea how the target architecture handles IO, redirect it to the
+           OS/arch-specific handler. */
+        case 1:
+            AcpipWriteIoSpace(Source->Region.RegionOffset + Offset, Size, Data);
+            break;
+
         /* PCI_Config; We need to write into the PCI configuration space; This is OS/architecture
            specific, so redirect to the correct handler. */
         case 2:
-            printf("Write into the PCI configuration space\n");
-            printf("    PciReady    = %u\n", Source->Region.PciReady);
-            printf("    PciDevice   = %u\n", Source->Region.PciDevice);
-            printf("    PciFunction = %u\n", Source->Region.PciFunction);
-            printf("    PciSegment  = %u\n", Source->Region.PciSegment);
-            printf("    PciBus      = %u\n", Source->Region.PciBus);
-            while (1)
-                ;
+            AcpipWritePciConfigSpace(Source, Source->Region.RegionOffset + Offset, Size, Data);
+            break;
 
         default:
             printf(
@@ -223,7 +223,7 @@ static void WriteRegion(AcpiValue *Source, int Offset, int Size, uint64_t Data) 
 static uint64_t ReadField(AcpiValue *Source, int Offset, int AccessWidth) {
     switch (Source->FieldUnit.FieldType) {
         case ACPI_FIELD:
-            return ReadRegion(&Source->FieldUnit.Region->Value, Offset, AccessWidth >> 3);
+            return ReadRegion(&Source->FieldUnit.Region->Value, Offset, AccessWidth / 8);
 
         case ACPI_INDEX_FIELD: {
             /* Index field means we need to write into the index location, followed by R/W'ing
@@ -287,7 +287,7 @@ WriteField(AcpiValue *Target, int Offset, int AccessWidth, uint64_t Data, uint64
     switch (Target->FieldUnit.FieldType) {
         case ACPI_FIELD:
             return WriteRegion(
-                &Target->FieldUnit.Region->Value, Offset, AccessWidth >> 3, MaskedValue);
+                &Target->FieldUnit.Region->Value, Offset, AccessWidth / 8, MaskedValue);
 
         case ACPI_INDEX_FIELD: {
             /* Index field means we need to write into the index location, followed by R/W'ing
@@ -397,14 +397,14 @@ int AcpipReadField(AcpiValue *Source, AcpiValue *Target) {
     uint8_t *Buffer;
     if (Source->FieldUnit.Length > 64) {
         Target->Type = ACPI_BUFFER;
-        Target->Buffer.Size = (Source->FieldUnit.Length + AccessWidth - 1) >> 3;
+        Target->Buffer.Size = (Source->FieldUnit.Length + AccessWidth - 1) / 8;
         Target->Buffer.Data = malloc(Target->Buffer.Size);
 
         if (!Target->Buffer.Data) {
             return 0;
         }
 
-        memset(Target->Buffer.Data, 0, (Source->FieldUnit.Length + AccessWidth - 1) >> 3);
+        memset(Target->Buffer.Data, 0, (Source->FieldUnit.Length + AccessWidth - 1) / 8);
         Buffer = Target->Buffer.Data;
     } else {
         Target->Type = ACPI_INTEGER;
@@ -424,11 +424,10 @@ int AcpipReadField(AcpiValue *Source, AcpiValue *Target) {
     int UnalignedItemCount =
         (Source->FieldUnit.Length + UnalignedOffset + AccessWidth - 1) / AccessWidth;
 
-    uint64_t Item =
-        ReadField(Source, (Source->FieldUnit.Offset >> 3), AccessWidth) >> UnalignedOffset;
+    uint64_t Item = ReadField(Source, Source->FieldUnit.Offset / 8, AccessWidth) >> UnalignedOffset;
 
     for (int i = 1; i < UnalignedItemCount; i++) {
-        int Offset = (Source->FieldUnit.Offset >> 3) + (AccessWidth >> 3) * i;
+        int Offset = (Source->FieldUnit.Offset / 8) + (AccessWidth / 8) * i;
         uint64_t Value = ReadField(Source, Offset, AccessWidth);
 
         /* Unaligned start, merge with previous item. */
@@ -442,8 +441,8 @@ int AcpipReadField(AcpiValue *Source, AcpiValue *Target) {
             break;
         }
 
-        memcpy(Buffer, &Item, AccessWidth >> 3);
-        Buffer += AccessWidth >> 3;
+        memcpy(Buffer, &Item, AccessWidth / 8);
+        Buffer += AccessWidth / 8;
         Item = Value >> UnalignedOffset;
     }
 
@@ -452,7 +451,7 @@ int AcpipReadField(AcpiValue *Source, AcpiValue *Target) {
         Item &= (2ull << (UnalignedLength - 1)) - 1;
     }
 
-    memcpy(Buffer, &Item, AccessWidth >> 3);
+    memcpy(Buffer, &Item, AccessWidth / 8);
     return 1;
 }
 
@@ -502,10 +501,10 @@ int AcpipWriteField(AcpiValue *Target, AcpiValue *Data) {
         BufferWidth = 64;
     } else if (Data->Type == ACPI_STRING) {
         Buffer = (const uint8_t *)&Data->String;
-        BufferWidth = (strlen(Data->String) << 3) + 8;
+        BufferWidth = strlen(Data->String) * 8 + 8;
     } else {
         Buffer = Data->Buffer.Data;
-        BufferWidth = Data->Buffer.Size << 3;
+        BufferWidth = Data->Buffer.Size * 8;
     }
 
     /* We need to respect the access width, and as such, write item by item into the region,
@@ -524,8 +523,8 @@ int AcpipWriteField(AcpiValue *Target, AcpiValue *Data) {
        and would probably access memory not belonging to us (or even unmapped).
        SafeBufferRead() should handle that for us. */
     uint64_t Item = SafeBufferRead(Buffer, 0, BufferWidth, AccessWidth) >> UnalignedOffset;
-    int FieldOffset = Target->FieldUnit.Offset >> 3;
-    int BufferOffset = AccessWidth >> 3;
+    int FieldOffset = Target->FieldUnit.Offset / 8;
+    int BufferOffset = AccessWidth / 8;
 
     for (int i = 1; i < UnalignedItemCount; i++) {
         uint64_t Value = SafeBufferRead(Buffer, BufferOffset, BufferWidth, AccessWidth);
@@ -541,38 +540,34 @@ int AcpipWriteField(AcpiValue *Target, AcpiValue *Data) {
             break;
         }
 
-        int RemainingBufferWidth = BufferWidth - (BufferOffset << 3);
-        if (RemainingBufferWidth < 0) {
-            RemainingBufferWidth = 0;
-        }
-
         /* On the unaligned loop, we just need to mask off any bits higher than the remaining
            buffer size. */
-        uint64_t Mask = UINT64_MAX;
-        Mask >>= AccessWidth - RemainingBufferWidth;
+        int RunOffLength = BufferWidth - BufferOffset * 8;
+        if (AccessWidth < RunOffLength) {
+            RunOffLength = AccessWidth;
+        } else if (RunOffLength < 0) {
+            RunOffLength = 0;
+        }
 
-        WriteField(Target, FieldOffset, AccessWidth, Item, ~Mask);
-        Buffer += AccessWidth >> 3;
-        FieldOffset += AccessWidth >> 3;
-        BufferOffset += AccessWidth >> 3;
+        WriteField(Target, FieldOffset, AccessWidth, Item, UINT64_MAX << RunOffLength);
+        Buffer += AccessWidth / 8;
+        FieldOffset += AccessWidth / 8;
+        BufferOffset += AccessWidth / 8;
         Item = Value >> UnalignedOffset;
     }
 
-    int RemainingBufferWidth = BufferWidth - (BufferOffset << 3);
+    /* Fixup the offsets, as they point to the item after the aligned end. */
+    BufferOffset -= AccessWidth / 8;
+    FieldOffset -= Target->FieldUnit.Offset / 8;
 
-    if (UnalignedLength < RemainingBufferWidth) {
-        RemainingBufferWidth = UnalignedLength;
+    /* This should take care of the remaining buffer size being bigger than the AccessWidth. */
+    int RunOffLength = BufferWidth - BufferOffset * 8;
+    if (AccessWidth - UnalignedLength < RunOffLength) {
+        RunOffLength = AccessWidth - UnalignedLength;
+    } else if (RunOffLength < 0) {
+        RunOffLength = 0;
     }
 
-    if (RemainingBufferWidth < 0) {
-        RemainingBufferWidth = 0;
-    }
-
-    /* Outside the loop, mask off anything that either goes off the buffer, or off the remaining
-       field width. */
-    uint64_t Mask = UINT64_MAX;
-    Mask >>= AccessWidth - RemainingBufferWidth;
-
-    WriteField(Target, FieldOffset, AccessWidth, Item, Mask);
+    WriteField(Target, FieldOffset, AccessWidth, Item, UINT64_MAX << RunOffLength);
     return 1;
 }
