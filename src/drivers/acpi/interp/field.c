@@ -161,8 +161,6 @@ static uint64_t ReadRegion(AcpiValue *Source, int Offset, int Size) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 static void WriteRegion(AcpiValue *Source, int Offset, int Size, uint64_t Data) {
-    printf("Writing %x (%c)\n", Data, (char)Data);
-
     switch (Source->Region.RegionSpace) {
         /* SystemMemory; We'll be writing into a physical memory address. */
         case 0: {
