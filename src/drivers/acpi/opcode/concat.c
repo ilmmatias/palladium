@@ -25,12 +25,12 @@ int AcpipExecuteConcatOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Valu
         /* DefConcat := ConcatOp Data Data Target */
         case 0x73: {
             AcpiValue Left;
-            if (!AcpipExecuteOpcode(State, &Left)) {
+            if (!AcpipExecuteOpcode(State, &Left, 0)) {
                 return 0;
             }
 
             AcpiValue Right;
-            if (!AcpipExecuteOpcode(State, &Right)) {
+            if (!AcpipExecuteOpcode(State, &Right, 0)) {
                 return 0;
             }
 

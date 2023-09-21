@@ -27,6 +27,8 @@
 #define ACPI_SCOPE 18
 #define ACPI_REFERENCE 19
 #define ACPI_INDEX 20
+#define ACPI_LOCAL 21
+#define ACPI_ARG 22
 
 #define ACPI_FIELD 0
 #define ACPI_INDEX_FIELD 1

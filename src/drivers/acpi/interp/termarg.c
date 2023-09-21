@@ -294,7 +294,7 @@ int AcpipCastToBuffer(AcpiValue *Value) {
  *-----------------------------------------------------------------------------------------------*/
 int AcpipExecuteInteger(AcpipState *State, uint64_t *Result) {
     AcpiValue Value;
-    if (!AcpipExecuteOpcode(State, &Value)) {
+    if (!AcpipExecuteOpcode(State, &Value, 0)) {
         return 0;
     }
 
@@ -313,5 +313,5 @@ int AcpipExecuteInteger(AcpipState *State, uint64_t *Result) {
  *     1 on success, 0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
 int AcpipExecuteBuffer(AcpipState *State, AcpiValue *Result) {
-    return AcpipExecuteOpcode(State, Result) && AcpipCastToBuffer(Result);
+    return AcpipExecuteOpcode(State, Result, 0) && AcpipCastToBuffer(Result);
 }

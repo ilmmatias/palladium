@@ -75,7 +75,7 @@ void AcpipWritePciConfigSpace(AcpiValue *Source, int Offset, int Size, uint64_t 
 uint64_t AcpipReadIoSpace(int Offset, int Size);
 void AcpipWriteIoSpace(int Offset, int Size, uint64_t Data);
 
-int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Value);
+int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Value, int ObjReference);
 int AcpipExecuteConcatOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value);
 int AcpipExecuteConvOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value);
 int AcpipExecuteDataObjOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value);

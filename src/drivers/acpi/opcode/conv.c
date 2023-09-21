@@ -23,7 +23,7 @@ int AcpipExecuteConvOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
     switch (Opcode) {
         /* DefToBuffer := ToBufferOp Operand Target */
         case 0x96: {
-            if (!AcpipExecuteOpcode(State, Value)) {
+            if (!AcpipExecuteOpcode(State, Value, 0)) {
                 return 0;
             }
 
@@ -47,7 +47,7 @@ int AcpipExecuteConvOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
            DefToHexString := ToHexStringOp Operand Target */
         case 0x97:
         case 0x98: {
-            if (!AcpipExecuteOpcode(State, Value)) {
+            if (!AcpipExecuteOpcode(State, Value, 0)) {
                 return 0;
             }
 

@@ -57,7 +57,7 @@ int AcpipExecuteTermList(AcpipState *State) {
             continue;
         }
 
-        if (!AcpipExecuteOpcode(State, NULL)) {
+        if (!AcpipExecuteOpcode(State, NULL, 0)) {
             break;
         }
 

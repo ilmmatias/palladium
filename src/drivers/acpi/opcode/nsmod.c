@@ -61,7 +61,7 @@ int AcpipExecuteNsModOpcode(AcpipState *State, uint16_t Opcode) {
             }
 
             AcpiValue DataRefObject;
-            if (!AcpipExecuteOpcode(State, &DataRefObject)) {
+            if (!AcpipExecuteOpcode(State, &DataRefObject, 1)) {
                 return 0;
             }
 

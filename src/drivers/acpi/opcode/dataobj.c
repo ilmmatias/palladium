@@ -191,7 +191,7 @@ int AcpipExecuteDataObjOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Val
                 if (Opcode != '\\' && Opcode != '^' && Opcode != 0x2E && Opcode != 0x2F &&
                     !isupper(Opcode) && Opcode != '_') {
                     Value->Package.Data[i].Type = 1;
-                    if (!AcpipExecuteOpcode(State, &Value->Package.Data[i].Value)) {
+                    if (!AcpipExecuteOpcode(State, &Value->Package.Data[i].Value, 1)) {
                         Value->Package.Size = i ? i - 1 : 0;
                         AcpiRemoveReference(Value, 0);
                         return 0;

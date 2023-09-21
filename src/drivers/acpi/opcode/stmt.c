@@ -138,7 +138,7 @@ int AcpipExecuteStmtOpcode(AcpipState *State, uint16_t Opcode) {
 
         /* DefReturn ArgObject */
         case 0xA4: {
-            if (!AcpipExecuteOpcode(State, &State->ReturnValue)) {
+            if (!AcpipExecuteOpcode(State, &State->ReturnValue, 1)) {
                 return 0;
             }
 

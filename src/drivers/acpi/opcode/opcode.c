@@ -24,11 +24,13 @@
  * PARAMETERS:
  *     State - AML state containing the current scope.
  *     Result - Output; Where to store the resulting value; Only used for expression calls.
+ *     ObjReference - Set this to 1 if you're parsing an object reference (changes the inner
+ *                    workings of a few opcodes).
  *
  * RETURN VALUE:
  *     1 on success, 0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
+int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result, int ObjReference) {
     uint8_t Opcode;
     if (!AcpipReadByte(State, &Opcode)) {
         return 0;
@@ -64,7 +66,13 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
             case 0x64:
             case 0x65:
             case 0x66: {
-                memcpy(&Value, &State->Locals[Opcode - 0x60], sizeof(AcpiValue));
+                if (ObjReference) {
+                    Value.Type = ACPI_LOCAL;
+                    Value.Integer = FullOpcode - 0x60;
+                } else {
+                    memcpy(&Value, &State->Locals[Opcode - 0x60], sizeof(AcpiValue));
+                }
+
                 break;
             }
 
@@ -76,14 +84,20 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
             case 0x6C:
             case 0x6D:
             case 0x6E: {
-                memcpy(&Value, &State->Arguments[Opcode - 0x68], sizeof(AcpiValue));
+                if (ObjReference) {
+                    Value.Type = ACPI_ARG;
+                    Value.Integer = FullOpcode - 0x68;
+                } else {
+                    memcpy(&Value, &State->Arguments[Opcode - 0x68], sizeof(AcpiValue));
+                }
+
                 break;
             }
 
             /* DefStore := StoreOp TermArg SuperName */
             case 0x70: {
                 AcpiValue Source;
-                if (!AcpipExecuteOpcode(State, &Source)) {
+                if (!AcpipExecuteOpcode(State, &Source, 0)) {
                     return 0;
                 }
 
@@ -103,7 +117,7 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
             /* DerefOf := DerefOfOp ObjReference */
             case 0x83: {
                 AcpiValue Reference;
-                if (!AcpipExecuteOpcode(State, &Reference)) {
+                if (!AcpipExecuteOpcode(State, &Reference, 1)) {
                     return 0;
                 }
 
@@ -121,6 +135,24 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
                         Value.Type = ACPI_INTEGER;
                         Value.Integer = Source->Type == ACPI_STRING ? Source->String[Index]
                                                                     : Source->Buffer.Data[Index];
+                        break;
+                    }
+
+                    case ACPI_LOCAL: {
+                        if (!AcpiCopyValue(&State->Locals[Reference.Integer], &Value)) {
+                            AcpiRemoveReference(&Reference, 0);
+                            return 0;
+                        }
+
+                        break;
+                    }
+
+                    case ACPI_ARG: {
+                        if (!AcpiCopyValue(&State->Arguments[Reference.Integer], &Value)) {
+                            AcpiRemoveReference(&Reference, 0);
+                            return 0;
+                        }
+
                         break;
                     }
 
@@ -173,7 +205,7 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
                 AcpiValue *Buffer = malloc(sizeof(AcpiValue));
                 if (!Buffer) {
                     return 0;
-                } else if (!AcpipExecuteOpcode(State, Buffer)) {
+                } else if (!AcpipExecuteOpcode(State, Buffer, 0)) {
                     free(Buffer);
                     return 0;
                 } else if (
@@ -321,7 +353,7 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
                    bit annoying, as we can't parse the MethodInvocation or anything after it
                    (inside its enclosing scope) without knowing the method itself first. */
                 for (int i = 0; i < (Object->Value.Method.Flags & 0x07); i++) {
-                    if (!AcpipExecuteOpcode(State, &Arguments[i])) {
+                    if (!AcpipExecuteOpcode(State, &Arguments[i], 0)) {
                         return 0;
                     }
                 }
