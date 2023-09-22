@@ -26,6 +26,7 @@ add_executable(acpi "knostdlib"
     opcode/namedobj.c
     opcode/nsmod.c
     opcode/opcode.c
+    opcode/ref.c
     opcode/stmt.c
     opcode/target.c
 

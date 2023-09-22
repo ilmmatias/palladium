@@ -7,7 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-static int ExecuteSuperName(AcpipState *State, uint8_t Opcode, AcpipTarget *Target) {
+static int ExecuteSuperName(AcpipState *State, uint8_t Opcode, AcpipTarget *Target, int Optional) {
     switch (Opcode) {
         /* LocalObj (Local0-6) */
         case 0x60:
@@ -38,9 +38,15 @@ static int ExecuteSuperName(AcpipState *State, uint8_t Opcode, AcpipTarget *Targ
 
             AcpiObject *Object = AcpipResolveObject(&Name);
             if (!Object) {
-                return 0;
+                if (Optional) {
+                    Target->Type = ACPI_TARGET_UNRESOLVED;
+                    return 1;
+                } else {
+                    return 0;
+                }
             } else if (
-                Object->Value.Type > ACPI_FIELD_UNIT && Object->Value.Type != ACPI_BUFFER_FIELD) {
+                Object->Value.Type > ACPI_FIELD_UNIT && Object->Value.Type != ACPI_BUFFER_FIELD &&
+                !Optional) {
                 /* Writing to a scope or method (or internal object) is invalid. */
                 return 0;
             }
@@ -53,13 +59,13 @@ static int ExecuteSuperName(AcpipState *State, uint8_t Opcode, AcpipTarget *Targ
     return 1;
 }
 
-int AcpipExecuteSuperName(AcpipState *State, AcpipTarget *Target) {
+int AcpipExecuteSuperName(AcpipState *State, AcpipTarget *Target, int Optional) {
     uint8_t Opcode;
     if (!AcpipReadByte(State, &Opcode)) {
         return 0;
     }
 
-    int Status = ExecuteSuperName(State, Opcode, Target);
+    int Status = ExecuteSuperName(State, Opcode, Target, Optional);
     if (!Status) {
         return 0;
     } else if (Status > 0) {
@@ -81,7 +87,7 @@ int AcpipExecuteTarget(AcpipState *State, AcpipTarget *Target) {
         return 0;
     }
 
-    int Status = ExecuteSuperName(State, Opcode, Target);
+    int Status = ExecuteSuperName(State, Opcode, Target, 0);
     if (!Status) {
         return 0;
     } else if (Status > 0) {

@@ -322,6 +322,8 @@ WriteField(AcpiValue *Target, int Offset, int AccessWidth, uint64_t Data, uint64
  *-----------------------------------------------------------------------------------------------*/
 static uint64_t
 SafeBufferRead(const uint8_t *Buffer, uint64_t Offset, int BufferWidth, int AccessWidth) {
+    printf("SafeBufferRead(%p, %llu, %u, %u)\n", Buffer, Offset, BufferWidth, AccessWidth);
+
     int RemainingBits = BufferWidth - Offset * 8;
     Buffer += Offset;
 

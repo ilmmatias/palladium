@@ -9,6 +9,7 @@
 #define ACPI_TARGET_NONE 0
 #define ACPI_TARGET_LOCAL 1
 #define ACPI_TARGET_NAMED 2
+#define ACPI_TARGET_UNRESOLVED 3
 
 typedef struct {
     int Type;
@@ -83,6 +84,7 @@ int AcpipExecuteFieldOpcode(AcpipState *State, uint16_t Opcode);
 int AcpipExecuteMathOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value);
 int AcpipExecuteNamedObjOpcode(AcpipState *State, uint16_t Opcode);
 int AcpipExecuteNsModOpcode(AcpipState *State, uint16_t Opcode);
+int AcpipExecuteRefOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value);
 int AcpipExecuteStmtOpcode(AcpipState *State, uint16_t Opcode);
 
 int AcpipCastToInteger(AcpiValue *Value, uint64_t *Result, int Cleanup);
@@ -93,7 +95,7 @@ int AcpipExecuteInteger(AcpipState *State, uint64_t *Result);
 int AcpipExecuteBuffer(AcpipState *State, AcpiValue *Result);
 
 int AcpipExecuteTermList(AcpipState *State);
-int AcpipExecuteSuperName(AcpipState *State, AcpipTarget *Target);
+int AcpipExecuteSuperName(AcpipState *State, AcpipTarget *Target, int Optional);
 int AcpipExecuteTarget(AcpipState *State, AcpipTarget *Target);
 int AcpipReadTarget(AcpipState *State, AcpipTarget *Target, AcpiValue *Value);
 int AcpipStoreTarget(AcpipState *State, AcpipTarget *Target, AcpiValue *Value);

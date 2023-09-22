@@ -97,7 +97,7 @@ int AcpipExecuteMathOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
         case 0x75:
         case 0x76: {
             AcpipTarget Target;
-            if (!AcpipExecuteSuperName(State, &Target)) {
+            if (!AcpipExecuteSuperName(State, &Target, 0)) {
                 return 0;
             }
 

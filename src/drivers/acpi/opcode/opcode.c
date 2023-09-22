@@ -55,6 +55,7 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result, int ObjReference) {
         TRY_EXECUTE_OPCODE(AcpipExecuteMathOpcode, &Value);
         TRY_EXECUTE_OPCODE(AcpipExecuteNamedObjOpcode);
         TRY_EXECUTE_OPCODE(AcpipExecuteNsModOpcode);
+        TRY_EXECUTE_OPCODE(AcpipExecuteRefOpcode, &Value);
         TRY_EXECUTE_OPCODE(AcpipExecuteStmtOpcode);
 
         switch (FullOpcode) {
@@ -102,7 +103,7 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result, int ObjReference) {
                 }
 
                 AcpipTarget Target;
-                if (!AcpipExecuteSuperName(State, &Target)) {
+                if (!AcpipExecuteSuperName(State, &Target, 0)) {
                     AcpiRemoveReference(&Source, 0);
                     return 0;
                 }
@@ -114,62 +115,10 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result, int ObjReference) {
                 break;
             }
 
-            /* DerefOf := DerefOfOp ObjReference */
-            case 0x83: {
-                AcpiValue Reference;
-                if (!AcpipExecuteOpcode(State, &Reference, 1)) {
-                    return 0;
-                }
-
-                switch (Reference.Type) {
-                    case ACPI_INDEX: {
-                        AcpiValue *Source = Reference.Index.Source;
-                        uint64_t Index = Reference.Index.Index;
-
-                        if (Source->Type == ACPI_PACKAGE) {
-                            printf("DerefOf ACPI_PACKAGE\n");
-                            while (1)
-                                ;
-                        }
-
-                        Value.Type = ACPI_INTEGER;
-                        Value.Integer = Source->Type == ACPI_STRING ? Source->String[Index]
-                                                                    : Source->Buffer.Data[Index];
-                        break;
-                    }
-
-                    case ACPI_LOCAL: {
-                        if (!AcpiCopyValue(&State->Locals[Reference.Integer], &Value)) {
-                            AcpiRemoveReference(&Reference, 0);
-                            return 0;
-                        }
-
-                        break;
-                    }
-
-                    case ACPI_ARG: {
-                        if (!AcpiCopyValue(&State->Arguments[Reference.Integer], &Value)) {
-                            AcpiRemoveReference(&Reference, 0);
-                            return 0;
-                        }
-
-                        break;
-                    }
-
-                    default:
-                        printf("DerefOf, default case\n");
-                        AcpiRemoveReference(&Reference, 0);
-                        return 0;
-                }
-
-                AcpiRemoveReference(&Reference, 0);
-                break;
-            }
-
             /* DefSizeOf := SizeOfOp SuperName */
             case 0x87: {
                 AcpipTarget SuperName;
-                if (!AcpipExecuteSuperName(State, &SuperName)) {
+                if (!AcpipExecuteSuperName(State, &SuperName, 0)) {
                     return 0;
                 }
 
@@ -194,92 +143,6 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result, int ObjReference) {
                 }
 
                 AcpiRemoveReference(&Target, 0);
-
-                break;
-            }
-
-            /* DefIndex := IndexOp BuffPkgStrObj IndexValue Target */
-            case 0x88: {
-                /* BufferField takes a reference to an AcpiValue (that needs to live for long
-                   enough), so allocate some memory for it. */
-                AcpiValue *Buffer = malloc(sizeof(AcpiValue));
-                if (!Buffer) {
-                    return 0;
-                } else if (!AcpipExecuteOpcode(State, Buffer, 0)) {
-                    free(Buffer);
-                    return 0;
-                } else if (
-                    Buffer->Type != ACPI_STRING && Buffer->Type != ACPI_BUFFER &&
-                    Buffer->Type != ACPI_PACKAGE) {
-                    AcpiRemoveReference(Buffer, 1);
-                    return 0;
-                }
-
-                uint64_t Index;
-                if (!AcpipExecuteInteger(State, &Index)) {
-                    AcpiRemoveReference(Buffer, 1);
-                    return 0;
-                }
-
-                AcpipTarget Target;
-                if (!AcpipExecuteTarget(State, &Target)) {
-                    AcpiRemoveReference(Buffer, 1);
-                    return 0;
-                }
-
-                /* Pre-validate the index value (prevent buffer overflows). */
-                switch (Buffer->Type) {
-                    case ACPI_STRING: {
-                        if (Index > strlen(Buffer->String)) {
-                            AcpiRemoveReference(Buffer, 1);
-                            return 0;
-                        }
-
-                        break;
-                    }
-
-                    case ACPI_BUFFER: {
-                        if (Index >= Buffer->Buffer.Size) {
-                            AcpiRemoveReference(Buffer, 1);
-                            return 0;
-                        }
-
-                        break;
-                    }
-
-                    default: {
-                        if (Index >= Buffer->Package.Size) {
-                            AcpiRemoveReference(Buffer, 1);
-                            return 0;
-                        }
-
-                        break;
-                    }
-                }
-
-                Value.Type = ACPI_INDEX;
-                Value.Index.Source = Buffer;
-                Value.Index.Index = Index;
-
-                if (!AcpipStoreTarget(State, &Target, &Value)) {
-                    AcpiRemoveReference(Buffer, 1);
-                    return 0;
-                }
-
-                break;
-            }
-
-            /* DefCondRefOf := CondRefOfOp SuperName Target */
-            case 0x125B: {
-                AcpipTarget SuperName;
-                if (!AcpipExecuteSuperName(State, &SuperName)) {
-                    return 0;
-                }
-
-                AcpipTarget Target;
-                if (!AcpipExecuteTarget(State, &Target)) {
-                    return 0;
-                }
 
                 break;
             }
@@ -320,12 +183,6 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result, int ObjReference) {
                         case ACPI_INTEGER:
                             memcpy(&Value, &Object->Value, sizeof(AcpiValue));
                             break;
-
-                        /* Buffer fields get their backing buffer dereferenced. */
-                        case ACPI_BUFFER_FIELD:
-                            printf("read buffer field\n");
-                            while (1)
-                                ;
 
                         /* Field units will get redirected to the right read type (MMIO, PCI,
                            etc). */
