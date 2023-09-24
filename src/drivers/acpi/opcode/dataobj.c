@@ -165,7 +165,7 @@ int AcpipExecuteDataObjOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Val
             }
 
             uint32_t LengthSoFar = Start - State->Scope->RemainingLength;
-            if (LengthSoFar >= PkgLength ||
+            if (LengthSoFar > PkgLength ||
                 PkgLength - LengthSoFar > State->Scope->RemainingLength) {
                 return 0;
             }

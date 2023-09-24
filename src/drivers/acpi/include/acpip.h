@@ -5,6 +5,7 @@
 #define _ACPIP_H_
 
 #include <acpi.h>
+#include <sdt.h>
 
 #define ACPI_TARGET_NONE 0
 #define ACPI_TARGET_LOCAL 1
@@ -45,10 +46,10 @@ typedef struct AcpipState {
     AcpipScope *Scope;
 } AcpipState;
 
-void AcpipInitializeFromRsdt(void);
-void AcpipInitializeFromXsdt(void);
-void AcpipPopulatePredefined(void);
+SdtHeader *AcpipFindTable(char Signature[4]);
+void AcpipReadTables(void);
 
+void AcpipPopulatePredefined(void);
 void AcpipPopulateTree(const uint8_t *Code, uint32_t Length);
 AcpiObject *AcpipCreateObject(AcpipName *Name, AcpiValue *Value);
 AcpiObject *AcpipResolveObject(AcpipName *Name);

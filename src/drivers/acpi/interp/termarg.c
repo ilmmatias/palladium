@@ -47,6 +47,11 @@ int AcpipCastToInteger(AcpiValue *Value, uint64_t *Result, int Cleanup) {
     AcpiValue *Source = Value->Type == ACPI_REFERENCE ? &Value->Reference->Value : Value;
     if (Source->Type == ACPI_INTEGER) {
         *Result = Source->Integer;
+
+        if (Cleanup) {
+            AcpiRemoveReference(Value, 0);
+        }
+
         return 1;
     }
 
@@ -95,6 +100,7 @@ int AcpipCastToString(AcpiValue *Value, int ImplicitCast, int Decimal) {
     AcpiValue *Source = Value->Type == ACPI_REFERENCE ? &Value->Reference->Value : Value;
     if (Source->Type == ACPI_STRING) {
         if (Value != Source) {
+            AcpiRemoveReference(Value, 0);
             AcpiCopyValue(Source, Value);
         }
 
@@ -230,6 +236,7 @@ int AcpipCastToBuffer(AcpiValue *Value) {
     AcpiValue *Source = Value->Type == ACPI_REFERENCE ? &Value->Reference->Value : Value;
     if (Source->Type == ACPI_BUFFER) {
         if (Value != Source) {
+            AcpiRemoveReference(Value, 0);
             AcpiCopyValue(Source, Value);
         }
 

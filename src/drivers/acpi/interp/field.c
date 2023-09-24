@@ -35,6 +35,7 @@ static int ReadInteger(AcpiObject *Object, const char *Name, uint64_t *Result) {
     }
 
     if (Object->Value.Type != ACPI_METHOD) {
+        Object->Value.References++;
         return AcpipCastToInteger(&Object->Value, Result, 0);
     }
 
@@ -223,6 +224,11 @@ static uint64_t ReadField(AcpiValue *Source, int Offset, int AccessWidth) {
         case ACPI_FIELD:
             return ReadRegion(&Source->FieldUnit.Region->Value, Offset, AccessWidth / 8);
 
+        case ACPI_BANK_FIELD:
+            printf("ReadField() on BankField\n");
+            while (1)
+                ;
+
         case ACPI_INDEX_FIELD: {
             /* Index field means we need to write into the index location, followed by R/W'ing
                from/into the data location. */
@@ -287,6 +293,11 @@ WriteField(AcpiValue *Target, int Offset, int AccessWidth, uint64_t Data, uint64
             return WriteRegion(
                 &Target->FieldUnit.Region->Value, Offset, AccessWidth / 8, MaskedValue);
 
+        case ACPI_BANK_FIELD:
+            printf("WriteField() on BankField\n");
+            while (1)
+                ;
+
         case ACPI_INDEX_FIELD: {
             /* Index field means we need to write into the index location, followed by R/W'ing
                from/into the data location. */
@@ -322,8 +333,6 @@ WriteField(AcpiValue *Target, int Offset, int AccessWidth, uint64_t Data, uint64
  *-----------------------------------------------------------------------------------------------*/
 static uint64_t
 SafeBufferRead(const uint8_t *Buffer, uint64_t Offset, int BufferWidth, int AccessWidth) {
-    printf("SafeBufferRead(%p, %llu, %u, %u)\n", Buffer, Offset, BufferWidth, AccessWidth);
-
     int RemainingBits = BufferWidth - Offset * 8;
     Buffer += Offset;
 
@@ -386,7 +395,8 @@ int AcpipReadField(AcpiValue *Source, AcpiValue *Target) {
     }
 
     /* We need some extra work for PCI Config regions, but we'll be caching it afterwards. */
-    if (Source->FieldUnit.FieldType == ACPI_FIELD) {
+    if (Source->FieldUnit.FieldType == ACPI_FIELD ||
+        Source->FieldUnit.FieldType == ACPI_BANK_FIELD) {
         if (!SetupPciConfigRegion(Source->FieldUnit.Region)) {
             return 0;
         }
@@ -484,7 +494,8 @@ int AcpipWriteField(AcpiValue *Target, AcpiValue *Data) {
     }
 
     /* We need some extra work for PCI Config regions, but we'll be caching it afterwards. */
-    if (Target->FieldUnit.FieldType == ACPI_FIELD) {
+    if (Target->FieldUnit.FieldType == ACPI_FIELD ||
+        Target->FieldUnit.FieldType == ACPI_BANK_FIELD) {
         if (!SetupPciConfigRegion(Target->FieldUnit.Region)) {
             return 0;
         }

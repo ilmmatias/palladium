@@ -85,8 +85,15 @@ int AcpipExecuteRefOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value) 
             } else if (!AcpipExecuteOpcode(State, Buffer, 0)) {
                 free(Buffer);
                 return 0;
-            } else if (
-                Buffer->Type != ACPI_STRING && Buffer->Type != ACPI_BUFFER &&
+            }
+
+            if (Buffer->Type == ACPI_REFERENCE) {
+                AcpiValue *Reference = &Buffer->Reference->Value;
+                free(Buffer);
+                Buffer = Reference;
+            }
+
+            if (Buffer->Type != ACPI_STRING && Buffer->Type != ACPI_BUFFER &&
                 Buffer->Type != ACPI_PACKAGE) {
                 AcpiRemoveReference(Buffer, 1);
                 return 0;

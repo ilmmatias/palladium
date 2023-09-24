@@ -234,6 +234,8 @@ int AcpipExecuteFieldOpcode(AcpipState *State, uint16_t Opcode) {
             AcpiObject *IndexObject = AcpipResolveObject(&IndexName);
             if (!IndexObject) {
                 return 0;
+            } else if (IndexObject->Value.Type != ACPI_FIELD_UNIT) {
+                return 0;
             }
 
             AcpipName DataName;
@@ -244,6 +246,8 @@ int AcpipExecuteFieldOpcode(AcpipState *State, uint16_t Opcode) {
             AcpiObject *DataObject = AcpipResolveObject(&DataName);
             if (!DataObject) {
                 return 0;
+            } else if (DataObject->Value.Type != ACPI_FIELD_UNIT) {
+                return 0;
             }
 
             AcpiValue Base;
@@ -252,6 +256,57 @@ int AcpipExecuteFieldOpcode(AcpipState *State, uint16_t Opcode) {
             Base.FieldUnit.FieldType = ACPI_INDEX_FIELD;
             Base.FieldUnit.Region = IndexObject;
             Base.FieldUnit.Data = DataObject;
+            if (!ReadFieldList(State, &Base, Start, Length)) {
+                return 0;
+            }
+
+            break;
+        }
+
+        /* DefBankField := BankFieldOp PkgLength NameString NameString BankValue
+                           FieldFlags FieldList */
+        case 0x875B: {
+            uint32_t Length;
+            if (!AcpipReadPkgLength(State, &Length)) {
+                return 0;
+            }
+
+            AcpipName RegionName;
+            if (!AcpipReadName(State, &RegionName)) {
+                return 0;
+            }
+
+            AcpiObject *RegionObject = AcpipResolveObject(&RegionName);
+            if (!RegionObject) {
+                return 0;
+            } else if (RegionObject->Value.Type != ACPI_REGION) {
+                return 0;
+            }
+
+            AcpipName BankName;
+            if (!AcpipReadName(State, &BankName)) {
+                return 0;
+            }
+
+            AcpiObject *BankObject = AcpipResolveObject(&BankName);
+            if (!BankObject) {
+                return 0;
+            } else if (BankObject->Value.Type != ACPI_FIELD_UNIT) {
+                return 0;
+            }
+
+            uint64_t BankValue;
+            if (!AcpipExecuteInteger(State, &BankValue)) {
+                return 0;
+            }
+
+            AcpiValue Base;
+            Base.Type = ACPI_FIELD_UNIT;
+            Base.References = 1;
+            Base.FieldUnit.FieldType = ACPI_BANK_FIELD;
+            Base.FieldUnit.Region = RegionObject;
+            Base.FieldUnit.Data = BankObject;
+            Base.FieldUnit.BankValue = BankValue;
             if (!ReadFieldList(State, &Base, Start, Length)) {
                 return 0;
             }

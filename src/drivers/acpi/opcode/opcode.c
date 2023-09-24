@@ -147,6 +147,19 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result, int ObjReference) {
                 break;
             }
 
+            /* DefSleep := SleepOp MsecTime */
+            case 0x225B: {
+                /* TODO: Just a stub at the moment, make it work after we implement support in
+                   the kernel. */
+
+                uint64_t Milliseconds;
+                if (!AcpipExecuteInteger(State, &Milliseconds)) {
+                    return 0;
+                }
+
+                break;
+            }
+
             default: {
                 State->Scope->Code--;
                 State->Scope->RemainingLength++;
@@ -197,6 +210,7 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result, int ObjReference) {
                         default:
                             Value.Type = ACPI_REFERENCE;
                             Value.Reference = Object;
+                            Object->Value.References++;
                             break;
                     }
 

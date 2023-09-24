@@ -31,7 +31,8 @@
 #define ACPI_ARG 22
 
 #define ACPI_FIELD 0
-#define ACPI_INDEX_FIELD 1
+#define ACPI_BANK_FIELD 1
+#define ACPI_INDEX_FIELD 2
 
 struct AcpiPackageElement;
 struct AcpiObject;
@@ -80,6 +81,7 @@ typedef struct AcpiValue {
             uint8_t AccessLength;
             uint32_t Offset;
             uint32_t Length;
+            uint64_t BankValue;
         } FieldUnit;
         struct {
             struct AcpiValue *FieldSource;

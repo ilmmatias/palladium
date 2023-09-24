@@ -9,8 +9,6 @@
 #include <string.h>
 #include <vid.h>
 
-extern AcpiObject *AcpipObjectTree;
-
 /* stdio START; for debugging our AML interpreter. */
 static void put_buf(const void *buffer, int size, void *context) {
     (void)context;
@@ -28,37 +26,6 @@ int printf(const char *format, ...) {
 }
 /* stdio END */
 
-static void PrintChar(char Data) {
-    WritePortByte(0x402, Data);
-}
-
-static void PrintTabs(int Tabs) {
-    while (Tabs--) {
-        PrintChar(' ');
-        PrintChar(' ');
-        PrintChar(' ');
-        PrintChar(' ');
-    }
-}
-
-static void DumpTree(AcpiObject *Root, int Tabs) {
-    PrintTabs(Tabs);
-    PrintChar(Root->Name[0]);
-    PrintChar(Root->Name[1]);
-    PrintChar(Root->Name[2]);
-    PrintChar(Root->Name[3]);
-    PrintChar(0x0A);
-
-    if (Root->Value.Type != ACPI_REGION && Root->Value.Type != ACPI_SCOPE &&
-        Root->Value.Type != ACPI_DEVICE && Root->Value.Type != ACPI_PROCESSOR) {
-        return;
-    }
-
-    for (AcpiObject *Leaf = Root->Value.Objects; Leaf; Leaf = Leaf->Next) {
-        DumpTree(Leaf, Tabs + 1);
-    }
-}
-
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function is the entry point of the ACPI compatibility module. We're responsible for
@@ -73,13 +40,69 @@ static void DumpTree(AcpiObject *Root, int Tabs) {
  *-----------------------------------------------------------------------------------------------*/
 void DriverEntry(void) {
     AcpipPopulatePredefined();
+    AcpipReadTables();
 
-    if (KiGetAcpiTableType() == KI_ACPI_RDST) {
-        AcpipInitializeFromRsdt();
-    } else {
-        AcpipInitializeFromXsdt();
+    /* Let's start the shutdown process; Grab the FADT. */
+    FadtHeader *Fadt = (FadtHeader *)AcpipFindTable("FACP");
+    if (!Fadt) {
+        printf("Could not get the FADT\n");
+        return;
     }
 
-    /* Dumping the ACPI namespace root. */
-    DumpTree(AcpipObjectTree, 0);
+    /* Try enabling ACPI (if its not already enabled). */
+    if (Fadt->SmiCommandPort && Fadt->AcpiEnable && !(ReadPortWord(Fadt->Pm1aControlBlock) & 1)) {
+        WritePortByte(Fadt->SmiCommandPort, Fadt->AcpiEnable);
+        while (!(ReadPortWord(Fadt->Pm1aControlBlock) & 1))
+            ;
+    }
+
+    /* Evaluate \\_S5_. */
+    AcpiObject *S5Object = AcpiSearchObject("\\_S5_");
+    AcpiValue S5MethodResult;
+    AcpiValue *S5Value;
+    if (!S5Object) {
+        printf("This computer doesn't support S5 shutdown?\n");
+        return;
+    } else if (S5Object->Value.Type == ACPI_METHOD) {
+        if (!AcpiExecuteMethod(S5Object, 0, NULL, &S5MethodResult)) {
+            printf("Could not evaluate the S5 object\n");
+            return;
+        }
+
+        S5Value = &S5MethodResult;
+    } else {
+        S5Value = &S5Object->Value;
+    }
+
+    /* Validate if we have a package with at least one integer. */
+    AcpiValue *SlpTypA = &S5Value->Package.Data[0].Value;
+    AcpiValue *SlpTypB = &S5Value->Package.Data[1].Value;
+    if (S5Value->Type != ACPI_PACKAGE) {
+        printf("S5 isn't a package\n");
+        return;
+    } else if (S5Value->Package.Size < 2) {
+        printf("S5 has less than 2 items\n");
+        return;
+    } else if (
+        !S5Value->Package.Data[0].Type || SlpTypA->Type != ACPI_INTEGER ||
+        !S5Value->Package.Data[1].Type || SlpTypB->Type != ACPI_INTEGER) {
+        printf("One of the two required S5 values aren't an integer\n");
+        return;
+    }
+
+    /* Execute _PTS and _GTS if they exist. */
+    AcpiValue Argument;
+    Argument.Type = ACPI_INTEGER;
+    Argument.Integer = 5;
+    AcpiExecuteMethod(AcpiSearchObject("\\_PTS"), 1, &Argument, NULL);
+    AcpiExecuteMethod(AcpiSearchObject("\\_GTS"), 1, &Argument, NULL);
+
+    /* Enter S5/shutdown. */
+    WritePortWord(Fadt->Pm1aControlBlock, (SlpTypA->Integer << 10) | (1 << 13));
+    if (Fadt->Pm1bControlBlock) {
+        WritePortWord(Fadt->Pm1bControlBlock, (SlpTypB->Integer << 10) | (1 << 13));
+    }
+
+    while (1)
+        ;
 }

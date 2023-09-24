@@ -523,8 +523,12 @@ int AcpipReadName(AcpipState *State, AcpipName *Name) {
 
     /* Consume any and every `parent scope` prefixes, even if we don't have as many parent scopes
        and we're consuming. */
-    if (IsRoot && !AcpipReadByte(State, &Current)) {
-        return 0;
+    if (IsRoot) {
+        while (Current == '\\') {
+            if (!AcpipReadByte(State, &Current)) {
+                return 0;
+            }
+        }
     } else if (!IsRoot && Current == '^') {
         while (Current == '^') {
             if (!AcpipReadByte(State, &Current)) {
