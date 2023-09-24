@@ -80,7 +80,7 @@ int AcpipExecuteDataObjOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Val
                 StringSize++;
             }
 
-            if (StringSize > State->Scope->RemainingLength) {
+            if (++StringSize > State->Scope->RemainingLength) {
                 return 0;
             }
 
@@ -90,8 +90,8 @@ int AcpipExecuteDataObjOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Val
             }
 
             memcpy(Value->String, State->Scope->Code, StringSize);
-            State->Scope->Code += StringSize + 1;
-            State->Scope->RemainingLength -= StringSize + 1;
+            State->Scope->Code += StringSize;
+            State->Scope->RemainingLength -= StringSize;
 
             break;
         }

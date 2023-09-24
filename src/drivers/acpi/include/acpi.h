@@ -35,7 +35,11 @@
 #define ACPI_INDEX_FIELD 2
 
 struct AcpiPackageElement;
+struct AcpiValue;
 struct AcpiObject;
+
+typedef int (
+    *AcpiOverrideMethod)(int ArgCount, struct AcpiValue *Arguments, struct AcpiValue *Result);
 
 typedef struct AcpiValue {
     int Type;
@@ -55,6 +59,7 @@ typedef struct AcpiValue {
             struct AcpiPackageElement *Data;
         } Package;
         struct {
+            AcpiOverrideMethod Override;
             const uint8_t *Start;
             uint32_t Size;
             uint8_t Flags;
@@ -67,10 +72,10 @@ typedef struct AcpiValue {
             uint64_t RegionOffset;
             uint64_t RegionLen;
             int PciReady;
-            uint16_t PciDevice;
-            uint16_t PciFunction;
-            uint16_t PciSegment;
-            uint16_t PciBus;
+            uint32_t PciDevice;
+            uint32_t PciFunction;
+            uint32_t PciSegment;
+            uint32_t PciBus;
         } Region;
         struct {
             int FieldType;

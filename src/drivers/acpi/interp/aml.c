@@ -31,6 +31,8 @@ int AcpiExecuteMethod(AcpiObject *Object, int ArgCount, AcpiValue *Arguments, Ac
         ArgCount = 0;
     } else if (ArgCount > 7) {
         ArgCount = 7;
+    } else if (Object->Value.Method.Override) {
+        return Object->Value.Method.Override(ArgCount, Arguments, Result);
     }
 
     AcpipState State;
@@ -211,7 +213,7 @@ void AcpiRemoveReference(AcpiValue *Value, int CleanupPointer) {
  *-----------------------------------------------------------------------------------------------*/
 void AcpipPopulatePredefined(void) {
 #define PREDEFINED_ITEMS 5
-    static const char Names[5][PREDEFINED_ITEMS] = {
+    static const char Names[PREDEFINED_ITEMS][5] = {
         "_GPE",
         "_PR_",
         "_SB_",

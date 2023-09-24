@@ -175,7 +175,12 @@ int AcpipExecuteRefOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value) 
                 switch (SuperName.Type) {
                     case ACPI_TARGET_LOCAL:
                         Reference.Type = ACPI_LOCAL;
-                        Reference.Integer = SuperName.LocalIndex;
+                        Reference.Integer = SuperName.Index;
+                        break;
+
+                    case ACPI_TARGET_ARG:
+                        Reference.Type = ACPI_ARG;
+                        Reference.Integer = SuperName.Index;
                         break;
 
                     case ACPI_TARGET_NAMED:

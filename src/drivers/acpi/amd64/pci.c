@@ -16,13 +16,10 @@ uint64_t AcpipReadPciConfigSpace(AcpiValue *Source, int Offset, int Size) {
     switch (Size) {
         case 1:
             return ReadPortByte(0xCFC + (Offset & 2));
-            break;
         case 2:
             return ReadPortWord(0xCFC + (Offset & 2));
-            break;
         default:
             return ReadPortDWord(0xCFC + (Offset & 2));
-            break;
     }
 }
 

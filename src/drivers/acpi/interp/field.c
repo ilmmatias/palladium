@@ -480,7 +480,7 @@ int AcpipReadField(AcpiValue *Source, AcpiValue *Target) {
 int AcpipWriteField(AcpiValue *Target, AcpiValue *Data) {
     /* We need to check for access width > 1 byte; Any invalid value will also be assumed to be 1
        byte. */
-    int AccessWidth = 8;
+    uint32_t AccessWidth = 8;
     switch (Target->FieldUnit.AccessType & 0x0F) {
         case 2:
             AccessWidth = 16;
@@ -553,7 +553,7 @@ int AcpipWriteField(AcpiValue *Target, AcpiValue *Data) {
 
         /* On the unaligned loop, we just need to mask off any bits higher than the remaining
            buffer size. */
-        int RunOffLength = BufferWidth - BufferOffset * 8;
+        uint32_t RunOffLength = BufferWidth - BufferOffset * 8;
         if (AccessWidth < RunOffLength) {
             RunOffLength = AccessWidth;
         } else if (RunOffLength < 0) {
@@ -572,8 +572,12 @@ int AcpipWriteField(AcpiValue *Target, AcpiValue *Data) {
     FieldOffset -= Target->FieldUnit.Offset / 8;
 
     /* This should take care of the remaining buffer size being bigger than the AccessWidth. */
-    int RunOffLength = BufferWidth - BufferOffset * 8;
-    if (AccessWidth - UnalignedLength < RunOffLength) {
+    uint32_t RunOffLength = BufferWidth - BufferOffset * 8;
+    if (Target->FieldUnit.Length < AccessWidth) {
+        if (Target->FieldUnit.Length < RunOffLength) {
+            RunOffLength = Target->FieldUnit.Length;
+        }
+    } else if (AccessWidth - UnalignedLength < RunOffLength) {
         RunOffLength = AccessWidth - UnalignedLength;
     } else if (RunOffLength < 0) {
         RunOffLength = 0;

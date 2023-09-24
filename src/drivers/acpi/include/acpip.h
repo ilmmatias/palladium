@@ -9,13 +9,14 @@
 
 #define ACPI_TARGET_NONE 0
 #define ACPI_TARGET_LOCAL 1
-#define ACPI_TARGET_NAMED 2
-#define ACPI_TARGET_UNRESOLVED 3
+#define ACPI_TARGET_ARG 2
+#define ACPI_TARGET_NAMED 3
+#define ACPI_TARGET_UNRESOLVED 4
 
 typedef struct {
     int Type;
     union {
-        int LocalIndex;
+        int Index;
         AcpiObject *Object;
     };
 } AcpipTarget;
@@ -50,6 +51,7 @@ SdtHeader *AcpipFindTable(char Signature[4]);
 void AcpipReadTables(void);
 
 void AcpipPopulatePredefined(void);
+void AcpipPopulateOverride(void);
 void AcpipPopulateTree(const uint8_t *Code, uint32_t Length);
 AcpiObject *AcpipCreateObject(AcpipName *Name, AcpiValue *Value);
 AcpiObject *AcpipResolveObject(AcpipName *Name);

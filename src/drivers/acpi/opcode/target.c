@@ -18,7 +18,19 @@ static int ExecuteSuperName(AcpipState *State, uint8_t Opcode, AcpipTarget *Targ
         case 0x65:
         case 0x66:
             Target->Type = ACPI_TARGET_LOCAL;
-            Target->LocalIndex = Opcode - 0x60;
+            Target->Index = Opcode - 0x60;
+            break;
+
+        /* ArgObj (Arg0-6) */
+        case 0x68:
+        case 0x69:
+        case 0x6A:
+        case 0x6B:
+        case 0x6C:
+        case 0x6D:
+        case 0x6E:
+            Target->Type = ACPI_TARGET_ARG;
+            Target->Index = Opcode - 0x68;
             break;
 
         default:
@@ -119,7 +131,10 @@ int AcpipReadTarget(AcpipState *State, AcpipTarget *Target, AcpiValue *Value) {
 
     switch (Target->Type) {
         case ACPI_TARGET_LOCAL:
-            Source = &State->Locals[Target->LocalIndex];
+            Source = &State->Locals[Target->Index];
+            break;
+        case ACPI_TARGET_ARG:
+            Source = &State->Arguments[Target->Index];
             break;
         case ACPI_TARGET_NAMED:
             printf("Reading from a named field\n");
@@ -135,8 +150,12 @@ int AcpipReadTarget(AcpipState *State, AcpipTarget *Target, AcpiValue *Value) {
 int AcpipStoreTarget(AcpipState *State, AcpipTarget *Target, AcpiValue *Value) {
     switch (Target->Type) {
         case ACPI_TARGET_LOCAL:
-            AcpiRemoveReference(&State->Locals[Target->LocalIndex], 0);
-            memcpy(&State->Locals[Target->LocalIndex], Value, sizeof(AcpiValue));
+            AcpiRemoveReference(&State->Locals[Target->Index], 0);
+            memcpy(&State->Locals[Target->Index], Value, sizeof(AcpiValue));
+            break;
+        case ACPI_TARGET_ARG:
+            AcpiRemoveReference(&State->Arguments[Target->Index], 0);
+            memcpy(&State->Arguments[Target->Index], Value, sizeof(AcpiValue));
             break;
         case ACPI_TARGET_NAMED:
             switch (Target->Object->Value.Type) {

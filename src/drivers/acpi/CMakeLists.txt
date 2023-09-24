@@ -15,6 +15,7 @@ add_executable(acpi "knostdlib"
     interp/aml.c
     interp/field.c
     interp/object.c
+    interp/override.c
     interp/termarg.c
     interp/termlist.c
 

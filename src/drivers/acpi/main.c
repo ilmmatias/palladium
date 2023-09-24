@@ -26,6 +26,83 @@ int printf(const char *format, ...) {
 }
 /* stdio END */
 
+static uint64_t EvaluateSta(AcpiObject *Root) {
+    AcpipName RawName;
+    RawName.LinkedObject = Root;
+    RawName.Start = (const uint8_t *)"_STA";
+    RawName.BacktrackCount = 0;
+    RawName.SegmentCount = 1;
+
+    AcpiObject *Sta = AcpipResolveObject(&RawName);
+    if (!Sta) {
+        return 0x0F;
+    }
+
+    AcpiValue MethodResult;
+    AcpiValue *Value = &Sta->Value;
+    if (Sta->Value.Type == ACPI_METHOD) {
+        if (!AcpiExecuteMethod(Sta, 0, NULL, &MethodResult)) {
+            return 0;
+        }
+
+        Value = &MethodResult;
+    }
+
+    uint64_t Result;
+    return AcpipCastToInteger(Value, &Result, Value == &MethodResult) ? Result : 0;
+}
+
+static void EvaluateReg(AcpiObject *Root, AcpiObject *Region) {
+    AcpipName RawName;
+    RawName.LinkedObject = Root;
+    RawName.Start = (const uint8_t *)"_REG";
+    RawName.BacktrackCount = 0;
+    RawName.SegmentCount = 1;
+
+    AcpiValue Arguments[2];
+    Arguments[0].Type = ACPI_INTEGER;
+    Arguments[0].References = 1;
+    Arguments[0].Integer = Region->Value.Region.RegionSpace;
+    Arguments[1].Type = ACPI_INTEGER;
+    Arguments[1].References = 1;
+    Arguments[1].Integer = 1;
+
+    AcpiExecuteMethod(AcpipResolveObject(&RawName), 2, Arguments, NULL);
+}
+
+static void EvaluateIni(AcpiObject *Root) {
+    AcpipName RawName;
+    RawName.LinkedObject = Root;
+    RawName.Start = (const uint8_t *)"_INI";
+    RawName.BacktrackCount = 0;
+    RawName.SegmentCount = 1;
+    AcpiExecuteMethod(AcpipResolveObject(&RawName), 0, NULL, NULL);
+}
+
+static void InitializeChildren(AcpiObject *Root) {
+    for (AcpiObject *Device = Root->Value.Objects; Device != NULL; Device = Device->Next) {
+        if (Device->Value.Type != ACPI_DEVICE) {
+            continue;
+        }
+
+        uint64_t Sta = EvaluateSta(Device);
+        if (Sta & 1) {
+            EvaluateIni(Device);
+
+            for (AcpiObject *Region = Device->Value.Objects; Region != NULL;
+                 Region = Region->Next) {
+                if (Region->Value.Type == ACPI_REGION) {
+                    EvaluateReg(Device, Region);
+                }
+            }
+        }
+
+        if ((Sta & 1) | (Sta & 8)) {
+            InitializeChildren(Device);
+        }
+    }
+}
+
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function is the entry point of the ACPI compatibility module. We're responsible for
@@ -40,7 +117,24 @@ int printf(const char *format, ...) {
  *-----------------------------------------------------------------------------------------------*/
 void DriverEntry(void) {
     AcpipPopulatePredefined();
+    AcpipPopulateOverride();
     AcpipReadTables();
+
+    /* Non standard, but call the Windows-specific global initialization method. */
+    AcpiExecuteMethod(AcpiSearchObject("\\_INI"), 0, NULL, NULL);
+
+    /* Call the _SB_ scope initialization method. */
+    AcpiExecuteMethod(AcpiSearchObject("\\_SB_._INI"), 0, NULL, NULL);
+
+    /* Initialize all devices inside the _SB_ scope. */
+    InitializeChildren(AcpiSearchObject("\\_SB_"));
+
+    /* Inform the ACPI BIOS that we're still using the classic PIC. */
+    AcpiValue Argument;
+    Argument.Type = ACPI_INTEGER;
+    Argument.References = 1;
+    Argument.Integer = 0;
+    AcpiExecuteMethod(AcpiSearchObject("\\_PIC"), 1, &Argument, NULL);
 
     /* Let's start the shutdown process; Grab the FADT. */
     FadtHeader *Fadt = (FadtHeader *)AcpipFindTable("FACP");
@@ -91,8 +185,6 @@ void DriverEntry(void) {
     }
 
     /* Execute _PTS and _GTS if they exist. */
-    AcpiValue Argument;
-    Argument.Type = ACPI_INTEGER;
     Argument.Integer = 5;
     AcpiExecuteMethod(AcpiSearchObject("\\_PTS"), 1, &Argument, NULL);
     AcpiExecuteMethod(AcpiSearchObject("\\_GTS"), 1, &Argument, NULL);
