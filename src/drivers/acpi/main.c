@@ -41,6 +41,7 @@ static void InitializeChildren(AcpiObject *Root) {
             /* _INI should be a method? Change this to EvaluateObject if we encounter any case of
                this not being one (and it making any difference). */
             AcpiExecuteMethod(AcpiSearchObject(Device, "_INI"), 0, NULL, NULL);
+            AcpipShowDebugMessage("initialized device, top most name %.4s\n", Device->Name);
 
             for (AcpiObject *Region = Device->Value.Children->Objects; Region != NULL;
                  Region = Region->Next) {
