@@ -43,7 +43,13 @@ int AcpipExecuteNamedObjOpcode(AcpipState *State, uint16_t Opcode) {
             AcpiValue Value;
             Value.Type = ACPI_METHOD;
             Value.References = 1;
-            Value.Objects = NULL;
+            Value.Children = malloc(sizeof(AcpiChildren));
+            if (!Value.Children) {
+                return 0;
+            }
+
+            Value.Children->References = 1;
+            Value.Children->Objects = NULL;
             Value.Method.Override = NULL;
             Value.Method.Start = State->Scope->Code + 1;
             Value.Method.Size = Length - LengthSoFar - 1;
@@ -125,7 +131,13 @@ int AcpipExecuteNamedObjOpcode(AcpipState *State, uint16_t Opcode) {
             AcpiValue Value;
             Value.Type = ACPI_REGION;
             Value.References = 1;
-            Value.Objects = NULL;
+            Value.Children = malloc(sizeof(AcpiChildren));
+            if (!Value.Children) {
+                return 0;
+            }
+
+            Value.Children->References = 1;
+            Value.Children->Objects = NULL;
             Value.Region.RegionSpace = RegionSpace;
             Value.Region.RegionLen = RegionLen;
             Value.Region.RegionOffset = RegionOffset;
@@ -164,7 +176,13 @@ int AcpipExecuteNamedObjOpcode(AcpipState *State, uint16_t Opcode) {
             AcpiValue Value;
             Value.Type = Opcode == 0x825B ? ACPI_DEVICE : ACPI_THERMAL;
             Value.References = 1;
-            Value.Objects = NULL;
+            Value.Children = malloc(sizeof(AcpiChildren));
+            if (!Value.Children) {
+                return 0;
+            }
+
+            Value.Children->References = 1;
+            Value.Children->Objects = NULL;
 
             AcpiObject *Object = AcpipCreateObject(&Name, &Value);
             if (!Object) {
@@ -200,7 +218,13 @@ int AcpipExecuteNamedObjOpcode(AcpipState *State, uint16_t Opcode) {
             AcpiValue Value;
             Value.Type = ACPI_PROCESSOR;
             Value.References = 1;
-            Value.Objects = NULL;
+            Value.Children = malloc(sizeof(AcpiChildren));
+            if (!Value.Children) {
+                return 0;
+            }
+
+            Value.Children->References = 1;
+            Value.Children->Objects = NULL;
             Value.Processor.ProcId = *(State->Scope->Code);
             Value.Processor.PblkAddr = *(uint32_t *)(State->Scope->Code + 1);
             Value.Processor.PblkLen = *(State->Scope->Code + 5);
@@ -242,7 +266,13 @@ int AcpipExecuteNamedObjOpcode(AcpipState *State, uint16_t Opcode) {
             AcpiValue Value;
             Value.Type = ACPI_POWER;
             Value.References = 1;
-            Value.Objects = NULL;
+            Value.Children = malloc(sizeof(AcpiChildren));
+            if (!Value.Children) {
+                return 0;
+            }
+
+            Value.Children->References = 1;
+            Value.Children->Objects = NULL;
             Value.Power.SystemLevel = *(State->Scope->Code);
             Value.Power.ResourceOrder = *(uint16_t *)(State->Scope->Code + 1);
 

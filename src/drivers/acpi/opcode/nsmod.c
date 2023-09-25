@@ -93,7 +93,13 @@ int AcpipExecuteNsModOpcode(AcpipState *State, uint16_t Opcode) {
             AcpiValue Value;
             Value.Type = ACPI_SCOPE;
             Value.References = 1;
-            Value.Objects = NULL;
+            Value.Children = malloc(sizeof(AcpiChildren));
+            if (!Value.Children) {
+                return 0;
+            }
+
+            Value.Children->References = 1;
+            Value.Children->Objects = NULL;
 
             AcpiObject *Object = AcpipCreateObject(&Name, &Value);
             if (!Object) {

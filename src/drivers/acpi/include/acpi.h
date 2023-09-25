@@ -34,30 +34,53 @@
 #define ACPI_BANK_FIELD 1
 #define ACPI_INDEX_FIELD 2
 
+#define ACPI_SPACE_SYSTEM_MEMORY 0
+#define ACPI_SPACE_SYSTEM_IO 1
+#define ACPI_SPACE_PCI_CONFIG 2
+#define ACPI_SPACE_EMBEDDED_CONTROL 3
+#define ACPI_SPACE_SMBUS 4
+#define ACPI_SPACE_SYSTEM_CMOS 5
+#define ACPI_SPACE_PCI_BAR_TARGET 6
+#define ACPI_SPACE_IPMI 7
+#define ACPI_SPACE_GENERAL_PURPOSE_IO 8
+#define ACPI_SPACE_GENERIC_SERIAL_BUS 9
+#define ACPI_SPACE_PCC 10
+
 struct AcpiPackageElement;
+struct AcpiPackage;
 struct AcpiValue;
 struct AcpiObject;
 
 typedef int (
     *AcpiOverrideMethod)(int ArgCount, struct AcpiValue *Arguments, struct AcpiValue *Result);
 
+typedef struct {
+    int References;
+    char Data[];
+} AcpiString;
+
+typedef struct {
+    int References;
+    uint64_t Size;
+    uint8_t Data[];
+} AcpiBuffer;
+
+typedef struct {
+    int References;
+    struct AcpiObject *Objects;
+} AcpiChildren;
+
 typedef struct AcpiValue {
     int Type;
     int References;
-    struct AcpiObject *Objects;
+    AcpiChildren *Children;
     union {
         struct AcpiObject *Alias;
         struct AcpiObject *Reference;
         uint64_t Integer;
-        char *String;
-        struct {
-            uint64_t Size;
-            uint8_t *Data;
-        } Buffer;
-        struct {
-            uint64_t Size;
-            struct AcpiPackageElement *Data;
-        } Package;
+        AcpiString *String;
+        AcpiBuffer *Buffer;
+        struct AcpiPackage *Package;
         struct {
             AcpiOverrideMethod Override;
             const uint8_t *Start;
@@ -117,6 +140,12 @@ typedef struct AcpiPackageElement {
     };
 } AcpiPackageElement;
 
+typedef struct AcpiPackage {
+    int References;
+    uint64_t Size;
+    AcpiPackageElement Data[];
+} AcpiPackage;
+
 typedef struct AcpiObject {
     char Name[4];
     struct AcpiValue Value;
@@ -124,10 +153,13 @@ typedef struct AcpiObject {
     struct AcpiObject *Parent;
 } AcpiObject;
 
-AcpiObject *AcpiSearchObject(const char *Name);
+AcpiObject *AcpiSearchObject(AcpiObject *Parent, const char *Name);
+int AcpiEvaluateObject(AcpiObject *Object, AcpiValue *Result, int ExpectedType);
 int AcpiExecuteMethod(AcpiObject *Object, int ArgCount, AcpiValue *Arguments, AcpiValue *Result);
 
-int AcpiCopyValue(AcpiValue *Source, AcpiValue *Target);
+void AcpiCreateReference(AcpiValue *Source, AcpiValue *Target);
 void AcpiRemoveReference(AcpiValue *Value, int CleanupPointer);
+
+int AcpiCopyValue(AcpiValue *Source, AcpiValue *Target);
 
 #endif /* _ACPI_H_ */

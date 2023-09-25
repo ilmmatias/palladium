@@ -42,28 +42,23 @@ int AcpipExecuteRefOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value) 
                     }
 
                     Value->Type = ACPI_INTEGER;
-                    Value->Integer = Source->Type == ACPI_STRING ? Source->String[Index]
-                                                                 : Source->Buffer.Data[Index];
+                    Value->References = 1;
+                    Value->Integer = Source->Type == ACPI_STRING ? Source->String->Data[Index]
+                                                                 : Source->Buffer->Data[Index];
                     break;
                 }
 
-                case ACPI_LOCAL: {
-                    if (!AcpiCopyValue(&State->Locals[Reference.Integer], Value)) {
-                        AcpiRemoveReference(&Reference, 0);
-                        return 0;
-                    }
-
+                case ACPI_LOCAL:
+                    AcpiCreateReference(&State->Locals[Reference.Integer], Value);
                     break;
-                }
 
-                case ACPI_ARG: {
-                    if (!AcpiCopyValue(&State->Arguments[Reference.Integer], Value)) {
-                        AcpiRemoveReference(&Reference, 0);
-                        return 0;
-                    }
-
+                case ACPI_ARG:
+                    AcpiCreateReference(&State->Arguments[Reference.Integer], Value);
                     break;
-                }
+
+                case ACPI_REFERENCE:
+                    AcpiCreateReference(&Reference.Reference->Value, Value);
+                    break;
 
                 default:
                     printf("DerefOf, default case\n");
@@ -87,12 +82,6 @@ int AcpipExecuteRefOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value) 
                 return 0;
             }
 
-            if (Buffer->Type == ACPI_REFERENCE) {
-                AcpiValue *Reference = &Buffer->Reference->Value;
-                free(Buffer);
-                Buffer = Reference;
-            }
-
             if (Buffer->Type != ACPI_STRING && Buffer->Type != ACPI_BUFFER &&
                 Buffer->Type != ACPI_PACKAGE) {
                 AcpiRemoveReference(Buffer, 1);
@@ -114,7 +103,7 @@ int AcpipExecuteRefOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value) 
             /* Pre-validate the index value (prevent buffer overflows). */
             switch (Buffer->Type) {
                 case ACPI_STRING: {
-                    if (Index > strlen(Buffer->String)) {
+                    if (Index > strlen(Buffer->String->Data)) {
                         AcpiRemoveReference(Buffer, 1);
                         return 0;
                     }
@@ -123,7 +112,7 @@ int AcpipExecuteRefOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value) 
                 }
 
                 case ACPI_BUFFER: {
-                    if (Index >= Buffer->Buffer.Size) {
+                    if (Index >= Buffer->Buffer->Size) {
                         AcpiRemoveReference(Buffer, 1);
                         return 0;
                     }
@@ -132,7 +121,7 @@ int AcpipExecuteRefOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value) 
                 }
 
                 default: {
-                    if (Index >= Buffer->Package.Size) {
+                    if (Index >= Buffer->Package->Size) {
                         AcpiRemoveReference(Buffer, 1);
                         return 0;
                     }
@@ -142,6 +131,7 @@ int AcpipExecuteRefOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value) 
             }
 
             Value->Type = ACPI_INDEX;
+            Value->References = 1;
             Value->Index.Source = Buffer;
             Value->Index.Index = Index;
 
@@ -166,6 +156,7 @@ int AcpipExecuteRefOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value) 
             }
 
             Value->Type = ACPI_INTEGER;
+            Value->References = 1;
             Value->Integer = SuperName.Type == ACPI_TARGET_UNRESOLVED ? 0 : UINT64_MAX;
 
             if (SuperName.Type != ACPI_TARGET_UNRESOLVED) {
@@ -186,7 +177,7 @@ int AcpipExecuteRefOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value) 
                     case ACPI_TARGET_NAMED:
                         Reference.Type = ACPI_REFERENCE;
                         Reference.Reference = SuperName.Object;
-                        SuperName.Object->Value.References++;
+                        AcpiCreateReference(&SuperName.Object->Value, NULL);
                         break;
                 }
 

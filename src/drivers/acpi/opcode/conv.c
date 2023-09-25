@@ -51,12 +51,6 @@ int AcpipExecuteConvOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
                 return 0;
             }
 
-            AcpiValue *Source = Value->Type == ACPI_REFERENCE ? &Value->Reference->Value : Value;
-            if (Source->Type != ACPI_INTEGER && Source->Type != ACPI_STRING &&
-                Source->Type != ACPI_BUFFER) {
-                return 0;
-            }
-
             AcpipTarget Target;
             if (!AcpipExecuteTarget(State, &Target)) {
                 return 0;
@@ -76,12 +70,6 @@ int AcpipExecuteConvOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
         /* DefToInteger := ToIntegerOp Operand Target */
         case 0x99: {
             if (!AcpipExecuteOpcode(State, Value, 0)) {
-                return 0;
-            }
-
-            AcpiValue *Source = Value->Type == ACPI_REFERENCE ? &Value->Reference->Value : Value;
-            if (Source->Type != ACPI_INTEGER && Source->Type != ACPI_STRING &&
-                Source->Type != ACPI_BUFFER) {
                 return 0;
             }
 

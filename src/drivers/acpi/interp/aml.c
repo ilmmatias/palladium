@@ -8,6 +8,8 @@
 #include <string.h>
 
 static AcpiObject ObjectTreeRoot;
+static AcpiChildren ObjectTreeRootChildren;
+
 extern AcpiObject *AcpipObjectTree;
 
 /*-------------------------------------------------------------------------------------------------
@@ -58,8 +60,8 @@ int AcpiExecuteMethod(AcpiObject *Object, int ArgCount, AcpiValue *Arguments, Ac
 
     /* Objects defined inside methods have temporary scopes (they live as long as the method
        doesn't return), so we still need to cleanup (even on failure). */
-    AcpiObject *Base = Object->Value.Objects;
-    Object->Value.Objects = NULL;
+    AcpiObject *Base = Object->Value.Children->Objects;
+    Object->Value.Children->Objects = NULL;
 
     while (Base != NULL) {
         AcpiObject *Next = Base->Next;
@@ -96,40 +98,57 @@ int AcpiCopyValue(AcpiValue *Source, AcpiValue *Target) {
 
     switch (Source->Type) {
         case ACPI_STRING:
-            Target->String = strdup(Source->String);
+            Target->String = malloc(sizeof(AcpiString) + strlen(Source->String->Data) + 1);
             if (!Target->String) {
                 return 0;
             }
 
+            Target->String->References = 1;
+            memcpy(Target->String->Data, Source->String->Data, strlen(Source->String->Data) + 1);
+
             break;
 
         case ACPI_BUFFER:
-            Target->Buffer.Data = malloc(Source->Buffer.Size);
-            if (!Target->Buffer.Data) {
+            Target->Buffer = malloc(sizeof(AcpiBuffer) + Source->Buffer->Size);
+            if (!Target->Buffer) {
                 return 0;
             }
 
-            memcpy(Target->Buffer.Data, Source->Buffer.Data, Source->Buffer.Size);
+            Target->Buffer->References = 1;
+            Target->Buffer->Size = Source->Buffer->Size;
+            memcpy(Target->Buffer->Data, Source->Buffer->Data, Source->Buffer->Size);
+
             break;
 
         case ACPI_PACKAGE:
-            Target->Package.Data = malloc(Source->Package.Size * sizeof(AcpiPackageElement));
-            if (!Target->Package.Data) {
+            Target->Package =
+                malloc(sizeof(AcpiPackage) + Source->Package->Size * sizeof(AcpiPackageElement));
+            if (!Target->Package) {
                 return 0;
             }
 
-            for (uint64_t i = 0; i < Source->Package.Size; i++) {
-                Target->Package.Data[i].Type = Source->Package.Data[i].Type;
-                if (Source->Package.Data[i].Type &&
-                    !AcpiCopyValue(
-                        &Source->Package.Data[i].Value, &Target->Package.Data[i].Value)) {
-                    /* Recursive cleanup on failure (if we processed any items). */
-                    Target->Package.Size = i ? i - 1 : 0;
-                    AcpiRemoveReference(Target, 0);
-                    return 0;
+            Target->Package->References = 1;
+            Target->Package->Size = Source->Package->Size;
+
+            for (uint64_t i = 0; i < Source->Package->Size; i++) {
+                Target->Package->Data[i].Type = Source->Package->Data[i].Type;
+
+                if (Source->Package->Data[i].Type) {
+                    if (!AcpiCopyValue(
+                            &Source->Package->Data[i].Value, &Target->Package->Data[i].Value)) {
+                        /* Recursive cleanup on failure (if we processed any items). */
+                        Target->Package->Size = i ? i - 1 : 0;
+                        AcpiRemoveReference(Target, 0);
+                        return 0;
+                    }
                 }
             }
 
+            break;
+
+        case ACPI_FIELD_UNIT:
+            AcpiCreateReference(&Source->FieldUnit.Region->Value, NULL);
+            AcpiCreateReference(&Source->FieldUnit.Data->Value, NULL);
             break;
 
         case ACPI_BUFFER_FIELD:
@@ -138,6 +157,63 @@ int AcpiCopyValue(AcpiValue *Source, AcpiValue *Target) {
     }
 
     return 1;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function tells the object that either its containing pointer/object is being added
+ *     inside another (and we need to increase the value reference counter), or that we're reusing
+ *     its internal data (and just increasing the type-specific reference counter), according to
+ *     Target.
+ *
+ * PARAMETERS:
+ *     Source - Value being referenced.
+ *     Target - Optional; Setting this to NULL means we want to reference the pointer/object
+ *              itself, otherwise, it means we want to reference the inner data.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void AcpiCreateReference(AcpiValue *Source, AcpiValue *Target) {
+    if (!Source) {
+        return;
+    }
+
+    if (!Target) {
+        Source->References++;
+        return;
+    }
+
+    memcpy(Target, Source, sizeof(AcpiValue));
+    switch (Target->Type) {
+        case ACPI_INTEGER:
+            break;
+        case ACPI_STRING:
+            Target->String->References++;
+            break;
+        case ACPI_BUFFER:
+            Target->Buffer->References++;
+            break;
+        case ACPI_PACKAGE:
+            Target->Package->References++;
+            break;
+        case ACPI_FIELD_UNIT:
+            AcpiCreateReference(&Target->FieldUnit.Region->Value, NULL);
+            AcpiCreateReference(&Target->FieldUnit.Data->Value, NULL);
+            break;
+        case ACPI_BUFFER_FIELD:
+            AcpiCreateReference(Target->BufferField.FieldSource, NULL);
+            break;
+        case ACPI_DEVICE:
+        case ACPI_METHOD:
+        case ACPI_REGION:
+        case ACPI_POWER:
+        case ACPI_PROCESSOR:
+        case ACPI_THERMAL:
+        case ACPI_SCOPE:
+            Target->Children->References++;
+            break;
+    }
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -162,31 +238,40 @@ void AcpiRemoveReference(AcpiValue *Value, int CleanupPointer) {
 
     switch (Value->Type) {
         case ACPI_STRING:
-            if (NeedsCleanup && Value->String) {
+            if (NeedsCleanup && --Value->String->References <= 0) {
                 free(Value->String);
             }
 
             break;
 
         case ACPI_BUFFER:
-            if (NeedsCleanup && Value->Buffer.Data) {
-                free(Value->Buffer.Data);
+            if (NeedsCleanup && --Value->Buffer->References <= 0) {
+                free(Value->Buffer);
             }
 
             break;
 
         case ACPI_PACKAGE:
-            if (NeedsCleanup) {
-                for (uint64_t i = 0; i < Value->Package.Size; i++) {
-                    if (Value->Package.Data[i].Type) {
-                        AcpiRemoveReference(&Value->Package.Data[i].Value, 0);
+            if (NeedsCleanup && --Value->Package->References <= 0) {
+                for (uint64_t i = 0; i < Value->Package->Size; i++) {
+                    if (Value->Package->Data[i].Type) {
+                        AcpiRemoveReference(&Value->Package->Data[i].Value, 0);
                     }
                 }
 
-                free(Value->Package.Data);
+                free(Value->Package);
             }
 
             break;
+
+        case ACPI_FIELD_UNIT: {
+            if (NeedsCleanup) {
+                AcpiRemoveReference(&Value->FieldUnit.Region->Value, 1);
+                AcpiRemoveReference(&Value->FieldUnit.Data->Value, 1);
+            }
+
+            break;
+        }
 
         case ACPI_BUFFER_FIELD:
             if (NeedsCleanup) {
@@ -226,11 +311,18 @@ void AcpipPopulatePredefined(void) {
         KeFatalError(KE_EARLY_MEMORY_FAILURE);
     }
 
+    AcpiChildren *Children = calloc(PREDEFINED_ITEMS, sizeof(AcpiChildren));
+    if (!Children) {
+        KeFatalError(KE_EARLY_MEMORY_FAILURE);
+    }
+
     for (int i = 0; i < PREDEFINED_ITEMS; i++) {
         memcpy(Objects[i].Name, Names[i], 4);
         Objects[i].Value.Type = ACPI_SCOPE;
         Objects[i].Value.References = 1;
-        Objects[i].Value.Objects = NULL;
+        Objects[i].Value.Children = &Children[i];
+        Objects[i].Value.Children->References = 1;
+        Objects[i].Value.Children->Objects = NULL;
         Objects[i].Next = NULL;
         Objects[i].Parent = &ObjectTreeRoot;
 
@@ -242,7 +334,9 @@ void AcpipPopulatePredefined(void) {
     memcpy(ObjectTreeRoot.Name, "____", 4);
     ObjectTreeRoot.Value.Type = ACPI_SCOPE;
     ObjectTreeRoot.Value.References = 1;
-    ObjectTreeRoot.Value.Objects = Objects;
+    ObjectTreeRoot.Value.Children = &ObjectTreeRootChildren;
+    ObjectTreeRootChildren.References = 1;
+    ObjectTreeRootChildren.Objects = Objects;
     ObjectTreeRoot.Next = NULL;
     ObjectTreeRoot.Parent = NULL;
     AcpipObjectTree = &ObjectTreeRoot;

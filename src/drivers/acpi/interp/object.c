@@ -14,55 +14,114 @@ AcpiObject *AcpipObjectTree = NULL;
  *     This function searches for an object/entry within the AML namespace tree.
  *
  * PARAMETERS:
+ *     Parent - Which scope to search for the object.
  *     Name - Name attached to the object.
- *     NameSegs - Output; How many segments the name had; Can be NULL.
  *
  * RETURN VALUE:
  *     Pointer to the object if the entry was found, NULL otherwise.
  *-----------------------------------------------------------------------------------------------*/
-AcpiObject *AcpiSearchObject(const char *Name) {
+AcpiObject *AcpiSearchObject(AcpiObject *Parent, const char *Name) {
     if (!Name || !AcpipObjectTree) {
         return NULL;
+    } else if (!Parent) {
+        Parent = AcpipObjectTree;
     }
 
-    char *Path = strdup(Name + 1);
-    if (!Path) {
+    if (Parent->Value.Type != ACPI_DEVICE && Parent->Value.Type != ACPI_REGION &&
+        Parent->Value.Type != ACPI_POWER && Parent->Value.Type != ACPI_PROCESSOR &&
+        Parent->Value.Type != ACPI_THERMAL && Parent->Value.Type != ACPI_SCOPE) {
         return NULL;
     }
 
-    AcpiObject *Namespace = AcpipObjectTree->Value.Objects;
-    char *Token = strtok(Path, ".");
-
-    /* `Name` should contain the full path/namespace for the item, and as such, we need to tokenize
-       it to find the right leaf within the namespace. */
-    while (Namespace) {
-        if (!Token) {
-            free(Path);
-            return Namespace->Parent;
+    for (AcpiObject *Object = Parent->Value.Children->Objects; Object; Object = Object->Next) {
+        if (!memcmp(Object->Name, Name, 4)) {
+            return Object;
         }
-
-        if (!memcmp(Namespace->Name, Token, 4)) {
-            Token = strtok(NULL, ".");
-
-            if (!Token) {
-                return Namespace;
-            }
-
-            if (Namespace->Value.Type != ACPI_REGION && Namespace->Value.Type != ACPI_SCOPE &&
-                Namespace->Value.Type != ACPI_DEVICE && Namespace->Value.Type != ACPI_PROCESSOR) {
-                free(Path);
-                return NULL;
-            }
-
-            Namespace = Namespace->Value.Objects;
-            continue;
-        }
-
-        Namespace = Namespace->Next;
     }
 
-    free(Path);
     return NULL;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function evaluates the given object, either executing it as a method and returning its
+ *     result, or copying its value.
+ *
+ * PARAMETERS:
+ *     Object - The object to be evaluated.
+ *     Result - Output; Where to store the result.
+ *     ExpectedType - What type we want; we'll automatically CastToX() if this isn't ACPI_EMPTY.
+ *
+ * RETURN VALUE:
+ *     1 on success, 0 otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+int AcpiEvaluateObject(AcpiObject *Object, AcpiValue *Result, int ExpectedType) {
+    if (!Object || !Result) {
+        return 0;
+    }
+
+    AcpiValue MethodResult;
+    AcpiValue *Value = &Object->Value;
+    if (Value->Type == ACPI_METHOD) {
+        /* It should be safe to assume that a mismatch in the argument size means something's gone
+           wrong?*/
+        if (Value->Method.Flags & 0x07) {
+            return 0;
+        } else if (!AcpiExecuteMethod(Object, 0, NULL, &MethodResult)) {
+            return 0;
+        }
+
+        Value = &MethodResult;
+    }
+
+    AcpiCreateReference(Value, Result);
+    if (Value != &Object->Value) {
+        AcpiRemoveReference(Value, 0);
+    }
+
+    /* Equal types means we're done. */
+    if (ExpectedType == ACPI_EMPTY || ExpectedType == Value->Type) {
+        return 1;
+    }
+
+    switch (ExpectedType) {
+        case ACPI_INTEGER: {
+            uint64_t Integer;
+            if (!AcpipCastToInteger(Result, &Integer, 1)) {
+                return 0;
+            }
+
+            Result->Type = ACPI_INTEGER;
+            Result->References = 1;
+            Result->Integer = Integer;
+            break;
+        }
+
+        case ACPI_STRING: {
+            if (!AcpipCastToString(Result, 1, 0)) {
+                return 0;
+            }
+
+            break;
+        }
+
+        case ACPI_BUFFER: {
+            if (!AcpipCastToBuffer(Result)) {
+                return 0;
+            }
+
+            break;
+        }
+
+        default: {
+            if (Value->Type != ExpectedType) {
+                AcpiRemoveReference(Result, 0);
+                return 0;
+            }
+        }
+    }
+
+    return 1;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -79,7 +138,7 @@ AcpiObject *AcpiSearchObject(const char *Name) {
  *-----------------------------------------------------------------------------------------------*/
 AcpiObject *AcpipCreateObject(AcpipName *Name, AcpiValue *Value) {
     AcpiObject *Parent = Name->LinkedObject ? Name->LinkedObject : AcpipObjectTree;
-    AcpiObject *Base = Parent->Value.Objects;
+    AcpiObject *Base = Parent->Value.Children->Objects;
 
     /* First pass, backtrack however many `^` we had prefixing this path. */
     while (Name->BacktrackCount > 0) {
@@ -100,13 +159,14 @@ AcpiObject *AcpipCreateObject(AcpipName *Name, AcpiValue *Value) {
             }
 
             if (!memcmp(Base->Name, Name->Start, 4)) {
-                if (Base->Value.Type != ACPI_REGION && Base->Value.Type != ACPI_SCOPE &&
-                    Base->Value.Type != ACPI_DEVICE && Base->Value.Type != ACPI_PROCESSOR) {
+                if (Base->Value.Type != ACPI_DEVICE && Base->Value.Type != ACPI_REGION &&
+                    Base->Value.Type != ACPI_POWER && Base->Value.Type != ACPI_PROCESSOR &&
+                    Base->Value.Type != ACPI_THERMAL && Base->Value.Type != ACPI_SCOPE) {
                     return NULL;
                 }
 
                 Parent = Base;
-                Base = Base->Value.Objects;
+                Base = Base->Value.Children->Objects;
                 break;
             }
 
@@ -155,7 +215,7 @@ AcpiObject *AcpipCreateObject(AcpipName *Name, AcpiValue *Value) {
     if (Base) {
         Base->Next = Entry;
     } else {
-        Parent->Value.Objects = Entry;
+        Parent->Value.Children->Objects = Entry;
     }
 
     return Entry;
@@ -173,7 +233,7 @@ AcpiObject *AcpipCreateObject(AcpipName *Name, AcpiValue *Value) {
  *-----------------------------------------------------------------------------------------------*/
 AcpiObject *AcpipResolveObject(AcpipName *Name) {
     AcpiObject *Parent = Name->LinkedObject ? Name->LinkedObject : AcpipObjectTree;
-    AcpiObject *Base = Parent->Value.Objects;
+    AcpiObject *Base = Parent->Value.Children->Objects;
 
     /* First pass, backtrack however many `^` we had prefixing this path. */
     while (Name->BacktrackCount > 0) {
@@ -193,12 +253,13 @@ AcpiObject *AcpipResolveObject(AcpipName *Name) {
             }
 
             if (!memcmp(Base->Name, Name->Start, 4)) {
-                if (Base->Value.Type != ACPI_REGION && Base->Value.Type != ACPI_SCOPE &&
-                    Base->Value.Type != ACPI_DEVICE && Base->Value.Type != ACPI_PROCESSOR) {
+                if (Base->Value.Type != ACPI_DEVICE && Base->Value.Type != ACPI_REGION &&
+                    Base->Value.Type != ACPI_POWER && Base->Value.Type != ACPI_PROCESSOR &&
+                    Base->Value.Type != ACPI_THERMAL && Base->Value.Type != ACPI_SCOPE) {
                     return NULL;
                 }
 
-                Base = Base->Value.Objects;
+                Base = Base->Value.Children->Objects;
                 break;
             }
 
@@ -226,7 +287,7 @@ AcpiObject *AcpipResolveObject(AcpipName *Name) {
                 return NULL;
             }
 
-            Base = Parent->Value.Objects;
+            Base = Parent->Value.Children->Objects;
             continue;
         }
 
@@ -242,7 +303,7 @@ AcpiObject *AcpipResolveObject(AcpipName *Name) {
                previous scope. */
             Parent = Base->Parent->Parent;
             if (Parent) {
-                Base = Parent->Value.Objects;
+                Base = Parent->Value.Children->Objects;
             } else {
                 return NULL;
             }

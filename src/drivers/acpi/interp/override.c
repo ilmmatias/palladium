@@ -25,14 +25,16 @@ extern AcpiObject *AcpipObjectTree;
 static int ExecuteOsi(int ArgCount, AcpiValue *Arguments, AcpiValue *Result) {
     /* Return TRUE for Darwin, otherwise, we'll probably fail to boot on Macs. */
     if (ArgCount >= 1 && Arguments[0].Type == ACPI_STRING &&
-        (!strncmp(Arguments[0].String, "Windows ", 8) || !strcmp(Arguments[0].String, "Darwin") ||
-         !strcmp(Arguments[0].String, "Module Device") ||
-         !strcmp(Arguments[0].String, "Processor Device") ||
-         !strcmp(Arguments[0].String, "3.0 Thermal Model") ||
-         !strcmp(Arguments[0].String, "Extended Address Space Descriptor") ||
-         !strcmp(Arguments[0].String, "3.0 _SCP Extensions") ||
-         !strcmp(Arguments[0].String, "Processor Aggregator Device"))) {
+        (!strncmp(Arguments[0].String->Data, "Windows ", 8) ||
+         !strcmp(Arguments[0].String->Data, "Darwin") ||
+         !strcmp(Arguments[0].String->Data, "Module Device") ||
+         !strcmp(Arguments[0].String->Data, "Processor Device") ||
+         !strcmp(Arguments[0].String->Data, "3.0 Thermal Model") ||
+         !strcmp(Arguments[0].String->Data, "Extended Address Space Descriptor") ||
+         !strcmp(Arguments[0].String->Data, "3.0 _SCP Extensions") ||
+         !strcmp(Arguments[0].String->Data, "Processor Aggregator Device"))) {
         Result->Type = ACPI_INTEGER;
+        Result->References = 1;
         Result->Integer = UINT64_MAX;
         return 1;
     }
@@ -58,9 +60,15 @@ static int ExecuteOsi(int ArgCount, AcpiValue *Arguments, AcpiValue *Result) {
 static int ExecuteOs(int ArgCount, AcpiValue *Arguments, AcpiValue *Result) {
     (void)ArgCount;
     (void)Arguments;
+
     Result->Type = ACPI_STRING;
     Result->References = 1;
-    Result->String = strdup("Microsoft Windows NT");
+    Result->String = malloc(sizeof(AcpiString) + strlen("Microsoft Windows NT") + 1);
+    if (Result->String) {
+        Result->String->References = 1;
+        strcpy(Result->String->Data, "Microsoft Windows NT");
+    }
+
     return Result->String != NULL;
 }
 
@@ -125,7 +133,7 @@ void AcpipPopulateOverride(void) {
         memcpy(Objects[i].Name, Names[i], 4);
         Objects[i].Value.Type = ACPI_METHOD;
         Objects[i].Value.References = 1;
-        Objects[i].Value.Objects = NULL;
+        Objects[i].Value.Children->Objects = NULL;
         Objects[i].Value.Method.Override = Methods[i];
         Objects[i].Value.Method.Start = NULL;
         Objects[i].Value.Method.Size = 0;
@@ -139,7 +147,7 @@ void AcpipPopulateOverride(void) {
     }
 
     /* We'll be appending all items to the last entry in the root scope. */
-    AcpiObject *Parent = AcpipObjectTree->Value.Objects;
+    AcpiObject *Parent = AcpipObjectTree->Value.Children->Objects;
     while (Parent->Next != NULL) {
         Parent = Parent->Next;
     }

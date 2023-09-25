@@ -51,14 +51,15 @@ int AcpipExecuteConcatOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Valu
 
                     Value->Type = ACPI_BUFFER;
                     Value->References = 1;
-                    Value->Buffer.Size = 16;
-                    Value->Buffer.Data = malloc(16);
-                    if (!Value->Buffer.Data) {
+                    Value->Buffer = malloc(sizeof(AcpiBuffer) + 16);
+                    if (!Value->Buffer) {
                         return 0;
                     }
 
-                    *((uint64_t *)Value->Buffer.Data) = LeftValue;
-                    *((uint64_t *)(Value->Buffer.Data + 8)) = RightValue;
+                    Value->Buffer->References = 1;
+                    Value->Buffer->Size = 16;
+                    *((uint64_t *)Value->Buffer->Data) = LeftValue;
+                    *((uint64_t *)(Value->Buffer->Data + 8)) = RightValue;
 
                     break;
                 }
@@ -66,22 +67,27 @@ int AcpipExecuteConcatOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Valu
                 /* Read it as two buffers, and append them into another buffer. */
                 case ACPI_BUFFER: {
                     if (!AcpipCastToBuffer(&Right)) {
+                        AcpiRemoveReference(&Left, 0);
                         return 0;
                     }
 
                     Value->Type = ACPI_BUFFER;
                     Value->References = 1;
-                    Value->Buffer.Size = Left.Buffer.Size + Right.Buffer.Size;
-                    Value->Buffer.Data = malloc(Value->Buffer.Size);
-                    if (!Value->Buffer.Data) {
+                    Value->Buffer =
+                        malloc(sizeof(AcpiBuffer) + Left.Buffer->Size + Right.Buffer->Size);
+                    if (!Value->Buffer) {
+                        AcpiRemoveReference(&Left, 0);
+                        AcpiRemoveReference(&Right, 0);
                         return 0;
                     }
 
-                    memcpy(Value->Buffer.Data, Left.Buffer.Data, Left.Buffer.Size);
+                    Value->Buffer->References = 1;
+                    Value->Buffer->Size = Left.Buffer->Size + Right.Buffer->Size;
+                    memcpy(Value->Buffer->Data, Left.Buffer->Data, Left.Buffer->Size);
                     memcpy(
-                        Value->Buffer.Data + Left.Buffer.Size,
-                        Right.Buffer.Data,
-                        Right.Buffer.Size);
+                        Value->Buffer->Data + Left.Buffer->Size,
+                        Right.Buffer->Data,
+                        Right.Buffer->Size);
 
                     break;
                 }
@@ -89,18 +95,23 @@ int AcpipExecuteConcatOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Valu
                 /* Convert both sides into strings, and append them into a single string. */
                 default: {
                     if (!AcpipCastToString(&Left, 1, 0) || !AcpipCastToString(&Right, 1, 0)) {
+                        AcpiRemoveReference(&Left, 0);
+                        AcpiRemoveReference(&Right, 0);
                         return 0;
                     }
 
                     Value->Type = ACPI_STRING;
                     Value->References = 1;
-                    Value->String = malloc(strlen(Left.String) + strlen(Right.String) + 1);
+                    Value->String = malloc(
+                        sizeof(AcpiString) + strlen(Left.String->Data) +
+                        strlen(Right.String->Data) + 1);
                     if (!Value->String) {
                         return 0;
                     }
 
-                    strcpy(Value->String, Left.String);
-                    strcat(Value->String, Right.String);
+                    Value->String->References = 1;
+                    strcpy(Value->String->Data, Left.String->Data);
+                    strcat(Value->String->Data, Right.String->Data);
 
                     break;
                 }

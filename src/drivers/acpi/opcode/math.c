@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <acpip.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 /*-------------------------------------------------------------------------------------------------
@@ -49,6 +50,7 @@ int AcpipExecuteMathOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
             }
 
             Value->Type = ACPI_INTEGER;
+            Value->References = 1;
             switch (Opcode) {
                 case 0x72:
                     Value->Integer = Left + Right;
@@ -110,6 +112,7 @@ int AcpipExecuteMathOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
             }
 
             Value->Type = ACPI_INTEGER;
+            Value->References = 1;
             switch (Opcode) {
                 case 0x75:
                     Value->Integer = TargetInteger + 1;
@@ -143,6 +146,7 @@ int AcpipExecuteMathOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
             }
 
             Value->Type = ACPI_INTEGER;
+            Value->References = 1;
             switch (Opcode) {
                 case 0x90:
                     Value->Integer = Left && Right;
@@ -173,6 +177,7 @@ int AcpipExecuteMathOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
             }
 
             Value->Type = ACPI_INTEGER;
+            Value->References = 1;
             Value->Integer = Operand ? 0 : UINT64_MAX;
 
             break;

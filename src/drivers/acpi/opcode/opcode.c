@@ -130,14 +130,12 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result, int ObjReference) {
                 Value.Type = ACPI_INTEGER;
                 Value.References = 1;
 
-                AcpiValue *TargetValue =
-                    Target.Type == ACPI_REFERENCE ? &Target.Reference->Value : &Target;
-                if (TargetValue->Type == ACPI_STRING) {
-                    Value.Integer = strlen(TargetValue->String);
-                } else if (TargetValue->Type == ACPI_BUFFER) {
-                    Value.Integer = TargetValue->Buffer.Size;
-                } else if (TargetValue->Type == ACPI_PACKAGE) {
-                    Value.Integer = TargetValue->Package.Size;
+                if (Target.Type == ACPI_STRING) {
+                    Value.Integer = strlen(Target.String->Data);
+                } else if (Target.Type == ACPI_BUFFER) {
+                    Value.Integer = Target.Buffer->Size;
+                } else if (Target.Type == ACPI_PACKAGE) {
+                    Value.Integer = Target.Package->Size;
                 } else {
                     return 0;
                 }
@@ -208,9 +206,7 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result, int ObjReference) {
 
                         /* Anything else we just mount a reference to. */
                         default:
-                            Value.Type = ACPI_REFERENCE;
-                            Value.Reference = Object;
-                            Object->Value.References++;
+                            AcpiCreateReference(&Object->Value, &Value);
                             break;
                     }
 

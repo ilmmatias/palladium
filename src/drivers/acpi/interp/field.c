@@ -9,46 +9,6 @@
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function resolves an object, either casting it directly into an integer, or executing
- *     it as a method (and trying casting its return value into an integer), depending on the
- *     type of the object.
- *     We use this to resolve all the required objects for PCI config related setup.
- *
- * PARAMETERS:
- *     Object - Base object; PCI config region.
- *     Name - Name of the object to be resolved.
- *     Result - Output; Will be set to whatever integer we read on success.
- *
- * RETURN VALUE:
- *     1 on success, 0 otherwise.
- *-----------------------------------------------------------------------------------------------*/
-static int ReadInteger(AcpiObject *Object, const char *Name, uint64_t *Result) {
-    AcpipName RawName;
-    RawName.LinkedObject = Object;
-    RawName.Start = (const uint8_t *)Name;
-    RawName.BacktrackCount = 0;
-    RawName.SegmentCount = 1;
-
-    Object = AcpipResolveObject(&RawName);
-    if (!Object) {
-        return 0;
-    }
-
-    if (Object->Value.Type != ACPI_METHOD) {
-        Object->Value.References++;
-        return AcpipCastToInteger(&Object->Value, Result, 0);
-    }
-
-    AcpiValue Value;
-    if (!AcpiExecuteMethod(Object, 0, NULL, &Value)) {
-        return 0;
-    }
-
-    return AcpipCastToInteger(&Value, Result, 1);
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
  *     This function sets up a region for reading/writing into the PCI configuration space.
  *     We're a noop if the region isn't PCI_Config, or if we have already cached the required
  *     values.
@@ -64,29 +24,55 @@ static int SetupPciConfigRegion(AcpiObject *Object) {
         return 1;
     }
 
+    /* _SEG and _BBN makes no sense to exist inside a sub device, they should be taken from
+       the root bus instead. */
+    AcpiObject *RootBus = Object;
+    while (RootBus) {
+        AcpiValue Id;
+
+        if (AcpiEvaluateObject(AcpiSearchObject(RootBus, "_HID"), &Id, ACPI_INTEGER) ||
+            AcpiEvaluateObject(AcpiSearchObject(RootBus, "_CID"), &Id, ACPI_INTEGER)) {
+            if (Id.Integer == 0x030AD041 || Id.Integer == 0x080AD041) {
+                break;
+            }
+        }
+
+        RootBus = RootBus->Parent;
+    }
+
+    /* It makes no sense for the root PCI bus to not exist. */
+    if (!RootBus) {
+        return 0;
+    }
+
     /* _ADR is the only required symbol, as it the device and function values (which we can't
        obtain any other way, and can't assume to be zero).
        _SEG and _BBN will be also used if they're found, but they'll be taken as 0 (root bus)
        otherwise. */
 
-    uint64_t AdrValue;
-    if (!ReadInteger(Object, "_ADR", &AdrValue)) {
+    AcpiValue Adr;
+    AcpipName Name;
+    Name.LinkedObject = Object;
+    Name.Start = (const uint8_t *)"_ADR";
+    Name.BacktrackCount = 0;
+    Name.SegmentCount = 1;
+    if (!AcpiEvaluateObject(AcpipResolveObject(&Name), &Adr, ACPI_INTEGER)) {
         return 0;
     }
 
-    uint64_t SegValue;
-    if (ReadInteger(Object, "_SEG", &SegValue)) {
-        Object->Value.Region.PciSegment = SegValue;
+    AcpiValue Seg;
+    if (!AcpiEvaluateObject(AcpiSearchObject(RootBus, "_SEG"), &Adr, ACPI_INTEGER)) {
+        Object->Value.Region.PciSegment = Seg.Integer;
     }
 
-    uint64_t BbnValue;
-    if (ReadInteger(Object, "_BBN", &BbnValue)) {
-        Object->Value.Region.PciBus = BbnValue;
+    AcpiValue Bbn;
+    if (!AcpiEvaluateObject(AcpiSearchObject(RootBus, "_BBN"), &Bbn, ACPI_INTEGER)) {
+        Object->Value.Region.PciBus = Bbn.Integer;
     }
 
     /* Everything seems to be valid, break down the _ADR value, and set this region as ready. */
-    Object->Value.Region.PciDevice = (AdrValue >> 16) & UINT16_MAX;
-    Object->Value.Region.PciFunction = AdrValue & UINT16_MAX;
+    Object->Value.Region.PciDevice = (Adr.Integer >> 16) & UINT16_MAX;
+    Object->Value.Region.PciFunction = Adr.Integer & UINT16_MAX;
     Object->Value.Region.PciReady = 1;
     return 1;
 }
@@ -406,18 +392,22 @@ int AcpipReadField(AcpiValue *Source, AcpiValue *Target) {
        any extra memory. */
     uint8_t *Buffer;
     if (Source->FieldUnit.Length > 64) {
-        Target->Type = ACPI_BUFFER;
-        Target->Buffer.Size = (Source->FieldUnit.Length + AccessWidth - 1) / 8;
-        Target->Buffer.Data = malloc(Target->Buffer.Size);
+        int BufferSize = (Source->FieldUnit.Length + AccessWidth - 1) / 8;
 
-        if (!Target->Buffer.Data) {
+        Target->Type = ACPI_BUFFER;
+        Target->Buffer = malloc(sizeof(AcpiBuffer) + BufferSize);
+        if (!Target->Buffer) {
             return 0;
         }
 
-        memset(Target->Buffer.Data, 0, (Source->FieldUnit.Length + AccessWidth - 1) / 8);
-        Buffer = Target->Buffer.Data;
+        Target->Buffer->References = 1;
+        Target->Buffer->Size = BufferSize;
+        memset(Target->Buffer->Data, 0, BufferSize);
+
+        Buffer = Target->Buffer->Data;
     } else {
         Target->Type = ACPI_INTEGER;
+        Target->References = 1;
         Target->Integer = 0;
         Buffer = (uint8_t *)&Target->Integer;
     }
@@ -511,11 +501,11 @@ int AcpipWriteField(AcpiValue *Target, AcpiValue *Data) {
         Buffer = (const uint8_t *)&Data->Integer;
         BufferWidth = 64;
     } else if (Data->Type == ACPI_STRING) {
-        Buffer = (const uint8_t *)&Data->String;
-        BufferWidth = strlen(Data->String) * 8 + 8;
+        Buffer = (const uint8_t *)&Data->String->Data;
+        BufferWidth = strlen(Data->String->Data) * 8 + 8;
     } else {
-        Buffer = Data->Buffer.Data;
-        BufferWidth = Data->Buffer.Size * 8;
+        Buffer = Data->Buffer->Data;
+        BufferWidth = Data->Buffer->Size * 8;
     }
 
     /* We need to respect the access width, and as such, write item by item into the region,

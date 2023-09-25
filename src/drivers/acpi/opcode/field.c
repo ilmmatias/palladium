@@ -91,6 +91,10 @@ static int ReadFieldList(AcpipState *State, AcpiValue *Base, uint32_t Start, uin
 
                 AcpiValue Value;
                 memcpy(&Value, Base, sizeof(AcpiValue));
+
+                AcpiCreateReference(&Value.FieldUnit.Region->Value, NULL);
+                AcpiCreateReference(&Value.FieldUnit.Data->Value, NULL);
+
                 Value.FieldUnit.AccessType = AccessType;
                 Value.FieldUnit.AccessAttrib = AccessAttrib;
                 Value.FieldUnit.AccessLength = AccessLength;
@@ -181,6 +185,7 @@ int AcpipExecuteFieldOpcode(AcpipState *State, uint16_t Opcode) {
 
             if (!AcpipCreateObject(&Name, &Value)) {
                 AcpiRemoveReference(&SourceBuff, 0);
+                free(Buffer);
                 return 0;
             }
 
