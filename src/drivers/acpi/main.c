@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <acpip.h>
-#include <amd64/port.h>
 #include <crt_impl.h>
 #include <ke.h>
 #include <stdarg.h>
@@ -129,22 +128,23 @@ void DriverEntry(void) {
     Argument.Integer = 0;
     AcpiExecuteMethod(AcpiSearchObject(NULL, "_PIC"), 1, &Argument, NULL);
 
-    /* Let's start the shutdown process; Grab the FADT. */
-    FadtHeader *Fadt = (FadtHeader *)AcpipFindTable("FACP");
+    /* For the final step, we need to inform the BIOS we're ready to handle the ACPI/power events
+       now.. */
+    FadtHeader *Fadt = (FadtHeader *)AcpipFindTable("FACP", 0);
     if (!Fadt) {
         printf("Could not get the FADT\n");
         return;
     }
 
-    /* Try enabling ACPI (if its not already enabled). */
-    if (Fadt->SmiCommandPort && Fadt->AcpiEnable && !(ReadPortWord(Fadt->Pm1aControlBlock) & 1)) {
-        WritePortByte(Fadt->SmiCommandPort, Fadt->AcpiEnable);
-        while (!(ReadPortWord(Fadt->Pm1aControlBlock) & 1))
+    if (Fadt->SmiCommandPort && Fadt->AcpiEnable &&
+        !(AcpipReadIoSpace(Fadt->Pm1aControlBlock, 2) & 1)) {
+        AcpipWriteIoSpace(Fadt->SmiCommandPort, 1, Fadt->AcpiEnable);
+        while (!(AcpipReadIoSpace(Fadt->Pm1aControlBlock, 2) & 1))
             ;
     }
     printf("ACPI enabled\n");
 
-    /* Evaluate \\_S5_. */
+    /* For testing purposes, let's do an S5 shutdown; Start by evaluating \\_S5_. */
     AcpiValue S5;
     if (!AcpiEvaluateObject(AcpiSearchObject(NULL, "_S5_"), &S5, ACPI_PACKAGE)) {
         printf("This computer doesn't support S5 shutdown?\n");
@@ -178,9 +178,9 @@ void DriverEntry(void) {
 
     /* Enter S5/shutdown. */
     printf("Running shutdown command\n");
-    WritePortWord(Fadt->Pm1aControlBlock, (SlpTypA->Integer << 10) | (1 << 13));
+    AcpipWriteIoSpace(Fadt->Pm1aControlBlock, 2, (SlpTypA->Integer << 10) | (1 << 13));
     if (Fadt->Pm1bControlBlock) {
-        WritePortWord(Fadt->Pm1bControlBlock, (SlpTypB->Integer << 10) | (1 << 13));
+        AcpipWriteIoSpace(Fadt->Pm1bControlBlock, 2, (SlpTypB->Integer << 10) | (1 << 13));
     }
 
     while (1)

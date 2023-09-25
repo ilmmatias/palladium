@@ -49,7 +49,7 @@ typedef struct AcpipState {
     AcpipScope *Scope;
 } AcpipState;
 
-SdtHeader *AcpipFindTable(char Signature[4]);
+SdtHeader *AcpipFindTable(char Signature[4], int Index);
 void AcpipReadTables(void);
 
 void AcpipPopulatePredefined(void);

@@ -33,7 +33,8 @@ add_executable(acpi "knostdlib"
     opcode/target.c
 
     main.c
-    rsdt.c)
+    os.c
+    table.c)
 
 target_link_libraries(acpi kernel)
 target_include_directories(acpi PRIVATE include)
