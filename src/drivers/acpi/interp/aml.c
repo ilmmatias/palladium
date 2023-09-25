@@ -26,8 +26,11 @@ extern AcpiObject *AcpipObjectTree;
  *-----------------------------------------------------------------------------------------------*/
 int AcpiExecuteMethod(AcpiObject *Object, int ArgCount, AcpiValue *Arguments, AcpiValue *Result) {
     if (!Object || Object->Value.Type != ACPI_METHOD) {
-        AcpipShowDebugMessage(
-            "attempt at executing non-method object, top most name %.4s\n", Object->Name);
+        if (Object) {
+            AcpipShowDebugMessage(
+                "attempt at executing non-method object, top most name %.4s\n", Object->Name);
+        }
+
         return 0;
     } else if (ArgCount < 0) {
         ArgCount = 0;
