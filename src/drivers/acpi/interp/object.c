@@ -232,20 +232,19 @@ AcpiObject *AcpipCreateObject(AcpipName *Name, AcpiValue *Value) {
  *     Pointer to the object if the entry was found, NULL otherwise.
  *-----------------------------------------------------------------------------------------------*/
 AcpiObject *AcpipResolveObject(AcpipName *Name) {
-    AcpiObject *Parent = Name->LinkedObject ? Name->LinkedObject : AcpipObjectTree;
-    AcpiObject *Base = Parent->Value.Children->Objects;
-
     /* First pass, backtrack however many `^` we had prefixing this path. */
+    AcpiObject *Parent = Name->LinkedObject ? Name->LinkedObject : AcpipObjectTree;
     while (Name->BacktrackCount > 0) {
-        if (!Base) {
+        if (!Parent) {
             return NULL;
         }
 
         Name->BacktrackCount--;
-        Base = Base->Parent;
+        Parent = Parent->Parent;
     }
 
     /* Second pass, validate that all required path segments in the way exist. */
+    AcpiObject *Base = Parent->Value.Children->Objects;
     while (Name->SegmentCount > 1) {
         while (1) {
             if (!Base) {

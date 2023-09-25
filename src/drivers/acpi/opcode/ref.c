@@ -36,15 +36,20 @@ int AcpipExecuteRefOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value) 
                     uint64_t Index = Reference.Index.Index;
 
                     if (Source->Type == ACPI_PACKAGE) {
-                        printf("DerefOf ACPI_PACKAGE\n");
-                        while (1)
-                            ;
+                        if (!Source->Package->Data[Index].Type) {
+                            printf("ACPI_PACKAGE, Type == 0 (string), TODO!\n");
+                            while (1)
+                                ;
+                        }
+
+                        AcpiCreateReference(&Source->Package->Data[Index].Value, Value);
+                    } else {
+                        Value->Type = ACPI_INTEGER;
+                        Value->References = 1;
+                        Value->Integer = Source->Type == ACPI_STRING ? Source->String->Data[Index]
+                                                                     : Source->Buffer->Data[Index];
                     }
 
-                    Value->Type = ACPI_INTEGER;
-                    Value->References = 1;
-                    Value->Integer = Source->Type == ACPI_STRING ? Source->String->Data[Index]
-                                                                 : Source->Buffer->Data[Index];
                     break;
                 }
 
@@ -61,7 +66,6 @@ int AcpipExecuteRefOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value) 
                     break;
 
                 default:
-                    printf("DerefOf, default case\n");
                     AcpiRemoveReference(&Reference, 0);
                     return 0;
             }

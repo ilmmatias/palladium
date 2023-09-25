@@ -7,7 +7,16 @@
 #include <stdlib.h>
 #include <string.h>
 
-static int ExecuteSuperName(AcpipState *State, uint8_t Opcode, AcpipTarget *Target, int Optional) {
+#define TRY_EXECUTE_OPCODE(Function, ...)                        \
+    Status = Function(State, FullOpcode, Target, ##__VA_ARGS__); \
+    if (!Status) {                                               \
+        return 0;                                                \
+    } else if (Status > 0) {                                     \
+        return 1;                                                \
+    }
+
+static int
+ExecuteSimpleName(AcpipState *State, uint16_t Opcode, AcpipTarget *Target, int Optional) {
     switch (Opcode) {
         /* LocalObj (Local0-6) */
         case 0x60:
@@ -56,11 +65,6 @@ static int ExecuteSuperName(AcpipState *State, uint8_t Opcode, AcpipTarget *Targ
                 } else {
                     return 0;
                 }
-            } else if (
-                Object->Value.Type > ACPI_FIELD_UNIT && Object->Value.Type != ACPI_BUFFER_FIELD &&
-                !Optional) {
-                /* Writing to a scope or method (or internal object) is invalid. */
-                return 0;
             }
 
             Target->Type = ACPI_TARGET_NAMED;
@@ -71,22 +75,133 @@ static int ExecuteSuperName(AcpipState *State, uint8_t Opcode, AcpipTarget *Targ
     return 1;
 }
 
+static int ExecuteSuperName(AcpipState *State, uint16_t Opcode, AcpipTarget *Target) {
+    switch (Opcode) {
+        /* DefIndex := IndexOp BuffPkgStrObj IndexValue Target */
+        case 0x88: {
+            /* We probably shouldn't be repeating all this code (it already exists on ref.c). */
+            AcpiValue *Buffer = malloc(sizeof(AcpiValue));
+            if (!Buffer) {
+                return 0;
+            } else if (!AcpipExecuteOpcode(State, Buffer, 0)) {
+                free(Buffer);
+                return 0;
+            }
+
+            if (Buffer->Type != ACPI_STRING && Buffer->Type != ACPI_BUFFER &&
+                Buffer->Type != ACPI_PACKAGE) {
+                AcpiRemoveReference(Buffer, 1);
+                return 0;
+            }
+
+            uint64_t Index;
+            if (!AcpipExecuteInteger(State, &Index)) {
+                AcpiRemoveReference(Buffer, 1);
+                return 0;
+            }
+
+            AcpipTarget WriteTarget;
+            if (!AcpipExecuteTarget(State, &WriteTarget)) {
+                AcpiRemoveReference(Buffer, 1);
+                return 0;
+            }
+
+            /* Pre-validate the index value (prevent buffer overflows). */
+            switch (Buffer->Type) {
+                case ACPI_STRING: {
+                    if (Index > strlen(Buffer->String->Data)) {
+                        AcpiRemoveReference(Buffer, 1);
+                        return 0;
+                    }
+
+                    break;
+                }
+
+                case ACPI_BUFFER: {
+                    if (Index >= Buffer->Buffer->Size) {
+                        AcpiRemoveReference(Buffer, 1);
+                        return 0;
+                    }
+
+                    break;
+                }
+
+                default: {
+                    if (Index >= Buffer->Package->Size) {
+                        AcpiRemoveReference(Buffer, 1);
+                        return 0;
+                    }
+
+                    break;
+                }
+            }
+
+            Target->Type = ACPI_TARGET_INDEX;
+            Target->Source = Buffer;
+            Target->Index = Index;
+
+            AcpiValue Value;
+            Value.Type = ACPI_INDEX;
+            Value.References = 1;
+            Value.Index.Source = Buffer;
+            Value.Index.Index = Index;
+            if (!AcpipStoreTarget(State, &WriteTarget, &Value)) {
+                AcpiRemoveReference(Buffer, 1);
+                return 0;
+            }
+
+            break;
+        }
+
+        /* DebugObj; Noop for us. */
+        case 0x315B: {
+            Target->Type = ACPI_TARGET_NONE;
+            break;
+        }
+
+        default:
+            return -1;
+    }
+
+    return 1;
+}
+
+int AcpipExecuteSimpleName(AcpipState *State, AcpipTarget *Target) {
+    uint8_t Opcode;
+    if (!AcpipReadByte(State, &Opcode)) {
+        return 0;
+    }
+
+    uint8_t ExtOpcode = 0;
+    if (Opcode == 0x5B && !AcpipReadByte(State, &ExtOpcode)) {
+        return 0;
+    }
+
+    uint16_t FullOpcode = Opcode | ((uint16_t)ExtOpcode << 8);
+    return ExecuteSimpleName(State, FullOpcode, Target, 0) <= 0 ? 0 : 1;
+}
+
 int AcpipExecuteSuperName(AcpipState *State, AcpipTarget *Target, int Optional) {
     uint8_t Opcode;
     if (!AcpipReadByte(State, &Opcode)) {
         return 0;
     }
 
-    int Status = ExecuteSuperName(State, Opcode, Target, Optional);
-    if (!Status) {
+    uint8_t ExtOpcode = 0;
+    if (Opcode == 0x5B && !AcpipReadByte(State, &ExtOpcode)) {
         return 0;
-    } else if (Status > 0) {
-        return 1;
     }
 
+    uint16_t FullOpcode = Opcode | ((uint16_t)ExtOpcode << 8);
+    do {
+        int Status;
+        TRY_EXECUTE_OPCODE(ExecuteSimpleName, Optional);
+        TRY_EXECUTE_OPCODE(ExecuteSuperName);
+    } while (0);
+
     printf(
-        "unimplemented supername opcode: %#hhx; %d bytes left to parse out of %d.\n",
-        Opcode,
+        "unimplemented supername opcode: %#hx; %d bytes left to parse out of %d.\n",
+        FullOpcode,
         State->Scope->RemainingLength,
         State->Scope->Length);
     while (1)
@@ -99,29 +214,34 @@ int AcpipExecuteTarget(AcpipState *State, AcpipTarget *Target) {
         return 0;
     }
 
-    int Status = ExecuteSuperName(State, Opcode, Target, 0);
-    if (!Status) {
+    uint8_t ExtOpcode = 0;
+    if (Opcode == 0x5B && !AcpipReadByte(State, &ExtOpcode)) {
         return 0;
-    } else if (Status > 0) {
-        return 1;
     }
 
-    switch (Opcode) {
-        /* Assume writes to Zero are to be ignored. */
-        case 0x00:
-            Target->Type = ACPI_TARGET_NONE;
-            break;
+    uint16_t FullOpcode = Opcode | ((uint16_t)ExtOpcode << 8);
+    do {
+        int Status;
+        TRY_EXECUTE_OPCODE(ExecuteSimpleName, 0);
+        TRY_EXECUTE_OPCODE(ExecuteSuperName);
 
-        default: {
-            printf(
-                "unimplemented target opcode: %#hhx; %d bytes left to parse out of %d.\n",
-                Opcode,
-                State->Scope->RemainingLength,
-                State->Scope->Length);
-            while (1)
-                ;
+        switch (Opcode) {
+            /* Assume writes to Zero are to be ignored. */
+            case 0x00:
+                Target->Type = ACPI_TARGET_NONE;
+                break;
+
+            default: {
+                printf(
+                    "unimplemented target opcode: %#hx; %d bytes left to parse out of %d.\n",
+                    FullOpcode,
+                    State->Scope->RemainingLength,
+                    State->Scope->Length);
+                while (1)
+                    ;
+            }
         }
-    }
+    } while (0);
 
     return 1;
 }
@@ -137,9 +257,8 @@ int AcpipReadTarget(AcpipState *State, AcpipTarget *Target, AcpiValue *Value) {
             Source = &State->Arguments[Target->Index];
             break;
         case ACPI_TARGET_NAMED:
-            printf("Reading from a named field\n");
-            while (1)
-                ;
+            AcpiCreateReference(&Target->Object->Value, Value);
+            return 1;
         default:
             return 0;
     }
@@ -220,6 +339,33 @@ int AcpipStoreTarget(AcpipState *State, AcpipTarget *Target, AcpiValue *Value) {
 
                     if (!Status) {
                         return 0;
+                    }
+
+                    break;
+                }
+
+                case ACPI_BUFFER_FIELD: {
+                    uint64_t Index = Target->Object->Value.BufferField.Index;
+                    AcpiValue *FieldSource = Target->Object->Value.BufferField.FieldSource;
+
+                    uint64_t Slot;
+                    if (!AcpipCastToInteger(Value, &Slot, 1)) {
+                        return 0;
+                    }
+
+                    switch (Target->Object->Value.BufferField.Size) {
+                        case 2:
+                            *((uint16_t *)(FieldSource->Buffer->Data + Index)) = Slot;
+                            break;
+                        case 4:
+                            *((uint32_t *)(FieldSource->Buffer->Data + Index)) = Slot;
+                            break;
+                        case 8:
+                            *((uint64_t *)(FieldSource->Buffer->Data + Index)) = Slot;
+                            break;
+                        default:
+                            *(FieldSource->Buffer->Data + Index) = Slot;
+                            break;
                     }
 
                     break;

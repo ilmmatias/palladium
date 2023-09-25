@@ -23,6 +23,7 @@ add_executable(acpi "knostdlib"
     opcode/conv.c
     opcode/dataobj.c
     opcode/field.c
+    opcode/lock.c
     opcode/math.c
     opcode/namedobj.c
     opcode/nsmod.c

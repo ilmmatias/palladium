@@ -129,11 +129,18 @@ void AcpipPopulateOverride(void) {
         KeFatalError(KE_EARLY_MEMORY_FAILURE);
     }
 
+    AcpiChildren *Children = calloc(OVERRIDE_ITEMS, sizeof(AcpiChildren));
+    if (!Children) {
+        KeFatalError(KE_EARLY_MEMORY_FAILURE);
+    }
+
     for (int i = 0; i < OVERRIDE_ITEMS; i++) {
         memcpy(Objects[i].Name, Names[i], 4);
         Objects[i].Value.Type = ACPI_METHOD;
         Objects[i].Value.References = 1;
-        Objects[i].Value.Children->Objects = NULL;
+        Objects[i].Value.Children = &Children[i];
+        Children[i].References = 1;
+        Children[i].Objects = NULL;
         Objects[i].Value.Method.Override = Methods[i];
         Objects[i].Value.Method.Start = NULL;
         Objects[i].Value.Method.Size = 0;

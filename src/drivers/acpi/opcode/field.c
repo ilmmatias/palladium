@@ -93,7 +93,9 @@ static int ReadFieldList(AcpipState *State, AcpiValue *Base, uint32_t Start, uin
                 memcpy(&Value, Base, sizeof(AcpiValue));
 
                 AcpiCreateReference(&Value.FieldUnit.Region->Value, NULL);
-                AcpiCreateReference(&Value.FieldUnit.Data->Value, NULL);
+                if (Value.FieldUnit.Data) {
+                    AcpiCreateReference(&Value.FieldUnit.Data->Value, NULL);
+                }
 
                 Value.FieldUnit.AccessType = AccessType;
                 Value.FieldUnit.AccessAttrib = AccessAttrib;
@@ -155,6 +157,9 @@ int AcpipExecuteFieldOpcode(AcpipState *State, uint16_t Opcode) {
             if (!AcpipExecuteInteger(State, &ByteIndex)) {
                 AcpiRemoveReference(&SourceBuff, 0);
                 return 0;
+            } else if (ByteIndex >= SourceBuff.Buffer->Size) {
+                AcpiRemoveReference(&SourceBuff, 0);
+                return 0;
             }
 
             AcpipName Name;
@@ -177,11 +182,11 @@ int AcpipExecuteFieldOpcode(AcpipState *State, uint16_t Opcode) {
             Value.Type = ACPI_BUFFER_FIELD;
             Value.References = 1;
             Value.BufferField.FieldSource = Buffer;
-            Value.BufferField.Index = ByteIndex * 8;
-            Value.BufferField.Size = Opcode == 0x8A   ? 32
-                                     : Opcode == 0x8B ? 16
-                                     : Opcode == 0x8C ? 8
-                                                      : 64;
+            Value.BufferField.Index = ByteIndex;
+            Value.BufferField.Size = Opcode == 0x8A   ? 4
+                                     : Opcode == 0x8B ? 2
+                                     : Opcode == 0x8C ? 1
+                                                      : 8;
 
             if (!AcpipCreateObject(&Name, &Value)) {
                 AcpiRemoveReference(&SourceBuff, 0);

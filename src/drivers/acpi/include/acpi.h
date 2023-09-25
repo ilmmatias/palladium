@@ -4,6 +4,7 @@
 #ifndef _ACPI_H_
 #define _ACPI_H_
 
+#include <stdatomic.h>
 #include <stdint.h>
 
 #define ACPI_REVISION 0x0000000000000000
@@ -67,6 +68,12 @@ typedef struct {
 
 typedef struct {
     int References;
+    uint8_t Flags;
+    volatile atomic_flag Value;
+} AcpiMutex;
+
+typedef struct {
+    int References;
     struct AcpiObject *Objects;
 } AcpiChildren;
 
@@ -81,15 +88,13 @@ typedef struct AcpiValue {
         AcpiString *String;
         AcpiBuffer *Buffer;
         struct AcpiPackage *Package;
+        AcpiMutex *Mutex;
         struct {
             AcpiOverrideMethod Override;
             const uint8_t *Start;
             uint32_t Size;
             uint8_t Flags;
         } Method;
-        struct {
-            uint8_t Flags;
-        } Mutex;
         struct {
             uint8_t RegionSpace;
             uint64_t RegionOffset;

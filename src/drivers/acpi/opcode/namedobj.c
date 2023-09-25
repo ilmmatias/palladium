@@ -64,30 +64,6 @@ int AcpipExecuteNamedObjOpcode(AcpipState *State, uint16_t Opcode) {
             break;
         }
 
-        /* DefMutex := MutexOp NameString SyncFlags */
-        case 0x015B: {
-            AcpipName Name;
-            if (!AcpipReadName(State, &Name)) {
-                return 0;
-            }
-
-            uint8_t SyncFlags;
-            if (!AcpipReadByte(State, &SyncFlags)) {
-                return 0;
-            }
-
-            AcpiValue Value;
-            Value.Type = ACPI_MUTEX;
-            Value.References = 1;
-            Value.Mutex.Flags = SyncFlags;
-
-            if (!AcpipCreateObject(&Name, &Value)) {
-                return 0;
-            }
-
-            break;
-        }
-
         /* DefEvent := EventOp NameString */
         case 0x025B: {
             AcpipName Name;

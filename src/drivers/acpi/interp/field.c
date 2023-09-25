@@ -61,12 +61,12 @@ static int SetupPciConfigRegion(AcpiObject *Object) {
     }
 
     AcpiValue Seg;
-    if (!AcpiEvaluateObject(AcpiSearchObject(RootBus, "_SEG"), &Adr, ACPI_INTEGER)) {
+    if (AcpiEvaluateObject(AcpiSearchObject(RootBus, "_SEG"), &Seg, ACPI_INTEGER)) {
         Object->Value.Region.PciSegment = Seg.Integer;
     }
 
     AcpiValue Bbn;
-    if (!AcpiEvaluateObject(AcpiSearchObject(RootBus, "_BBN"), &Bbn, ACPI_INTEGER)) {
+    if (AcpiEvaluateObject(AcpiSearchObject(RootBus, "_BBN"), &Bbn, ACPI_INTEGER)) {
         Object->Value.Region.PciBus = Bbn.Integer;
     }
 
@@ -543,8 +543,8 @@ int AcpipWriteField(AcpiValue *Target, AcpiValue *Data) {
 
         /* On the unaligned loop, we just need to mask off any bits higher than the remaining
            buffer size. */
-        uint32_t RunOffLength = BufferWidth - BufferOffset * 8;
-        if (AccessWidth < RunOffLength) {
+        int RunOffLength = BufferWidth - BufferOffset * 8;
+        if ((int)AccessWidth < RunOffLength) {
             RunOffLength = AccessWidth;
         } else if (RunOffLength < 0) {
             RunOffLength = 0;
@@ -562,12 +562,12 @@ int AcpipWriteField(AcpiValue *Target, AcpiValue *Data) {
     FieldOffset -= Target->FieldUnit.Offset / 8;
 
     /* This should take care of the remaining buffer size being bigger than the AccessWidth. */
-    uint32_t RunOffLength = BufferWidth - BufferOffset * 8;
+    int RunOffLength = BufferWidth - BufferOffset * 8;
     if (Target->FieldUnit.Length < AccessWidth) {
-        if (Target->FieldUnit.Length < RunOffLength) {
+        if ((int)Target->FieldUnit.Length < RunOffLength) {
             RunOffLength = Target->FieldUnit.Length;
         }
-    } else if (AccessWidth - UnalignedLength < RunOffLength) {
+    } else if ((int)(AccessWidth - UnalignedLength) < RunOffLength) {
         RunOffLength = AccessWidth - UnalignedLength;
     } else if (RunOffLength < 0) {
         RunOffLength = 0;

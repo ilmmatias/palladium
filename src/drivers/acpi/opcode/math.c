@@ -94,8 +94,8 @@ int AcpipExecuteMathOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
             break;
         }
 
-        /* Unary operations (all follow the format: Op Target, where Target is always a
-           SuperName). */
+        /* Unary operations without a target (all follow the format: Op Target, where Target is
+           both the input and the output). */
         case 0x75:
         case 0x76: {
             AcpipTarget Target;
@@ -124,6 +124,30 @@ int AcpipExecuteMathOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
 
             if (!AcpipStoreTarget(State, &Target, Value)) {
                 return 0;
+            }
+
+            break;
+        }
+
+        /* Unary operations with a target (Op TermArg Target, the operate on TermArg, and save the
+           result on Target). */
+        case 0x80: {
+            uint64_t Operand;
+            if (!AcpipExecuteInteger(State, &Operand)) {
+                return 0;
+            }
+
+            AcpipTarget Target;
+            if (!AcpipExecuteTarget(State, &Target)) {
+                return 0;
+            }
+
+            Value->Type = ACPI_INTEGER;
+            Value->References = 1;
+            switch (Opcode) {
+                case 0x80:
+                    Value->Integer = ~Operand;
+                    break;
             }
 
             break;

@@ -146,9 +146,17 @@ int AcpiCopyValue(AcpiValue *Source, AcpiValue *Target) {
 
             break;
 
+        case ACPI_MUTEX:
+            printf("CopyValue(Mutex), is this even valid/possible?\n");
+            while (1)
+                ;
+
         case ACPI_FIELD_UNIT:
             AcpiCreateReference(&Source->FieldUnit.Region->Value, NULL);
-            AcpiCreateReference(&Source->FieldUnit.Data->Value, NULL);
+            if (Source->FieldUnit.Data) {
+                AcpiCreateReference(&Source->FieldUnit.Data->Value, NULL);
+            }
+
             break;
 
         case ACPI_BUFFER_FIELD:
@@ -199,7 +207,13 @@ void AcpiCreateReference(AcpiValue *Source, AcpiValue *Target) {
             break;
         case ACPI_FIELD_UNIT:
             AcpiCreateReference(&Target->FieldUnit.Region->Value, NULL);
-            AcpiCreateReference(&Target->FieldUnit.Data->Value, NULL);
+            if (Target->FieldUnit.Data) {
+                AcpiCreateReference(&Target->FieldUnit.Data->Value, NULL);
+            }
+
+            break;
+        case ACPI_MUTEX:
+            Target->Mutex->References++;
             break;
         case ACPI_BUFFER_FIELD:
             AcpiCreateReference(Target->BufferField.FieldSource, NULL);
@@ -266,8 +280,18 @@ void AcpiRemoveReference(AcpiValue *Value, int CleanupPointer) {
 
         case ACPI_FIELD_UNIT: {
             if (NeedsCleanup) {
-                AcpiRemoveReference(&Value->FieldUnit.Region->Value, 1);
-                AcpiRemoveReference(&Value->FieldUnit.Data->Value, 1);
+                AcpiRemoveReference(&Value->FieldUnit.Region->Value, 0);
+                if (Value->FieldUnit.Data) {
+                    AcpiRemoveReference(&Value->FieldUnit.Data->Value, 0);
+                }
+            }
+
+            break;
+        }
+
+        case ACPI_MUTEX: {
+            if (NeedsCleanup && --Value->Mutex->References <= 0) {
+                free(Value->Mutex);
             }
 
             break;

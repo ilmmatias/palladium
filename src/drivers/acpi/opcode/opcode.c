@@ -52,6 +52,7 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result, int ObjReference) {
         TRY_EXECUTE_OPCODE(AcpipExecuteConvOpcode, &Value);
         TRY_EXECUTE_OPCODE(AcpipExecuteDataObjOpcode, &Value);
         TRY_EXECUTE_OPCODE(AcpipExecuteFieldOpcode);
+        TRY_EXECUTE_OPCODE(AcpipExecuteLockOpcode, &Value);
         TRY_EXECUTE_OPCODE(AcpipExecuteMathOpcode, &Value);
         TRY_EXECUTE_OPCODE(AcpipExecuteNamedObjOpcode);
         TRY_EXECUTE_OPCODE(AcpipExecuteNsModOpcode);
@@ -145,6 +146,33 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result, int ObjReference) {
                 break;
             }
 
+            /* DefCopyObject := CopyObjectOp TermArg SimpleName */
+            case 0x9D: {
+                AcpiValue Source;
+                if (!AcpipExecuteOpcode(State, &Source, 0)) {
+                    return 0;
+                }
+
+                AcpipTarget Target;
+                if (!AcpipExecuteSimpleName(State, &Target)) {
+                    AcpiRemoveReference(&Source, 0);
+                    return 0;
+                }
+
+                AcpiValue Copy;
+                if (!AcpiCopyValue(&Source, &Copy)) {
+                    AcpiRemoveReference(&Source, 0);
+                    return 0;
+                }
+
+                AcpiRemoveReference(&Source, 0);
+                if (!AcpipStoreTarget(State, &Target, &Copy)) {
+                    return 0;
+                }
+
+                break;
+            }
+
             /* DefSleep := SleepOp MsecTime */
             case 0x225B: {
                 /* TODO: Just a stub at the moment, make it work after we implement support in
@@ -190,11 +218,6 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result, int ObjReference) {
                    value. */
                 if (Object->Value.Type != ACPI_METHOD) {
                     switch (Object->Value.Type) {
-                        /* Basic constants (aka integers) get directly copied. */
-                        case ACPI_INTEGER:
-                            memcpy(&Value, &Object->Value, sizeof(AcpiValue));
-                            break;
-
                         /* Field units will get redirected to the right read type (MMIO, PCI,
                            etc). */
                         case ACPI_FIELD_UNIT:
