@@ -2,8 +2,6 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <acpip.h>
-#include <mm.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -94,40 +92,20 @@ static int SetupPciConfigRegion(AcpiObject *Object) {
  *-----------------------------------------------------------------------------------------------*/
 static uint64_t ReadRegion(AcpiValue *Source, int Offset, int Size) {
     switch (Source->Region.RegionSpace) {
-        /* SystemMemory; We'll be reading a physical memory address. */
-        case 0: {
-            void *Address = MI_PADDR_TO_VADDR(Source->Region.RegionOffset + Offset);
-            switch (Size) {
-                case 2:
-                    return *(uint16_t *)Address;
-                case 4:
-                    return *(uint32_t *)Address;
-                case 8:
-                    return *(uint64_t *)Address;
-                default:
-                    return *(uint8_t *)Address;
-            }
-        }
-
-        /* SystemIO; We have no idea how the target architecture handles IO, redirect it to the
-           OS/arch-specific handler. */
-        case 1:
+        case ACPI_SPACE_SYSTEM_MEMORY:
+            return AcpipReadMmioSpace(Source->Region.RegionOffset + Offset, Size);
+        case ACPI_SPACE_SYSTEM_IO:
             return AcpipReadIoSpace(Source->Region.RegionOffset + Offset, Size);
-
-        /* PCI_Config; We need to read from the PCI configuration space; This is OS/architecture
-           specific, so redirect to the correct handler. */
-        case 2:
+        case ACPI_SPACE_PCI_CONFIG:
             return AcpipReadPciConfigSpace(Source, Source->Region.RegionOffset + Offset, Size);
-
         default:
-            printf(
+            AcpipShowErrorMessage(
+                ACPI_REASON_CORRUPTED_TABLES,
                 "ReadRegionField(%p, %u, %u), RegionSpace = %hhu\n",
                 Source,
                 Offset,
                 Size,
                 Source->Region.RegionSpace);
-            while (1)
-                ;
     }
 }
 
@@ -149,47 +127,24 @@ static uint64_t ReadRegion(AcpiValue *Source, int Offset, int Size) {
  *-----------------------------------------------------------------------------------------------*/
 static void WriteRegion(AcpiValue *Source, int Offset, int Size, uint64_t Data) {
     switch (Source->Region.RegionSpace) {
-        /* SystemMemory; We'll be writing into a physical memory address. */
-        case 0: {
-            void *Address = MI_PADDR_TO_VADDR(Source->Region.RegionOffset + Offset);
-            switch (Size) {
-                case 2:
-                    *(uint16_t *)Address = Data;
-                    break;
-                case 4:
-                    *(uint32_t *)Address = Data;
-                    break;
-                case 8:
-                    *(uint64_t *)Address = Data;
-                    break;
-                default:
-                    *(uint8_t *)Address = Data;
-                    break;
-            }
-        }
-
-        /* SystemIO; We have no idea how the target architecture handles IO, redirect it to the
-           OS/arch-specific handler. */
-        case 1:
+        case ACPI_SPACE_SYSTEM_MEMORY:
+            AcpipWriteMmioSpace(Source->Region.RegionOffset + Offset, Size, Data);
+            break;
+        case ACPI_SPACE_SYSTEM_IO:
             AcpipWriteIoSpace(Source->Region.RegionOffset + Offset, Size, Data);
             break;
-
-        /* PCI_Config; We need to write into the PCI configuration space; This is OS/architecture
-           specific, so redirect to the correct handler. */
-        case 2:
+        case ACPI_SPACE_PCI_CONFIG:
             AcpipWritePciConfigSpace(Source, Source->Region.RegionOffset + Offset, Size, Data);
             break;
-
         default:
-            printf(
+            AcpipShowErrorMessage(
+                ACPI_REASON_CORRUPTED_TABLES,
                 "WriteRegionField(%p, %u, %u, %llu), RegionSpace = %hhu\n",
                 Source,
                 Offset,
                 Size,
                 Data,
                 Source->Region.RegionSpace);
-            while (1)
-                ;
     }
 }
 
@@ -211,9 +166,7 @@ static uint64_t ReadField(AcpiValue *Source, int Offset, int AccessWidth) {
             return ReadRegion(&Source->FieldUnit.Region->Value, Offset, AccessWidth / 8);
 
         case ACPI_BANK_FIELD:
-            printf("ReadField() on BankField\n");
-            while (1)
-                ;
+            AcpipShowErrorMessage(ACPI_REASON_CORRUPTED_TABLES, "ReadField() on BankField\n");
 
         case ACPI_INDEX_FIELD: {
             /* Index field means we need to write into the index location, followed by R/W'ing
@@ -280,9 +233,7 @@ WriteField(AcpiValue *Target, int Offset, int AccessWidth, uint64_t Data, uint64
                 &Target->FieldUnit.Region->Value, Offset, AccessWidth / 8, MaskedValue);
 
         case ACPI_BANK_FIELD:
-            printf("WriteField() on BankField\n");
-            while (1)
-                ;
+            AcpipShowErrorMessage(ACPI_REASON_CORRUPTED_TABLES, "WriteField() on BankField\n");
 
         case ACPI_INDEX_FIELD: {
             /* Index field means we need to write into the index location, followed by R/W'ing

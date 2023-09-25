@@ -199,13 +199,12 @@ int AcpipExecuteSuperName(AcpipState *State, AcpipTarget *Target, int Optional) 
         TRY_EXECUTE_OPCODE(ExecuteSuperName);
     } while (0);
 
-    printf(
+    AcpipShowErrorMessage(
+        ACPI_REASON_CORRUPTED_TABLES,
         "unimplemented supername opcode: %#hx; %d bytes left to parse out of %d.\n",
         FullOpcode,
         State->Scope->RemainingLength,
         State->Scope->Length);
-    while (1)
-        ;
 }
 
 int AcpipExecuteTarget(AcpipState *State, AcpipTarget *Target) {
@@ -232,13 +231,12 @@ int AcpipExecuteTarget(AcpipState *State, AcpipTarget *Target) {
                 break;
 
             default: {
-                printf(
+                AcpipShowErrorMessage(
+                    ACPI_REASON_CORRUPTED_TABLES,
                     "unimplemented target opcode: %#hx; %d bytes left to parse out of %d.\n",
                     FullOpcode,
                     State->Scope->RemainingLength,
                     State->Scope->Length);
-                while (1)
-                    ;
             }
         }
     } while (0);
@@ -372,9 +370,10 @@ int AcpipStoreTarget(AcpipState *State, AcpipTarget *Target, AcpiValue *Value) {
                 }
 
                 default:
-                    printf("Writing to a named field of type %d\n", Target->Object->Value.Type);
-                    while (1)
-                        ;
+                    AcpipShowErrorMessage(
+                        ACPI_REASON_CORRUPTED_TABLES,
+                        "writing to a named field of type %d\n",
+                        Target->Object->Value.Type);
             }
     }
 

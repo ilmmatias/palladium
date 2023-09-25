@@ -195,13 +195,12 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result, int ObjReference) {
                    name char, so we can quickly check if this is it. */
                 if (Opcode != '\\' && Opcode != '^' && Opcode != 0x2E && Opcode != 0x2F &&
                     !isupper(Opcode) && Opcode != '_') {
-                    printf(
+                    AcpipShowErrorMessage(
+                        ACPI_REASON_CORRUPTED_TABLES,
                         "unimplemented opcode: %#hx; %d bytes left to parse out of %d.\n",
                         Opcode | ((uint32_t)ExtOpcode << 8),
                         State->Scope->RemainingLength,
                         State->Scope->Length);
-                    while (1)
-                        ;
                 }
 
                 AcpipName Name;

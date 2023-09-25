@@ -71,9 +71,8 @@ static int ReadFieldList(AcpipState *State, AcpiValue *Base, uint32_t Start, uin
 
             /* ConnectField */
             case 0x02:
-                printf("ConnectField (unimplemented)\n");
-                while (1)
-                    ;
+                AcpipShowErrorMessage(
+                    ACPI_REASON_CORRUPTED_TABLES, "ConnectField (unimplemented)\n");
 
             /* NamedField := NameSeg PkgLength */
             default: {

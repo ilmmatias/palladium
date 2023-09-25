@@ -2,8 +2,6 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <acpip.h>
-#include <ke.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -23,6 +21,12 @@ extern AcpiObject *AcpipObjectTree;
  *     1 on success, 0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
 static int ExecuteOsi(int ArgCount, AcpiValue *Arguments, AcpiValue *Result) {
+    if (ArgCount >= 1 && Arguments[0].Type == ACPI_STRING) {
+        AcpipShowDebugMessage("request for \\_OSI, feature = %s\n", Arguments[0].String->Data);
+    } else {
+        AcpipShowDebugMessage("request for \\_OSI, no valid arguments\n");
+    }
+
     /* Return TRUE for Darwin, otherwise, we'll probably fail to boot on Macs. */
     if (ArgCount >= 1 && Arguments[0].Type == ACPI_STRING &&
         (!strncmp(Arguments[0].String->Data, "Windows ", 8) ||
@@ -61,6 +65,8 @@ static int ExecuteOs(int ArgCount, AcpiValue *Arguments, AcpiValue *Result) {
     (void)ArgCount;
     (void)Arguments;
 
+    AcpipShowDebugMessage("request for \\_OS\n");
+
     Result->Type = ACPI_STRING;
     Result->References = 1;
     Result->String = malloc(sizeof(AcpiString) + strlen("Microsoft Windows NT") + 1);
@@ -87,9 +93,13 @@ static int ExecuteOs(int ArgCount, AcpiValue *Arguments, AcpiValue *Result) {
 static int ExecuteRev(int ArgCount, AcpiValue *Arguments, AcpiValue *Result) {
     (void)ArgCount;
     (void)Arguments;
+
+    AcpipShowDebugMessage("request for \\_REV\n");
+
     Result->Type = ACPI_INTEGER;
     Result->References = 1;
     Result->Integer = 2;
+
     return 1;
 }
 
@@ -126,12 +136,14 @@ void AcpipPopulateOverride(void) {
 
     AcpiObject *Objects = calloc(OVERRIDE_ITEMS, sizeof(AcpiObject));
     if (!Objects) {
-        KeFatalError(KE_EARLY_MEMORY_FAILURE);
+        AcpipShowErrorMessage(
+            ACPI_REASON_OUT_OF_MEMORY, "could not allocate the predefined methods\n");
     }
 
     AcpiChildren *Children = calloc(OVERRIDE_ITEMS, sizeof(AcpiChildren));
     if (!Children) {
-        KeFatalError(KE_EARLY_MEMORY_FAILURE);
+        AcpipShowErrorMessage(
+            ACPI_REASON_OUT_OF_MEMORY, "could not allocate the predefined methods\n");
     }
 
     for (int i = 0; i < OVERRIDE_ITEMS; i++) {

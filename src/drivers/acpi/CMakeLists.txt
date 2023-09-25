@@ -5,6 +5,7 @@ project(os/drivers/acpi)
 
 if(ARCH STREQUAL "amd64")
     set(SOURCES
+        ${ARCH}/mmio.c
         ${ARCH}/pci.c
         ${ARCH}/port.c)
 endif()

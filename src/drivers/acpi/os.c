@@ -2,9 +2,12 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <acpip.h>
+#include <crt_impl.h>
 #include <ke.h>
 #include <mm.h>
+#include <stdarg.h>
 #include <string.h>
+#include <vid.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -56,7 +59,7 @@ SdtHeader *AcpipFindTable(char Signature[4], int Index) {
 
         Header = MI_PADDR_TO_VADDR(IsXsdt && Fadt->XDsdt ? Fadt->XDsdt : Fadt->Dsdt);
         if (!Checksum((char *)Header, Header->Length) || memcmp(Header->Signature, "DSDT", 4)) {
-            KeFatalError(KE_CORRUPTED_HARDWARE_STRUCTURES);
+            AcpipShowErrorMessage(ACPI_REASON_CORRUPTED_TABLES, "invalid DSDT table\n");
         }
 
         return Header;
@@ -64,18 +67,86 @@ SdtHeader *AcpipFindTable(char Signature[4], int Index) {
 
     if (memcmp(Header->Signature, IsXsdt ? "XSDT" : "RSDT", 4) ||
         !Checksum((char *)Header, Header->Length)) {
-        KeFatalError(KE_CORRUPTED_HARDWARE_STRUCTURES);
+        AcpipShowErrorMessage(ACPI_REASON_CORRUPTED_TABLES, "invalid R/XSDT table\n");
     }
 
     for (uint32_t i = 0; i < (Header->Length - sizeof(SdtHeader)) / (IsXsdt ? 8 : 4); i++) {
         SdtHeader *Header = MI_PADDR_TO_VADDR(IsXsdt ? XsdtTables[i] : RsdtTables[i]);
 
         if (!Checksum((char *)Header, Header->Length)) {
-            KeFatalError(KE_CORRUPTED_HARDWARE_STRUCTURES);
+            continue;
         } else if (!memcmp(Header->Signature, Signature, 4) && Occourances++ == Index) {
             return Header;
         }
     }
 
     return NULL;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     Wrapper around VidPutChar for __vprint.
+ *
+ * PARAMETERS:
+ *     Buffer - What we need to display.
+ *     Size - Size of that data; The data is not required to be NULL terminated, so this need to be
+ *            taken into account!
+ *     Context - Always NULL for us.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+static void PutBuffer(const void *buffer, int size, void *context) {
+    (void)context;
+    for (int i = 0; i < size; i++) {
+        VidPutChar(((const char *)buffer)[i]);
+    }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function shows a debug message to the screen.
+ *
+ * PARAMETERS:
+ *     Message - Format string; Works the same as printf().
+ *     ... - Variadic arguments.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void AcpipShowDebugMessage(const char *Format, ...) {
+    va_list vlist;
+    va_start(vlist, Format);
+
+    VidPutString("ACPI Debug: ");
+    __vprintf(Format, vlist, NULL, PutBuffer);
+
+    va_end(vlist);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function halts the system with the given reason, printing a debug message to the
+ *     screen if possible.
+ *
+ * PARAMETERS:
+ *     Reason - What went wrong.
+ *     Message - Format string; Works the same as printf().
+ *     ... - Variadic arguments.
+ *
+ * RETURN VALUE:
+ *     Does not return.
+ *-----------------------------------------------------------------------------------------------*/
+[[noreturn]] void AcpipShowErrorMessage(int Reason, const char *Format, ...) {
+    va_list vlist;
+    va_start(vlist, Format);
+
+    VidPutString("ACPI Error: ");
+    __vprintf(Format, vlist, NULL, PutBuffer);
+
+    va_end(vlist);
+
+    KeFatalError(
+        Reason == ACPI_REASON_OUT_OF_MEMORY ? KE_EARLY_MEMORY_FAILURE
+                                            : KE_CORRUPTED_HARDWARE_STRUCTURES);
 }

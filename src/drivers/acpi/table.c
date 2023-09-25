@@ -2,8 +2,6 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <acpip.h>
-#include <ke.h>
-#include <stdio.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -19,10 +17,10 @@ void AcpipReadTables(void) {
     /* The DSDT should always exist; We assume something's broken with this BIOS if it doesn't. */
     SdtHeader *Dsdt = AcpipFindTable("DSDT", 0);
     if (!Dsdt) {
-        KeFatalError(KE_CORRUPTED_HARDWARE_STRUCTURES);
+        AcpipShowErrorMessage(ACPI_REASON_CORRUPTED_TABLES, "couldn't find the DSDT table\n");
     }
 
-    printf("Reading DSDT (%u bytes)\n", Dsdt->Length - sizeof(SdtHeader));
+    AcpipShowDebugMessage("reading DSDT (%u bytes)\n", Dsdt->Length - sizeof(SdtHeader));
     AcpipPopulateTree((uint8_t *)(Dsdt + 1), Dsdt->Length - sizeof(SdtHeader));
 
     for (int i = 0;; i++) {
@@ -31,7 +29,7 @@ void AcpipReadTables(void) {
             break;
         }
 
-        printf("Reading SSDT (%u bytes)\n", Ssdt->Length - sizeof(SdtHeader));
+        AcpipShowDebugMessage("reading SSDT (%u bytes)\n", Ssdt->Length - sizeof(SdtHeader));
         AcpipPopulateTree((uint8_t *)(Ssdt + 1), Ssdt->Length - sizeof(SdtHeader));
     }
 }

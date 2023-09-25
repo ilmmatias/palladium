@@ -14,6 +14,9 @@
 #define ACPI_TARGET_INDEX 4
 #define ACPI_TARGET_UNRESOLVED 4
 
+#define ACPI_REASON_OUT_OF_MEMORY 0
+#define ACPI_REASON_CORRUPTED_TABLES 1
+
 typedef struct {
     int Type;
     int Index;
@@ -58,6 +61,9 @@ void AcpipPopulateTree(const uint8_t *Code, uint32_t Length);
 AcpiObject *AcpipCreateObject(AcpipName *Name, AcpiValue *Value);
 AcpiObject *AcpipResolveObject(AcpipName *Name);
 
+void AcpipShowDebugMessage(const char *Format, ...);
+[[noreturn]] void AcpipShowErrorMessage(int Reason, const char *Format, ...);
+
 AcpipScope *AcpipEnterScope(AcpipState *State, AcpiObject *Object, uint32_t Length);
 AcpipScope *AcpipEnterIf(AcpipState *State, uint32_t Length);
 AcpipScope *AcpipEnterWhile(
@@ -76,6 +82,8 @@ int AcpipReadName(AcpipState *State, AcpipName *Name);
 int AcpipReadField(AcpiValue *Source, AcpiValue *Target);
 int AcpipWriteField(AcpiValue *Target, AcpiValue *Value);
 
+uint64_t AcpipReadMmioSpace(uint64_t Address, int Size);
+void AcpipWriteMmioSpace(uint64_t Address, int Size, uint64_t Data);
 uint64_t AcpipReadPciConfigSpace(AcpiValue *Source, int Offset, int Size);
 void AcpipWritePciConfigSpace(AcpiValue *Source, int Offset, int Size, uint64_t Data);
 uint64_t AcpipReadIoSpace(int Offset, int Size);

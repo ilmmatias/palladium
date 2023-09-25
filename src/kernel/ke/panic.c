@@ -27,11 +27,7 @@ static char *Messages[] = {
     }
 
     VidSetColor(VID_COLOR_PANIC);
-    VidResetDisplay();
-
-    VidPutString("A fatal error has occoured, and the system cannot safely recover operation.\n");
-    VidPutString("You'll need to reboot your computer.\n");
-    VidPutString("Error Code: ");
+    VidPutString("CANNOT SAFELY RECOVER OPERATION: ");
     VidPutString(Messages[Message]);
 
     while (1)

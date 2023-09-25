@@ -37,9 +37,9 @@ int AcpipExecuteRefOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value) 
 
                     if (Source->Type == ACPI_PACKAGE) {
                         if (!Source->Package->Data[Index].Type) {
-                            printf("ACPI_PACKAGE, Type == 0 (string), TODO!\n");
-                            while (1)
-                                ;
+                            AcpipShowErrorMessage(
+                                ACPI_REASON_CORRUPTED_TABLES,
+                                "ACPI_PACKAGE, Type == 0 (string), TODO!\n");
                         }
 
                         AcpiCreateReference(&Source->Package->Data[Index].Value, Value);

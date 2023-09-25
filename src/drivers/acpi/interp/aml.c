@@ -2,8 +2,6 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <acpip.h>
-#include <ke.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -28,12 +26,15 @@ extern AcpiObject *AcpipObjectTree;
  *-----------------------------------------------------------------------------------------------*/
 int AcpiExecuteMethod(AcpiObject *Object, int ArgCount, AcpiValue *Arguments, AcpiValue *Result) {
     if (!Object || Object->Value.Type != ACPI_METHOD) {
+        AcpipShowDebugMessage(
+            "attempt at executing non-method object, top most name %.4s\n", Object->Name);
         return 0;
     } else if (ArgCount < 0) {
         ArgCount = 0;
     } else if (ArgCount > 7) {
         ArgCount = 7;
     } else if (Object->Value.Method.Override) {
+        AcpipShowDebugMessage("executing overwritten method, top most name %.4s\n", Object->Name);
         return Object->Value.Method.Override(ArgCount, Arguments, Result);
     }
 
@@ -147,9 +148,8 @@ int AcpiCopyValue(AcpiValue *Source, AcpiValue *Target) {
             break;
 
         case ACPI_MUTEX:
-            printf("CopyValue(Mutex), is this even valid/possible?\n");
-            while (1)
-                ;
+            AcpipShowDebugMessage("attempt at CopyValue(Mutex)\n");
+            return 0;
 
         case ACPI_FIELD_UNIT:
             AcpiCreateReference(&Source->FieldUnit.Region->Value, NULL);
@@ -332,12 +332,14 @@ void AcpipPopulatePredefined(void) {
 
     AcpiObject *Objects = calloc(PREDEFINED_ITEMS, sizeof(AcpiObject));
     if (!Objects) {
-        KeFatalError(KE_EARLY_MEMORY_FAILURE);
+        AcpipShowErrorMessage(
+            ACPI_REASON_OUT_OF_MEMORY, "could not allocate the predefined object scopes\n");
     }
 
     AcpiChildren *Children = calloc(PREDEFINED_ITEMS, sizeof(AcpiChildren));
     if (!Children) {
-        KeFatalError(KE_EARLY_MEMORY_FAILURE);
+        AcpipShowErrorMessage(
+            ACPI_REASON_OUT_OF_MEMORY, "could not allocate the predefined object scopes\n");
     }
 
     for (int i = 0; i < PREDEFINED_ITEMS; i++) {
@@ -394,9 +396,7 @@ void AcpipPopulateTree(const uint8_t *Code, uint32_t Length) {
     State.Scope = &Scope;
 
     if (!AcpipExecuteTermList(&State)) {
-        printf("Failure on AcpipExecuteTermList()!\n");
-        while (1)
-            ;
+        AcpipShowErrorMessage(ACPI_REASON_CORRUPTED_TABLES, "failed execution of ACPI table\n");
     }
 }
 

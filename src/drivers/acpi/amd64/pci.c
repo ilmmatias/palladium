@@ -4,6 +4,18 @@
 #include <acpip.h>
 #include <amd64/port.h>
 
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function reads data from the PCI(e) address space.
+ *
+ * PARAMETERS:
+ *     Source - Region containing the data of the PCI device.
+ *     Offset - Offset were trying to read.
+ *     Size - How many bytes we're trying to read.
+ *
+ * RETURN VALUE:
+ *     Data from the address space.
+ *-----------------------------------------------------------------------------------------------*/
 uint64_t AcpipReadPciConfigSpace(AcpiValue *Source, int Offset, int Size) {
     /* Setup the address we need to send into the CONFIG_ADDRESS port. */
     uint32_t Address = 0x80000000 | (Source->Region.PciBus << 16) |
@@ -11,6 +23,7 @@ uint64_t AcpipReadPciConfigSpace(AcpiValue *Source, int Offset, int Size) {
                        (Offset & 0xFC);
 
     /* Send it, and try to read from CONFIG_DATA. */
+    AcpipShowDebugMessage("read from PCI config space, address 0x%X, size %u\n", Address, Size);
     WritePortDWord(0xCF8, Address);
 
     switch (Size) {
@@ -23,6 +36,19 @@ uint64_t AcpipReadPciConfigSpace(AcpiValue *Source, int Offset, int Size) {
     }
 }
 
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function writes data into the PCI(e) address space.
+ *
+ * PARAMETERS:
+ *     Source - Region containing the data of the PCI device.
+ *     Offset - Offset were trying to read.
+ *     Size - How many bytes we're trying to write.
+ *     Data - What we're trying to write.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
 void AcpipWritePciConfigSpace(AcpiValue *Source, int Offset, int Size, uint64_t Data) {
     /* Setup the address we need to send into the CONFIG_ADDRESS port. */
     uint32_t Address = 0x80000000 | (Source->Region.PciBus << 16) |
@@ -30,6 +56,8 @@ void AcpipWritePciConfigSpace(AcpiValue *Source, int Offset, int Size, uint64_t 
                        (Offset & 0xFC);
 
     /* Send it, followed by writing into CONFIG_DATA. */
+    AcpipShowDebugMessage(
+        "write into PCI config space, address 0x%X, size %u, data 0x%llX\n", Address, Size, Data);
     WritePortDWord(0xCF8, Address);
 
     switch (Size) {

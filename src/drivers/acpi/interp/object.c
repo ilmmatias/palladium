@@ -190,6 +190,12 @@ AcpiObject *AcpipCreateObject(AcpipName *Name, AcpiValue *Value) {
     if (Base) {
         while (1) {
             if (!memcmp(Base->Name, Name->Start, 4)) {
+                if (Base->Value.Type != ACPI_DEVICE && Base->Value.Type != ACPI_REGION &&
+                    Base->Value.Type != ACPI_POWER && Base->Value.Type != ACPI_PROCESSOR &&
+                    Base->Value.Type != ACPI_THERMAL && Base->Value.Type != ACPI_SCOPE) {
+                    AcpipShowDebugMessage("duplicate object, top most name %.4s\n", Base->Name);
+                }
+
                 return Base;
             }
 
