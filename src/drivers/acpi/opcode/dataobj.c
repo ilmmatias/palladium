@@ -90,12 +90,13 @@ int AcpipExecuteDataObjOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Val
                 return 0;
             }
 
-            Value->String = malloc(StringSize);
+            Value->String = malloc(sizeof(AcpiString) + StringSize);
             if (!Value->String) {
                 return 0;
             }
 
-            memcpy(Value->String, State->Scope->Code, StringSize);
+            Value->String->References = 1;
+            memcpy(Value->String->Data, State->Scope->Code, StringSize);
             State->Scope->Code += StringSize;
             State->Scope->RemainingLength -= StringSize;
 

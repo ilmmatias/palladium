@@ -18,7 +18,7 @@
 static int
 ExecuteSimpleName(AcpipState *State, uint16_t Opcode, AcpipTarget *Target, int Optional) {
     switch (Opcode) {
-        /* LocalObj (Local0-6) */
+        /* LocalObj (Local0-7) */
         case 0x60:
         case 0x61:
         case 0x62:
@@ -26,6 +26,7 @@ ExecuteSimpleName(AcpipState *State, uint16_t Opcode, AcpipTarget *Target, int O
         case 0x64:
         case 0x65:
         case 0x66:
+        case 0x67:
             Target->Type = ACPI_TARGET_LOCAL;
             Target->Index = Opcode - 0x60;
             break;

@@ -17,13 +17,21 @@
  *     Data from the address space.
  *-----------------------------------------------------------------------------------------------*/
 uint64_t AcpipReadPciConfigSpace(AcpiValue *Source, int Offset, int Size) {
+    AcpipShowDebugMessage(
+        "read from PCI config space, 0x%X/0x%X/0x%X/0x%X, offset 0x%X, size %u\n",
+        Source->Region.PciSegment,
+        Source->Region.PciBus,
+        Source->Region.PciDevice,
+        Source->Region.PciFunction,
+        Offset,
+        Size);
+
     /* Setup the address we need to send into the CONFIG_ADDRESS port. */
     uint32_t Address = 0x80000000 | (Source->Region.PciBus << 16) |
                        (Source->Region.PciDevice << 11) | (Source->Region.PciFunction << 8) |
                        (Offset & 0xFC);
 
     /* Send it, and try to read from CONFIG_DATA. */
-    AcpipShowDebugMessage("read from PCI config space, address 0x%X, size %u\n", Address, Size);
     WritePortDWord(0xCF8, Address);
 
     switch (Size) {
@@ -50,14 +58,22 @@ uint64_t AcpipReadPciConfigSpace(AcpiValue *Source, int Offset, int Size) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void AcpipWritePciConfigSpace(AcpiValue *Source, int Offset, int Size, uint64_t Data) {
+    AcpipShowDebugMessage(
+        "write into PCI config space, 0x%X/0x%X/0x%X/0x%X, offset 0x%X, size %u, data 0x%llX\n",
+        Source->Region.PciSegment,
+        Source->Region.PciBus,
+        Source->Region.PciDevice,
+        Source->Region.PciFunction,
+        Offset,
+        Size,
+        Data);
+
     /* Setup the address we need to send into the CONFIG_ADDRESS port. */
     uint32_t Address = 0x80000000 | (Source->Region.PciBus << 16) |
                        (Source->Region.PciDevice << 11) | (Source->Region.PciFunction << 8) |
                        (Offset & 0xFC);
 
     /* Send it, followed by writing into CONFIG_DATA. */
-    AcpipShowDebugMessage(
-        "write into PCI config space, address 0x%X, size %u, data 0x%llX\n", Address, Size, Data);
     WritePortDWord(0xCF8, Address);
 
     switch (Size) {

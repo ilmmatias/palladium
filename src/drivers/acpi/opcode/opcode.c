@@ -60,14 +60,15 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result, int ObjReference) {
         TRY_EXECUTE_OPCODE(AcpipExecuteStmtOpcode);
 
         switch (FullOpcode) {
-            /* LocalObj (Local0-6) */
+            /* LocalObj (Local0-7) */
             case 0x60:
             case 0x61:
             case 0x62:
             case 0x63:
             case 0x64:
             case 0x65:
-            case 0x66: {
+            case 0x66:
+            case 0x67: {
                 if (ObjReference) {
                     Value.Type = ACPI_LOCAL;
                     Value.Integer = FullOpcode - 0x60;

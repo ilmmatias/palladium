@@ -47,7 +47,7 @@ typedef struct AcpipState {
     int IsMethod;
     int HasReturned;
     AcpiValue Arguments[7];
-    AcpiValue Locals[7];
+    AcpiValue Locals[8];
     AcpiValue ReturnValue;
     AcpipScope *Scope;
 } AcpipState;
