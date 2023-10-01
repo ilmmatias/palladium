@@ -3,8 +3,8 @@
 
 #include <acpip.h>
 #include <stddef.h>
-#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -19,28 +19,19 @@
  *     Positive number on success, negative on "this isn't a statement", 0 on failure.
  *-----------------------------------------------------------------------------------------------*/
 int AcpipExecuteStmtOpcode(AcpipState *State, uint16_t Opcode) {
-    uint32_t Start = State->Scope->RemainingLength;
-    const uint8_t *StartCode = State->Scope->Code;
+    const uint8_t *StartCode = State->Opcode->StartCode;
+    uint32_t Start = State->Opcode->Start;
 
     switch (Opcode) {
         /* DefIfElse := IfOp PkgLength Predicate TermList DefElse */
         case 0xA0: {
-            uint32_t Length;
-            if (!AcpipReadPkgLength(State, &Length)) {
-                return 0;
-            }
-
-            uint64_t Predicate;
-            if (!AcpipExecuteInteger(State, &Predicate)) {
-                return 0;
-            }
-
+            uint32_t Length = State->Opcode->PkgLength;
             uint32_t LengthSoFar = Start - State->Scope->RemainingLength;
             if (LengthSoFar > Length || Length - LengthSoFar > State->Scope->RemainingLength) {
                 return 0;
             }
 
-            if (Predicate) {
+            if (State->Opcode->FixedArguments[0].TermArg.Integer) {
                 AcpipScope *Scope = AcpipEnterIf(State, Length - LengthSoFar);
                 if (!Scope) {
                     return 0;
@@ -84,8 +75,8 @@ int AcpipExecuteStmtOpcode(AcpipState *State, uint16_t Opcode) {
 
         /* DefElse := ElseOp PkgLength TermList */
         case 0xA1: {
-            uint32_t Length;
-            if (!AcpipReadPkgLength(State, &Length) || Length > Start) {
+            uint32_t Length = State->Opcode->PkgLength;
+            if (Length > Start) {
                 return 0;
             }
 
@@ -96,32 +87,22 @@ int AcpipExecuteStmtOpcode(AcpipState *State, uint16_t Opcode) {
 
         /* DefWhile := WhileOp PkgLength Predicate TermList */
         case 0xA2: {
-            uint32_t Length;
-            if (!AcpipReadPkgLength(State, &Length)) {
-                return 0;
-            }
-
-            const uint8_t *PredicateStart = State->Scope->Code;
-            uint32_t PredicateBacktrack = State->Scope->RemainingLength;
-
-            uint64_t Predicate;
-            if (!AcpipExecuteInteger(State, &Predicate)) {
-                return 0;
-            }
-
+            uint32_t Length = State->Opcode->PkgLength;
             uint32_t LengthSoFar = Start - State->Scope->RemainingLength;
             if (LengthSoFar > Length || Length - LengthSoFar > State->Scope->RemainingLength) {
                 return 0;
             }
 
-            if (!Predicate) {
+            const uint8_t *Predicate = State->Opcode->Predicate;
+            uint32_t PredicateBacktrack = State->Opcode->PredicateBacktrack;
+            if (!State->Opcode->FixedArguments[0].TermArg.Integer) {
                 State->Scope->Code += Length - LengthSoFar;
                 State->Scope->RemainingLength -= Length - LengthSoFar;
                 break;
             }
 
             AcpipScope *Scope =
-                AcpipEnterWhile(State, PredicateStart, PredicateBacktrack, Length - LengthSoFar);
+                AcpipEnterWhile(State, Predicate, PredicateBacktrack, Length - LengthSoFar);
             if (!Scope) {
                 return 0;
             }
@@ -138,10 +119,8 @@ int AcpipExecuteStmtOpcode(AcpipState *State, uint16_t Opcode) {
 
         /* DefReturn ArgObject */
         case 0xA4: {
-            if (!AcpipExecuteOpcode(State, &State->ReturnValue, 1)) {
-                return 0;
-            }
-
+            memcpy(
+                &State->ReturnValue, &State->Opcode->FixedArguments[0].TermArg, sizeof(AcpiValue));
             State->HasReturned = 1;
             break;
         }

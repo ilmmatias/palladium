@@ -20,23 +20,13 @@
  *     failure.
  *-----------------------------------------------------------------------------------------------*/
 int AcpipExecuteNsModOpcode(AcpipState *State, uint16_t Opcode) {
-    uint32_t Start = State->Scope->RemainingLength;
+    uint32_t Start = State->Opcode->Start;
 
     switch (Opcode) {
         /* DefAlias := AliasOp NameString NameString */
         case 0x06: {
-            AcpipName SourceName;
-            if (!AcpipReadName(State, &SourceName)) {
-                return 0;
-            }
-
-            AcpiObject *SourceObject = AcpipResolveObject(&SourceName);
+            AcpiObject *SourceObject = AcpipResolveObject(&State->Opcode->FixedArguments[0].Name);
             if (!SourceObject) {
-                return 0;
-            }
-
-            AcpipName AliasName;
-            if (!AcpipReadName(State, &AliasName)) {
                 return 0;
             }
 
@@ -45,7 +35,7 @@ int AcpipExecuteNsModOpcode(AcpipState *State, uint16_t Opcode) {
             Value.References = 1;
             Value.Alias = SourceObject;
 
-            AcpiObject *Object = AcpipCreateObject(&AliasName, &Value);
+            AcpiObject *Object = AcpipCreateObject(&State->Opcode->FixedArguments[1].Name, &Value);
             if (!Object) {
                 return 0;
             }
@@ -55,17 +45,8 @@ int AcpipExecuteNsModOpcode(AcpipState *State, uint16_t Opcode) {
 
         /* DefName := NameOp NameString DataRefObject */
         case 0x08: {
-            AcpipName Name;
-            if (!AcpipReadName(State, &Name)) {
-                return 0;
-            }
-
-            AcpiValue DataRefObject;
-            if (!AcpipExecuteOpcode(State, &DataRefObject, 1)) {
-                return 0;
-            }
-
-            AcpiObject *Object = AcpipCreateObject(&Name, &DataRefObject);
+            AcpiObject *Object = AcpipCreateObject(
+                &State->Opcode->FixedArguments[0].Name, &State->Opcode->FixedArguments[1].TermArg);
             if (!Object) {
                 return 0;
             }
@@ -75,16 +56,7 @@ int AcpipExecuteNsModOpcode(AcpipState *State, uint16_t Opcode) {
 
         /* DefScope := ScopeOp PkgLength NameString TermList */
         case 0x10: {
-            uint32_t Length;
-            if (!AcpipReadPkgLength(State, &Length)) {
-                return 0;
-            }
-
-            AcpipName Name;
-            if (!AcpipReadName(State, &Name)) {
-                return 0;
-            }
-
+            uint32_t Length = State->Opcode->PkgLength;
             uint32_t LengthSoFar = Start - State->Scope->RemainingLength;
             if (LengthSoFar > Length || Length - LengthSoFar > State->Scope->RemainingLength) {
                 return 0;
@@ -101,7 +73,7 @@ int AcpipExecuteNsModOpcode(AcpipState *State, uint16_t Opcode) {
             Value.Children->References = 1;
             Value.Children->Objects = NULL;
 
-            AcpiObject *Object = AcpipCreateObject(&Name, &Value);
+            AcpiObject *Object = AcpipCreateObject(&State->Opcode->FixedArguments[0].Name, &Value);
             if (!Object) {
                 return 0;
             }

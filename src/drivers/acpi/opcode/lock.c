@@ -23,16 +23,6 @@ int AcpipExecuteLockOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
     switch (Opcode) {
         /* DefMutex := MutexOp NameString SyncFlags */
         case 0x015B: {
-            AcpipName Name;
-            if (!AcpipReadName(State, &Name)) {
-                return 0;
-            }
-
-            uint8_t SyncFlags;
-            if (!AcpipReadByte(State, &SyncFlags)) {
-                return 0;
-            }
-
             AcpiValue Value;
             Value.Type = ACPI_MUTEX;
             Value.References = 1;
@@ -42,10 +32,10 @@ int AcpipExecuteLockOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
             }
 
             Value.Mutex->References = 1;
-            Value.Mutex->Flags = SyncFlags;
+            Value.Mutex->Flags = State->Opcode->FixedArguments[1].Integer;
             atomic_flag_clear(&Value.Mutex->Value);
 
-            if (!AcpipCreateObject(&Name, &Value)) {
+            if (!AcpipCreateObject(&State->Opcode->FixedArguments[0].Name, &Value)) {
                 return 0;
             }
 
@@ -54,18 +44,8 @@ int AcpipExecuteLockOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
 
         /* DefAcquire := AcquireOp MutexObject Timeout */
         case 0x235B: {
-            AcpipTarget MutexName;
-            if (!AcpipExecuteSuperName(State, &MutexName, 0)) {
-                return 0;
-            }
-
             AcpiValue MutexObject;
-            if (!AcpipReadTarget(State, &MutexName, &MutexObject)) {
-                return 0;
-            }
-
-            uint16_t Timeout;
-            if (!AcpipReadWord(State, &Timeout)) {
+            if (!AcpipReadTarget(State, &State->Opcode->FixedArguments[0].TermArg, &MutexObject)) {
                 return 0;
             }
 
@@ -74,23 +54,21 @@ int AcpipExecuteLockOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
             while (atomic_flag_test_and_set(&MutexObject.Mutex->Value))
                 ;
 
+            AcpiRemoveReference(&State->Opcode->FixedArguments[0].TermArg, 0);
             break;
         }
 
         /* DefRelease := ReleaseOp MutexObject */
         case 0x275B: {
-            AcpipTarget MutexName;
-            if (!AcpipExecuteSuperName(State, &MutexName, 0)) {
-                return 0;
-            }
-
             AcpiValue MutexObject;
-            if (!AcpipReadTarget(State, &MutexName, &MutexObject)) {
+            if (!AcpipReadTarget(State, &State->Opcode->FixedArguments[0].TermArg, &MutexObject)) {
                 return 0;
             }
 
             /* STUB, send a "mutex release" signal to the kernel after we implement threading. */
             atomic_flag_clear(&MutexObject.Mutex->Value);
+
+            AcpiRemoveReference(&State->Opcode->FixedArguments[0].TermArg, 0);
             break;
         }
 

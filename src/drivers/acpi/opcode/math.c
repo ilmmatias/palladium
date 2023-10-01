@@ -34,20 +34,9 @@ int AcpipExecuteMathOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
         case 0x7E:
         case 0x7F:
         case 0x85: {
-            uint64_t Left;
-            if (!AcpipExecuteInteger(State, &Left)) {
-                return 0;
-            }
-
-            uint64_t Right;
-            if (!AcpipExecuteInteger(State, &Right)) {
-                return 0;
-            }
-
-            AcpipTarget Target;
-            if (!AcpipExecuteTarget(State, &Target)) {
-                return 0;
-            }
+            uint64_t Left = State->Opcode->FixedArguments[0].TermArg.Integer;
+            uint64_t Right = State->Opcode->FixedArguments[1].TermArg.Integer;
+            AcpiValue *Target = &State->Opcode->FixedArguments[2].TermArg;
 
             Value->Type = ACPI_INTEGER;
             Value->References = 1;
@@ -87,10 +76,12 @@ int AcpipExecuteMathOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
                     break;
             }
 
-            if (!AcpipStoreTarget(State, &Target, Value)) {
+            if (!AcpipStoreTarget(State, Target, Value)) {
+                AcpiRemoveReference(Target, 0);
                 return 0;
             }
 
+            AcpiRemoveReference(Target, 0);
             break;
         }
 
@@ -98,16 +89,15 @@ int AcpipExecuteMathOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
            both the input and the output). */
         case 0x75:
         case 0x76: {
-            AcpipTarget Target;
-            if (!AcpipExecuteSuperName(State, &Target, 0)) {
-                return 0;
-            }
+            AcpiValue *Target = &State->Opcode->FixedArguments[0].TermArg;
 
             uint64_t TargetInteger;
             AcpiValue TargetValue;
-            if (!AcpipReadTarget(State, &Target, &TargetValue)) {
+            if (!AcpipReadTarget(State, Target, &TargetValue)) {
+                AcpiRemoveReference(Target, 0);
                 return 0;
             } else if (!AcpipCastToInteger(&TargetValue, &TargetInteger, 1)) {
+                AcpiRemoveReference(Target, 0);
                 return 0;
             }
 
@@ -122,25 +112,20 @@ int AcpipExecuteMathOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
                     break;
             }
 
-            if (!AcpipStoreTarget(State, &Target, Value)) {
+            if (!AcpipStoreTarget(State, Target, Value)) {
+                AcpiRemoveReference(Target, 0);
                 return 0;
             }
 
+            AcpiRemoveReference(Target, 0);
             break;
         }
 
         /* Unary operations with a target (Op TermArg Target, the operate on TermArg, and save the
            result on Target). */
         case 0x80: {
-            uint64_t Operand;
-            if (!AcpipExecuteInteger(State, &Operand)) {
-                return 0;
-            }
-
-            AcpipTarget Target;
-            if (!AcpipExecuteTarget(State, &Target)) {
-                return 0;
-            }
+            uint64_t Operand = State->Opcode->FixedArguments[0].TermArg.Integer;
+            AcpiValue *Target = &State->Opcode->FixedArguments[1].TermArg;
 
             Value->Type = ACPI_INTEGER;
             Value->References = 1;
@@ -150,6 +135,12 @@ int AcpipExecuteMathOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
                     break;
             }
 
+            if (!AcpipStoreTarget(State, Target, Value)) {
+                AcpiRemoveReference(Target, 0);
+                return 0;
+            }
+
+            AcpiRemoveReference(Target, 0);
             break;
         }
 
@@ -159,15 +150,8 @@ int AcpipExecuteMathOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
         case 0x93:
         case 0x94:
         case 0x95: {
-            uint64_t Left;
-            if (!AcpipExecuteInteger(State, &Left)) {
-                return 0;
-            }
-
-            uint64_t Right;
-            if (!AcpipExecuteInteger(State, &Right)) {
-                return 0;
-            }
+            uint64_t Left = State->Opcode->FixedArguments[0].TermArg.Integer;
+            uint64_t Right = State->Opcode->FixedArguments[1].TermArg.Integer;
 
             Value->Type = ACPI_INTEGER;
             Value->References = 1;
@@ -195,15 +179,9 @@ int AcpipExecuteMathOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
 
         /* DefLNot := LnotOp Operand */
         case 0x92: {
-            uint64_t Operand;
-            if (!AcpipExecuteInteger(State, &Operand)) {
-                return 0;
-            }
-
             Value->Type = ACPI_INTEGER;
             Value->References = 1;
-            Value->Integer = Operand ? 0 : UINT64_MAX;
-
+            Value->Integer = State->Opcode->FixedArguments[0].TermArg.Integer ? 0 : UINT64_MAX;
             break;
         }
 

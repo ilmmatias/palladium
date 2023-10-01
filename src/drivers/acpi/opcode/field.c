@@ -22,19 +22,17 @@
  *-----------------------------------------------------------------------------------------------*/
 static int ReadFieldList(AcpipState *State, AcpiValue *Base, uint32_t Start, uint32_t Length) {
     uint32_t LengthSoFar = Start - State->Scope->RemainingLength;
-    if (LengthSoFar >= Length || Length - LengthSoFar > State->Scope->RemainingLength) {
+    if (LengthSoFar > Length || Length - LengthSoFar > State->Scope->RemainingLength) {
         return 0;
     }
 
     /* Last part of a Field def, should always be `... FieldFlags FieldList`. */
-    uint8_t AccessType = *(State->Scope->Code++);
+    uint8_t AccessType = State->Opcode->FixedArguments[State->Opcode->ValidArgs - 1].Integer;
     uint8_t AccessAttrib = 0;
     uint8_t AccessLength = 0;
     uint32_t Offset = 0;
 
-    Length -= LengthSoFar + 1;
-    State->Scope->RemainingLength--;
-
+    Length -= LengthSoFar;
     while (Length) {
         uint32_t Start = State->Scope->RemainingLength;
 
@@ -78,7 +76,7 @@ static int ReadFieldList(AcpipState *State, AcpiValue *Base, uint32_t Start, uin
             default: {
                 /* Just a single NameSeg is equivalent to a normal NamePath, so we can use
                    ReadName). */
-                AcpipName Name;
+                AcpiName Name;
                 if (!AcpipReadName(State, &Name)) {
                     return 0;
                 }
@@ -136,7 +134,7 @@ static int ReadFieldList(AcpipState *State, AcpiValue *Base, uint32_t Start, uin
  *     Positive number on success, negative on "this isn't a field op", 0 on failure.
  *-----------------------------------------------------------------------------------------------*/
 int AcpipExecuteFieldOpcode(AcpipState *State, uint16_t Opcode) {
-    uint32_t Start = State->Scope->RemainingLength;
+    uint32_t Start = State->Opcode->Start;
 
     switch (Opcode) {
         /* DefCreateDWordField := CreateDWordFieldOp SourceBuff ByteIndex NameString
@@ -147,23 +145,12 @@ int AcpipExecuteFieldOpcode(AcpipState *State, uint16_t Opcode) {
         case 0x8B:
         case 0x8C:
         case 0x8F: {
-            AcpiValue SourceBuff;
-            if (!AcpipExecuteBuffer(State, &SourceBuff)) {
-                return 0;
-            }
+            AcpiValue *SourceBuff = &State->Opcode->FixedArguments[0].TermArg;
+            uint64_t ByteIndex = State->Opcode->FixedArguments[1].TermArg.Integer;
+            AcpiName *Name = &State->Opcode->FixedArguments[2].Name;
 
-            uint64_t ByteIndex;
-            if (!AcpipExecuteInteger(State, &ByteIndex)) {
-                AcpiRemoveReference(&SourceBuff, 0);
-                return 0;
-            } else if (ByteIndex >= SourceBuff.Buffer->Size) {
-                AcpiRemoveReference(&SourceBuff, 0);
-                return 0;
-            }
-
-            AcpipName Name;
-            if (!AcpipReadName(State, &Name)) {
-                AcpiRemoveReference(&SourceBuff, 0);
+            if (ByteIndex >= SourceBuff->Buffer->Size) {
+                AcpiRemoveReference(SourceBuff, 0);
                 return 0;
             }
 
@@ -171,11 +158,11 @@ int AcpipExecuteFieldOpcode(AcpipState *State, uint16_t Opcode) {
                store SourceBuff. */
             AcpiValue *Buffer = malloc(sizeof(AcpiValue));
             if (!Buffer) {
-                AcpiRemoveReference(&SourceBuff, 0);
+                AcpiRemoveReference(SourceBuff, 0);
                 return 0;
             }
 
-            memcpy(Buffer, &SourceBuff, sizeof(AcpiValue));
+            memcpy(Buffer, SourceBuff, sizeof(AcpiValue));
 
             AcpiValue Value;
             Value.Type = ACPI_BUFFER_FIELD;
@@ -187,8 +174,8 @@ int AcpipExecuteFieldOpcode(AcpipState *State, uint16_t Opcode) {
                                      : Opcode == 0x8C ? 1
                                                       : 8;
 
-            if (!AcpipCreateObject(&Name, &Value)) {
-                AcpiRemoveReference(&SourceBuff, 0);
+            if (!AcpipCreateObject(Name, &Value)) {
+                AcpiRemoveReference(SourceBuff, 0);
                 free(Buffer);
                 return 0;
             }
@@ -198,17 +185,9 @@ int AcpipExecuteFieldOpcode(AcpipState *State, uint16_t Opcode) {
 
         /* DefField := FieldOp PkgLength NameString FieldFlags FieldList */
         case 0x815B: {
-            uint32_t Length;
-            if (!AcpipReadPkgLength(State, &Length)) {
-                return 0;
-            }
-
-            AcpipName Name;
-            if (!AcpipReadName(State, &Name)) {
-                return 0;
-            }
-
-            AcpiObject *Object = AcpipResolveObject(&Name);
+            uint32_t Length = State->Opcode->PkgLength;
+            AcpiName *Name = &State->Opcode->FixedArguments[0].Name;
+            AcpiObject *Object = AcpipResolveObject(Name);
             if (!Object) {
                 return 0;
             } else if (Object->Value.Type != ACPI_REGION) {
@@ -230,29 +209,18 @@ int AcpipExecuteFieldOpcode(AcpipState *State, uint16_t Opcode) {
 
         /* DefIndexField := IndexFieldOp PkgLength NameString NameString FieldFlags FieldList */
         case 0x865B: {
-            uint32_t Length;
-            if (!AcpipReadPkgLength(State, &Length)) {
-                return 0;
-            }
+            uint32_t Length = State->Opcode->PkgLength;
+            AcpiName *IndexName = &State->Opcode->FixedArguments[0].Name;
+            AcpiName *DataName = &State->Opcode->FixedArguments[1].Name;
 
-            AcpipName IndexName;
-            if (!AcpipReadName(State, &IndexName)) {
-                return 0;
-            }
-
-            AcpiObject *IndexObject = AcpipResolveObject(&IndexName);
+            AcpiObject *IndexObject = AcpipResolveObject(IndexName);
             if (!IndexObject) {
                 return 0;
             } else if (IndexObject->Value.Type != ACPI_FIELD_UNIT) {
                 return 0;
             }
 
-            AcpipName DataName;
-            if (!AcpipReadName(State, &DataName)) {
-                return 0;
-            }
-
-            AcpiObject *DataObject = AcpipResolveObject(&DataName);
+            AcpiObject *DataObject = AcpipResolveObject(DataName);
             if (!DataObject) {
                 return 0;
             } else if (DataObject->Value.Type != ACPI_FIELD_UNIT) {
@@ -275,37 +243,22 @@ int AcpipExecuteFieldOpcode(AcpipState *State, uint16_t Opcode) {
         /* DefBankField := BankFieldOp PkgLength NameString NameString BankValue
                            FieldFlags FieldList */
         case 0x875B: {
-            uint32_t Length;
-            if (!AcpipReadPkgLength(State, &Length)) {
-                return 0;
-            }
+            uint32_t Length = State->Opcode->PkgLength;
+            AcpiName *RegionName = &State->Opcode->FixedArguments[0].Name;
+            AcpiName *BankName = &State->Opcode->FixedArguments[1].Name;
+            uint64_t BankValue = State->Opcode->FixedArguments[2].TermArg.Integer;
 
-            AcpipName RegionName;
-            if (!AcpipReadName(State, &RegionName)) {
-                return 0;
-            }
-
-            AcpiObject *RegionObject = AcpipResolveObject(&RegionName);
+            AcpiObject *RegionObject = AcpipResolveObject(RegionName);
             if (!RegionObject) {
                 return 0;
             } else if (RegionObject->Value.Type != ACPI_REGION) {
                 return 0;
             }
 
-            AcpipName BankName;
-            if (!AcpipReadName(State, &BankName)) {
-                return 0;
-            }
-
-            AcpiObject *BankObject = AcpipResolveObject(&BankName);
+            AcpiObject *BankObject = AcpipResolveObject(BankName);
             if (!BankObject) {
                 return 0;
             } else if (BankObject->Value.Type != ACPI_FIELD_UNIT) {
-                return 0;
-            }
-
-            uint64_t BankValue;
-            if (!AcpipExecuteInteger(State, &BankValue)) {
                 return 0;
             }
 

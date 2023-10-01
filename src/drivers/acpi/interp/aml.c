@@ -27,8 +27,15 @@ extern AcpiObject *AcpipObjectTree;
 int AcpiExecuteMethod(AcpiObject *Object, int ArgCount, AcpiValue *Arguments, AcpiValue *Result) {
     if (!Object || Object->Value.Type != ACPI_METHOD) {
         if (Object) {
-            AcpipShowDebugMessage(
-                "attempt at executing non-method object, top most name %.4s\n", Object->Name);
+            char *Path = AcpipGetObjectPath(Object);
+            if (Path) {
+                AcpipShowDebugMessage(
+                    "attempt at executing non-method object, full path %s\n", Path);
+                free(Path);
+            } else {
+                AcpipShowDebugMessage(
+                    "attempt at executing non-method object, top most name %.4s\n", Object->Name);
+            }
         }
 
         return 0;
@@ -37,7 +44,16 @@ int AcpiExecuteMethod(AcpiObject *Object, int ArgCount, AcpiValue *Arguments, Ac
     } else if (ArgCount > 7) {
         ArgCount = 7;
     } else if (Object->Value.Method.Override) {
-        AcpipShowDebugMessage("executing overwritten method, top most name %.4s\n", Object->Name);
+        char *Path = AcpipGetObjectPath(Object);
+
+        if (Path) {
+            AcpipShowDebugMessage("executing overwritten method, full path %s\n", Path);
+            free(Path);
+        } else {
+            AcpipShowDebugMessage(
+                "executing overwritten method, top most name %.4s\n", Object->Name);
+        }
+
         return Object->Value.Method.Override(ArgCount, Arguments, Result);
     }
 
@@ -55,6 +71,7 @@ int AcpiExecuteMethod(AcpiObject *Object, int ArgCount, AcpiValue *Arguments, Ac
     memset(&State, 0, sizeof(State));
     State.IsMethod = 1;
     State.Scope = &Scope;
+    State.Opcode = NULL;
 
     if (ArgCount) {
         memcpy(State.Arguments, Arguments, ArgCount * sizeof(AcpiValue));
@@ -135,8 +152,6 @@ int AcpiCopyValue(AcpiValue *Source, AcpiValue *Target) {
             Target->Package->Size = Source->Package->Size;
 
             for (uint64_t i = 0; i < Source->Package->Size; i++) {
-                Target->Package->Data[i].Type = Source->Package->Data[i].Type;
-
                 if (Source->Package->Data[i].Type) {
                     if (!AcpiCopyValue(
                             &Source->Package->Data[i].Value, &Target->Package->Data[i].Value)) {
@@ -145,6 +160,11 @@ int AcpiCopyValue(AcpiValue *Source, AcpiValue *Target) {
                         AcpiRemoveReference(Target, 0);
                         return 0;
                     }
+                } else {
+                    memcpy(
+                        &Target->Package->Data[i],
+                        &Source->Package->Data[i],
+                        sizeof(AcpiPackageElement));
                 }
             }
 
@@ -247,7 +267,7 @@ void AcpiCreateReference(AcpiValue *Source, AcpiValue *Target) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void AcpiRemoveReference(AcpiValue *Value, int CleanupPointer) {
-    if (!Value) {
+    if (!Value || !Value->References) {
         return;
     }
 
@@ -397,6 +417,7 @@ void AcpipPopulateTree(const uint8_t *Code, uint32_t Length) {
     memset(&State, 0, sizeof(State));
     State.IsMethod = 0;
     State.Scope = &Scope;
+    State.Opcode = NULL;
 
     if (!AcpipExecuteTermList(&State)) {
         AcpipShowErrorMessage(ACPI_REASON_CORRUPTED_TABLES, "failed execution of ACPI table\n");
@@ -635,7 +656,7 @@ int AcpipReadPkgLength(AcpipState *State, uint32_t *Length) {
  * RETURN VALUE:
  *     0 on end of code, 1 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int AcpipReadName(AcpipState *State, AcpipName *Name) {
+int AcpipReadName(AcpipState *State, AcpiName *Name) {
     uint8_t Current;
     if (!AcpipReadByte(State, &Current)) {
         return 0;

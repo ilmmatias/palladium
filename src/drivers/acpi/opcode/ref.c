@@ -25,24 +25,31 @@ int AcpipExecuteRefOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value) 
     switch (Opcode) {
         /* DerefOf := DerefOfOp ObjReference */
         case 0x83: {
-            AcpiValue Reference;
-            if (!AcpipExecuteOpcode(State, &Reference, 1)) {
-                return 0;
-            }
+            AcpiValue *Reference = &State->Opcode->FixedArguments[0].TermArg;
 
-            switch (Reference.Type) {
+            switch (Reference->Type) {
                 case ACPI_INDEX: {
-                    AcpiValue *Source = Reference.Index.Source;
-                    uint64_t Index = Reference.Index.Index;
+                    AcpiValue *Source = Reference->Index.Source;
+                    uint64_t Index = Reference->Index.Index;
 
                     if (Source->Type == ACPI_PACKAGE) {
-                        if (!Source->Package->Data[Index].Type) {
-                            AcpipShowErrorMessage(
-                                ACPI_REASON_CORRUPTED_TABLES,
-                                "ACPI_PACKAGE, Type == 0 (string), TODO!\n");
-                        }
+                        if (Source->Package->Data[Index].Type) {
+                            AcpiCreateReference(&Source->Package->Data[Index].Value, Value);
+                        } else {
+                            /* For NameStrings, we need to resolve them + create a reference to
+                               their contents; by now, the object they point to should exist, so
+                               we're erroring out if they don't. */
+                            AcpiName Name;
+                            memcpy(&Name, &Source->Package->Data[Index].Name, sizeof(AcpiName));
 
-                        AcpiCreateReference(&Source->Package->Data[Index].Value, Value);
+                            AcpiObject *Object = AcpipResolveObject(&Name);
+                            if (!Object) {
+                                AcpiRemoveReference(Reference, 0);
+                                return 0;
+                            }
+
+                            AcpiCreateReference(&Object->Value, Value);
+                        }
                     } else {
                         Value->Type = ACPI_INTEGER;
                         Value->References = 1;
@@ -54,61 +61,48 @@ int AcpipExecuteRefOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value) 
                 }
 
                 case ACPI_LOCAL:
-                    AcpiCreateReference(&State->Locals[Reference.Integer], Value);
+                    AcpiCreateReference(&State->Locals[Reference->Integer], Value);
                     break;
 
                 case ACPI_ARG:
-                    AcpiCreateReference(&State->Arguments[Reference.Integer], Value);
+                    AcpiCreateReference(&State->Arguments[Reference->Integer], Value);
                     break;
 
                 case ACPI_REFERENCE:
-                    AcpiCreateReference(&Reference.Reference->Value, Value);
+                    AcpiCreateReference(&Reference->Reference->Value, Value);
                     break;
 
                 default:
-                    AcpiRemoveReference(&Reference, 0);
+                    AcpiRemoveReference(Reference, 0);
                     return 0;
             }
 
-            AcpiRemoveReference(&Reference, 0);
+            AcpiRemoveReference(Reference, 0);
             break;
         }
 
         /* DefIndex := IndexOp BuffPkgStrObj IndexValue Target */
         case 0x88: {
+            AcpiValue *Target = &State->Opcode->FixedArguments[2].TermArg;
+
             /* BufferField takes a reference to an AcpiValue (that needs to live for long
                enough), so allocate some memory for it. */
             AcpiValue *Buffer = malloc(sizeof(AcpiValue));
-            if (!Buffer) {
-                return 0;
-            } else if (!AcpipExecuteOpcode(State, Buffer, 0)) {
-                free(Buffer);
-                return 0;
-            }
-
+            memcpy(Buffer, &State->Opcode->FixedArguments[0].TermArg, sizeof(AcpiValue));
             if (Buffer->Type != ACPI_STRING && Buffer->Type != ACPI_BUFFER &&
                 Buffer->Type != ACPI_PACKAGE) {
                 AcpiRemoveReference(Buffer, 1);
-                return 0;
-            }
-
-            uint64_t Index;
-            if (!AcpipExecuteInteger(State, &Index)) {
-                AcpiRemoveReference(Buffer, 1);
-                return 0;
-            }
-
-            AcpipTarget Target;
-            if (!AcpipExecuteTarget(State, &Target)) {
-                AcpiRemoveReference(Buffer, 1);
+                AcpiRemoveReference(Target, 0);
                 return 0;
             }
 
             /* Pre-validate the index value (prevent buffer overflows). */
+            uint64_t Index = State->Opcode->FixedArguments[1].TermArg.Integer;
             switch (Buffer->Type) {
                 case ACPI_STRING: {
                     if (Index > strlen(Buffer->String->Data)) {
                         AcpiRemoveReference(Buffer, 1);
+                        AcpiRemoveReference(Target, 0);
                         return 0;
                     }
 
@@ -118,6 +112,7 @@ int AcpipExecuteRefOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value) 
                 case ACPI_BUFFER: {
                     if (Index >= Buffer->Buffer->Size) {
                         AcpiRemoveReference(Buffer, 1);
+                        AcpiRemoveReference(Target, 0);
                         return 0;
                     }
 
@@ -127,6 +122,7 @@ int AcpipExecuteRefOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value) 
                 default: {
                     if (Index >= Buffer->Package->Size) {
                         AcpiRemoveReference(Buffer, 1);
+                        AcpiRemoveReference(Target, 0);
                         return 0;
                     }
 
@@ -139,57 +135,31 @@ int AcpipExecuteRefOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value) 
             Value->Index.Source = Buffer;
             Value->Index.Index = Index;
 
-            if (!AcpipStoreTarget(State, &Target, Value)) {
+            if (!AcpipStoreTarget(State, Target, Value)) {
                 AcpiRemoveReference(Buffer, 1);
+                AcpiRemoveReference(Target, 0);
                 return 0;
             }
 
+            AcpiRemoveReference(Target, 0);
             break;
         }
 
         /* DefCondRefOf := CondRefOfOp SuperName Target */
         case 0x125B: {
-            AcpipTarget SuperName;
-            if (!AcpipExecuteSuperName(State, &SuperName, 1)) {
-                return 0;
-            }
-
-            AcpipTarget Target;
-            if (!AcpipExecuteTarget(State, &Target)) {
-                return 0;
-            }
+            AcpiValue *SuperName = &State->Opcode->FixedArguments[0].TermArg;
+            AcpiValue *Target = &State->Opcode->FixedArguments[1].TermArg;
 
             Value->Type = ACPI_INTEGER;
             Value->References = 1;
-            Value->Integer = SuperName.Type == ACPI_TARGET_UNRESOLVED ? 0 : UINT64_MAX;
+            Value->Integer = SuperName->Type == ACPI_EMPTY ? 0 : UINT64_MAX;
 
-            if (SuperName.Type != ACPI_TARGET_UNRESOLVED) {
-                AcpiValue Reference;
-                memset(&Reference, 0, sizeof(AcpiValue));
-
-                switch (SuperName.Type) {
-                    case ACPI_TARGET_LOCAL:
-                        Reference.Type = ACPI_LOCAL;
-                        Reference.Integer = SuperName.Index;
-                        break;
-
-                    case ACPI_TARGET_ARG:
-                        Reference.Type = ACPI_ARG;
-                        Reference.Integer = SuperName.Index;
-                        break;
-
-                    case ACPI_TARGET_NAMED:
-                        Reference.Type = ACPI_REFERENCE;
-                        Reference.Reference = SuperName.Object;
-                        AcpiCreateReference(&SuperName.Object->Value, NULL);
-                        break;
-                }
-
-                if (!AcpipStoreTarget(State, &Target, &Reference)) {
-                    return 0;
-                }
+            if (SuperName->Type != ACPI_EMPTY && !AcpipStoreTarget(State, Target, SuperName)) {
+                AcpiRemoveReference(Target, 0);
+                return 0;
             }
 
+            AcpiRemoveReference(Target, 0);
             break;
         }
 

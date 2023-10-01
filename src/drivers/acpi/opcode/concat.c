@@ -24,28 +24,17 @@ int AcpipExecuteConcatOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Valu
     switch (Opcode) {
         /* DefConcat := ConcatOp Data Data Target */
         case 0x73: {
-            AcpiValue Left;
-            if (!AcpipExecuteOpcode(State, &Left, 0)) {
-                return 0;
-            }
+            AcpiValue *Left = &State->Opcode->FixedArguments[0].TermArg;
+            AcpiValue *Right = &State->Opcode->FixedArguments[1].TermArg;
 
-            AcpiValue Right;
-            if (!AcpipExecuteOpcode(State, &Right, 0)) {
-                return 0;
-            }
-
-            AcpipTarget Target;
-            if (!AcpipExecuteTarget(State, &Target)) {
-                return 0;
-            }
-
-            switch (Left.Type) {
+            switch (Left->Type) {
                 /* Read it as two integers, and append them into a buffer. */
                 case ACPI_INTEGER: {
-                    uint64_t LeftValue = Left.Integer;
+                    uint64_t LeftValue = Left->Integer;
                     uint64_t RightValue;
-                    int Result = AcpipCastToInteger(&Right, &RightValue, 1);
+                    int Result = AcpipCastToInteger(Right, &RightValue, 1);
                     if (!Result) {
+                        AcpiRemoveReference(&State->Opcode->FixedArguments[2].TermArg, 0);
                         return 0;
                     }
 
@@ -53,6 +42,7 @@ int AcpipExecuteConcatOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Valu
                     Value->References = 1;
                     Value->Buffer = malloc(sizeof(AcpiBuffer) + 16);
                     if (!Value->Buffer) {
+                        AcpiRemoveReference(&State->Opcode->FixedArguments[2].TermArg, 0);
                         return 0;
                     }
 
@@ -66,60 +56,65 @@ int AcpipExecuteConcatOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Valu
 
                 /* Read it as two buffers, and append them into another buffer. */
                 case ACPI_BUFFER: {
-                    if (!AcpipCastToBuffer(&Right)) {
-                        AcpiRemoveReference(&Left, 0);
+                    if (!AcpipCastToBuffer(Right)) {
+                        AcpiRemoveReference(Left, 0);
+                        AcpiRemoveReference(&State->Opcode->FixedArguments[2].TermArg, 0);
                         return 0;
                     }
 
                     Value->Type = ACPI_BUFFER;
                     Value->References = 1;
                     Value->Buffer =
-                        malloc(sizeof(AcpiBuffer) + Left.Buffer->Size + Right.Buffer->Size);
+                        malloc(sizeof(AcpiBuffer) + Left->Buffer->Size + Right->Buffer->Size);
                     if (!Value->Buffer) {
-                        AcpiRemoveReference(&Left, 0);
-                        AcpiRemoveReference(&Right, 0);
+                        AcpiRemoveReference(Left, 0);
+                        AcpiRemoveReference(Right, 0);
+                        AcpiRemoveReference(&State->Opcode->FixedArguments[2].TermArg, 0);
                         return 0;
                     }
 
                     Value->Buffer->References = 1;
-                    Value->Buffer->Size = Left.Buffer->Size + Right.Buffer->Size;
-                    memcpy(Value->Buffer->Data, Left.Buffer->Data, Left.Buffer->Size);
+                    Value->Buffer->Size = Left->Buffer->Size + Right->Buffer->Size;
+                    memcpy(Value->Buffer->Data, Left->Buffer->Data, Left->Buffer->Size);
                     memcpy(
-                        Value->Buffer->Data + Left.Buffer->Size,
-                        Right.Buffer->Data,
-                        Right.Buffer->Size);
+                        Value->Buffer->Data + Left->Buffer->Size,
+                        Right->Buffer->Data,
+                        Right->Buffer->Size);
 
                     break;
                 }
 
                 /* Convert both sides into strings, and append them into a single string. */
                 default: {
-                    if (!AcpipCastToString(&Left, 1, 0) || !AcpipCastToString(&Right, 1, 0)) {
-                        AcpiRemoveReference(&Left, 0);
-                        AcpiRemoveReference(&Right, 0);
+                    if (!AcpipCastToString(Left, 1, 0) || !AcpipCastToString(Right, 1, 0)) {
+                        AcpiRemoveReference(Left, 0);
+                        AcpiRemoveReference(Right, 0);
+                        AcpiRemoveReference(&State->Opcode->FixedArguments[2].TermArg, 0);
                         return 0;
                     }
 
                     Value->Type = ACPI_STRING;
                     Value->References = 1;
                     Value->String = malloc(
-                        sizeof(AcpiString) + strlen(Left.String->Data) +
-                        strlen(Right.String->Data) + 1);
+                        sizeof(AcpiString) + strlen(Left->String->Data) +
+                        strlen(Right->String->Data) + 1);
                     if (!Value->String) {
+                        AcpiRemoveReference(&State->Opcode->FixedArguments[2].TermArg, 0);
                         return 0;
                     }
 
                     Value->String->References = 1;
-                    strcpy(Value->String->Data, Left.String->Data);
-                    strcat(Value->String->Data, Right.String->Data);
+                    strcpy(Value->String->Data, Left->String->Data);
+                    strcat(Value->String->Data, Right->String->Data);
 
                     break;
                 }
             }
 
-            int Status = AcpipStoreTarget(State, &Target, Value);
-            AcpiRemoveReference(&Left, 0);
-            AcpiRemoveReference(&Right, 0);
+            int Status = AcpipStoreTarget(State, &State->Opcode->FixedArguments[2].TermArg, Value);
+            AcpiRemoveReference(Left, 0);
+            AcpiRemoveReference(Right, 0);
+            AcpiRemoveReference(&State->Opcode->FixedArguments[2].TermArg, 0);
 
             if (!Status) {
                 return 0;

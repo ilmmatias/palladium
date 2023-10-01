@@ -30,6 +30,7 @@
 #define ACPI_INDEX 20
 #define ACPI_LOCAL 21
 #define ACPI_ARG 22
+#define ACPI_DEBUG 23
 
 #define ACPI_FIELD 0
 #define ACPI_BANK_FIELD 1
@@ -47,13 +48,19 @@
 #define ACPI_SPACE_GENERIC_SERIAL_BUS 9
 #define ACPI_SPACE_PCC 10
 
-struct AcpiPackageElement;
 struct AcpiPackage;
 struct AcpiValue;
 struct AcpiObject;
 
 typedef int (
     *AcpiOverrideMethod)(int ArgCount, struct AcpiValue *Arguments, struct AcpiValue *Result);
+
+typedef struct {
+    struct AcpiObject *LinkedObject;
+    const uint8_t *Start;
+    int BacktrackCount;
+    int SegmentCount;
+} AcpiName;
 
 typedef struct {
     int References;
@@ -137,10 +144,10 @@ typedef struct AcpiValue {
     };
 } AcpiValue;
 
-typedef struct AcpiPackageElement {
+typedef struct {
     int Type;
     union {
-        char *String;
+        AcpiName Name;
         AcpiValue Value;
     };
 } AcpiPackageElement;

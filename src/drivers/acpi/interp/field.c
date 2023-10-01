@@ -49,7 +49,7 @@ static int SetupPciConfigRegion(AcpiObject *Object) {
        otherwise. */
 
     AcpiValue Adr;
-    AcpipName Name;
+    AcpiName Name;
     Name.LinkedObject = Object;
     Name.Start = (const uint8_t *)"_ADR";
     Name.BacktrackCount = 0;
@@ -139,7 +139,7 @@ static void WriteRegion(AcpiValue *Source, int Offset, int Size, uint64_t Data) 
         default:
             AcpipShowErrorMessage(
                 ACPI_REASON_CORRUPTED_TABLES,
-                "WriteRegionField(%p, %u, %u, %llu), RegionSpace = %hhu\n",
+                "WriteRegionField(%p, %u, %u, %lu), RegionSpace = %hhu\n",
                 Source,
                 Offset,
                 Size,

@@ -3,6 +3,7 @@
 
 #include <acpip.h>
 #include <stdlib.h>
+#include <string.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -23,23 +24,18 @@ int AcpipExecuteConvOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
     switch (Opcode) {
         /* DefToBuffer := ToBufferOp Operand Target */
         case 0x96: {
-            if (!AcpipExecuteOpcode(State, Value, 0)) {
-                return 0;
-            }
-
-            AcpipTarget Target;
-            if (!AcpipExecuteTarget(State, &Target)) {
-                return 0;
-            }
+            memcpy(Value, &State->Opcode->FixedArguments[0].TermArg, sizeof(AcpiValue));
+            AcpiValue *Target = &State->Opcode->FixedArguments[1].TermArg;
 
             if (!AcpipCastToBuffer(Value)) {
+                AcpiRemoveReference(Target, 0);
+                return 0;
+            } else if (!AcpipStoreTarget(State, Target, Value)) {
+                AcpiRemoveReference(Target, 0);
                 return 0;
             }
 
-            if (!AcpipStoreTarget(State, &Target, Value)) {
-                return 0;
-            }
-
+            AcpiRemoveReference(Target, 0);
             break;
         }
 
@@ -47,46 +43,37 @@ int AcpipExecuteConvOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
            DefToHexString := ToHexStringOp Operand Target */
         case 0x97:
         case 0x98: {
-            if (!AcpipExecuteOpcode(State, Value, 0)) {
-                return 0;
-            }
-
-            AcpipTarget Target;
-            if (!AcpipExecuteTarget(State, &Target)) {
-                return 0;
-            }
+            memcpy(Value, &State->Opcode->FixedArguments[0].TermArg, sizeof(AcpiValue));
+            AcpiValue *Target = &State->Opcode->FixedArguments[1].TermArg;
 
             if (!AcpipCastToString(Value, 0, Opcode == 0x97)) {
+                AcpiRemoveReference(Target, 0);
+                return 0;
+            } else if (!AcpipStoreTarget(State, Target, Value)) {
+                AcpiRemoveReference(Target, 0);
                 return 0;
             }
 
-            if (!AcpipStoreTarget(State, &Target, Value)) {
-                return 0;
-            }
-
+            AcpiRemoveReference(Target, 0);
             break;
         }
 
         /* DefToInteger := ToIntegerOp Operand Target */
         case 0x99: {
-            if (!AcpipExecuteOpcode(State, Value, 0)) {
+            AcpiValue *Target = &State->Opcode->FixedArguments[1].TermArg;
+
+            Value->Type = ACPI_INTEGER;
+            Value->References = 1;
+            if (!AcpipCastToInteger(
+                    &State->Opcode->FixedArguments[0].TermArg, &Value->Integer, 1)) {
+                AcpiRemoveReference(Target, 0);
+                return 0;
+            } else if (!AcpipStoreTarget(State, Target, Value)) {
+                AcpiRemoveReference(Target, 0);
                 return 0;
             }
 
-            AcpipTarget Target;
-            if (!AcpipExecuteTarget(State, &Target)) {
-                return 0;
-            }
-
-            uint64_t Integer;
-            if (!AcpipCastToInteger(Value, &Integer, 1)) {
-                return 0;
-            }
-
-            if (!AcpipStoreTarget(State, &Target, Value)) {
-                return 0;
-            }
-
+            AcpiRemoveReference(Target, 0);
             break;
         }
 

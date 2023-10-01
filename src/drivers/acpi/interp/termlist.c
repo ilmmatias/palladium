@@ -36,7 +36,12 @@ int AcpipExecuteTermList(AcpipState *State) {
                 State->Scope->RemainingLength = State->Scope->PredicateBacktrack;
 
                 uint64_t Predicate;
-                if (!AcpipExecuteInteger(State, &Predicate)) {
+                AcpiValue PredicateValue;
+                if (!AcpipPrepareExecuteOpcode(State) ||
+                    !AcpipExecuteOpcode(State, &PredicateValue) ||
+                    !AcpipCastToInteger(&PredicateValue, &Predicate, 1)) {
+                    return 0;
+                } else if (!Predicate) {
                     break;
                 }
 
@@ -57,7 +62,7 @@ int AcpipExecuteTermList(AcpipState *State) {
             continue;
         }
 
-        if (!AcpipExecuteOpcode(State, NULL, 0)) {
+        if (!AcpipPrepareExecuteOpcode(State) || !AcpipExecuteOpcode(State, NULL)) {
             break;
         }
 

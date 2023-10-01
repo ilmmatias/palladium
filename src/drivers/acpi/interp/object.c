@@ -136,7 +136,7 @@ int AcpiEvaluateObject(AcpiObject *Object, AcpiValue *Result, int ExpectedType) 
  * RETURN VALUE:
  *     Pointer to the allocated object (->Value memset'ed to zero), or NULL on failure.
  *-----------------------------------------------------------------------------------------------*/
-AcpiObject *AcpipCreateObject(AcpipName *Name, AcpiValue *Value) {
+AcpiObject *AcpipCreateObject(AcpiName *Name, AcpiValue *Value) {
     AcpiObject *Parent = Name->LinkedObject ? Name->LinkedObject : AcpipObjectTree;
     AcpiObject *Base = Parent->Value.Children->Objects;
 
@@ -193,7 +193,13 @@ AcpiObject *AcpipCreateObject(AcpipName *Name, AcpiValue *Value) {
                 if (Base->Value.Type != ACPI_DEVICE && Base->Value.Type != ACPI_REGION &&
                     Base->Value.Type != ACPI_POWER && Base->Value.Type != ACPI_PROCESSOR &&
                     Base->Value.Type != ACPI_THERMAL && Base->Value.Type != ACPI_SCOPE) {
-                    AcpipShowDebugMessage("duplicate object, top most name %.4s\n", Base->Name);
+                    char *Path = AcpipGetObjectPath(Base);
+                    if (Path) {
+                        AcpipShowDebugMessage("duplicate object, full path %s\n", Path);
+                        free(Path);
+                    } else {
+                        AcpipShowDebugMessage("duplicate object, top most name %.4s\n", Base->Name);
+                    }
                 }
 
                 return Base;
@@ -237,7 +243,7 @@ AcpiObject *AcpipCreateObject(AcpipName *Name, AcpiValue *Value) {
  * RETURN VALUE:
  *     Pointer to the object if the entry was found, NULL otherwise.
  *-----------------------------------------------------------------------------------------------*/
-AcpiObject *AcpipResolveObject(AcpipName *Name) {
+AcpiObject *AcpipResolveObject(AcpiName *Name) {
     /* First pass, backtrack however many `^` we had prefixing this path. */
     AcpiObject *Parent = Name->LinkedObject ? Name->LinkedObject : AcpipObjectTree;
     while (Name->BacktrackCount > 0) {
@@ -314,4 +320,46 @@ AcpiObject *AcpipResolveObject(AcpipName *Name) {
             }
         }
     }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function saves the full path of an object into a string; The caller is expected to
+ *     free() it after use.
+ *
+ * PARAMETERS:
+ *     Object - What object we should get the path of.
+ *
+ * RETURN VALUE:
+ *     Pointer to the object path string, or NULL on failure.
+ *-----------------------------------------------------------------------------------------------*/
+char *AcpipGetObjectPath(AcpiObject *Object) {
+    int Parts = 0;
+    for (AcpiObject *Current = Object; Current->Parent; Current = Current->Parent) {
+        Parts++;
+    }
+
+    /* No parts means this is the root scope (\), otherwise, each part is separated by a dot (+4
+       characters for the name itself, 5 characters in total); The exception is the first part, as
+       it is prefixed by the root char instead of a dot (still 5 characters). */
+    char *Path = malloc(Parts ? Parts * 5 + 1 : 2);
+    if (!Path) {
+        return NULL;
+    } else if (!Parts) {
+        *Path = '\\';
+        *(Path + 1) = 0;
+        return Path;
+    }
+
+    char *Segment = Path + Parts * 5;
+    *Segment = 0;
+
+    for (; Object->Parent; Object = Object->Parent) {
+        memcpy(Segment - 4, Object->Name, 4);
+        *(Segment - 5) = '.';
+        Segment -= 5;
+    }
+
+    *Segment = '\\';
+    return Path;
 }

@@ -111,13 +111,13 @@ int AcpipCastToString(AcpiValue *Value, int ImplicitCast, int Decimal) {
                For decimal, we need snprintf to get the output size, then we convert it. */
         case ACPI_INTEGER: {
             if (Decimal) {
-                int Size = snprintf(NULL, 0, "%lld", Value->Integer);
+                int Size = snprintf(NULL, 0, "%ld", Value->Integer);
                 String = malloc(sizeof(AcpiString) + Size + 1);
                 if (!String) {
                     return 0;
                 }
 
-                if (snprintf(String->Data, Size + 1, "%lld", Value->Integer) != Size) {
+                if (snprintf(String->Data, Size + 1, "%ld", Value->Integer) != Size) {
                     free(String);
                     return 0;
                 }
@@ -127,7 +127,7 @@ int AcpipCastToString(AcpiValue *Value, int ImplicitCast, int Decimal) {
                     return 0;
                 }
 
-                if (snprintf(String->Data, 17, "%016llX", Value->Integer) != 16) {
+                if (snprintf(String->Data, 17, "%016lX", Value->Integer) != 16) {
                     free(String);
                     return 0;
                 }
@@ -146,10 +146,10 @@ int AcpipCastToString(AcpiValue *Value, int ImplicitCast, int Decimal) {
                 int Size = 0;
 
                 for (uint64_t i = 0; i < Value->Buffer->Size; i++) {
-                    const char *PrintfFormat = "%lld";
+                    const char *PrintfFormat = "%ld";
 
                     if (i < Value->Buffer->Size - 1) {
-                        PrintfFormat = ImplicitCast ? "%lld " : "%lld,";
+                        PrintfFormat = ImplicitCast ? "%ld " : "%ld,";
                     }
 
                     Size += snprintf(NULL, 0, PrintfFormat, Value->Buffer->Data[i]);
@@ -162,10 +162,10 @@ int AcpipCastToString(AcpiValue *Value, int ImplicitCast, int Decimal) {
 
                 int Offset = 0;
                 for (uint64_t i = 0; i < Value->Buffer->Size; i++) {
-                    const char *PrintfFormat = "%lld";
+                    const char *PrintfFormat = "%ld";
 
                     if (i < Value->Buffer->Size - 1) {
-                        PrintfFormat = ImplicitCast ? "%lld " : "%lld,";
+                        PrintfFormat = ImplicitCast ? "%ld " : "%ld,";
                     }
 
                     Offset += snprintf(
@@ -283,39 +283,4 @@ int AcpipCastToBuffer(AcpiValue *Value) {
     Value->Buffer->Size = BufferSize;
 
     return 1;
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function tries executing the next termarg in the scope.
- *
- * PARAMETERS:
- *     State - AML state containing the current scope.
- *     Result - Output as an integer.
- *
- * RETURN VALUE:
- *     1 on success, 0 otherwise.
- *-----------------------------------------------------------------------------------------------*/
-int AcpipExecuteInteger(AcpipState *State, uint64_t *Result) {
-    AcpiValue Value;
-    if (!AcpipExecuteOpcode(State, &Value, 0)) {
-        return 0;
-    }
-
-    return AcpipCastToInteger(&Value, Result, 1);
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function tries executing the next termarg in the scope.
- *
- * PARAMETERS:
- *     State - AML state containing the current scope.
- *     Value - Output as a buffer.
- *
- * RETURN VALUE:
- *     1 on success, 0 otherwise.
- *-----------------------------------------------------------------------------------------------*/
-int AcpipExecuteBuffer(AcpipState *State, AcpiValue *Result) {
-    return AcpipExecuteOpcode(State, Result, 0) && AcpipCastToBuffer(Result);
 }

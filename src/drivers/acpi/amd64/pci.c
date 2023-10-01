@@ -18,7 +18,7 @@
  *-----------------------------------------------------------------------------------------------*/
 uint64_t AcpipReadPciConfigSpace(AcpiValue *Source, int Offset, int Size) {
     AcpipShowDebugMessage(
-        "read from PCI config space, 0x%X/0x%X/0x%X/0x%X, offset 0x%X, size %u\n",
+        "read from PCI config space, %X/%X/%X/%X, offset 0x%X, size %u\n",
         Source->Region.PciSegment,
         Source->Region.PciBus,
         Source->Region.PciDevice,
@@ -59,7 +59,7 @@ uint64_t AcpipReadPciConfigSpace(AcpiValue *Source, int Offset, int Size) {
  *-----------------------------------------------------------------------------------------------*/
 void AcpipWritePciConfigSpace(AcpiValue *Source, int Offset, int Size, uint64_t Data) {
     AcpipShowDebugMessage(
-        "write into PCI config space, 0x%X/0x%X/0x%X/0x%X, offset 0x%X, size %u, data 0x%llX\n",
+        "write into PCI config space, %X/%X/%X/%X, offset 0x%X, size %u, data 0x%llX\n",
         Source->Region.PciSegment,
         Source->Region.PciBus,
         Source->Region.PciDevice,

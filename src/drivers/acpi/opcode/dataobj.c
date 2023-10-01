@@ -21,7 +21,7 @@
  *     Positive number on success, negative on "this isn't a data object", 0 on failure.
  *-----------------------------------------------------------------------------------------------*/
 int AcpipExecuteDataObjOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value) {
-    uint32_t Start = State->Scope->RemainingLength;
+    uint32_t Start = State->Opcode->Start;
 
     switch (Opcode) {
         /* ZeroOp */
@@ -41,38 +41,13 @@ int AcpipExecuteDataObjOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Val
         }
 
         /* ByteConst := BytePrefix ByteData */
-        case 0x0A: {
+        case 0x0A:
+        case 0x0B:
+        case 0x0C:
+        case 0x0E: {
             Value->Type = ACPI_INTEGER;
             Value->References = 1;
-
-            if (!AcpipReadByte(State, (uint8_t *)&Value->Integer)) {
-                return 0;
-            }
-
-            break;
-        }
-
-        /* WordConst := WordPrefix WordData */
-        case 0x0B: {
-            Value->Type = ACPI_INTEGER;
-            Value->References = 1;
-
-            if (!AcpipReadWord(State, (uint16_t *)&Value->Integer)) {
-                return 0;
-            }
-
-            break;
-        }
-
-        /* DWordConst := DWordPrefix DWordData */
-        case 0x0C: {
-            Value->Type = ACPI_INTEGER;
-            Value->References = 1;
-
-            if (!AcpipReadDWord(State, (uint32_t *)&Value->Integer)) {
-                return 0;
-            }
-
+            Value->Integer = State->Opcode->FixedArguments[0].Integer;
             break;
         }
 
@@ -80,38 +55,7 @@ int AcpipExecuteDataObjOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Val
         case 0x0D: {
             Value->Type = ACPI_STRING;
             Value->References = 1;
-
-            size_t StringSize = 0;
-            while (StringSize < State->Scope->RemainingLength && State->Scope->Code[StringSize]) {
-                StringSize++;
-            }
-
-            if (++StringSize > State->Scope->RemainingLength) {
-                return 0;
-            }
-
-            Value->String = malloc(sizeof(AcpiString) + StringSize);
-            if (!Value->String) {
-                return 0;
-            }
-
-            Value->String->References = 1;
-            memcpy(Value->String->Data, State->Scope->Code, StringSize);
-            State->Scope->Code += StringSize;
-            State->Scope->RemainingLength -= StringSize;
-
-            break;
-        }
-
-        /* QWordConst := QWordPrefix QWordData */
-        case 0x0E: {
-            Value->Type = ACPI_INTEGER;
-            Value->References = 1;
-
-            if (!AcpipReadQWord(State, &Value->Integer)) {
-                return 0;
-            }
-
+            Value->String = State->Opcode->FixedArguments[0].String;
             break;
         }
 
@@ -120,14 +64,8 @@ int AcpipExecuteDataObjOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Val
             Value->Type = ACPI_BUFFER;
             Value->References = 1;
 
-            uint32_t PkgLength;
-            uint64_t BufferSize;
-            if (!AcpipReadPkgLength(State, &PkgLength)) {
-                return 0;
-            } else if (!AcpipExecuteInteger(State, &BufferSize)) {
-                return 0;
-            }
-
+            uint32_t PkgLength = State->Opcode->PkgLength;
+            uint64_t BufferSize = State->Opcode->FixedArguments[0].TermArg.Integer;
             uint32_t LengthSoFar = Start - State->Scope->RemainingLength;
             if (LengthSoFar > PkgLength ||
                 PkgLength - LengthSoFar > State->Scope->RemainingLength ||
@@ -159,25 +97,13 @@ int AcpipExecuteDataObjOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Val
             Value->Type = ACPI_PACKAGE;
             Value->References = 1;
 
-            uint32_t PkgLength;
-            if (!AcpipReadPkgLength(State, &PkgLength)) {
-                return 0;
-            }
-
             /* The difference between DefPackage and DefVarPackage is NumElements vs
                VarNumElements; NumElements is always an 8-bit constant, which VarNumElements
-               is a term arg (ExecuteInteger). */
-            uint64_t Size = 0;
-            if (Opcode == 0x13) {
-                if (!AcpipExecuteInteger(State, &Size)) {
-                    return 0;
-                }
-            } else {
-                if (!AcpipReadByte(State, (uint8_t *)&Size)) {
-                    return 0;
-                }
-            }
+               is a term arg. */
+            uint64_t Size = Opcode == 0x13 ? State->Opcode->FixedArguments[0].TermArg.Integer
+                                           : State->Opcode->FixedArguments[0].Integer;
 
+            uint32_t PkgLength = State->Opcode->PkgLength;
             uint32_t LengthSoFar = Start - State->Scope->RemainingLength;
             if (LengthSoFar > PkgLength ||
                 PkgLength - LengthSoFar > State->Scope->RemainingLength) {
@@ -203,20 +129,20 @@ int AcpipExecuteDataObjOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Val
                 uint32_t Start = State->Scope->RemainingLength;
                 uint8_t Opcode = *State->Scope->Code;
 
-                /* Each PackageElement should always be either a DataRefObject (which we just call
-                   ExecuteOpcode to handle), or a NameString. */
-                if (Opcode != '\\' && Opcode != '^' && Opcode != 0x2E && Opcode != 0x2F &&
-                    !isupper(Opcode) && Opcode != '_') {
-                    Value->Package->Data[i].Type = 1;
-                    if (!AcpipExecuteOpcode(State, &Value->Package->Data[i].Value, 1)) {
-                        Value->Package->Size = i ? i - 1 : 0;
+                /* Each PackageElement should always be either a NameString, or a DataRefObject. */
+                if (Opcode == '\\' || Opcode == '^' || Opcode == 0x2E || Opcode == 0x2F ||
+                    isupper(Opcode) || Opcode == '_') {
+                    Value->Package->Data[i].Type = 0;
+                    if (!AcpipReadName(State, &Value->Package->Data[i].Name)) {
+                        Value->Package->Size = i;
                         AcpiRemoveReference(Value, 0);
                         return 0;
                     }
                 } else {
-                    AcpipName Name;
-                    if (!AcpipReadName(State, &Name)) {
-                        Value->Package->Size = i ? i - 1 : 0;
+                    Value->Package->Data[i].Type = 1;
+                    if (!AcpipPrepareExecuteOpcode(State) ||
+                        !AcpipExecuteOpcode(State, &Value->Package->Data[i].Value)) {
+                        Value->Package->Size = i;
                         AcpiRemoveReference(Value, 0);
                         return 0;
                     }
@@ -224,7 +150,7 @@ int AcpipExecuteDataObjOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Val
 
                 i++;
                 if (Start - State->Scope->RemainingLength > PkgLength) {
-                    Value->Package->Size = i - 1;
+                    Value->Package->Size = i;
                     AcpiRemoveReference(Value, 0);
                     return 0;
                 }
