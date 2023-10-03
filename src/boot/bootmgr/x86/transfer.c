@@ -177,6 +177,13 @@ static void InstallIdtHandler(int Number, uint64_t Handler) {
             uint64_t ImagePdtBase = (Images[i].VirtualAddress >> 21) & 0x1FF;
             uint64_t ImagePtBase = (Images[i].VirtualAddress >> 12) & 0x1FF;
 
+            /* Take a lot of caution with the virtual address, if we straddle the 2MiB barrier,
+               we need one extra large slice. */
+            if (ImagePdtBase !=
+                (((Images[i].VirtualAddress + (ImageSlices4KiB << 12)) >> 21) & 0x1FF)) {
+                ImageSlices2MiB++;
+            }
+
             uint64_t *ImagePdt = BmAllocatePages(1, MEMORY_KERNEL);
             uint64_t *ImagePt = BmAllocatePages(ImageSlices2MiB, MEMORY_KERNEL);
 
