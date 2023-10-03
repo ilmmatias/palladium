@@ -44,16 +44,6 @@ int AcpiExecuteMethod(AcpiObject *Object, int ArgCount, AcpiValue *Arguments, Ac
     } else if (ArgCount > 7) {
         ArgCount = 7;
     } else if (Object->Value.Method.Override) {
-        char *Path = AcpipGetObjectPath(Object);
-
-        if (Path) {
-            AcpipShowDebugMessage("executing overwritten method, full path %s\n", Path);
-            free(Path);
-        } else {
-            AcpipShowDebugMessage(
-                "executing overwritten method, top most name %.4s\n", Object->Name);
-        }
-
         return Object->Value.Method.Override(ArgCount, Arguments, Result);
     }
 
