@@ -183,7 +183,8 @@ int AcpiCopyValue(AcpiValue *Source, AcpiValue *Target) {
             break;
 
         case ACPI_BUFFER_FIELD:
-            Source->BufferField.FieldSource->References++;
+        case ACPI_INDEX:
+            Source->BufferField.Source->References++;
             break;
     }
 
@@ -239,7 +240,8 @@ void AcpiCreateReference(AcpiValue *Source, AcpiValue *Target) {
             Target->Mutex->References++;
             break;
         case ACPI_BUFFER_FIELD:
-            AcpiCreateReference(Target->BufferField.FieldSource, NULL);
+        case ACPI_INDEX:
+            AcpiCreateReference(Target->BufferField.Source, NULL);
             break;
         case ACPI_DEVICE:
         case ACPI_METHOD:
@@ -321,8 +323,9 @@ void AcpiRemoveReference(AcpiValue *Value, int CleanupPointer) {
         }
 
         case ACPI_BUFFER_FIELD:
+        case ACPI_INDEX:
             if (NeedsCleanup) {
-                AcpiRemoveReference(Value->BufferField.FieldSource, 1);
+                AcpiRemoveReference(Value->BufferField.Source, 1);
             }
 
             break;

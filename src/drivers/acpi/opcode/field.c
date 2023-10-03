@@ -154,7 +154,7 @@ int AcpipExecuteFieldOpcode(AcpipState *State, uint16_t Opcode) {
                 return 0;
             }
 
-            /* .BufferField.FieldSource is a pointer into the heap, so let's allocate somewhere to
+            /* .BufferField.Source is a pointer into the heap, so let's allocate somewhere to
                store SourceBuff. */
             AcpiValue *Buffer = malloc(sizeof(AcpiValue));
             if (!Buffer) {
@@ -167,7 +167,7 @@ int AcpipExecuteFieldOpcode(AcpipState *State, uint16_t Opcode) {
             AcpiValue Value;
             Value.Type = ACPI_BUFFER_FIELD;
             Value.References = 1;
-            Value.BufferField.FieldSource = Buffer;
+            Value.BufferField.Source = Buffer;
             Value.BufferField.Index = ByteIndex;
             Value.BufferField.Size = Opcode == 0x8A   ? 4
                                      : Opcode == 0x8B ? 2

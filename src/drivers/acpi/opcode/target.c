@@ -112,7 +112,7 @@ int AcpipStoreTarget(AcpipState *State, AcpiValue *Target, AcpiValue *Value) {
 
                 case ACPI_BUFFER_FIELD: {
                     uint64_t Index = Target->Reference->Value.BufferField.Index;
-                    AcpiValue *FieldSource = Target->Reference->Value.BufferField.FieldSource;
+                    AcpiValue *Source = Target->Reference->Value.BufferField.Source;
 
                     uint64_t Slot;
                     if (!AcpipCastToInteger(Value, &Slot, 1)) {
@@ -121,16 +121,16 @@ int AcpipStoreTarget(AcpipState *State, AcpiValue *Target, AcpiValue *Value) {
 
                     switch (Target->Reference->Value.BufferField.Size) {
                         case 2:
-                            *((uint16_t *)(FieldSource->Buffer->Data + Index)) = Slot;
+                            *((uint16_t *)(Source->Buffer->Data + Index)) = Slot;
                             break;
                         case 4:
-                            *((uint32_t *)(FieldSource->Buffer->Data + Index)) = Slot;
+                            *((uint32_t *)(Source->Buffer->Data + Index)) = Slot;
                             break;
                         case 8:
-                            *((uint64_t *)(FieldSource->Buffer->Data + Index)) = Slot;
+                            *((uint64_t *)(Source->Buffer->Data + Index)) = Slot;
                             break;
                         default:
-                            *(FieldSource->Buffer->Data + Index) = Slot;
+                            *(Source->Buffer->Data + Index) = Slot;
                             break;
                     }
 

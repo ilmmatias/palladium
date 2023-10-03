@@ -124,14 +124,10 @@ typedef struct AcpiValue {
             uint64_t BankValue;
         } FieldUnit;
         struct {
-            struct AcpiValue *FieldSource;
+            struct AcpiValue *Source;
             uint64_t Index;
             int Size;
         } BufferField;
-        struct {
-            struct AcpiValue *Source;
-            uint64_t Index;
-        } Index;
         struct {
             uint8_t ProcId;
             uint32_t PblkAddr;

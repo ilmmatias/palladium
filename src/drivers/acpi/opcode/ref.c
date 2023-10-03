@@ -29,8 +29,8 @@ int AcpipExecuteRefOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value) 
 
             switch (Reference->Type) {
                 case ACPI_INDEX: {
-                    AcpiValue *Source = Reference->Index.Source;
-                    uint64_t Index = Reference->Index.Index;
+                    AcpiValue *Source = Reference->BufferField.Source;
+                    uint64_t Index = Reference->BufferField.Index;
 
                     if (Source->Type == ACPI_PACKAGE) {
                         if (Source->Package->Data[Index].Type) {
@@ -132,8 +132,8 @@ int AcpipExecuteRefOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value) 
 
             Value->Type = ACPI_INDEX;
             Value->References = 1;
-            Value->Index.Source = Buffer;
-            Value->Index.Index = Index;
+            Value->BufferField.Source = Buffer;
+            Value->BufferField.Index = Index;
 
             if (!AcpipStoreTarget(State, Target, Value)) {
                 AcpiRemoveReference(Buffer, 1);
