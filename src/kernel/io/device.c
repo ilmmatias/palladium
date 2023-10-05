@@ -6,8 +6,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-static IopDeviceListEntry *DeviceListHead = NULL;
-static IopDeviceListEntry *DeviceListTail = NULL;
+typedef struct DeviceListEntry {
+    IoDevice Device;
+    struct DeviceListEntry *Next;
+} DeviceListEntry;
+
+static DeviceListEntry *DeviceListHead = NULL;
+static DeviceListEntry *DeviceListTail = NULL;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -26,7 +31,7 @@ int IoCreateDevice(const char *Name, IoReadFn Read, IoWriteFn Write) {
         return 0;
     }
 
-    IopDeviceListEntry *Entry = malloc(sizeof(IopDeviceListEntry));
+    DeviceListEntry *Entry = malloc(sizeof(DeviceListEntry));
     if (!Entry) {
         return 0;
     }
@@ -67,7 +72,7 @@ IoDevice *IoOpenDevice(const char *Name) {
         return NULL;
     }
 
-    IopDeviceListEntry *Entry = DeviceListHead;
+    DeviceListEntry *Entry = DeviceListHead;
     while (Entry) {
         if (!strcmp(Entry->Device.Name, Name)) {
             return &Entry->Device;

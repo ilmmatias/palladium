@@ -13,16 +13,6 @@
 
 #define MM_PAGE_SIZE (1ull << (MM_PAGE_SHIFT))
 
-typedef struct MmPageEntry {
-    uint8_t References;
-    uint64_t GroupBase;
-    uint32_t GroupPages;
-    struct MmPageEntry *NextGroup;
-    struct MmPageEntry *PreviousGroup;
-} MmPageEntry;
-
-void MiPreparePageAllocator(void *LoaderData);
-
 uint64_t MmAllocatePages(uint32_t Pages);
 
 #endif /* _MM_H_ */

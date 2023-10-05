@@ -105,7 +105,32 @@ static void PutBuffer(const void *buffer, int size, void *context) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function shows a debug message to the screen.
+ *     This function shows a info (basic debug) message to the screen if allowed
+ *     (ACPI_ENABLE_INFO set to 1).
+ *
+ * PARAMETERS:
+ *     Message - Format string; Works the same as printf().
+ *     ... - Variadic arguments.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void AcpipShowInfoMessage(const char *Format, ...) {
+    if (ACPI_ENABLE_INFO) {
+        va_list vlist;
+        va_start(vlist, Format);
+
+        VidPutString("ACPI Info: ");
+        __vprintf(Format, vlist, NULL, PutBuffer);
+
+        va_end(vlist);
+    }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function shows a misc debug message to the screen if allowed
+ *     (ACPI_ENABLE_DEBUG set to 1).
  *
  * PARAMETERS:
  *     Message - Format string; Works the same as printf().
@@ -115,13 +140,39 @@ static void PutBuffer(const void *buffer, int size, void *context) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void AcpipShowDebugMessage(const char *Format, ...) {
-    va_list vlist;
-    va_start(vlist, Format);
+    if (ACPI_ENABLE_DEBUG) {
+        va_list vlist;
+        va_start(vlist, Format);
 
-    VidPutString("ACPI Debug: ");
-    __vprintf(Format, vlist, NULL, PutBuffer);
+        VidPutString("ACPI Debug: ");
+        __vprintf(Format, vlist, NULL, PutBuffer);
 
-    va_end(vlist);
+        va_end(vlist);
+    }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function shows a tracing (I/O related and device initialization) message to the screen
+ *     if allowed (ACPI_ENABLE_TRACE set to 1).
+ *
+ * PARAMETERS:
+ *     Message - Format string; Works the same as printf().
+ *     ... - Variadic arguments.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void AcpipShowTraceMessage(const char *Format, ...) {
+    if (ACPI_ENABLE_TRACE) {
+        va_list vlist;
+        va_start(vlist, Format);
+
+        VidPutString("ACPI Trace: ");
+        __vprintf(Format, vlist, NULL, PutBuffer);
+
+        va_end(vlist);
+    }
 }
 
 /*-------------------------------------------------------------------------------------------------

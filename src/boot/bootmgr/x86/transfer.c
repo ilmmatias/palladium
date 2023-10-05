@@ -95,7 +95,7 @@ static void InstallIdtHandler(int Number, uint64_t Handler) {
 
     /* Pre-allocate the space required for the kernel's physical memory manager; This way
        the kernel doesn't need to worry about anything but filling the info.
-       MmSize should always be `PagesOfMemory * sizeof(MmPageEntry)`, if MmPageEntry changes
+       MmSize should always be `PagesOfMemory * sizeof(MiPageEntry)`, if MiPageEntry changes
        on the kernel, the size here needs to change too! */
     uint64_t PagesOfMemory = (BiosMemorySize + PAGE_SIZE - 1) >> PAGE_SHIFT;
     uint64_t MmSize = PagesOfMemory * 29;

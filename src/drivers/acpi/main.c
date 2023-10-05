@@ -3,6 +3,7 @@
 
 #include <acpip.h>
 #include <stdarg.h>
+#include <stdlib.h>
 #include <string.h>
 
 /*-------------------------------------------------------------------------------------------------
@@ -41,7 +42,14 @@ static void InitializeChildren(AcpiObject *Root) {
             /* _INI should be a method? Change this to EvaluateObject if we encounter any case of
                this not being one (and it making any difference). */
             AcpiExecuteMethod(AcpiSearchObject(Device, "_INI"), 0, NULL, NULL);
-            AcpipShowDebugMessage("initialized device, top most name %.4s\n", Device->Name);
+
+            char *Path = AcpipGetObjectPath(Device);
+            if (Path) {
+                AcpipShowTraceMessage("initialized device, full path %s\n", Path);
+                free(Path);
+            } else {
+                AcpipShowTraceMessage("initialized device, top most name %.4s\n", Device->Name);
+            }
 
             for (AcpiObject *Region = Device->Value.Children->Objects; Region != NULL;
                  Region = Region->Next) {
@@ -122,43 +130,6 @@ void DriverEntry(void) {
         while (!(AcpipReadIoSpace(Fadt->Pm1aControlBlock, 2) & 1))
             ;
     }
-    AcpipShowDebugMessage("enabled ACPI\n");
 
-    /* For testing purposes, let's do an S5 shutdown; Start by evaluating \\_S5_. */
-    AcpiValue S5;
-    if (!AcpiEvaluateObject(AcpiSearchObject(NULL, "_S5_"), &S5, ACPI_PACKAGE)) {
-        AcpipShowDebugMessage("machine does not support S5 shutdown\n");
-        return;
-    }
-
-    /* Validate if we have a package with at least one integer. */
-    AcpiValue *SlpTypA = &S5.Package->Data[0].Value;
-    AcpiValue *SlpTypB = &S5.Package->Data[1].Value;
-    if (S5.Package->Size < 2) {
-        AcpipShowDebugMessage("invalid \\_S5_ object, less than 2 package entries\n");
-        return;
-    } else if (
-        (!S5.Package->Data[0].Type || SlpTypA->Type != ACPI_INTEGER) ||
-        (!S5.Package->Data[1].Type || SlpTypB->Type != ACPI_INTEGER)) {
-        AcpipShowDebugMessage("invalid \\_S5_ object, one of the 2 entries isn't an integer\n");
-        return;
-    }
-    AcpipShowDebugMessage("evaluated \\_S5_\n");
-
-    /* Execute _PTS and _GTS if they exist. */
-    Argument.Integer = 5;
-    AcpipShowDebugMessage("running \\_PTS\n");
-    AcpiExecuteMethod(AcpiSearchObject(NULL, "_PTS"), 1, &Argument, NULL);
-    AcpipShowDebugMessage("running \\_GTS\n");
-    AcpiExecuteMethod(AcpiSearchObject(NULL, "_GTS"), 1, &Argument, NULL);
-
-    /* Enter S5/shutdown. */
-    AcpipShowDebugMessage("running shutdown command\n");
-    AcpipWriteIoSpace(Fadt->Pm1aControlBlock, 2, (SlpTypA->Integer << 10) | (1 << 13));
-    if (Fadt->Pm1bControlBlock) {
-        AcpipWriteIoSpace(Fadt->Pm1bControlBlock, 2, (SlpTypB->Integer << 10) | (1 << 13));
-    }
-
-    while (1)
-        ;
+    AcpipShowInfoMessage("enabled ACPI\n");
 }

@@ -9,7 +9,6 @@
 #define VID_COLOR_DEFAULT 0
 #define VID_COLOR_PANIC 1
 
-void VidpInitialize(void);
 void VidResetDisplay(void);
 
 void VidSetColor(int Color);

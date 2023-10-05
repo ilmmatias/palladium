@@ -161,7 +161,7 @@ int AcpiCopyValue(AcpiValue *Source, AcpiValue *Target) {
             break;
 
         case ACPI_MUTEX:
-            AcpipShowDebugMessage("attempt at CopyValue(Mutex)\n");
+            AcpipShowTraceMessage("attempt at CopyValue(Mutex)\n");
             return 0;
 
         case ACPI_FIELD_UNIT:

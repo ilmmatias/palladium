@@ -7,6 +7,13 @@
 #include <acpi.h>
 #include <sdt.h>
 
+/* The flags below control how much debugging info should be displayed on boot.
+   On normal debugging, you probably want only ACPI_ENABLE_INFO (which only shows the "enabled
+   ACPI" message).  */
+#define ACPI_ENABLE_INFO 1
+#define ACPI_ENABLE_DEBUG 1
+#define ACPI_ENABLE_TRACE 0
+
 #define ACPI_ARG_NONE 0
 #define ACPI_ARG_BYTE 1
 #define ACPI_ARG_WORD 2
@@ -84,7 +91,12 @@ AcpiObject *AcpipCreateObject(AcpiName *Name, AcpiValue *Value);
 AcpiObject *AcpipResolveObject(AcpiName *Name);
 char *AcpipGetObjectPath(AcpiObject *Object);
 
+void AcpiCreateReference(AcpiValue *Source, AcpiValue *Target);
+void AcpiRemoveReference(AcpiValue *Value, int CleanupPointer);
+
+void AcpipShowInfoMessage(const char *Format, ...);
 void AcpipShowDebugMessage(const char *Format, ...);
+void AcpipShowTraceMessage(const char *Format, ...);
 [[noreturn]] void AcpipShowErrorMessage(int Reason, const char *Format, ...);
 
 AcpipScope *AcpipEnterScope(AcpipState *State, AcpiObject *Object, uint32_t Length);

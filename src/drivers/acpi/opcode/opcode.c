@@ -96,7 +96,7 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
             switch (Opcode->ArgInfo->Types[Position]) {
                 /* This shouldn't really be reached? */
                 case ACPI_ARG_NONE:
-                    AcpipShowDebugMessage("trying to read EMPTY argument, possible memory "
+                    AcpipShowTraceMessage("trying to read EMPTY argument, possible memory "
                                           "corruption (or code bug)?\n");
                     break;
 

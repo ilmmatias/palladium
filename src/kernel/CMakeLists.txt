@@ -30,7 +30,7 @@ add_executable(kernel "kernel"
 
     kernel.def)
 
-target_include_directories(kernel PUBLIC include)
+target_include_directories(kernel PRIVATE include/private PUBLIC include/public)
 target_compile_options(kernel PRIVATE $<$<COMPILE_LANGUAGE:C,CXX>:-ffreestanding>)
 target_link_options(kernel PRIVATE -Wl,--subsystem=native,--entry=KiSystemStartup)
 set_target_properties(kernel PROPERTIES ENABLE_EXPORTS TRUE)

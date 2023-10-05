@@ -18,11 +18,6 @@ struct IoDevice {
     IoWriteFn Write;
 };
 
-typedef struct IopDeviceListEntry {
-    IoDevice Device;
-    struct IopDeviceListEntry *Next;
-} IopDeviceListEntry;
-
 int IoCreateDevice(const char *Name, IoReadFn Read, IoWriteFn Write);
 IoDevice *IoOpenDevice(const char *Name);
 

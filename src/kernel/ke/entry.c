@@ -1,9 +1,9 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
-#include <ke.h>
-#include <mm.h>
-#include <vid.h>
+#include <ki.h>
+#include <mi.h>
+#include <vidp.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:

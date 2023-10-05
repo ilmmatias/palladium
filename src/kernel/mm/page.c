@@ -1,12 +1,12 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
-#include <mm.h>
+#include <mi.h>
 #include <stddef.h>
 
-MmPageEntry *MmPageList = NULL;
-MmPageEntry *MmFreePageListHead = NULL;
-MmPageEntry *MmFreePageListTail = NULL;
+MiPageEntry *MiPageList = NULL;
+MiPageEntry *MiFreePageListHead = NULL;
+MiPageEntry *MiFreePageListTail = NULL;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -20,7 +20,7 @@ MmPageEntry *MmFreePageListTail = NULL;
  *     Physical address of the first allocated page, or 0 on failure.
  *-----------------------------------------------------------------------------------------------*/
 uint64_t MmAllocatePages(uint32_t Pages) {
-    MmPageEntry *Group = MmFreePageListHead;
+    MiPageEntry *Group = MiFreePageListHead;
 
     while (Group && Group->GroupPages < Pages) {
         Group = Group->NextGroup;
@@ -45,13 +45,13 @@ uint64_t MmAllocatePages(uint32_t Pages) {
     if (Group->PreviousGroup) {
         Group->PreviousGroup->NextGroup = Group->NextGroup;
     } else {
-        MmFreePageListHead = Group->NextGroup;
+        MiFreePageListHead = Group->NextGroup;
     }
 
     if (Group->NextGroup) {
         Group->NextGroup->PreviousGroup = Group->PreviousGroup;
     } else {
-        MmFreePageListTail = Group->PreviousGroup;
+        MiFreePageListTail = Group->PreviousGroup;
     }
 
     return Group->GroupBase;

@@ -2,12 +2,12 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <amd64/boot.h>
-#include <mm.h>
+#include <mi.h>
 #include <stddef.h>
 
-extern MmPageEntry *MmPageList;
-extern MmPageEntry *MmFreePageListHead;
-extern MmPageEntry *MmFreePageListTail;
+extern MiPageEntry *MiPageList;
+extern MiPageEntry *MiFreePageListHead;
+extern MiPageEntry *MiFreePageListTail;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -23,7 +23,7 @@ extern MmPageEntry *MmFreePageListTail;
 void MiPreparePageAllocator(void *LoaderData) {
     LoaderBootData *BootData = LoaderData;
 
-    MmPageList = (MmPageEntry *)BootData->MemoryManager.PageAllocatorBase;
+    MiPageList = (MiPageEntry *)BootData->MemoryManager.PageAllocatorBase;
 
     for (uint32_t i = 0; i < BootData->MemoryMap.Count; i++) {
         BiosMemoryRegion *Region = &BootData->MemoryMap.Entries[i];
@@ -51,27 +51,27 @@ void MiPreparePageAllocator(void *LoaderData) {
                 We either need to append to the end of the free list,
                 Or we need to extend the last entry. */
 
-        if (MmFreePageListTail &&
-            MmFreePageListTail->GroupBase + (MmFreePageListTail->GroupPages << MM_PAGE_SHIFT) ==
+        if (MiFreePageListTail &&
+            MiFreePageListTail->GroupBase + (MiFreePageListTail->GroupPages << MM_PAGE_SHIFT) ==
                 Region->BaseAddress) {
-            MmFreePageListTail->GroupPages += Region->Length >> MM_PAGE_SHIFT;
+            MiFreePageListTail->GroupPages += Region->Length >> MM_PAGE_SHIFT;
             continue;
         }
 
-        MmPageEntry *Group = &MmPageList[Region->BaseAddress >> MM_PAGE_SHIFT];
+        MiPageEntry *Group = &MiPageList[Region->BaseAddress >> MM_PAGE_SHIFT];
 
         Group->References = 0;
         Group->GroupBase = Region->BaseAddress;
         Group->GroupPages = Region->Length >> MM_PAGE_SHIFT;
         Group->NextGroup = NULL;
-        Group->PreviousGroup = MmFreePageListTail;
+        Group->PreviousGroup = MiFreePageListTail;
 
-        if (MmFreePageListTail) {
-            MmFreePageListTail->NextGroup = Group;
+        if (MiFreePageListTail) {
+            MiFreePageListTail->NextGroup = Group;
         } else {
-            MmFreePageListHead = Group;
+            MiFreePageListHead = Group;
         }
 
-        MmFreePageListTail = Group;
+        MiFreePageListTail = Group;
     }
 }

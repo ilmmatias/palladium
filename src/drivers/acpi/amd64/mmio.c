@@ -16,7 +16,7 @@
  *     Data from the address space.
  *-----------------------------------------------------------------------------------------------*/
 uint64_t AcpipReadMmioSpace(uint64_t Address, int Size) {
-    AcpipShowDebugMessage("read from MMIO space, address 0x%llX, size %u\n", Address, Size);
+    AcpipShowTraceMessage("read from MMIO space, address 0x%llX, size %u\n", Address, Size);
 
     Address = (uint64_t)MI_PADDR_TO_VADDR(Address);
     switch (Size) {
@@ -44,7 +44,7 @@ uint64_t AcpipReadMmioSpace(uint64_t Address, int Size) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void AcpipWriteMmioSpace(uint64_t Address, int Size, uint64_t Data) {
-    AcpipShowDebugMessage(
+    AcpipShowTraceMessage(
         "write into MMIO space, address 0x%llX, size %u, data 0x%llX\n", Address, Size, Data);
 
     Address = (uint64_t)MI_PADDR_TO_VADDR(Address);
