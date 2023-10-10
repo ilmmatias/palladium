@@ -66,8 +66,8 @@ void *__fopen(const char *filename, int mode, size_t *length) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function redirects the caller to the correct device-specific free function.
- *     We expect it to also free the context itself.
+ *     This function closes the specified file handle.
+ *     It will free the context handle, and the private data pointer (if not NULL).
  *
  * PARAMETERS:
  *     handle - OS-specific handle; We expect/assume it is a FileContext.
@@ -78,21 +78,13 @@ void *__fopen(const char *filename, int mode, size_t *length) {
 void __fclose(void *handle) {
     FileContext *Context = handle;
 
-    if (!Context || Context->Type == FILE_TYPE_NONE) {
+    if (!Context) {
         return;
-    } else if (Context->Type == FILE_TYPE_CONSOLE) {
-        BiFreeConsoleDevice(Context);
-    } else if (Context->Type == FILE_TYPE_ARCH) {
-        BiFreeArchDevice(Context);
-    } else if (Context->Type == FILE_TYPE_EXFAT) {
-        BiCleanupExfat(Context);
-    } else if (Context->Type == FILE_TYPE_FAT32) {
-        BiCleanupFat32(Context);
-    } else if (Context->Type == FILE_TYPE_ISO9660) {
-        BiCleanupIso9660(Context);
-    } else if (Context->Type == FILE_TYPE_NTFS) {
-        BiCleanupNtfs(Context);
+    } else if (Context->PrivateSize) {
+        free(Context->PrivateData);
     }
+
+    free(Context);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -165,7 +157,8 @@ int __fwrite(void *handle, size_t pos, const void *buffer, size_t size, size_t *
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function redirects the caller to the correct device-specific skeleton clone function.
+ *     This function does a copy of the specified file handle, also allocating space for a copy of
+ *     the private data pointer.
  *
  * PARAMETERS:
  *     Context - Device/node private data.
@@ -177,22 +170,21 @@ int __fwrite(void *handle, size_t pos, const void *buffer, size_t size, size_t *
 int BiCopyFileContext(FileContext *Context, FileContext *Copy) {
     if (!Context) {
         return 0;
-    } else if (Context->Type == FILE_TYPE_NONE) {
-        memcpy(Copy, Context, sizeof(FileContext));
-        return 1;
-    } else if (Context->Type == FILE_TYPE_ARCH) {
-        return BiCopyArchDevice(Context, Copy);
-    } else if (Context->Type == FILE_TYPE_EXFAT) {
-        return BiCopyExfat(Context, Copy);
-    } else if (Context->Type == FILE_TYPE_FAT32) {
-        return BiCopyFat32(Context, Copy);
-    } else if (Context->Type == FILE_TYPE_ISO9660) {
-        return BiCopyIso9660(Context, Copy);
-    } else if (Context->Type == FILE_TYPE_NTFS) {
-        return BiCopyNtfs(Context, Copy);
-    } else {
-        return 0;
     }
+
+    memcpy(Copy, Context, sizeof(FileContext));
+
+    if (Context->PrivateSize) {
+        Copy->PrivateData = malloc(Context->PrivateSize);
+
+        if (!Copy) {
+            return 0;
+        }
+
+        memcpy(Copy->PrivateData, Context->PrivateData, Context->PrivateSize);
+    }
+
+    return 1;
 }
 
 /*-------------------------------------------------------------------------------------------------

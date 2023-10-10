@@ -9,9 +9,20 @@
 #include <stdlib.h>
 #include <string.h>
 
-typedef struct {
+struct ExfatContext;
+
+typedef struct ExfatDataRun {
+    struct ExfatContext *Parent;
+    int Used;
+    uint64_t Vcn;
+    uint64_t Lcn;
+    struct ExfatDataRun *Next;
+} ExfatDataRun;
+
+typedef struct ExfatContext {
     FileContext Parent;
     void *ClusterBuffer;
+    ExfatDataRun *DataRuns;
     uint8_t ClusterShift;
     uint8_t SectorShift;
     uint64_t ClusterOffset;
@@ -20,34 +31,6 @@ typedef struct {
     int NoFatChain;
     int Directory;
 } ExfatContext;
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function tries copying the specified exFAT file entry, reusing everything but the
- *     ExfatContext.
- *
- * PARAMETERS:
- *     Context - File data to be copied.
- *     Copy - Destination of the copy.
- *
- * RETURN VALUE:
- *     1 on success, 0 otherwise.
- *-----------------------------------------------------------------------------------------------*/
-int BiCopyExfat(FileContext *Context, FileContext *Copy) {
-    ExfatContext *FsContext = Context->PrivateData;
-    ExfatContext *CopyContext = malloc(sizeof(ExfatContext));
-
-    if (!CopyContext) {
-        return 0;
-    }
-
-    memcpy(CopyContext, FsContext, sizeof(ExfatContext));
-    Copy->Type = FILE_TYPE_EXFAT;
-    Copy->PrivateData = CopyContext;
-    Copy->FileLength = Context->FileLength;
-
-    return 1;
-}
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -129,26 +112,12 @@ int BiProbeExfat(FileContext *Context) {
 
     memcpy(&FsContext->Parent, Context, sizeof(FileContext));
     Context->Type = FILE_TYPE_EXFAT;
+    Context->PrivateSize = sizeof(ExfatContext);
     Context->PrivateData = FsContext;
     Context->FileLength = 0;
 
     free(Buffer);
     return 1;
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function does the cleanup of an open exFAT directory or file, and free()s the Context
- *     pointer.
- *
- * PARAMETERS:
- *     Context - Device/node private data.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-void BiCleanupExfat(FileContext *Context) {
-    free(Context);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -307,6 +276,93 @@ int BiTraverseExfatDirectory(FileContext *Context, const char *Name) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
+ *     This function follows the FAT chain to cache all VCN->LCN conversions.
+ *
+ * PARAMETERS:
+ *     FsContext - FS-specific data.
+ *     FileLength - Full size of the file; We use this to limit how many VCNs we're converting.
+ *
+ * RETURN VALUE:
+ *     1 on success, 0 otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+static int FillDataRuns(ExfatContext *FsContext, uint64_t FileLength) {
+    /* We always get called on ReadFile, but this might be the trivial case of multiple operations
+       on the same file (VCNs already cached). */
+    if (FsContext->DataRuns && FsContext->DataRuns->Parent == FsContext) {
+        return 1;
+    }
+
+    ExfatDataRun *LastRun = FsContext->DataRuns;
+    ExfatDataRun *CurrentRun = LastRun;
+
+    uint64_t Lcn = FsContext->FileCluster;
+    uint64_t Vcn = 0;
+
+    while ((Vcn << FsContext->ClusterShift) < FileLength) {
+        /* If possible, reuse our past allocated data run list, overwriting its entries. */
+        ExfatDataRun *Entry = CurrentRun;
+        if (!Entry) {
+            Entry = malloc(sizeof(ExfatContext));
+            if (!Entry) {
+                return 0;
+            }
+        }
+
+        Entry->Parent = FsContext;
+        Entry->Used = 1;
+        Entry->Vcn = Vcn;
+        Entry->Lcn = Lcn;
+
+        if (!CurrentRun && !LastRun) {
+            FsContext->DataRuns = Entry;
+        } else if (!CurrentRun) {
+            LastRun->Next = Entry;
+        } else {
+            CurrentRun = CurrentRun->Next;
+        }
+
+        LastRun = Entry;
+        Vcn++;
+
+        if (!FollowCluster(FsContext, NULL, &Lcn)) {
+            if (CurrentRun) {
+                CurrentRun->Used = 0;
+            }
+
+            break;
+        }
+    }
+
+    return 1;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function uses a data run list obtained from FillDataRuns to convert a Virtual Cluster
+ *     Number (VCN) into a Logical Cluster Number (LCN, aka something we can just multiply by the
+ *     size of a cluster and __fread).
+ *
+ * PARAMETERS:
+ *     FsContext - FS-specific data.
+ *     Vcn - Virtual cluster to translate.
+ *     Lcn - Output; Contains the Logical Cluster Number on success.
+ *
+ * RETURN VALUE:
+ *     1 on match (if a translation was found), 0 otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+static int TranslateVcn(ExfatContext *FsContext, uint64_t Vcn, uint64_t *Lcn) {
+    for (ExfatDataRun *Entry = FsContext->DataRuns; Entry && Entry->Used; Entry = Entry->Next) {
+        if (Entry->Vcn == Vcn) {
+            *Lcn = Entry->Lcn;
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
  *     This function tries to read what should be an exFAT file. Calling it on a directory will
  *     fail.
  *
@@ -322,7 +378,6 @@ int BiTraverseExfatDirectory(FileContext *Context, const char *Name) {
  *-----------------------------------------------------------------------------------------------*/
 int BiReadExfatFile(FileContext *Context, void *Buffer, size_t Start, size_t Size, size_t *Read) {
     ExfatContext *FsContext = Context->PrivateData;
-    uint64_t Cluster = FsContext->FileCluster;
     char *Current = FsContext->ClusterBuffer;
     char *Output = Buffer;
     size_t Accum = 0;
@@ -340,24 +395,33 @@ int BiReadExfatFile(FileContext *Context, void *Buffer, size_t Start, size_t Siz
     }
 
     /* Seek through the file into the starting cluster (for the given byte index). */
-    while (Start >= (1 << FsContext->ClusterShift)) {
-        Start -= 1 << FsContext->ClusterShift;
-        if (!FollowCluster(FsContext, NULL, &Cluster)) {
-            if (Read) {
-                *Read = 0;
-            }
 
-            return __STDIO_FLAGS_ERROR;
+    if (!FillDataRuns(FsContext, Context->FileLength)) {
+        if (Read) {
+            *Read = 0;
         }
+
+        return __STDIO_FLAGS_ERROR;
+    }
+
+    uint64_t Vcn = 0;
+    if (Start > (1 << FsContext->ClusterShift)) {
+        size_t Clusters = Start / (1 << FsContext->ClusterShift);
+        Vcn += Clusters;
+        Start -= Clusters << FsContext->ClusterShift;
     }
 
     while (Size) {
-        if (!FollowCluster(FsContext, (void **)&Current, &Cluster)) {
-            if (Read) {
-                *Read = Accum;
-            }
-
-            return __STDIO_FLAGS_ERROR;
+        uint64_t Lcn;
+        if (!TranslateVcn(FsContext, Vcn++, &Lcn) ||
+            __fread(
+                &FsContext->Parent,
+                FsContext->ClusterOffset + ((Lcn - 2) << FsContext->ClusterShift),
+                FsContext->ClusterBuffer,
+                1 << FsContext->ClusterShift,
+                NULL)) {
+            Flags = __STDIO_FLAGS_ERROR;
+            break;
         }
 
         size_t CopySize = (1 << FsContext->ClusterShift) - Start;
@@ -366,7 +430,6 @@ int BiReadExfatFile(FileContext *Context, void *Buffer, size_t Start, size_t Siz
         }
 
         memcpy(Output, Current + Start, CopySize);
-        Current += 1 << FsContext->ClusterShift;
         Output += CopySize;
         Start = 0;
         Size -= CopySize;

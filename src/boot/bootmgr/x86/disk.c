@@ -99,6 +99,7 @@ void BiosDetectDisks(BiosBootBlock *Data) {
 
         FileContext Context;
         Context.Type = FILE_TYPE_ARCH;
+        Context.PrivateSize = 0;
         Context.PrivateData = (void *)i;
 
         if (BiProbeExfat(&Context) || BiProbeFat32(&Context) ||
@@ -106,22 +107,6 @@ void BiosDetectDisks(BiosBootBlock *Data) {
             memcpy(&DriveHandles[i], &Context, sizeof(FileContext));
         }
     }
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function copies the respective disk context.
- *
- * PARAMETERS:
- *     Context - Source context.
- *     Copy - Where to copy the context to.
- *
- * RETURN VALUE:
- *     1 on success, 0 otherwise.
- *-----------------------------------------------------------------------------------------------*/
-int BiCopyArchDevice(FileContext *Context, FileContext *Copy) {
-    memcpy(Copy, Context, sizeof(FileContext));
-    return 1;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -161,21 +146,6 @@ int BiOpenArchDevice(const char *Segment, FileContext *Context) {
     }
 
     return BiCopyFileContext(&DriveHandles[Drive], Context) ? End - Segment + 1 : 1;
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function does the cleanup of an open arch-specific device, and free()s the Context
- *     pointer.
- *
- * PARAMETERS:
- *     Context - Device/node private data.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-void BiFreeArchDevice(FileContext *Context) {
-    free(Context);
 }
 
 /*-------------------------------------------------------------------------------------------------

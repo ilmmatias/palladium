@@ -30,34 +30,6 @@ typedef struct {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function tries copying the specified NTFS file entry, reusing everything but the
- *     NtfsContext.
- *
- * PARAMETERS:
- *     Context - File data to be copied.
- *     Copy - Destination of the copy.
- *
- * RETURN VALUE:
- *     1 on success, 0 otherwise.
- *-----------------------------------------------------------------------------------------------*/
-int BiCopyNtfs(FileContext *Context, FileContext *Copy) {
-    NtfsContext *FsContext = Context->PrivateData;
-    NtfsContext *CopyContext = malloc(sizeof(NtfsContext));
-
-    if (!CopyContext) {
-        return 0;
-    }
-
-    memcpy(CopyContext, FsContext, sizeof(NtfsContext));
-    Copy->Type = FILE_TYPE_NTFS;
-    Copy->PrivateData = CopyContext;
-    Copy->FileLength = Context->FileLength;
-
-    return 1;
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
  *     This function tries probing an open device/partition for NTFS.
  *
  * PARAMETERS:
@@ -131,26 +103,12 @@ int BiProbeNtfs(FileContext *Context) {
 
     memcpy(&FsContext->Parent, Context, sizeof(FileContext));
     Context->Type = FILE_TYPE_NTFS;
+    Context->PrivateSize = sizeof(NtfsContext);
     Context->PrivateData = FsContext;
     Context->FileLength = 0;
 
     free(Buffer);
     return 1;
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function does the cleanup of an open NTFS directory or file, and free()s the Context
- *     pointer.
- *
- * PARAMETERS:
- *     Context - Device/node private data.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-void BiCleanupNtfs(FileContext *Context) {
-    free(Context);
 }
 
 /*-------------------------------------------------------------------------------------------------

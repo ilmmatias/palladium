@@ -8,43 +8,26 @@
 #include <stdlib.h>
 #include <string.h>
 
-typedef struct {
+struct Fat32Context;
+
+typedef struct Fat32DataRun {
+    struct Fat32Context *Parent;
+    int Used;
+    uint32_t Vcn;
+    uint32_t Lcn;
+    struct Fat32DataRun *Next;
+} Fat32DataRun;
+
+typedef struct Fat32Context {
     FileContext Parent;
     void *ClusterBuffer;
+    Fat32DataRun *DataRuns;
     uint16_t BytesPerCluster;
     uint32_t FatOffset;
     uint32_t ClusterOffset;
     uint32_t FileCluster;
     int Directory;
 } Fat32Context;
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function tries copying the specified FAT32 file entry, reusing everything but the
- *     Fat32Context.
- *
- * PARAMETERS:
- *     Context - File data to be copied.
- *     Copy - Destination of the copy.
- *
- * RETURN VALUE:
- *     1 on success, 0 otherwise.
- *-----------------------------------------------------------------------------------------------*/
-int BiCopyFat32(FileContext *Context, FileContext *Copy) {
-    Fat32Context *FsContext = Context->PrivateData;
-    Fat32Context *CopyContext = malloc(sizeof(Fat32Context));
-
-    if (!CopyContext) {
-        return 0;
-    }
-
-    memcpy(CopyContext, FsContext, sizeof(Fat32Context));
-    Copy->Type = FILE_TYPE_FAT32;
-    Copy->PrivateData = CopyContext;
-    Copy->FileLength = Context->FileLength;
-
-    return 1;
-}
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -99,26 +82,12 @@ int BiProbeFat32(FileContext *Context) {
 
     memcpy(&FsContext->Parent, Context, sizeof(FileContext));
     Context->Type = FILE_TYPE_FAT32;
+    Context->PrivateSize = sizeof(Fat32Context);
     Context->PrivateData = FsContext;
     Context->FileLength = 0;
 
     free(Buffer);
     return 1;
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function does the cleanup of an open FAT32 directory or file, and free()s the
- *     Context pointer.
- *
- * PARAMETERS:
- *     Context - Device/node private data.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-void BiCleanupFat32(FileContext *Context) {
-    free(Context);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -322,6 +291,93 @@ int BiTraverseFat32Directory(FileContext *Context, const char *Name) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
+ *     This function follows the FAT chain to cache all VCN->LCN conversions.
+ *
+ * PARAMETERS:
+ *     FsContext - FS-specific data.
+ *     FileLength - Full size of the file; We use this to limit how many VCNs we're converting.
+ *
+ * RETURN VALUE:
+ *     1 on success, 0 otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+static int FillDataRuns(Fat32Context *FsContext, uint64_t FileLength) {
+    /* We always get called on ReadFile, but this might be the trivial case of multiple operations
+       on the same file (VCNs already cached). */
+    if (FsContext->DataRuns && FsContext->DataRuns->Parent == FsContext) {
+        return 1;
+    }
+
+    Fat32DataRun *LastRun = FsContext->DataRuns;
+    Fat32DataRun *CurrentRun = LastRun;
+
+    uint32_t Lcn = FsContext->FileCluster;
+    uint32_t Vcn = 0;
+
+    while (Vcn * FsContext->BytesPerCluster < FileLength) {
+        /* If possible, reuse our past allocated data run list, overwriting its entries. */
+        Fat32DataRun *Entry = CurrentRun;
+        if (!Entry) {
+            Entry = malloc(sizeof(Fat32DataRun));
+            if (!Entry) {
+                return 0;
+            }
+        }
+
+        Entry->Parent = FsContext;
+        Entry->Used = 1;
+        Entry->Vcn = Vcn;
+        Entry->Lcn = Lcn;
+
+        if (!CurrentRun && !LastRun) {
+            FsContext->DataRuns = Entry;
+        } else if (!CurrentRun) {
+            LastRun->Next = Entry;
+        } else {
+            CurrentRun = CurrentRun->Next;
+        }
+
+        LastRun = Entry;
+        Vcn++;
+
+        if (!FollowCluster(FsContext, NULL, &Lcn)) {
+            if (CurrentRun) {
+                CurrentRun->Used = 0;
+            }
+
+            break;
+        }
+    }
+
+    return 1;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function uses a data run list obtained from FillDataRuns to convert a Virtual Cluster
+ *     Number (VCN) into a Logical Cluster Number (LCN, aka something we can just multiply by the
+ *     size of a cluster and __fread).
+ *
+ * PARAMETERS:
+ *     FsContext - FS-specific data.
+ *     Vcn - Virtual cluster to translate.
+ *     Lcn - Output; Contains the Logical Cluster Number on success.
+ *
+ * RETURN VALUE:
+ *     1 on match (if a translation was found), 0 otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+static int TranslateVcn(Fat32Context *FsContext, uint32_t Vcn, uint32_t *Lcn) {
+    for (Fat32DataRun *Entry = FsContext->DataRuns; Entry && Entry->Used; Entry = Entry->Next) {
+        if (Entry->Vcn == Vcn) {
+            *Lcn = Entry->Lcn;
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
  *     This function tries to read what should be an FAT32 file. Calling it on a directory will
  *     fail.
  *
@@ -337,11 +393,12 @@ int BiTraverseFat32Directory(FileContext *Context, const char *Name) {
  *-----------------------------------------------------------------------------------------------*/
 int BiReadFat32File(FileContext *Context, void *Buffer, size_t Start, size_t Size, size_t *Read) {
     Fat32Context *FsContext = Context->PrivateData;
-    uint32_t Cluster = FsContext->FileCluster;
     char *Current = FsContext->ClusterBuffer;
     char *Output = Buffer;
     size_t Accum = 0;
     int Flags = 0;
+
+    int printf(const char *fmt, ...);
 
     if (FsContext->Directory) {
         return __STDIO_FLAGS_ERROR;
@@ -355,24 +412,33 @@ int BiReadFat32File(FileContext *Context, void *Buffer, size_t Start, size_t Siz
     }
 
     /* Seek through the file into the starting cluster (for the given byte index). */
-    while (Start >= FsContext->BytesPerCluster) {
-        Start -= FsContext->BytesPerCluster;
-        if (!FollowCluster(FsContext, NULL, &Cluster)) {
-            if (Read) {
-                *Read = 0;
-            }
 
-            return __STDIO_FLAGS_ERROR;
+    if (!FillDataRuns(FsContext, Context->FileLength)) {
+        if (Read) {
+            *Read = 0;
         }
+
+        return __STDIO_FLAGS_ERROR;
+    }
+
+    uint32_t Vcn = 0;
+    if (Start > FsContext->BytesPerCluster) {
+        size_t Clusters = Start / FsContext->BytesPerCluster;
+        Vcn += Clusters;
+        Start -= Clusters * FsContext->BytesPerCluster;
     }
 
     while (Size) {
-        if (!FollowCluster(FsContext, (void **)&Current, &Cluster)) {
-            if (Read) {
-                *Read = Accum;
-            }
-
-            return __STDIO_FLAGS_ERROR;
+        uint32_t Lcn;
+        if (!TranslateVcn(FsContext, Vcn++, &Lcn) ||
+            __fread(
+                &FsContext->Parent,
+                FsContext->ClusterOffset + (Lcn - 2) * FsContext->BytesPerCluster,
+                FsContext->ClusterBuffer,
+                FsContext->BytesPerCluster,
+                NULL)) {
+            Flags = __STDIO_FLAGS_ERROR;
+            break;
         }
 
         size_t CopySize = FsContext->BytesPerCluster - Start;
@@ -381,7 +447,6 @@ int BiReadFat32File(FileContext *Context, void *Buffer, size_t Start, size_t Siz
         }
 
         memcpy(Output, Current + Start, CopySize);
-        Current += FsContext->BytesPerCluster;
         Output += CopySize;
         Start = 0;
         Size -= CopySize;

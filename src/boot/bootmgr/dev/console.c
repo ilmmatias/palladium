@@ -42,24 +42,10 @@ int BiOpenConsoleDevice(const char *Segment, FileContext *Context) {
     }
 
     Context->Type = FILE_TYPE_CONSOLE;
+    Context->PrivateSize = sizeof(ConsoleContext);
     Context->PrivateData = calloc(1, sizeof(ConsoleContext));
 
     return Context->PrivateData ? 9 : 0;
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function does the cleanup of the open console device.
- *
- * PARAMETERS:
- *     Context - Device private data.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-void BiFreeConsoleDevice(FileContext *Context) {
-    free(Context->PrivateData);
-    free(Context);
 }
 
 /*-------------------------------------------------------------------------------------------------

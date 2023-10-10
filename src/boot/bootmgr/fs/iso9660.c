@@ -19,34 +19,6 @@ typedef struct {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function tries copying the specified ISO9660 file entry, reusing everything but the
- *     Iso9660Context.
- *
- * PARAMETERS:
- *     Context - File data to be copied.
- *     Copy - Destination of the copy.
- *
- * RETURN VALUE:
- *     1 on success, 0 otherwise.
- *-----------------------------------------------------------------------------------------------*/
-int BiCopyIso9660(FileContext *Context, FileContext *Copy) {
-    Iso9660Context *FsContext = Context->PrivateData;
-    Iso9660Context *CopyContext = malloc(sizeof(Iso9660Context));
-
-    if (!CopyContext) {
-        return 0;
-    }
-
-    memcpy(CopyContext, FsContext, sizeof(Iso9660Context));
-    Copy->Type = FILE_TYPE_ISO9660;
-    Copy->PrivateData = CopyContext;
-    Copy->FileLength = Context->FileLength;
-
-    return 1;
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
  *     This function tries probing an open device/partition for ISO9660.
  *
  * PARAMETERS:
@@ -116,6 +88,7 @@ int BiProbeIso9660(FileContext *Context, uint16_t BytesPerSector) {
 
     memcpy(&FsContext->Parent, Context, sizeof(FileContext));
     Context->Type = FILE_TYPE_ISO9660;
+    Context->PrivateSize = sizeof(Iso9660Context);
     Context->PrivateData = FsContext;
     Context->FileLength = VolumeDescriptor->RootDirectory.ExtentSize;
 
@@ -124,21 +97,6 @@ int BiProbeIso9660(FileContext *Context, uint16_t BytesPerSector) {
     }
 
     return 1;
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function does the cleanup of an open ISO9660 directory or file, and free()s the
- *     Context pointer.
- *
- * PARAMETERS:
- *     Context - Device/node private data.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-void BiCleanupIso9660(FileContext *Context) {
-    free(Context);
 }
 
 /*-------------------------------------------------------------------------------------------------

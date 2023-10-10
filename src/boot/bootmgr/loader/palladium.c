@@ -414,5 +414,8 @@ static uint64_t LoadFile(
         BmTransferExecution(Images, DriverCount + 1);
     } while (0);
 
-    BmPanic(Message);
+    printf(Message);
+    while (1)
+        ;
+    // BmPanic(Message);
 }
