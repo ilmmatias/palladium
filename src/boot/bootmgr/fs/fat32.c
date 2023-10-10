@@ -73,6 +73,7 @@ int BiProbeFat32(FileContext *Context) {
         return 0;
     }
 
+    FsContext->DataRuns = NULL;
     FsContext->FatOffset = BootSector->ReservedSectors * BootSector->BytesPerSector;
     FsContext->ClusterOffset =
         BootSector->NumberOfFats * BootSector->SectorsPerFat * BootSector->BytesPerSector +
@@ -317,7 +318,7 @@ static int FillDataRuns(Fat32Context *FsContext, uint64_t FileLength) {
         /* If possible, reuse our past allocated data run list, overwriting its entries. */
         Fat32DataRun *Entry = CurrentRun;
         if (!Entry) {
-            Entry = malloc(sizeof(Fat32DataRun));
+            Entry = calloc(1, sizeof(Fat32DataRun));
             if (!Entry) {
                 return 0;
             }
@@ -397,8 +398,6 @@ int BiReadFat32File(FileContext *Context, void *Buffer, size_t Start, size_t Siz
     char *Output = Buffer;
     size_t Accum = 0;
     int Flags = 0;
-
-    int printf(const char *fmt, ...);
 
     if (FsContext->Directory) {
         return __STDIO_FLAGS_ERROR;

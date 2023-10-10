@@ -22,7 +22,7 @@ extern AcpiObject *AcpipObjectTree;
  *-----------------------------------------------------------------------------------------------*/
 static int ExecuteOsi(int ArgCount, AcpiValue *Arguments, AcpiValue *Result) {
     if (ArgCount >= 1 && Arguments[0].Type == ACPI_STRING) {
-        AcpipShowDebugMessage("request for \\_OSI, feature = %s\n", Arguments[0].String->Data);
+        AcpipShowTraceMessage("request for \\_OSI, feature = %s\n", Arguments[0].String->Data);
     } else {
         AcpipShowDebugMessage("request for \\_OSI, no valid arguments\n");
     }
@@ -65,7 +65,7 @@ static int ExecuteOs(int ArgCount, AcpiValue *Arguments, AcpiValue *Result) {
     (void)ArgCount;
     (void)Arguments;
 
-    AcpipShowDebugMessage("request for \\_OS\n");
+    AcpipShowTraceMessage("request for \\_OS\n");
 
     Result->Type = ACPI_STRING;
     Result->References = 1;
@@ -94,7 +94,7 @@ static int ExecuteRev(int ArgCount, AcpiValue *Arguments, AcpiValue *Result) {
     (void)ArgCount;
     (void)Arguments;
 
-    AcpipShowDebugMessage("request for \\_REV\n");
+    AcpipShowTraceMessage("request for \\_REV\n");
 
     Result->Type = ACPI_INTEGER;
     Result->References = 1;

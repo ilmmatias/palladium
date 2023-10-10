@@ -253,7 +253,7 @@ static void *FindAttribute(
                entries. */
             NtfsDataRun *Entry = CurrentRun;
             if (!Entry) {
-                Entry = malloc(sizeof(NtfsDataRun));
+                Entry = calloc(1, sizeof(NtfsDataRun));
                 if (!Entry) {
                     return NULL;
                 }

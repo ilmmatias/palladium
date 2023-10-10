@@ -88,6 +88,7 @@ int BiProbeExfat(FileContext *Context) {
         return 0;
     }
 
+    FsContext->DataRuns = NULL;
     FsContext->SectorShift = BootSector->BytesPerSectorShift;
     FsContext->ClusterOffset = BootSector->ClusterHeapOffset << BootSector->BytesPerSectorShift;
     FsContext->FatOffset = BootSector->FatOffset << BootSector->BytesPerSectorShift;
@@ -302,7 +303,7 @@ static int FillDataRuns(ExfatContext *FsContext, uint64_t FileLength) {
         /* If possible, reuse our past allocated data run list, overwriting its entries. */
         ExfatDataRun *Entry = CurrentRun;
         if (!Entry) {
-            Entry = malloc(sizeof(ExfatContext));
+            Entry = calloc(1, sizeof(ExfatContext));
             if (!Entry) {
                 return 0;
             }
