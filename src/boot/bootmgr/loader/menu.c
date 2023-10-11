@@ -3,6 +3,7 @@
 
 #include <boot.h>
 #include <display.h>
+#include <font.h>
 #include <keyboard.h>
 #include <registry.h>
 #include <stdlib.h>
@@ -18,6 +19,9 @@ static struct {
 static uint32_t Selection = 0;
 static uint32_t OptionCount = 0;
 
+extern uint16_t BiVideoWidth;
+extern uint16_t BiVideoHeight;
+
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function moves the highlight into another item, removing it from the previous one.
@@ -29,16 +33,18 @@ static uint32_t OptionCount = 0;
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 static void MoveSelection(int NewSelection) {
+    const int CharSize = BiFont.GlyphInfo->Width;
+
     /* Redrawing the whole screen/selection pane could cause tearing; But we can redraw only
        what changed. */
-    BmSetCursor(2, 5 + Selection);
+    BmSetCursor(CharSize * 2, BiFont.Height * (5 + Selection));
     BmSetColor(DISPLAY_COLOR_DEFAULT);
-    BmClearLine(2, 2);
+    BmClearLine(CharSize * 2, CharSize * 2);
     BmPutString(Options[Selection].Name);
 
-    BmSetCursor(2, 5 + NewSelection);
+    BmSetCursor(CharSize * 2, BiFont.Height * (5 + NewSelection));
     BmSetColor(DISPLAY_COLOR_INVERSE);
-    BmClearLine(2, 2);
+    BmClearLine(CharSize * 2, CharSize * 2);
     BmPutString(Options[NewSelection].Name);
 
     Selection = NewSelection;
@@ -142,37 +148,39 @@ void BmLoadMenuEntries(void) {
  *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
 [[noreturn]] void BmEnterMenu(void) {
+    const int CharSize = BiFont.GlyphInfo->Width;
+
     while (1) {
         BmSetColor(DISPLAY_COLOR_DEFAULT);
         BmInitDisplay();
 
         const char Header[] = "Boot Manager";
-        BmSetCursor((DISPLAY_WIDTH - strlen(Header)) / 2, 0);
+        BmSetCursor((BiVideoWidth - strlen(Header) * CharSize) / 2, 0);
         BmSetColor(DISPLAY_COLOR_INVERSE);
         BmClearLine(0, 0);
         BmPutString(Header);
 
         const char SubHeader[] = "Choose an operating system to start.";
-        BmSetCursor((DISPLAY_WIDTH - strlen(SubHeader)) / 2, 2);
+        BmSetCursor((BiVideoWidth - strlen(SubHeader) * CharSize) / 2, BiFont.Height * 2);
         BmSetColor(DISPLAY_COLOR_HIGHLIGHT);
         BmClearLine(0, 0);
         BmPutString(SubHeader);
 
         const char Subtitle[] = "(Use the arrow keys to highlight your choice, then press ENTER.)";
-        BmSetCursor((DISPLAY_WIDTH - strlen(Subtitle)) / 2, 3);
+        BmSetCursor((BiVideoWidth - strlen(Subtitle) * CharSize) / 2, BiFont.Height * 3);
         BmSetColor(DISPLAY_COLOR_DEFAULT);
         BmClearLine(0, 0);
         BmPutString(Subtitle);
 
         uint32_t Count = OptionCount;
-        if (Count > DISPLAY_HEIGHT - 6) {
-            Count = DISPLAY_HEIGHT - 6;
+        if (Count > (uint32_t)(BiVideoHeight - BiFont.Height * 6)) {
+            Count = BiVideoHeight - BiFont.Height * 6;
         }
 
         for (uint32_t i = 0; i < Count; i++) {
-            BmSetCursor(2, 5 + i);
+            BmSetCursor(CharSize * 2, BiFont.Height * (5 + i));
             BmSetColor(Selection == i ? DISPLAY_COLOR_INVERSE : DISPLAY_COLOR_DEFAULT);
-            BmClearLine(2, 2);
+            BmClearLine(CharSize * 2, CharSize * 2);
             BmPutString(Options[i].Name);
         }
 

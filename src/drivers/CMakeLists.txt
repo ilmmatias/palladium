@@ -4,7 +4,3 @@
 project(os/drivers)
 
 add_subdirectory(acpi)
-add_subdirectory(exfat)
-add_subdirectory(fat32)
-add_subdirectory(iso9660)
-add_subdirectory(ntfs)

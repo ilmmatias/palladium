@@ -3,213 +3,65 @@
 
 #include <stdint.h>
 #include <string.h>
+#include <x86/bios.h>
 
-#define VIDEO_MEMORY 0xB8000
+uint32_t *BiVideoBuffer = NULL;
+uint16_t BiVideoWidth = 0;
+uint16_t BiVideoHeight = 0;
+uint32_t BiVideoBackground = 0x00000000;
+uint32_t BiVideoForeground = 0x00AAAAAA;
 
-#define SCREEN_WIDTH 80
-#define SCREEN_HEIGHT 25
-#define SCREEN_SIZE (SCREEN_WIDTH * SCREEN_HEIGHT)
+typedef struct __attribute__((packed)) {
+    char VbeSignature[4];
+    uint16_t VbeVersion;
+    uint16_t OemStringPtr[2];
+    uint8_t Capabilities[4];
+    uint16_t VideoModeOff;
+    uint16_t VideoModeSeg;
+    uint16_t TotalMemory;
+    uint8_t Reserved[492];
+} VbeInfoBlock;
 
-#define TAB_SIZE 4
-
-static uint16_t *VideoMemory = (uint16_t *)VIDEO_MEMORY;
-static uint8_t Attribute = 0x07;
-static uint16_t CursorX = 0;
-static uint16_t CursorY = 0;
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function displaces all lines one slot up, giving way for a new line at the bottom.
- *
- * PARAMETERS:
- *     Color - New attributes.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-static void ScrollUp(void) {
-    memmove(VideoMemory, VideoMemory + SCREEN_WIDTH, (SCREEN_SIZE - SCREEN_WIDTH) * 2);
-    memset(VideoMemory + SCREEN_SIZE - SCREEN_WIDTH, 0, SCREEN_WIDTH * 2);
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function sets the background and foreground attributes of the screen.
- *
- * PARAMETERS:
- *     Color - New attributes.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-void BmSetColor(uint8_t Color) {
-    Attribute = Color;
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function returns the current background and foreground attributes.
- *
- * PARAMETERS:
- *     None.
- *
- * RETURN VALUE:
- *     Background and foreground attributes (in a single uint8_t).
- *-----------------------------------------------------------------------------------------------*/
-uint8_t BmGetColor(void) {
-    return Attribute;
-}
+typedef struct __attribute__((packed)) {
+    uint16_t Attributes;
+    uint8_t WindowA;
+    uint8_t WindowB;
+    uint16_t Granularity;
+    uint16_t WindowSize;
+    uint16_t SegmentA;
+    uint16_t SegmentB;
+    uint32_t WinFuncPtr;
+    uint16_t Pitch;
+    uint16_t Width;
+    uint16_t Height;
+    uint8_t WChar;
+    uint8_t YChar;
+    uint8_t Planes;
+    uint8_t Bpp;
+    uint8_t Banks;
+    uint8_t MemoryModel;
+    uint8_t BankSize;
+    uint8_t ImagePages;
+    uint8_t Reserved0;
+    uint8_t RedMask;
+    uint8_t RedPosition;
+    uint8_t GreenMask;
+    uint8_t GreenPosition;
+    uint8_t BlueMask;
+    uint8_t BluePosition;
+    uint8_t ReservedMask;
+    uint8_t ReservedPosition;
+    uint8_t DirectColorAttributes;
+    uint32_t Framebuffer;
+    uint32_t OffScreenMemOff;
+    uint16_t OffScreenMemSize;
+    uint8_t Reserved1[206];
+} VbeModeInfo;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function sets the X and Y positions of the console cursor simultaneously.
- *
- * PARAMETERS:
- *     X - New X position.
- *     Y - New Y position.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-void BmSetCursor(uint16_t X, uint16_t Y) {
-    CursorX = X;
-    CursorY = Y;
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function saves the X and Y positions of the console cursor simultaneously.
- *
- * PARAMETERS:
- *     X - Pointer to save location for the X position.
- *     Y - Pointer to save location for the Y position.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-void BmGetCursor(uint16_t *X, uint16_t *Y) {
-    *X = CursorX;
-    *Y = CursorY;
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function sets only the X position of the console cursor.
- *
- * PARAMETERS:
- *     X - New X position.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-void BmSetCursorX(uint16_t x) {
-    CursorX = x;
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function sets only the Y position of the console cursor.
- *
- * PARAMETERS:
- *     Y - New X position.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-void BmSetCursorY(uint16_t y) {
-    CursorY = y;
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function gets only the X position of the console cursor.
- *
- * PARAMETERS:
- *     None.
- *
- * RETURN VALUE:
- *     Current X position.
- *-----------------------------------------------------------------------------------------------*/
-uint16_t BmGetCursorX(void) {
-    return CursorX;
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function gets only the Y position of the console cursor.
- *
- * PARAMETERS:
- *     None.
- *
- * RETURN VALUE:
- *     Current Y position.
- *-----------------------------------------------------------------------------------------------*/
-uint16_t BmGetCursorY(void) {
-    return CursorY;
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function clears the current line, using the current attribute background.
- *
- * PARAMETERS:
- *     LeftOffset - How many spaces should we put (with no background) on the left side.
- *     RightOffset - How many spaces should we put (with no background) on the right side.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-void BmClearLine(int LeftOffset, int RightOffset) {
-    int Size = SCREEN_WIDTH - LeftOffset - RightOffset;
-
-    memset(VideoMemory + CursorY * SCREEN_WIDTH, 0, LeftOffset * 2);
-    memset(VideoMemory + (CursorY + 1) * SCREEN_WIDTH - RightOffset, 0, RightOffset * 2);
-
-    if (!(Attribute & 0xF0)) {
-        memset(VideoMemory + CursorY * SCREEN_WIDTH + LeftOffset, 0, Size * 2);
-    } else {
-        for (int i = 0; i < Size; i++) {
-            VideoMemory[CursorY * SCREEN_WIDTH + LeftOffset + i] = Attribute << 8;
-        }
-    }
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function displays a character using the current bg/fg attribute value.
- *
- * PARAMETERS:
- *     Character - The character.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-void BmPutChar(char Character) {
-    if (Character == '\n') {
-        CursorX = 0;
-        CursorY++;
-    } else if (Character == '\t') {
-        CursorX = (CursorX + 4) & ~3;
-    } else {
-        VideoMemory[CursorY * SCREEN_WIDTH + CursorX] = Attribute << 8 | Character;
-        CursorX++;
-    }
-
-    if (CursorX >= SCREEN_WIDTH) {
-        CursorX = 0;
-        CursorY++;
-    }
-
-    if (CursorY >= SCREEN_HEIGHT) {
-        ScrollUp();
-        CursorY = SCREEN_HEIGHT - 1;
-    }
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function reinitializes the screen, either right after we took over, or before showing
- *     a panic screen.
+ *     This function sets the video mode on first call, or clears the screen, either right after
+ *     we took over, or before showing a panic screen.
  *
  * PARAMETERS:
  *     None.
@@ -218,14 +70,87 @@ void BmPutChar(char Character) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void BmInitDisplay(void) {
-    CursorX = 0;
-    CursorY = 0;
+    if (!BiVideoBuffer) {
+        VbeInfoBlock InfoBlock;
+        VbeModeInfo ModeInfo;
+        BiosRegisters Registers;
 
-    if (!(Attribute & 0xF0)) {
-        memset(VideoMemory, 0, SCREEN_SIZE * 2);
-    } else {
-        for (int i = 0; i < SCREEN_SIZE; i++) {
-            VideoMemory[i] = Attribute << 8;
+        /* The info block contains the list of all valid modes, so grab it first (assume we're in an
+        incompatible system if it doesn't exist). */
+        memset(&InfoBlock, 0, sizeof(VbeInfoBlock));
+        strcpy(InfoBlock.VbeSignature, "VBE2");
+
+        memset(&Registers, 0, sizeof(BiosRegisters));
+        Registers.Eax = 0x4F00;
+        Registers.Edi = (uint32_t)&InfoBlock;
+
+        BiosCall(0x10, &Registers);
+        if (Registers.Eax != 0x4F) {
+            /* TODO: Print something using the legacy 0xB8000 text buffer. */
+            while (1)
+                ;
         }
+
+        /* We're aiming for at most 800x600, but anything that is lower than that (and 32bpp) is
+        good too. */
+        static const int MaxWidth = 800, MaxHeight = 600;
+
+        uint16_t *Modes = (uint16_t *)((InfoBlock.VideoModeSeg << 4) + InfoBlock.VideoModeOff);
+        int BestResolution = 0;
+        int BestMode;
+        uint16_t BestWidth;
+        uint16_t BestHeight;
+        uint32_t BestFramebuffer;
+
+        for (int i = 0; Modes[i] != UINT16_MAX; i++) {
+            memset(&Registers, 0, sizeof(BiosRegisters));
+            Registers.Eax = 0x4F01;
+            Registers.Ecx = Modes[i];
+            Registers.Edi = (uint32_t)&ModeInfo;
+
+            BiosCall(0x10, &Registers);
+            if (Registers.Eax != 0x4F) {
+                continue;
+            }
+
+            if (ModeInfo.MemoryModel != 0x06 || !(ModeInfo.Attributes & 0x80) ||
+                ModeInfo.Bpp != 32) {
+                continue;
+            } else if (
+                ModeInfo.Width * ModeInfo.Height < BestResolution || ModeInfo.Width > MaxWidth ||
+                ModeInfo.Height > MaxHeight) {
+                continue;
+            }
+
+            BestMode = Modes[i];
+            BestResolution = ModeInfo.Width * ModeInfo.Height;
+            BestWidth = ModeInfo.Width;
+            BestHeight = ModeInfo.Height;
+            BestFramebuffer = ModeInfo.Framebuffer;
+
+            /* No need to search further on an exact match. */
+            if (ModeInfo.Width == MaxWidth && ModeInfo.Height == MaxHeight) {
+                break;
+            }
+        }
+
+        if (!BestResolution) {
+            while (1)
+                ;
+        }
+
+        /* Wrap up by setting the graphics mode, and continuing into clearing the screen. */
+        memset(&Registers, 0, sizeof(BiosRegisters));
+        Registers.Eax = 0x4F02;
+        Registers.Ebx = BestMode | 0x4000;
+        BiosCall(0x10, &Registers);
+
+        BiVideoBuffer = (uint32_t *)BestFramebuffer;
+        BiVideoWidth = BestWidth;
+        BiVideoHeight = BestHeight;
+    }
+
+    for (int i = 0; i < BiVideoWidth * BiVideoHeight; i++) {
+        BiVideoBuffer[i] = BiVideoBackground;
     }
 }
