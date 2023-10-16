@@ -6,15 +6,17 @@
 
 #include <stdint.h>
 
-#define VID_COLOR_DEFAULT 0
-#define VID_COLOR_PANIC 1
+#define VID_COLOR_DEFAULT 0x000000, 0xAAAAAA
+#define VID_COLOR_INVERSE 0xAAAAAA, 0x000000
+#define VID_COLOR_HIGHLIGHT 0x000000, 0xFFFFFF
+#define VID_COLOR_PANIC 0xAA0000, 0xFFFFFF
 
 void VidResetDisplay(void);
 
-void VidSetColor(int Color);
-int VidGetColor(void);
-void VidSetCursor(int X, int Y);
-void VidGetCursor(int *X, int *Y);
+void VidSetColor(uint32_t BackgroundColor, uint32_t ForegroundColor);
+void VidGetColor(uint32_t *BackgroundColor, uint32_t *ForegroundColor);
+void VidSetCursor(uint16_t X, uint16_t Y);
+void VidGetCursor(uint16_t *X, uint16_t *Y);
 
 void VidPutChar(char Character);
 void VidPutString(const char *String);

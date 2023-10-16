@@ -18,7 +18,7 @@
  *-----------------------------------------------------------------------------------------------*/
 [[noreturn]] void BmPanic(const char *Message) {
     BmSetColor(DISPLAY_COLOR_PANIC);
-    BmInitDisplay();
+    BmResetDisplay();
     BmPutString(Message);
     while (1)
         ;
@@ -40,7 +40,7 @@
  *-----------------------------------------------------------------------------------------------*/
 [[noreturn]] void __assert(const char *condition, const char *file, int line, const char *func) {
     BmSetColor(DISPLAY_COLOR_PANIC);
-    BmInitDisplay();
+    BmResetDisplay();
     printf("%s:%d: %s: Assertion `%s` failed.", file, line, func, condition);
     while (1)
         ;

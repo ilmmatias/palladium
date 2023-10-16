@@ -283,7 +283,7 @@ static uint64_t LoadFile(
                           "Please, reboot your device and try again.\n";
 
     BmSetColor(DISPLAY_COLOR_DEFAULT);
-    BmInitDisplay();
+    BmResetDisplay();
 
     do {
         /* This should BmPanic() on incompatible machines, no need for a return code. */

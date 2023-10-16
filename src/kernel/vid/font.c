@@ -1,7 +1,7 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
-#include <font.h>
+#include <vidp.h>
 
 /* This font data was extracted from the Fira Code font (https://github.com/tonsky/FiraCode). */
 
@@ -1116,7 +1116,7 @@ static const uint8_t FontGlyphData[] = {
     0x00, 0x00, 0x00, 0x00, 0xB4, 0x30, 0x51, 0xE3, 0xD8, 0xD8, 0xD8, 0xD8, 0xD8, 0xD8, 0xE6, 0x2C
 };
 
-static const BiFontGlyph FontGlyphs[] = {
+static const VidpFontGlyph FontGlyphs[] = {
     {0x0000, 10, 13, 0, 12, 10},
     {0x0082, 10, 13, 0, 12, 10},
     {0x0104, 10, 13, 0, 12, 10},
@@ -1247,4 +1247,4 @@ static const BiFontGlyph FontGlyphs[] = {
     {0x30F9, 10, 13, 0, 12, 10}
 };
 
-const BiFontData BiFont = {15, 5, 20, FontGlyphs, FontGlyphData};
+const VidpFontData VidpFont = {15, 5, 20, FontGlyphs, FontGlyphData};

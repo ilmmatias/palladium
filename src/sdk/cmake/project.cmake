@@ -19,7 +19,7 @@ function(add_executable target type)
     endif()
 
     if((ARCH STREQUAL "amd64" OR ARCH STREQUAL "x86") AND
-       (type STREQUAL "kcrt" OR type STREQUAL "kstdlib" OR type STREQUAL "knostdlib"))
+       (type STREQUAL "kcrt" OR type STREQUAL "kstdlib" OR type STREQUAL "knostdlib" OR type STREQUAL "kernel"))
         target_compile_options(
             ${target}
             PRIVATE
@@ -57,7 +57,7 @@ function(add_library target type)
     endif()
 
     if((ARCH STREQUAL "amd64" OR ARCH STREQUAL "x86") AND
-       (type STREQUAL "kcrt" OR type STREQUAL "kstdlib" OR type STREQUAL "knostdlib"))
+       (type STREQUAL "kcrt" OR type STREQUAL "kstdlib" OR type STREQUAL "knostdlib" OR type STREQUAL "kernel"))
         target_compile_options(
             ${target}
             PRIVATE

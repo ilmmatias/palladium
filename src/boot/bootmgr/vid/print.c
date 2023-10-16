@@ -43,7 +43,7 @@ static void ScrollUp(void) {
  * RETURN VALUE:
  *     Alpha blended result.
  *-----------------------------------------------------------------------------------------------*/
-static uint8_t Blend(uint32_t Background, uint32_t Foreground, uint8_t Alpha) {
+static uint32_t Blend(uint32_t Background, uint32_t Foreground, uint8_t Alpha) {
     uint32_t RedBlue = Background & 0xFF00FF;
     uint32_t Green = Background & 0xFF00;
 
@@ -84,10 +84,9 @@ static void DrawCharacter(char Character) {
             }
 
             uint8_t Alpha = Data[Top * Info->Width + Left];
-            uint32_t *BufferPos = &Buffer[Top * BiVideoWidth + Left];
-
             if (Alpha) {
-                *BufferPos = Blend(*BufferPos, BiVideoForeground, Alpha);
+                Buffer[Top * BiVideoWidth + Left] =
+                    Blend(BiVideoBackground, BiVideoForeground, Alpha);
             }
         }
     }
@@ -95,11 +94,31 @@ static void DrawCharacter(char Character) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
+ *     This function clears up the screen, and resets most console related variables (excluding
+ *     background/foreground colors).
+ *
+ * PARAMETERS:
+ *     None.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void BmResetDisplay(void) {
+    for (int i = 0; i < BiVideoWidth * BiVideoHeight; i++) {
+        BiVideoBuffer[i] = BiVideoBackground;
+    }
+
+    CursorX = 0;
+    CursorY = 0;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
  *     This function sets the background and foreground attributes of the screen.
  *
  * PARAMETERS:
- *     BackgroundColor - New background color (RGB, full 32-bits).
- *     ForegroundColor - New foreground color (RGB, full 32-bits).
+ *     BackgroundColor - New background color (RGB, 24-bits).
+ *     ForegroundColor - New foreground color (RGB, 24-bits).
  *
  * RETURN VALUE:
  *     None.
@@ -171,11 +190,13 @@ void BmGetCursor(uint16_t *X, uint16_t *Y) {
 void BmClearLine(int LeftOffset, int RightOffset) {
     int Size = BiVideoWidth - LeftOffset - RightOffset;
 
-    memset(BiVideoBuffer + CursorY * BiVideoWidth, 0, LeftOffset * 4);
-    memset(BiVideoBuffer + (CursorY + 1) * BiVideoWidth - RightOffset, 0, RightOffset * 4);
+    for (int i = 0; i < BiFont.Height; i++) {
+        memset(BiVideoBuffer + (CursorY + i) * BiVideoWidth, 0, LeftOffset * 4);
+        memset(BiVideoBuffer + (CursorY + i + 1) * BiVideoWidth - RightOffset, 0, RightOffset * 4);
 
-    for (int i = 0; i < Size; i++) {
-        BiVideoBuffer[CursorY * BiVideoWidth + LeftOffset + i] = BiVideoBackground;
+        for (int j = 0; j < Size; j++) {
+            BiVideoBuffer[(CursorY + i) * BiVideoWidth + LeftOffset + j] = BiVideoBackground;
+        }
     }
 }
 
@@ -210,7 +231,7 @@ void BmPutChar(char Character) {
 
     if (CursorY >= BiVideoHeight) {
         ScrollUp();
-        CursorY = BiFont.Height - BiFont.Height;
+        CursorY = BiVideoHeight - BiFont.Height;
     }
 }
 
@@ -228,4 +249,26 @@ void BmPutString(const char *String) {
     while (*String) {
         BmPutChar(*(String++));
     }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function calculates the exact width of a string using the default font.
+ *     Use this instead of assuming the width of each character! .Advance won't always be the
+ *     same value/width!
+ *
+ * PARAMETERS:
+ *     String - What to get the size of.
+ *
+ * RETURN VALUE:
+ *     Length in pixels of the string.
+ *-----------------------------------------------------------------------------------------------*/
+size_t BmGetStringWidth(const char *String) {
+    size_t Size = 0;
+
+    while (*String) {
+        Size += BiFont.GlyphInfo[(int)*(String++)].Advance;
+    }
+
+    return Size;
 }

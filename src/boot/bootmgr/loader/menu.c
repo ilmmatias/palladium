@@ -33,18 +33,16 @@ extern uint16_t BiVideoHeight;
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 static void MoveSelection(int NewSelection) {
-    const int CharSize = BiFont.GlyphInfo->Width;
-
     /* Redrawing the whole screen/selection pane could cause tearing; But we can redraw only
        what changed. */
-    BmSetCursor(CharSize * 2, BiFont.Height * (5 + Selection));
+    BmSetCursor(32, BiFont.Height * (5 + Selection));
     BmSetColor(DISPLAY_COLOR_DEFAULT);
-    BmClearLine(CharSize * 2, CharSize * 2);
+    BmClearLine(32, 32);
     BmPutString(Options[Selection].Name);
 
-    BmSetCursor(CharSize * 2, BiFont.Height * (5 + NewSelection));
+    BmSetCursor(32, BiFont.Height * (5 + NewSelection));
     BmSetColor(DISPLAY_COLOR_INVERSE);
-    BmClearLine(CharSize * 2, CharSize * 2);
+    BmClearLine(32, 32);
     BmPutString(Options[NewSelection].Name);
 
     Selection = NewSelection;
@@ -148,26 +146,24 @@ void BmLoadMenuEntries(void) {
  *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
 [[noreturn]] void BmEnterMenu(void) {
-    const int CharSize = BiFont.GlyphInfo->Width;
-
     while (1) {
         BmSetColor(DISPLAY_COLOR_DEFAULT);
-        BmInitDisplay();
+        BmResetDisplay();
 
         const char Header[] = "Boot Manager";
-        BmSetCursor((BiVideoWidth - strlen(Header) * CharSize) / 2, 0);
+        BmSetCursor((BiVideoWidth - BmGetStringWidth(Header)) / 2, 0);
         BmSetColor(DISPLAY_COLOR_INVERSE);
         BmClearLine(0, 0);
         BmPutString(Header);
 
         const char SubHeader[] = "Choose an operating system to start.";
-        BmSetCursor((BiVideoWidth - strlen(SubHeader) * CharSize) / 2, BiFont.Height * 2);
+        BmSetCursor((BiVideoWidth - BmGetStringWidth(SubHeader)) / 2, BiFont.Height * 2);
         BmSetColor(DISPLAY_COLOR_HIGHLIGHT);
         BmClearLine(0, 0);
         BmPutString(SubHeader);
 
         const char Subtitle[] = "(Use the arrow keys to highlight your choice, then press ENTER.)";
-        BmSetCursor((BiVideoWidth - strlen(Subtitle) * CharSize) / 2, BiFont.Height * 3);
+        BmSetCursor((BiVideoWidth - BmGetStringWidth(Subtitle)) / 2, BiFont.Height * 3);
         BmSetColor(DISPLAY_COLOR_DEFAULT);
         BmClearLine(0, 0);
         BmPutString(Subtitle);
@@ -178,9 +174,14 @@ void BmLoadMenuEntries(void) {
         }
 
         for (uint32_t i = 0; i < Count; i++) {
-            BmSetCursor(CharSize * 2, BiFont.Height * (5 + i));
-            BmSetColor(Selection == i ? DISPLAY_COLOR_INVERSE : DISPLAY_COLOR_DEFAULT);
-            BmClearLine(CharSize * 2, CharSize * 2);
+            if (Selection == i) {
+                BmSetColor(DISPLAY_COLOR_INVERSE);
+            } else {
+                BmSetColor(DISPLAY_COLOR_DEFAULT);
+            }
+
+            BmSetCursor(32, BiFont.Height * (5 + i));
+            BmClearLine(32, 32);
             BmPutString(Options[i].Name);
         }
 

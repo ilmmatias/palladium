@@ -6,6 +6,23 @@
 
 #include <vid.h>
 
-void VidpInitialize(void);
+typedef struct {
+    int Offset;
+    int Width;
+    int Height;
+    int Left;
+    int Top;
+    int Advance;
+} VidpFontGlyph;
+
+typedef struct {
+    int Ascender;
+    int Descender;
+    int Height;
+    const VidpFontGlyph *GlyphInfo;
+    const uint8_t *GlyphData;
+} VidpFontData;
+
+void VidpInitialize(void *LoaderData);
 
 #endif /* _VIDP_H_ */

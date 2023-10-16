@@ -19,7 +19,7 @@
  *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
 [[noreturn]] void KiSystemStartup(void *LoaderData) {
-    VidpInitialize();
+    VidpInitialize(LoaderData);
     MiPreparePageAllocator(LoaderData);
     KiSaveAcpiData(LoaderData);
     KiRunBootStartDrivers(LoaderData);

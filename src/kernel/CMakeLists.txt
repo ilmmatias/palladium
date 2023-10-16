@@ -9,10 +9,8 @@ if(ARCH STREQUAL "amd64")
         ke/${ARCH}/driver.c
 
         mm/${ARCH}/page.c
-
-        vid/${ARCH}/attributes.c
-        vid/${ARCH}/initialize.c
-        vid/${ARCH}/print.c)
+        
+        vid/${ARCH}/initialize.c)
 endif()
 
 add_executable(kernel "kernel"
@@ -26,6 +24,8 @@ add_executable(kernel "kernel"
     mm/allocator.c
     mm/page.c
 
+    vid/attributes.c
+    vid/font.c
     vid/print.c
 
     kernel.def)

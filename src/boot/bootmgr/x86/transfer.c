@@ -31,6 +31,11 @@ typedef struct __attribute__((packed)) {
     } MemoryMap;
     struct {
         uint64_t BaseAddress;
+        uint16_t Width;
+        uint16_t Height;
+    } Display;
+    struct {
+        uint64_t BaseAddress;
         uint32_t Count;
     } Images;
 } LoaderBootData;
@@ -42,6 +47,10 @@ extern BiosMemoryRegion *BiosMemoryMap;
 extern uint32_t BiosMemoryMapEntries;
 extern uint64_t BiosMemorySize;
 extern uint64_t BiosMaxAddressableMemory;
+
+extern uint32_t *BiVideoBuffer;
+extern uint16_t BiVideoWidth;
+extern uint16_t BiVideoHeight;
 
 [[noreturn]] void BiTransferExecution(uint64_t *Pml4, uint64_t BootData, uint64_t EntryPoint);
 
@@ -234,6 +243,9 @@ static void InstallIdtHandler(int Number, uint64_t Handler) {
         BootData->MemoryManager.PageAllocatorBase = (uint64_t)MmBase + 0xFFFF800000000000;
         BootData->MemoryMap.BaseAddress = (uint64_t)BiosMemoryMap + 0xFFFF800000000000;
         BootData->MemoryMap.Count = BiosMemoryMapEntries;
+        BootData->Display.BaseAddress = (uint64_t)BiVideoBuffer + 0xFFFF800000000000;
+        BootData->Display.Width = BiVideoWidth;
+        BootData->Display.Height = BiVideoHeight;
         BootData->Images.BaseAddress = (uint64_t)Images + 0xFFFF800000000000;
         BootData->Images.Count = ImageCount;
 

@@ -6,7 +6,7 @@ if [[ ! -d obj.host ]]
 then
     mkdir obj.host
     cd obj.host
-    cmake ../src/sdk/host -GNinja -DCMAKE_BUILD_TYPE=Debug
+    cmake ../src/sdk/host -GNinja -DCMAKE_BUILD_TYPE=Release
 else
     cd obj.host
 fi
@@ -20,7 +20,8 @@ if [[ ! -d obj.x86 ]]
 then
     mkdir obj.x86
     cd obj.x86
-    cmake ../src -GNinja -DARCH=x86 -DCMAKE_BUILD_TYPE=Debug
+    # Always build the bootsector as release/minsize, we need to fit it within around 200KiB!
+    cmake ../src -GNinja -DARCH=x86 -DCMAKE_BUILD_TYPE=Release
 else
     cd obj.x86
 fi
@@ -34,7 +35,7 @@ if [[ ! -d obj.amd64 ]]
 then
     mkdir obj.amd64
     cd obj.amd64
-    cmake ../src -GNinja -DARCH=amd64 -DCMAKE_BUILD_TYPE=Debug
+    cmake ../src -GNinja -DARCH=amd64 -DCMAKE_BUILD_TYPE=Release
 else
     cd obj.amd64
 fi
