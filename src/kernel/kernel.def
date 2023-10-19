@@ -1,4 +1,4 @@
-LIBRARY kernel
+LIBRARY kernel.exe
 EXPORTS
     IoCreateDevice
     IoOpenDevice

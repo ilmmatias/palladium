@@ -50,6 +50,7 @@ cp obj.x86/boot/bootsect/iso9660boot.com _root/iso9660boot.com
 cat obj.x86/boot/startup/startup.com obj.x86/boot/bootmgr/bootmgr.exe > _root/bootmgr
 cp obj.amd64/kernel/kernel.exe _root/System/kernel.exe
 cp obj.amd64/drivers/acpi/acpi.sys _root/System/acpi.sys
+cp obj.amd64/drivers/test/test.sys _root/System/test.sys
 
 if [ "$1" == "fat32" ]
 then
@@ -95,7 +96,7 @@ then
 else
     mkisofs -iso-level 2 -R -b iso9660boot.com -no-emul-boot -o obj.amd64/iso9660.iso _root 1>/dev/null 2>&1
     echo "[5/5] Running emulator"
-    qemu-system-x86_64 -enable-kvm -M smm=off -cpu host -cdrom obj.amd64/iso9660.iso -no-reboot -chardev stdio,id=seabios -device isa-debugcon,iobase=0x402,chardev=seabios
+    qemu-system-x86_64 -enable-kvm -M smm=off -cpu host -cdrom obj.amd64/iso9660.iso -no-reboot
 fi
 
 rm -rf _root

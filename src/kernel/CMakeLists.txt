@@ -13,7 +13,7 @@ if(ARCH STREQUAL "amd64")
         vid/${ARCH}/initialize.c)
 endif()
 
-add_executable(kernel "kernel"
+add_executable(kernel "kernel" YES
     ${SOURCES}
 
     io/device.c

@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: (C) 2023 ilmmatias
 # SPDX-License-Identifier: BSD-3-Clause
 
-function(add_executable target type)
+function(add_executable target type has_lib)
     _add_executable(${target} ${ARGN})
 
     if(NOT (type STREQUAL "nostdlib" OR type STREQUAL "knostdlib"))
@@ -36,7 +36,7 @@ function(add_executable target type)
     	-fuse-ld=lld
     	/usr/local/lib/baremetal/libclang_rt.builtins-${TARGET_${ARCH}}.a)
 
-    if(type STREQUAL "kernel")
+    if(has_lib)
         target_link_options(${target} PRIVATE -Wl,--out-implib,${CMAKE_CURRENT_BINARY_DIR}/${target}.lib)
     endif()
 endfunction()

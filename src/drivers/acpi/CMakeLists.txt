@@ -10,7 +10,7 @@ if(ARCH STREQUAL "amd64")
         ${ARCH}/port.c)
 endif()
 
-add_executable(acpi "knostdlib"
+add_executable(acpi "knostdlib" YES
     ${SOURCES}
 
     interp/aml.c
@@ -34,6 +34,7 @@ add_executable(acpi "knostdlib"
     opcode/stmt.c
     opcode/target.c
 
+    acpi.def
     main.c
     os.c
     table.c)
@@ -43,3 +44,4 @@ target_include_directories(acpi PRIVATE include/private PUBLIC include/public)
 target_compile_options(acpi PRIVATE $<$<COMPILE_LANGUAGE:C,CXX>:-ffreestanding>)
 target_link_options(acpi PRIVATE -Wl,--subsystem=native,--entry=DriverEntry)
 set_target_properties(acpi PROPERTIES SUFFIX ".sys")
+set_target_properties(acpi PROPERTIES ENABLE_EXPORTS TRUE)

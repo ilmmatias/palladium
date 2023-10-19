@@ -14,6 +14,12 @@
 typedef struct {
     const char *Name;
     uint64_t Address;
+} ExportEntry;
+
+typedef struct {
+    const char *Name;
+    size_t EntryCount;
+    ExportEntry *Entries;
 } ExportTable;
 
 /*-------------------------------------------------------------------------------------------------
@@ -27,10 +33,10 @@ typedef struct {
  *     VirtualAddress - Output; Chosen virual address for the image.
  *     EntryAddress - Output; Where we should jump to reach the image entry point.
  *     ImageSize - Output; Size in bytes of the loaded image.
- *     IsKernel - Specifies if this is the main kernel image (kernel.exe).
- *     KernelExports - I/O; Kernel export table. Filled when IsKernel == TRUE, used for imports
- *                     otherwise.
- *     KernelExportCount - I/O; How many entries the export table has.
+ *     IsKernel - Specifies if this is the main kernel image.
+ *     CurrentImageCount - How many images have been loaded before us.
+ *     OtherImages - Start of the image array.
+ *     ThisImage - Pointer into where we should save this image's export table.
  *
  * RETURN VALUE:
  *     Physical address of the image, or 0 if we failed to load it.
@@ -42,8 +48,9 @@ static uint64_t LoadFile(
     uint64_t *ImageSize,
     int **PageFlags,
     int IsKernel,
-    ExportTable **KernelExports,
-    size_t *KernelExportCount) {
+    size_t CurrentImageCount,
+    ExportTable *OtherImages,
+    ExportTable *ThisImage) {
     printf("loading up %s\n", Path);
 
     FILE *Stream = fopen(Path, "rb");
@@ -144,13 +151,17 @@ static uint64_t LoadFile(
         }
     }
 
-    /* The drivers will almost certainly import functions from the kernel (to allocate memory,
-       register themselves, and so on); Read up the export table, saving it in a format that it's
-       easier for us to use. */
-    if (IsKernel && !Header->DataDirectories.ExportTable.Size) {
-        *KernelExports = NULL;
-        *KernelExportCount = 0;
-    } else if (IsKernel) {
+    /* Grab up this image's export table, and its name; We need to parse the path to get the
+       image's name (get everything after the last slash). */
+
+    ThisImage->Name = strrchr(Path, '/');
+    if (!(ThisImage->Name++)) {
+        /* All paths should be absolute (and they will ALWAYS contain at least one slash),
+           something's broken if that's not the case. */
+        return 0;
+    }
+
+    if (Header->DataDirectories.ExportTable.Size) {
         PeExportHeader *ExportHeader =
             (PeExportHeader *)((char *)PhysicalAddress +
                                Header->DataDirectories.ExportTable.VirtualAddress);
@@ -161,62 +172,83 @@ static uint64_t LoadFile(
         uint32_t *NamePointers =
             (uint32_t *)((char *)PhysicalAddress + ExportHeader->NamePointerRva);
 
-        *KernelExports = calloc(ExportHeader->NumberOfNamePointers, sizeof(ExportTable));
-        *KernelExportCount = ExportHeader->NumberOfNamePointers;
+        ThisImage->EntryCount = ExportHeader->NumberOfNamePointers;
+        ThisImage->Entries = calloc(ExportHeader->NumberOfNamePointers, sizeof(ExportEntry));
 
         for (uint32_t i = 0; i < ExportHeader->NumberOfNamePointers; i++) {
-            (*KernelExports)[i].Name = (char *)PhysicalAddress + NamePointers[i];
-            (*KernelExports)[i].Address = Header->ImageBase + AddressTable[ExportOrdinals[i]];
+            ThisImage->Entries[i].Name = (char *)PhysicalAddress + NamePointers[i];
+            ThisImage->Entries[i].Address = Header->ImageBase + AddressTable[ExportOrdinals[i]];
         }
+    } else {
+        ThisImage->EntryCount = 0;
+        ThisImage->Entries = NULL;
     }
 
-    /* Importing is invalid in the kernel; Drivers are allowed to import from and only from the
-       kernel (kernel.exe); Anything else, and we assume the image is invalid. */
+    /* Importing is invalid in the kernel; Drivers are allowed to import from any loaded image
+       but themselves. */
     if (IsKernel && Header->DataDirectories.ImportTable.Size) {
         return 0;
     } else if (Header->DataDirectories.ImportTable.Size) {
         PeImportHeader *ImportHeader =
             (PeImportHeader *)((char *)PhysicalAddress +
                                Header->DataDirectories.ImportTable.VirtualAddress);
+        PeImportHeader *Limit =
+            (PeImportHeader *)((char *)ImportHeader + Header->DataDirectories.ImportTable.Size);
 
-        if (strcmp((char *)PhysicalAddress + ImportHeader->NameRva, "kernel.exe")) {
-            return 0;
-        }
+        while (ImportHeader < Limit) {
+            /* All zeroes is the `end of import directory` marker, we can assume we're done if we
+               reach it. */
 
-        /* `kernel.exe` is the only valid import, anything that comes after is guaranteed to not
-           be it. Except all zeroes/NULLs, as that is the `end of import directory` marker. */
-        if ((ImportHeader + 1)->ImportLookupTableRva || (ImportHeader + 1)->TimeDateStamp ||
-            (ImportHeader + 1)->ForwarderChain || (ImportHeader + 1)->NameRva ||
-            (ImportHeader + 1)->ImportAddressTableRva) {
-            return 0;
-        }
-
-        uint64_t *ImportTable =
-            (uint64_t *)((char *)PhysicalAddress + ImportHeader->ImportLookupTableRva);
-        uint64_t *AddressTable =
-            (uint64_t *)((char *)PhysicalAddress + ImportHeader->ImportAddressTableRva);
-
-        while (*ImportTable) {
-            /* We currently don't support import by ordinal; It should be easy enough to add
-               support for it later (TODO). */
-            if (*ImportTable & 0x8000000000000000) {
-                return 0;
+            if (!ImportHeader->ImportLookupTableRva && !ImportHeader->TimeDateStamp &&
+                !ImportHeader->ForwarderChain && !ImportHeader->NameRva &&
+                !ImportHeader->ImportAddressTableRva) {
+                break;
             }
 
-            char *SearchName = (char *)PhysicalAddress + *(ImportTable++) + 2;
             int Found = 0;
-
-            for (size_t i = 0; i < *KernelExportCount; i++) {
-                if (!strcmp((*KernelExports)[i].Name, SearchName)) {
-                    *(AddressTable++) = (*KernelExports)[i].Address;
+            ExportTable *ImageExports = OtherImages;
+            for (size_t i = 0; i < CurrentImageCount; i++) {
+                if (!strcmp((char *)PhysicalAddress + ImportHeader->NameRva, ImageExports->Name)) {
                     Found = 1;
                     break;
                 }
+
+                ImageExports++;
             }
 
             if (!Found) {
                 return 0;
             }
+
+            uint64_t *ImportTable =
+                (uint64_t *)((char *)PhysicalAddress + ImportHeader->ImportLookupTableRva);
+            uint64_t *AddressTable =
+                (uint64_t *)((char *)PhysicalAddress + ImportHeader->ImportAddressTableRva);
+
+            while (*ImportTable) {
+                /* We currently don't support import by ordinal; It should be easy enough to add
+                   support for it later (TODO). */
+                if (*ImportTable & 0x8000000000000000) {
+                    return 0;
+                }
+
+                char *SearchName = (char *)PhysicalAddress + *(ImportTable++) + 2;
+                int Found = 0;
+
+                for (size_t i = 0; i < ImageExports->EntryCount; i++) {
+                    if (!strcmp(ImageExports->Entries[i].Name, SearchName)) {
+                        *(AddressTable++) = ImageExports->Entries[i].Address;
+                        Found = 1;
+                        break;
+                    }
+                }
+
+                if (!Found) {
+                    return 0;
+                }
+            }
+
+            ImportHeader++;
         }
     }
 
@@ -345,9 +377,13 @@ static uint64_t LoadFile(
             break;
         }
 
+        size_t ExportTableSize = 0;
+        ExportTable *Exports = malloc((DriverCount + 1) * sizeof(ExportTable));
+        if (!Exports) {
+            break;
+        }
+
         /* Delegate the loading job to the common PE loader. */
-        ExportTable *KernelExports;
-        size_t KernelExportCount;
         Images[0].PhysicalAddress = LoadFile(
             KernelPath,
             &Images[0].VirtualAddress,
@@ -355,8 +391,9 @@ static uint64_t LoadFile(
             &Images[0].ImageSize,
             &Images[0].PageFlags,
             1,
-            &KernelExports,
-            &KernelExportCount);
+            ExportTableSize++,
+            Exports,
+            Exports);
 
         if (!Images[0].PhysicalAddress) {
             Message = "An error occoured while trying to load the selected operating system.\n"
@@ -396,8 +433,9 @@ static uint64_t LoadFile(
                 &Images[DriverCount + 1].ImageSize,
                 &Images[DriverCount + 1].PageFlags,
                 0,
-                &KernelExports,
-                &KernelExportCount);
+                ExportTableSize++,
+                Exports,
+                Exports + i + 1);
 
             if (!Images[++DriverCount].PhysicalAddress) {
                 Message = "An error occoured while trying to load the selected operating system.\n"

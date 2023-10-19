@@ -15,7 +15,7 @@ if(ARCH STREQUAL "x86")
         ${ARCH}/transfer.S)
 endif()
 
-add_executable(bootmgr "kstdlib"
+add_executable(bootmgr "kstdlib" NO
     ${SOURCES}
 
     fs/console.c

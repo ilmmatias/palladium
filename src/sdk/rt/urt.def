@@ -1,2 +1,2 @@
-LIBRARY urt
+LIBRARY urt.dll
 EXPORTS

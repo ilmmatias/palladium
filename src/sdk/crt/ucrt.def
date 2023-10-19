@@ -1,4 +1,4 @@
-LIBRARY ucrt
+LIBRARY ucrt.dll
 EXPORTS
     isalnum
     isalpha
