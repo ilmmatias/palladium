@@ -62,12 +62,14 @@ static uint64_t LoadFile(
        guaranteed to be after the main MZ header. */
     uint32_t Offset;
     if (fseek(Stream, 0x3C, SEEK_SET) || fread(&Offset, sizeof(uint32_t), 1, Stream) != 1) {
+        fclose(Stream);
         return 0;
     }
 
     PeHeader InitialHeader;
     PeHeader *Header = &InitialHeader;
     if (fseek(Stream, Offset, SEEK_SET) || fread(Header, sizeof(PeHeader), 1, Stream) != 1) {
+        fclose(Stream);
         return 0;
     }
 
@@ -76,6 +78,7 @@ static uint64_t LoadFile(
     if (memcmp(Header->Signature, PE_SIGNATURE, 4) || Header->Machine != PE_MACHINE ||
         (Header->Characteristics & 0x2000) || Header->Magic != 0x20B || Header->Subsystem != 1 ||
         (Header->DllCharacteristics & 0x160) != 0x160) {
+        fclose(Stream);
         return 0;
     }
 
@@ -84,16 +87,19 @@ static uint64_t LoadFile(
 
     *PageFlags = calloc(Pages, sizeof(int));
     if (!*PageFlags) {
+        fclose(Stream);
         return 0;
     }
 
     void *PhysicalAddress = BmAllocatePages(*ImageSize >> PAGE_SHIFT, MEMORY_KERNEL);
     if (!PhysicalAddress) {
+        fclose(Stream);
         return 0;
     }
 
     *VirtualAddress = BmAllocateVirtualAddress(Pages);
     if (!*VirtualAddress) {
+        fclose(Stream);
         return 0;
     }
 
@@ -102,6 +108,7 @@ static uint64_t LoadFile(
        it all up to the base address. */
     if (fseek(Stream, 0, SEEK_SET) ||
         fread(PhysicalAddress, Header->SizeOfHeaders, 1, Stream) != 1) {
+        fclose(Stream);
         return 0;
     }
 
@@ -139,6 +146,7 @@ static uint64_t LoadFile(
                     Sections[i].SizeOfRawData,
                     1,
                     Stream) != 1) {
+                fclose(Stream);
                 return 0;
             }
         }
@@ -150,6 +158,9 @@ static uint64_t LoadFile(
                 Sections[i].VirtualSize - Sections[i].SizeOfRawData);
         }
     }
+
+    /* We should have loaded the whole file, so it's safe to close the handle. */
+    fclose(Stream);
 
     /* Grab up this image's export table, and its name; We need to parse the path to get the
        image's name (get everything after the last slash). */

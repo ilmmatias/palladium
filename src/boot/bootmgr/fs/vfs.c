@@ -177,7 +177,7 @@ int BiCopyFileContext(FileContext *Context, FileContext *Copy) {
     if (Context->PrivateSize) {
         Copy->PrivateData = malloc(Context->PrivateSize);
 
-        if (!Copy) {
+        if (!Copy->PrivateData) {
             return 0;
         }
 

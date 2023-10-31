@@ -78,7 +78,7 @@ void BmInitDisplay(void) {
     /* The info block contains the list of all valid modes, so grab it first (assume we're in an
     incompatible system if it doesn't exist). */
     memset(&InfoBlock, 0, sizeof(VbeInfoBlock));
-    strcpy(InfoBlock.VbeSignature, "VBE2");
+    memcpy(InfoBlock.VbeSignature, "VBE2", 4);
 
     memset(&Registers, 0, sizeof(BiosRegisters));
     Registers.Eax = 0x4F00;

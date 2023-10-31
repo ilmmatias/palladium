@@ -157,9 +157,9 @@ static int ApplyFixups(NtfsContext *FsContext, uint16_t FixupOffset, uint16_t Nu
  *-----------------------------------------------------------------------------------------------*/
 static int TranslateVcn(NtfsContext *FsContext, uint64_t Vcn, uint64_t *Lcn) {
     for (NtfsDataRun *Entry = FsContext->DataRuns; Entry && Entry->Used; Entry = Entry->Next) {
-        if (Entry->Vcn > Vcn) {
+        if (Vcn >= Entry->Vcn + Entry->Length) {
             break;
-        } else if (Entry->Vcn <= Vcn) {
+        } else if (Vcn >= Entry->Vcn) {
             *Lcn = Entry->Lcn + Vcn - Entry->Vcn;
             return 1;
         }
