@@ -3,7 +3,6 @@
 
 #include <acpip.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 /*-------------------------------------------------------------------------------------------------
@@ -87,7 +86,7 @@ int AcpipExecuteRefOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value) 
 
             /* BufferField takes a reference to an AcpiValue (that needs to live for long
                enough), so allocate some memory for it. */
-            AcpiValue *Buffer = malloc(sizeof(AcpiValue));
+            AcpiValue *Buffer = AcpipAllocateBlock(sizeof(AcpiValue));
             memcpy(Buffer, &State->Opcode->FixedArguments[0].TermArg, sizeof(AcpiValue));
             if (Buffer->Type != ACPI_STRING && Buffer->Type != ACPI_BUFFER &&
                 Buffer->Type != ACPI_PACKAGE) {

@@ -2,9 +2,6 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <acpip.h>
-#include <stddef.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 AcpiObject *AcpipObjectTree = NULL;
@@ -196,7 +193,7 @@ AcpiObject *AcpipCreateObject(AcpiName *Name, AcpiValue *Value) {
                     char *Path = AcpiGetObjectPath(Base);
                     if (Path) {
                         AcpipShowDebugMessage("duplicate object, full path %s\n", Path);
-                        free(Path);
+                        AcpipFreeBlock(Path);
                     } else {
                         AcpipShowDebugMessage("duplicate object, top most name %.4s\n", Base->Name);
                     }
@@ -213,7 +210,7 @@ AcpiObject *AcpipCreateObject(AcpiName *Name, AcpiValue *Value) {
         }
     }
 
-    AcpiObject *Entry = malloc(sizeof(AcpiObject));
+    AcpiObject *Entry = AcpipAllocateBlock(sizeof(AcpiObject));
     if (!Entry) {
         return 0;
     }
@@ -325,7 +322,7 @@ AcpiObject *AcpipResolveObject(AcpiName *Name) {
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function saves the full path of an object into a string; The caller is expected to
- *     free() it after use.
+ *     AcpipFreeBlock() it after use.
  *
  * PARAMETERS:
  *     Object - What object we should get the path of.
@@ -342,7 +339,7 @@ char *AcpiGetObjectPath(AcpiObject *Object) {
     /* No parts means this is the root scope (\), otherwise, each part is separated by a dot (+4
        characters for the name itself, 5 characters in total); The exception is the first part, as
        it is prefixed by the root char instead of a dot (still 5 characters). */
-    char *Path = malloc(Parts ? Parts * 5 + 1 : 2);
+    char *Path = AcpipAllocateBlock(Parts ? Parts * 5 + 1 : 2);
     if (!Path) {
         return NULL;
     } else if (!Parts) {

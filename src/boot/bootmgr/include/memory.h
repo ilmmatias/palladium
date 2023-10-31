@@ -26,13 +26,18 @@ typedef struct MemoryArena {
     struct MemoryArena *Next;
 } MemoryArena;
 
-extern MemoryArena *BmMemoryArena;
-extern int BmMemoryArenaSize;
+extern MemoryArena *BiMemoryArena;
+extern int BiMemoryArenaSize;
 
-void BmInitMemory(void *BootBlock);
+void BiInitMemory(void *BootBlock);
+
 void *BmAllocatePages(size_t Pages, int Type);
 void BmFreePages(void *Base, size_t Pages);
 
 uint64_t BmAllocateVirtualAddress(uint64_t Pages);
+
+void *BmAllocateBlock(size_t Size);
+void *BmAllocateZeroBlock(size_t Elements, size_t ElementSize);
+void BmFreeBlock(void *Block);
 
 #endif /* _MEMORY_H_ */

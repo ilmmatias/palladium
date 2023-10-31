@@ -1,11 +1,10 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
-#include <crt_impl.h>
 #include <ctype.h>
 #include <fat32.h>
 #include <file.h>
-#include <stdlib.h>
+#include <memory.h>
 #include <string.h>
 
 struct Fat32Context;
@@ -43,7 +42,7 @@ typedef struct Fat32Context {
 int BiProbeFat32(FileContext *Context) {
     const char ExpectedSystemIdentifier[8] = "FAT32   ";
 
-    char *Buffer = malloc(512);
+    char *Buffer = BmAllocateBlock(512);
     Fat32BootSector *BootSector = (Fat32BootSector *)Buffer;
     if (!Buffer) {
         return 0;
@@ -51,7 +50,7 @@ int BiProbeFat32(FileContext *Context) {
 
     /* We're using the process from http://jdebp.info/FGA/determining-filesystem-type.html to
        determine if this is really FAT32 (or if it at least looks like it). */
-    if (__fread(Context, 0, Buffer, 512, NULL) ||
+    if (BmReadFile(Context, Buffer, 0, 512, NULL) ||
         memcmp(BootSector->SystemIdentifier, ExpectedSystemIdentifier, 8) ||
         !(BootSector->BytesPerSector >= 256 && BootSector->BytesPerSector <= 4096) ||
         !BootSector->SectorsPerCluster || BootSector->SectorsPerCluster > 128 ||
@@ -59,17 +58,17 @@ int BiProbeFat32(FileContext *Context) {
         return 0;
     }
 
-    Fat32Context *FsContext = malloc(sizeof(Fat32Context));
+    Fat32Context *FsContext = BmAllocateBlock(sizeof(Fat32Context));
     if (!FsContext) {
-        free(Buffer);
+        BmFreeBlock(Buffer);
         return 0;
     }
 
     FsContext->BytesPerCluster = BootSector->BytesPerSector * BootSector->SectorsPerCluster;
-    FsContext->ClusterBuffer = malloc(FsContext->BytesPerCluster);
+    FsContext->ClusterBuffer = BmAllocateBlock(FsContext->BytesPerCluster);
     if (!FsContext->ClusterBuffer) {
-        free(FsContext);
-        free(Buffer);
+        BmFreeBlock(FsContext);
+        BmFreeBlock(Buffer);
         return 0;
     }
 
@@ -87,7 +86,7 @@ int BiProbeFat32(FileContext *Context) {
     Context->PrivateData = FsContext;
     Context->FileLength = 0;
 
-    free(Buffer);
+    BmFreeBlock(Buffer);
     return 1;
 }
 
@@ -109,10 +108,10 @@ static int FollowCluster(Fat32Context *FsContext, void **Current, uint32_t *Clus
     if (Offset && Offset < FsContext->BytesPerCluster) {
         return 1;
     } else if (Offset || !Current) {
-        if (__fread(
+        if (BmReadFile(
                 &FsContext->Parent,
-                FsContext->FatOffset + (*Cluster << 2),
                 FsContext->ClusterBuffer,
+                FsContext->FatOffset + (*Cluster << 2),
                 4,
                 NULL)) {
             return 0;
@@ -127,10 +126,10 @@ static int FollowCluster(Fat32Context *FsContext, void **Current, uint32_t *Clus
 
     if (Current) {
         *Current = FsContext->ClusterBuffer;
-        return !__fread(
+        return !BmReadFile(
             &FsContext->Parent,
-            FsContext->ClusterOffset + (*Cluster - 2) * FsContext->BytesPerCluster,
             FsContext->ClusterBuffer,
+            FsContext->ClusterOffset + (*Cluster - 2) * FsContext->BytesPerCluster,
             FsContext->BytesPerCluster,
             NULL);
     } else {
@@ -318,7 +317,7 @@ static int FillDataRuns(Fat32Context *FsContext, uint64_t FileLength) {
         /* If possible, reuse our past allocated data run list, overwriting its entries. */
         Fat32DataRun *Entry = CurrentRun;
         if (!Entry) {
-            Entry = calloc(1, sizeof(Fat32DataRun));
+            Entry = BmAllocateZeroBlock(1, sizeof(Fat32DataRun));
             if (!Entry) {
                 return 0;
             }
@@ -356,7 +355,7 @@ static int FillDataRuns(Fat32Context *FsContext, uint64_t FileLength) {
  * PURPOSE:
  *     This function uses a data run list obtained from FillDataRuns to convert a Virtual Cluster
  *     Number (VCN) into a Logical Cluster Number (LCN, aka something we can just multiply by the
- *     size of a cluster and __fread).
+ *     size of a cluster and read it).
  *
  * PARAMETERS:
  *     FsContext - FS-specific data.
@@ -390,7 +389,7 @@ static int TranslateVcn(Fat32Context *FsContext, uint32_t Vcn, uint32_t *Lcn) {
  *     Read - How many bytes we read with no error.
  *
  * RETURN VALUE:
- *     __STDIO_FLAGS_ERROR/EOF if something went wrong, 0 otherwise.
+ *     1 if something went wrong, 0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
 int BiReadFat32File(FileContext *Context, void *Buffer, size_t Start, size_t Size, size_t *Read) {
     Fat32Context *FsContext = Context->PrivateData;
@@ -399,14 +398,12 @@ int BiReadFat32File(FileContext *Context, void *Buffer, size_t Start, size_t Siz
     size_t Accum = 0;
     int Flags = 0;
 
-    if (FsContext->Directory) {
-        return __STDIO_FLAGS_ERROR;
-    } else if (Start > Context->FileLength) {
-        return __STDIO_FLAGS_EOF;
+    if (FsContext->Directory || Start > Context->FileLength) {
+        return 1;
     }
 
     if (Size > Context->FileLength - Start) {
-        Flags = __STDIO_FLAGS_EOF;
+        Flags = 1;
         Size = Context->FileLength - Start;
     }
 
@@ -417,7 +414,7 @@ int BiReadFat32File(FileContext *Context, void *Buffer, size_t Start, size_t Siz
             *Read = 0;
         }
 
-        return __STDIO_FLAGS_ERROR;
+        return 1;
     }
 
     uint32_t Vcn = 0;
@@ -430,13 +427,13 @@ int BiReadFat32File(FileContext *Context, void *Buffer, size_t Start, size_t Siz
     while (Size) {
         uint32_t Lcn;
         if (!TranslateVcn(FsContext, Vcn++, &Lcn) ||
-            __fread(
+            BmReadFile(
                 &FsContext->Parent,
-                FsContext->ClusterOffset + (Lcn - 2) * FsContext->BytesPerCluster,
                 FsContext->ClusterBuffer,
+                FsContext->ClusterOffset + (Lcn - 2) * FsContext->BytesPerCluster,
                 FsContext->BytesPerCluster,
                 NULL)) {
-            Flags = __STDIO_FLAGS_ERROR;
+            Flags = 1;
             break;
         }
 

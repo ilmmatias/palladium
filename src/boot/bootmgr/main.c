@@ -19,13 +19,12 @@
  * RETURN VALUE:
  *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
-[[noreturn]] void BmMain(void *BootBlock) {
-    BmInitDisplay();
-    BmInitKeyboard();
-    BmInitMemory(BootBlock);
-    BmInitArch(BootBlock);
-    BmInitStdio();
-    BmInitRegistry();
-    BmLoadMenuEntries();
-    BmEnterMenu();
+[[noreturn]] void BiMain(void *BootBlock) {
+    BiInitDisplay();
+    BiInitKeyboard();
+    BiInitMemory(BootBlock);
+    BiInitArch(BootBlock);
+    BiInitRegistry();
+    BiLoadMenuEntries();
+    BiEnterMenu();
 }

@@ -4,7 +4,6 @@
 #include <display.h>
 #include <keyboard.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <x86/keyboard.h>
 
 /* Scan Code Set 1 (the old PC-XT keyboard scan codes, which the controller should be emulating
@@ -85,7 +84,7 @@ static uint8_t PollData(void) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void BmInitKeyboard(void) {
+void BiInitKeyboard(void) {
     /* TODO: We need a proper init sequence, resetting the controller and detecting multiple PS/2
        devices (and which one is the keyboard). */
     ReadPort(PORT_DATA);

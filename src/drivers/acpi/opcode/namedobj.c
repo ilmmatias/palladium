@@ -2,8 +2,6 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <acpip.h>
-#include <stddef.h>
-#include <stdlib.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -34,7 +32,7 @@ int AcpipExecuteNamedObjOpcode(AcpipState *State, uint16_t Opcode) {
             AcpiValue Value;
             Value.Type = ACPI_METHOD;
             Value.References = 1;
-            Value.Children = malloc(sizeof(AcpiChildren));
+            Value.Children = AcpipAllocateBlock(sizeof(AcpiChildren));
             if (!Value.Children) {
                 return 0;
             }
@@ -73,7 +71,7 @@ int AcpipExecuteNamedObjOpcode(AcpipState *State, uint16_t Opcode) {
             AcpiValue Value;
             Value.Type = ACPI_REGION;
             Value.References = 1;
-            Value.Children = malloc(sizeof(AcpiChildren));
+            Value.Children = AcpipAllocateBlock(sizeof(AcpiChildren));
             if (!Value.Children) {
                 return 0;
             }
@@ -109,7 +107,7 @@ int AcpipExecuteNamedObjOpcode(AcpipState *State, uint16_t Opcode) {
             AcpiValue Value;
             Value.Type = Opcode == 0x825B ? ACPI_DEVICE : ACPI_THERMAL;
             Value.References = 1;
-            Value.Children = malloc(sizeof(AcpiChildren));
+            Value.Children = AcpipAllocateBlock(sizeof(AcpiChildren));
             if (!Value.Children) {
                 return 0;
             }
@@ -142,7 +140,7 @@ int AcpipExecuteNamedObjOpcode(AcpipState *State, uint16_t Opcode) {
             AcpiValue Value;
             Value.Type = ACPI_PROCESSOR;
             Value.References = 1;
-            Value.Children = malloc(sizeof(AcpiChildren));
+            Value.Children = AcpipAllocateBlock(sizeof(AcpiChildren));
             if (!Value.Children) {
                 return 0;
             }
@@ -178,7 +176,7 @@ int AcpipExecuteNamedObjOpcode(AcpipState *State, uint16_t Opcode) {
             AcpiValue Value;
             Value.Type = ACPI_POWER;
             Value.References = 1;
-            Value.Children = malloc(sizeof(AcpiChildren));
+            Value.Children = AcpipAllocateBlock(sizeof(AcpiChildren));
             if (!Value.Children) {
                 return 0;
             }

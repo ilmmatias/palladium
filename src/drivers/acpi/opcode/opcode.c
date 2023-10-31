@@ -3,9 +3,6 @@
 
 #include <acpip.h>
 #include <ctype.h>
-#include <stddef.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 extern AcpipArgument AcpipGroup0Arguments[256];
@@ -47,7 +44,7 @@ int AcpipPrepareExecuteOpcode(AcpipState *State) {
         return 0;
     }
 
-    AcpipOpcode *Info = calloc(1, sizeof(AcpipOpcode));
+    AcpipOpcode *Info = AcpipAllocateZeroBlock(1, sizeof(AcpipOpcode));
     if (!Info) {
         return 0;
     }
@@ -139,7 +136,7 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
                         return 0;
                     }
 
-                    Arg->String = malloc(sizeof(AcpiString) + StringSize);
+                    Arg->String = AcpipAllocateBlock(sizeof(AcpiString) + StringSize);
                     if (!Arg->String) {
                         return 0;
                     }
@@ -403,7 +400,7 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
             }
 
             AcpipOpcode *Parent = Opcode->Parent;
-            free(Opcode);
+            AcpipFreeBlock(Opcode);
             State->Opcode = Parent;
 
             return 1;
@@ -440,7 +437,7 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
         }
 
         AcpipOpcode *Parent = Opcode->Parent;
-        free(Opcode);
+        AcpipFreeBlock(Opcode);
         State->Opcode = Parent;
     }
 }

@@ -153,18 +153,18 @@ static AllocatorEntry *FindFreeEntry(size_t Size) {
  *     This function allocates a block of memory of the specified size.
  *
  * PARAMETERS:
- *     size - The size of the block to allocate.
+ *     Size - The size of the block to allocate.
  *
  * RETURN VALUE:
  *     A pointer to the allocated block, or NULL if there is was no free entry and requesting
  *     a new page failed.
  *-----------------------------------------------------------------------------------------------*/
-void *malloc(size_t size) {
-    size = (size + 15) & ~0x0F;
-    AllocatorEntry *Entry = FindFreeEntry(size);
+void *BmAllocateBlock(size_t Size) {
+    Size = (Size + 15) & ~0x0F;
+    AllocatorEntry *Entry = FindFreeEntry(Size);
 
     if (Entry) {
-        SplitEntry(Entry, size);
+        SplitEntry(Entry, Size);
         return Entry + 1;
     }
 
@@ -177,20 +177,19 @@ void *malloc(size_t size) {
  *     afterwards.
  *
  * PARAMETERS:
- *     num - How many elements the array has.
- *     size - The size of each element.
+ *     Elements - How many elements the array has.
+ *     ElementSize - The size of each element.
  *
  * RETURN VALUE:
  *     A pointer to the allocated block, or NULL if there is was no free entry and requesting
  *     a new page failed.
  *-----------------------------------------------------------------------------------------------*/
-void *calloc(size_t num, size_t size) {
-    size *= num;
-
-    void *Base = malloc(size);
+void *BmAllocateZeroBlock(size_t Elements, size_t ElementSize) {
+    size_t Size = Elements * ElementSize;
+    void *Base = BmAllocateBlock(Size);
 
     if (Base) {
-        memset(Base, 0, size);
+        memset(Base, 0, Size);
     }
 
     return Base;
@@ -201,13 +200,13 @@ void *calloc(size_t num, size_t size) {
  *     This function frees a block of memory.
  *
  * PARAMETERS:
- *     ptr - The base address of the block to free.
+ *     Block - The base address of the block to free.
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void free(void *ptr) {
-    AllocatorEntry *Entry = (AllocatorEntry *)ptr - 1;
+void BmFreeBlock(void *Block) {
+    AllocatorEntry *Entry = (AllocatorEntry *)Block - 1;
     Entry->Used = 0;
     MergeEntriesForward(Entry);
     MergeEntriesBackward(Entry);

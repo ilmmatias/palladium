@@ -1,37 +1,31 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
-#include <assert.h>
-#include <crt_impl.h>
 #include <file.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include <memory.h>
 #include <string.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function implements the code to open a file, returning a handle we can use (and the
- *     CRT can transparently store).
+ *     This function implements the code to open a file, given an absolute path.
  *
  * PARAMETERS:
- *     path - Full path of the file to open.
- *     mode - File flags; We don't really have any use for them, and they are ignore.
- *     length - Output; Total file size in bytes.
+ *     File - Full path of the file to open.
  *
  * RETURN VALUE:
- *     Transparent handle if the file/device exists, NULL otherwise.
+ *     File context if the file/device exists, NULL otherwise.
  *-----------------------------------------------------------------------------------------------*/
-void *__fopen(const char *filename, int mode, size_t *length) {
-    (void)mode;
-
-    char *Path = strdup(filename);
+FileContext *BmOpenFile(const char *File) {
+    char *Path = BmAllocateBlock(strlen(File) + 1);
     if (!Path) {
         return NULL;
     }
 
-    FileContext *Context = calloc(1, sizeof(FileContext));
+    strcpy(Path, File);
+
+    FileContext *Context = BmAllocateZeroBlock(1, sizeof(FileContext));
     if (!Context) {
-        free(Path);
+        BmFreeBlock(Path);
         return NULL;
     }
 
@@ -45,22 +39,21 @@ void *__fopen(const char *filename, int mode, size_t *length) {
             }
 
             if (!Offset) {
-                free(Context);
+                BmFreeBlock(Context);
                 return NULL;
             }
 
             Segment += Offset;
             if (*Segment) {
-                __fclose(Context);
+                BmCloseFile(Context);
                 return NULL;
             }
         } else if (!BiReadDirectoryEntry(Context, Segment)) {
-            __fclose(Context);
+            BmCloseFile(Context);
             return NULL;
         }
     }
 
-    *length = Context->FileLength;
     return Context;
 }
 
@@ -70,21 +63,17 @@ void *__fopen(const char *filename, int mode, size_t *length) {
  *     It will free the context handle, and the private data pointer (if not NULL).
  *
  * PARAMETERS:
- *     handle - OS-specific handle; We expect/assume it is a FileContext.
+ *     Context - Device/node private data.
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void __fclose(void *handle) {
-    FileContext *Context = handle;
-
-    if (!Context) {
-        return;
-    } else if (Context->PrivateSize) {
-        free(Context->PrivateData);
+void BmCloseFile(FileContext *Context) {
+    if (Context->PrivateSize) {
+        BmFreeBlock(Context->PrivateData);
     }
 
-    free(Context);
+    BmFreeBlock(Context);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -92,67 +81,39 @@ void __fclose(void *handle) {
  *     This function redirects the caller to the correct device-specific read function.
  *
  * PARAMETERS:
- *     handle - OS-specific handle; We expect/assume it is a DeviceContext.
- *     pos - Offset (from the start of the file) to read the element from.
- *     buffer - Buffer to read the element into.
- *     size - Size of the element to read.
- *     read - How many bytes of the total we were able to read.
+ *     Context - Device/node private data.
+ *     Buffer - Output buffer.
+ *     Start - Starting byte index (in the file).
+ *     Size - How many bytes to read into the buffer.
+ *     Read - How many bytes we read with no error.
  *
  * RETURN VALUE:
- *     __STDIO_FLAGS_ERROR/EOF if something went wrong, 0 otherwise.
+ *     1 if something went wrong, 0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int __fread(void *handle, size_t pos, void *buffer, size_t size, size_t *read) {
-    FileContext *Context = handle;
-
+int BmReadFile(FileContext *Context, void *Buffer, size_t Start, size_t Size, size_t *Read) {
     if (!Context || Context->Type == FILE_TYPE_NONE) {
-        if (read) {
-            *read = 0;
+        if (Read) {
+            *Read = 0;
         }
 
-        return __STDIO_FLAGS_ERROR;
+        return 1;
     } else if (Context->Type == FILE_TYPE_CONSOLE) {
-        return BiReadConsoleDevice(Context, buffer, pos, size, read);
+        return BiReadConsoleDevice(Context, Buffer, Start, Size, Read);
     } else if (Context->Type == FILE_TYPE_ARCH) {
-        return BiReadArchDevice(Context, buffer, pos, size, read);
+        return BiReadArchDevice(Context, Buffer, Start, Size, Read);
     } else if (Context->Type == FILE_TYPE_EXFAT) {
-        return BiReadExfatFile(Context, buffer, pos, size, read);
+        return BiReadExfatFile(Context, Buffer, Start, Size, Read);
     } else if (Context->Type == FILE_TYPE_FAT32) {
-        return BiReadFat32File(Context, buffer, pos, size, read);
+        return BiReadFat32File(Context, Buffer, Start, Size, Read);
     } else if (Context->Type == FILE_TYPE_ISO9660) {
-        return BiReadIso9660File(Context, buffer, pos, size, read);
+        return BiReadIso9660File(Context, Buffer, Start, Size, Read);
     } else if (Context->Type == FILE_TYPE_NTFS) {
-        return BiReadNtfsFile(Context, buffer, pos, size, read);
-    } else if (read) {
-        *read = 0;
+        return BiReadNtfsFile(Context, Buffer, Start, Size, Read);
+    } else if (Read) {
+        *Read = 0;
     }
 
-    return __STDIO_FLAGS_ERROR;
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function redirects the caller to the correct device-specific write function.
- *
- * PARAMETERS:
- *     handle - OS-specific handle; We expect/assume it is a DeviceContext.
- *     pos - Offset (from the start of the file) to write the element into.
- *     buffer - Buffer to get the element from.
- *     size - Size of the element.
- *     wrote - How many bytes of the total we were able to write.
- *
- * RETURN VALUE:
- *     __STDIO_FLAGS_ERROR/EOF if something went wrong, 0 otherwise.
- *-----------------------------------------------------------------------------------------------*/
-int __fwrite(void *handle, size_t pos, const void *buffer, size_t size, size_t *wrote) {
-    FileContext *Context = handle;
-
-    if (Context && Context->Type == FILE_TYPE_CONSOLE) {
-        return BiWriteConsoleDevice(Context, buffer, pos, size, wrote);
-    } else if (wrote) {
-        *wrote = 0;
-    }
-
-    return __STDIO_FLAGS_ERROR;
+    return 1;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -175,7 +136,7 @@ int BiCopyFileContext(FileContext *Context, FileContext *Copy) {
     memcpy(Copy, Context, sizeof(FileContext));
 
     if (Context->PrivateSize) {
-        Copy->PrivateData = malloc(Context->PrivateSize);
+        Copy->PrivateData = BmAllocateBlock(Context->PrivateSize);
 
         if (!Copy->PrivateData) {
             return 0;

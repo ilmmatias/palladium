@@ -4,6 +4,7 @@
 #include <acpi.h>
 #include <ke.h>
 #include <pcip.h>
+#include <string.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -25,29 +26,29 @@ void DriverEntry(void) {
             KE_CORRUPTED_HARDWARE_STRUCTURES, "cannot find the \\_SB_ ACPI object\n");
     }
 
-    for (AcpiObject *Bus = SystemBus->Value.Children->Objects; Bus != NULL; Bus = Bus->Next) {
-        AcpiValue Id;
-        if ((!AcpiEvaluateObject(AcpiSearchObject(Bus, "_HID"), &Id, ACPI_INTEGER) &&
-             !AcpiEvaluateObject(AcpiSearchObject(Bus, "_CID"), &Id, ACPI_INTEGER)) ||
-            (Id.Integer != 0x030AD041 && Id.Integer != 0x080AD041)) {
+    for (AcpiObject *Device = SystemBus->Value.Children->Objects; Device != NULL;
+         Device = Device->Next) {
+        AcpiValue Value;
+        if ((!AcpiEvaluateObject(AcpiSearchObject(Device, "_HID"), &Value, ACPI_INTEGER) &&
+             !AcpiEvaluateObject(AcpiSearchObject(Device, "_CID"), &Value, ACPI_INTEGER)) ||
+            (Value.Integer != 0x030AD041 && Value.Integer != 0x080AD041)) {
             continue;
         }
 
-        AcpiValue Seg;
-        uint64_t SegValue = 0;
-        if (AcpiEvaluateObject(AcpiSearchObject(Bus, "_SEG"), &Seg, ACPI_INTEGER)) {
-            SegValue = Seg.Integer;
+        PcipBus Bus;
+        memset(&Bus, 0, sizeof(PcipBus));
+
+        Bus.Object = Device;
+
+        if (AcpiEvaluateObject(AcpiSearchObject(Device, "_SEG"), &Value, ACPI_INTEGER)) {
+            Bus.Seg = Value.Integer;
         }
 
-        AcpiValue Bbn;
-        uint64_t BbnValue = 0;
-        if (AcpiEvaluateObject(AcpiSearchObject(Bus, "_BBN"), &Bbn, ACPI_INTEGER)) {
-            BbnValue = Bbn.Integer;
+        if (AcpiEvaluateObject(AcpiSearchObject(Device, "_BBN"), &Value, ACPI_INTEGER)) {
+            Bus.Bbn = Value.Integer;
         }
 
-        PcipShowInfoMessage("initialized root bus at ACPI path \\_SB_.%.4s\n", Bus->Name);
-
-        (void)SegValue;
-        (void)BbnValue;
+        PcipInitializeBus(&Bus);
+        PcipShowInfoMessage("initialized root bus at ACPI path \\_SB_.%.4s\n", Device->Name);
     }
 }

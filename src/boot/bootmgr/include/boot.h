@@ -18,15 +18,14 @@ typedef struct __attribute__((packed)) {
     int* PageFlags;
 } LoadedImage;
 
-void BmInitStdio(void);
-void BmInitArch(void* BootBlock);
+void BiInitArch(void* BootBlock);
 
-void BmLoadMenuEntries(void);
-[[noreturn]] void BmEnterMenu(void);
-[[noreturn]] void BmLoadPalladium(const char* SystemFolder);
+void BiLoadMenuEntries(void);
+[[noreturn]] void BiEnterMenu(void);
+[[noreturn]] void BiLoadPalladium(const char* SystemFolder);
 
-void BmCheckCompatibility(void);
-[[noreturn]] void BmTransferExecution(LoadedImage* Images, size_t ImageCount);
+void BiCheckCompatibility(void);
+[[noreturn]] void BiTransferExecution(LoadedImage* Images, size_t ImageCount);
 
 [[noreturn]] void BmPanic(const char* Message);
 

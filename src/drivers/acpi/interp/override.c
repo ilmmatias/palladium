@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <acpip.h>
-#include <stdlib.h>
 #include <string.h>
 
 extern AcpiObject *AcpipObjectTree;
@@ -69,7 +68,7 @@ static int ExecuteOs(int ArgCount, AcpiValue *Arguments, AcpiValue *Result) {
 
     Result->Type = ACPI_STRING;
     Result->References = 1;
-    Result->String = malloc(sizeof(AcpiString) + strlen("Microsoft Windows NT") + 1);
+    Result->String = AcpipAllocateBlock(sizeof(AcpiString) + strlen("Microsoft Windows NT") + 1);
     if (Result->String) {
         Result->String->References = 1;
         strcpy(Result->String->Data, "Microsoft Windows NT");
@@ -134,13 +133,13 @@ void AcpipPopulateOverride(void) {
         0,
     };
 
-    AcpiObject *Objects = calloc(OVERRIDE_ITEMS, sizeof(AcpiObject));
+    AcpiObject *Objects = AcpipAllocateZeroBlock(OVERRIDE_ITEMS, sizeof(AcpiObject));
     if (!Objects) {
         AcpipShowErrorMessage(
             ACPI_REASON_OUT_OF_MEMORY, "could not allocate the predefined methods\n");
     }
 
-    AcpiChildren *Children = calloc(OVERRIDE_ITEMS, sizeof(AcpiChildren));
+    AcpiChildren *Children = AcpipAllocateZeroBlock(OVERRIDE_ITEMS, sizeof(AcpiChildren));
     if (!Children) {
         AcpipShowErrorMessage(
             ACPI_REASON_OUT_OF_MEMORY, "could not allocate the predefined methods\n");

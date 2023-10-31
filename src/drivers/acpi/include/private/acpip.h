@@ -93,6 +93,10 @@ AcpiObject *AcpipResolveObject(AcpiName *Name);
 void AcpiCreateReference(AcpiValue *Source, AcpiValue *Target);
 void AcpiRemoveReference(AcpiValue *Value, int CleanupPointer);
 
+void *AcpipAllocateBlock(size_t Size);
+void *AcpipAllocateZeroBlock(size_t Elements, size_t ElementSize);
+void AcpipFreeBlock(void *Block);
+
 void AcpipShowInfoMessage(const char *Format, ...);
 void AcpipShowDebugMessage(const char *Format, ...);
 void AcpipShowTraceMessage(const char *Format, ...);

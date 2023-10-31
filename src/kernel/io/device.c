@@ -2,8 +2,8 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <io.h>
+#include <mm.h>
 #include <stddef.h>
-#include <stdlib.h>
 #include <string.h>
 
 typedef struct DeviceListEntry {
@@ -31,17 +31,18 @@ int IoCreateDevice(const char *Name, IoReadFn Read, IoWriteFn Write) {
         return 0;
     }
 
-    DeviceListEntry *Entry = malloc(sizeof(DeviceListEntry));
+    DeviceListEntry *Entry = MmAllocateBlock(sizeof(DeviceListEntry));
     if (!Entry) {
         return 0;
     }
 
-    Entry->Device.Name = strdup(Name);
+    Entry->Device.Name = MmAllocateBlock(strlen(Name) + 1);
     if (!Entry->Device.Name) {
-        free(Entry);
+        MmFreeBlock(Entry);
         return 0;
     }
 
+    strcpy((char *)Entry->Device.Name, Name);
     Entry->Device.Read = Read;
     Entry->Device.Write = Write;
     Entry->Next = NULL;

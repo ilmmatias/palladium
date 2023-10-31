@@ -5,8 +5,8 @@
 #include <display.h>
 #include <font.h>
 #include <keyboard.h>
+#include <memory.h>
 #include <registry.h>
-#include <stdlib.h>
 #include <string.h>
 
 static struct {
@@ -59,7 +59,7 @@ static void MoveSelection(int NewSelection) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void BmLoadMenuEntries(void) {
+void BiLoadMenuEntries(void) {
     /* Selection, Timeout, and Entries are required (and required to be of the right size); Assume
        a corrupted registry if they aren't present or are of the wrong type. */
     RegEntryHeader *TimeoutHeader = BmFindRegistryEntry(BmBootRegistry, NULL, "Timeout");
@@ -79,7 +79,7 @@ void BmLoadMenuEntries(void) {
         if (!Entry) {
             break;
         } else if (Entry->Type != REG_ENTRY_KEY) {
-            free(Entry);
+            BmFreeBlock(Entry);
             continue;
         }
 
@@ -89,7 +89,7 @@ void BmLoadMenuEntries(void) {
         if (!Type) {
             continue;
         } else if (Type->Type != REG_ENTRY_DWORD) {
-            free(Entry);
+            BmFreeBlock(Entry);
             continue;
         }
 
@@ -100,11 +100,11 @@ void BmLoadMenuEntries(void) {
                 BmFindRegistryEntry(BmBootRegistry, Entry, "SystemFolder");
 
             if (!SystemFolder) {
-                free(Entry);
+                BmFreeBlock(Entry);
                 continue;
             } else if (SystemFolder->Type != REG_ENTRY_STRING) {
-                free(SystemFolder);
-                free(Entry);
+                BmFreeBlock(SystemFolder);
+                BmFreeBlock(Entry);
                 continue;
             }
 
@@ -115,11 +115,11 @@ void BmLoadMenuEntries(void) {
             RegEntryHeader *BootDevice = BmFindRegistryEntry(BmBootRegistry, Entry, "BootDevice");
 
             if (!BootDevice) {
-                free(Entry);
+                BmFreeBlock(Entry);
                 continue;
             } else if (BootDevice->Type != REG_ENTRY_STRING) {
-                free(BootDevice);
-                free(Entry);
+                BmFreeBlock(BootDevice);
+                BmFreeBlock(Entry);
                 continue;
             }
 
@@ -145,7 +145,7 @@ void BmLoadMenuEntries(void) {
  * RETURN VALUE:
  *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
-[[noreturn]] void BmEnterMenu(void) {
+[[noreturn]] void BiEnterMenu(void) {
     while (1) {
         BmSetColor(DISPLAY_COLOR_DEFAULT);
         BmResetDisplay();
@@ -195,7 +195,7 @@ void BmLoadMenuEntries(void) {
             } else if (Key == '\n') {
                 switch (Options[Selection].Type) {
                     case 0:
-                        BmLoadPalladium(Options[Selection].SystemFolder);
+                        BiLoadPalladium(Options[Selection].SystemFolder);
                         break;
                 }
 

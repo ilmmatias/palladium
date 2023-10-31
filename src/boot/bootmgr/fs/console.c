@@ -1,13 +1,11 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
-#include <crt_impl.h>
 #include <ctype.h>
 #include <display.h>
 #include <file.h>
 #include <keyboard.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include <memory.h>
 #include <string.h>
 
 #define LINE_SIZE 128
@@ -43,7 +41,7 @@ int BiOpenConsoleDevice(const char *Segment, FileContext *Context) {
 
     Context->Type = FILE_TYPE_CONSOLE;
     Context->PrivateSize = sizeof(ConsoleContext);
-    Context->PrivateData = calloc(1, sizeof(ConsoleContext));
+    Context->PrivateData = BmAllocateZeroBlock(1, sizeof(ConsoleContext));
 
     return Context->PrivateData ? 9 : 0;
 }
@@ -60,7 +58,7 @@ int BiOpenConsoleDevice(const char *Segment, FileContext *Context) {
  *     Read - How many characters we read with no error.
  *
  * RETURN VALUE:
- *     __STDIO_FLAGS_ERROR/EOF if something went wrong, 0 otherwise.
+ *     1 if something went wrong, 0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
 int BiReadConsoleDevice(
     FileContext *Context,
@@ -113,7 +111,7 @@ int BiReadConsoleDevice(
         *Read = CopySize;
     }
 
-    return CopySize < Size ? __STDIO_FLAGS_EOF : 0;
+    return CopySize < Size ? 1 : 0;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -128,7 +126,7 @@ int BiReadConsoleDevice(
  *     Read - How many characters we wrote with no error.
  *
  * RETURN VALUE:
- *     __STDIO_FLAGS_ERROR/EOF if something went wrong, 0 otherwise.
+ *     1 if something went wrong, 0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
 int BiWriteConsoleDevice(
     FileContext *Context,

@@ -3,7 +3,6 @@
 
 #include <acpip.h>
 #include <stdarg.h>
-#include <stdlib.h>
 #include <string.h>
 
 /*-------------------------------------------------------------------------------------------------
@@ -46,7 +45,7 @@ static void InitializeChildren(AcpiObject *Root) {
             char *Path = AcpiGetObjectPath(Device);
             if (Path) {
                 AcpipShowTraceMessage("initialized device, full path %s\n", Path);
-                free(Path);
+                AcpipFreeBlock(Path);
             } else {
                 AcpipShowTraceMessage("initialized device, top most name %.4s\n", Device->Name);
             }

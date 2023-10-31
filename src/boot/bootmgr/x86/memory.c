@@ -20,7 +20,7 @@ uint64_t BiosMaxAddressableMemory = 0;
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void BmInitMemory(void *BootBlock) {
+void BiInitMemory(void *BootBlock) {
     BiosBootBlock *Data = (BiosBootBlock *)BootBlock;
 
     /* We should have booted from the startup module, so it should be safe to assume that

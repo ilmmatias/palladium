@@ -3,7 +3,6 @@
 
 #include <acpip.h>
 #include <stdio.h>
-#include <stdlib.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -26,7 +25,7 @@ int AcpipExecuteLockOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
             AcpiValue Value;
             Value.Type = ACPI_MUTEX;
             Value.References = 1;
-            Value.Mutex = malloc(sizeof(AcpiMutex));
+            Value.Mutex = AcpipAllocateBlock(sizeof(AcpiMutex));
             if (!Value.Mutex) {
                 return 0;
             }

@@ -3,7 +3,6 @@
 
 #include <acpip.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 /*-------------------------------------------------------------------------------------------------
@@ -156,7 +155,7 @@ int AcpipExecuteFieldOpcode(AcpipState *State, uint16_t Opcode) {
 
             /* .BufferField.Source is a pointer into the heap, so let's allocate somewhere to
                store SourceBuff. */
-            AcpiValue *Buffer = malloc(sizeof(AcpiValue));
+            AcpiValue *Buffer = AcpipAllocateBlock(sizeof(AcpiValue));
             if (!Buffer) {
                 AcpiRemoveReference(SourceBuff, 0);
                 return 0;
@@ -176,7 +175,7 @@ int AcpipExecuteFieldOpcode(AcpipState *State, uint16_t Opcode) {
 
             if (!AcpipCreateObject(Name, &Value)) {
                 AcpiRemoveReference(SourceBuff, 0);
-                free(Buffer);
+                AcpipFreeBlock(Buffer);
                 return 0;
             }
 

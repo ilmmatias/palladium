@@ -15,9 +15,16 @@ typedef struct {
     AcpiObject *Object;
     uint64_t Seg;
     uint64_t Bbn;
-} PciBus;
+} PcipBus;
+
+typedef struct PcipBusList {
+    PcipBus Bus;
+    struct PcipBusList *Next;
+} PcipBusList;
 
 void PcipShowInfoMessage(const char *Format, ...);
 [[noreturn]] void PcipShowErrorMessage(int Code, const char *Format, ...);
+
+void PcipInitializeBus(PcipBus *Bus);
 
 #endif /* _PCIP_H_ */

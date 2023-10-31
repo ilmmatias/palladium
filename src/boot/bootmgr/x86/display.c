@@ -70,7 +70,7 @@ typedef struct __attribute__((packed)) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void BmInitDisplay(void) {
+void BiInitDisplay(void) {
     VbeInfoBlock InfoBlock;
     VbeModeInfo ModeInfo;
     BiosRegisters Registers;

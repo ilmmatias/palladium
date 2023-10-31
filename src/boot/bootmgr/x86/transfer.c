@@ -2,10 +2,9 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <boot.h>
+#include <display.h>
 #include <memory.h>
 #include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <x86/bios.h>
 #include <x86/cpuid.h>
@@ -52,7 +51,11 @@ extern uint32_t *BiVideoBuffer;
 extern uint16_t BiVideoWidth;
 extern uint16_t BiVideoHeight;
 
-[[noreturn]] void BiTransferExecution(uint64_t *Pml4, uint64_t BootData, uint64_t EntryPoint);
+[[noreturn]] void BiFinishTransferExecution(
+    uint64_t *Pml4,
+    uint64_t BootData,
+    uint64_t EntryPoint,
+    uint64_t StackTop);
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -87,7 +90,7 @@ static void InstallIdtHandler(int Number, uint64_t Handler) {
  * RETURN VALUE:
  *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
-[[noreturn]] void BmTransferExecution(LoadedImage *Images, size_t ImageCount) {
+[[noreturn]] void BiTransferExecution(LoadedImage *Images, size_t ImageCount) {
     /* TODO: Add support for PML5 (under compatible processors). */
 
     /* Currently, we load the kernel expecting at most 16TiB of addressable physical memory; Any
@@ -125,7 +128,7 @@ static void InstallIdtHandler(int Number, uint64_t Handler) {
         uint64_t *LateIdentPdpt = BmAllocatePages(Slices512GiB, MEMORY_KERNEL);
         uint64_t *KernelPdpt = BmAllocatePages(1, MEMORY_KERNEL);
         uint64_t *EarlyIdentPdt = BmAllocatePages(1, MEMORY_KERNEL);
-        LoaderBootData *BootData = malloc(sizeof(LoaderBootData));
+        LoaderBootData *BootData = BmAllocateBlock(sizeof(LoaderBootData));
 
         if (!Pml4 || !EarlyIdentPdpt || !LateIdentPdpt || !EarlyIdentPdt || !KernelPdpt ||
             !BootData) {
@@ -147,7 +150,7 @@ static void InstallIdtHandler(int Number, uint64_t Handler) {
         }
 
         if (Edx & bit_PDPE1GB) {
-            printf("mapping %llu 1GiB slices of adressable physical memory\n", Slices1GiB);
+            BmPrint("mapping %llu 1GiB slices of adressable physical memory\n", Slices1GiB);
             memset(LateIdentPdpt, 0, Slices512GiB * PAGE_SIZE);
             for (uint64_t i = 0; i < Slices1GiB; i++) {
                 LateIdentPdpt[i] = (i << 30) | 0x83;
@@ -163,7 +166,7 @@ static void InstallIdtHandler(int Number, uint64_t Handler) {
                 LateIdentPdpt[i] = (uint64_t)(LateIdentPdt + (i << 9)) | 0x03;
             }
 
-            printf("mapping %llu 2MiB slices of adressable physical memory\n", Slices2MiB);
+            BmPrint("mapping %llu 2MiB slices of adressable physical memory\n", Slices2MiB);
             memset(LateIdentPdt, 0, Slices1GiB * PAGE_SIZE);
             for (uint64_t i = 0; i < Slices2MiB; i++) {
                 LateIdentPdt[i] = (i << 21) | 0x83;
@@ -207,7 +210,7 @@ static void InstallIdtHandler(int Number, uint64_t Handler) {
                 ImagePdt[ImagePdtBase + j] = (uint64_t)(ImagePt + (j << 9)) | 0x03;
             }
 
-            printf("mapping %llu slices of 4KiB of image %zu\n", ImageSlices4KiB, i);
+            BmPrint("mapping %llu slices of 4KiB of image %zu\n", ImageSlices4KiB, i);
             memset(ImagePt, 0, ImageSlices2MiB * PAGE_SIZE);
             for (uint64_t j = 0; j < ImageSlices4KiB; j++) {
                 int Flags = Images[i].PageFlags[j];
@@ -249,7 +252,12 @@ static void InstallIdtHandler(int Number, uint64_t Handler) {
         BootData->Images.BaseAddress = (uint64_t)Images + 0xFFFF800000000000;
         BootData->Images.Count = ImageCount;
 
-        BiTransferExecution(Pml4, (uint64_t)BootData + 0xFFFF800000000000, Images[0].EntryPoint);
+        /* The loader should have placed the stack directly above the kernel image. */
+        BiFinishTransferExecution(
+            Pml4,
+            (uint64_t)BootData + 0xFFFF800000000000,
+            Images[0].EntryPoint,
+            Images[0].VirtualAddress + Images[0].ImageSize);
     } while (0);
 
     BmPanic("An error occoured while trying to load the selected operating system.\n"

@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <acpip.h>
-#include <stdlib.h>
 #include <string.h>
 
 /*-------------------------------------------------------------------------------------------------
@@ -346,7 +345,7 @@ int AcpipReadField(AcpiValue *Source, AcpiValue *Target) {
         int BufferSize = (Source->FieldUnit.Length + AccessWidth - 1) / 8;
 
         Target->Type = ACPI_BUFFER;
-        Target->Buffer = malloc(sizeof(AcpiBuffer) + BufferSize);
+        Target->Buffer = AcpipAllocateBlock(sizeof(AcpiBuffer) + BufferSize);
         if (!Target->Buffer) {
             return 0;
         }

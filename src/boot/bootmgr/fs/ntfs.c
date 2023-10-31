@@ -1,11 +1,10 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
-#include <crt_impl.h>
 #include <ctype.h>
 #include <file.h>
+#include <memory.h>
 #include <ntfs.h>
-#include <stdlib.h>
 #include <string.h>
 
 typedef struct NtfsDataRun {
@@ -42,7 +41,7 @@ typedef struct {
 int BiProbeNtfs(FileContext *Context) {
     const char ExpectedFileSystemName[8] = "NTFS    ";
 
-    char *Buffer = malloc(512);
+    char *Buffer = BmAllocateBlock(512);
     NtfsBootSector *BootSector = (NtfsBootSector *)Buffer;
     if (!Buffer) {
         return 0;
@@ -54,7 +53,7 @@ int BiProbeNtfs(FileContext *Context) {
        https://github.com/libyal/libfsntfs/blob/main/documentation/New%20Technologies%20File%20System%20(NTFS).asciidoc
      */
 
-    if (__fread(Context, 0, Buffer, 512, NULL) ||
+    if (BmReadFile(Context, Buffer, 0, 512, NULL) ||
         memcmp(BootSector->FileSystemName, ExpectedFileSystemName, 8) ||
         !(BootSector->BytesPerSector >= 256 && BootSector->BytesPerSector <= 4096) ||
         BootSector->SectorsPerCluster > 255 || BootSector->ReservedSectors ||
@@ -62,16 +61,16 @@ int BiProbeNtfs(FileContext *Context) {
         BootSector->SectorsPerFat || BootSector->NumberOfSectors32 ||
         BootSector->BpbSignature != 0x80 || BootSector->MftEntrySize > 255 ||
         BootSector->IndexEntrySize > 255) {
-        free(Buffer);
+        BmFreeBlock(Buffer);
         return 0;
     }
 
     /* We can be somewhat confident now that the FS at least looks like NTFS; either the
        user wants to open the root directory (and leave at that), or open something inside it;
        either way, save the root directory to the new context struct. */
-    NtfsContext *FsContext = malloc(sizeof(NtfsContext));
+    NtfsContext *FsContext = BmAllocateBlock(sizeof(NtfsContext));
     if (!FsContext) {
-        free(Buffer);
+        BmFreeBlock(Buffer);
         return 0;
     }
 
@@ -83,10 +82,10 @@ int BiProbeNtfs(FileContext *Context) {
         FsContext->BytesPerCluster *= BootSector->SectorsPerCluster;
     }
 
-    FsContext->ClusterBuffer = malloc(FsContext->BytesPerCluster);
+    FsContext->ClusterBuffer = BmAllocateBlock(FsContext->BytesPerCluster);
     if (!FsContext->ClusterBuffer) {
-        free(FsContext);
-        free(Buffer);
+        BmFreeBlock(FsContext);
+        BmFreeBlock(Buffer);
         return 0;
     }
 
@@ -107,7 +106,7 @@ int BiProbeNtfs(FileContext *Context) {
     Context->PrivateData = FsContext;
     Context->FileLength = 0;
 
-    free(Buffer);
+    BmFreeBlock(Buffer);
     return 1;
 }
 
@@ -145,7 +144,7 @@ static int ApplyFixups(NtfsContext *FsContext, uint16_t FixupOffset, uint16_t Nu
  * PURPOSE:
  *     This function uses a data run list obtained from FindAttribute to convert a Virtual Cluster
  *     Number (VCN) into a Logical Cluster Number (LCN, aka something we can just multiply by the
- *     size of a cluster and __fread).
+ *     size of a cluster and read it).
  *
  * PARAMETERS:
  *     FsContext - FS-specific data.
@@ -253,7 +252,7 @@ static void *FindAttribute(
                entries. */
             NtfsDataRun *Entry = CurrentRun;
             if (!Entry) {
-                Entry = calloc(1, sizeof(NtfsDataRun));
+                Entry = BmAllocateZeroBlock(1, sizeof(NtfsDataRun));
                 if (!Entry) {
                     return NULL;
                 }
@@ -286,10 +285,10 @@ static void *FindAttribute(
 
         uint64_t Cluster;
         if (!TranslateVcn(FsContext, Attribute->NonResidentForm.FirstVcn, &Cluster) ||
-            __fread(
+            BmReadFile(
                 &FsContext->Parent,
-                Cluster * FsContext->BytesPerCluster,
                 FsContext->ClusterBuffer,
+                Cluster * FsContext->BytesPerCluster,
                 FsContext->BytesPerCluster,
                 NULL)) {
             return NULL;
@@ -388,10 +387,10 @@ int BiTraverseNtfsDirectory(FileContext *Context, const char *Name) {
     NtfsMftEntry *MftEntry = FsContext->ClusterBuffer;
 
     if (!FsContext->Directory ||
-        __fread(
+        BmReadFile(
             &FsContext->Parent,
-            FsContext->MftOffset + FsContext->FileEntry * FsContext->BytesPerMftEntry,
             FsContext->ClusterBuffer,
+            FsContext->MftOffset + FsContext->FileEntry * FsContext->BytesPerMftEntry,
             FsContext->BytesPerMftEntry,
             NULL) ||
         memcmp(MftEntry->Signature, ExpectedFileSignature, 4) ||
@@ -441,10 +440,10 @@ int BiTraverseNtfsDirectory(FileContext *Context, const char *Name) {
 
         FirstVcn = *(uint64_t *)((char *)LastEntry + LastEntry->EntryLength - 8);
         if (!TranslateVcn(FsContext, FirstVcn, &Cluster) ||
-            __fread(
+            BmReadFile(
                 &FsContext->Parent,
-                Cluster * FsContext->BytesPerCluster,
                 FsContext->ClusterBuffer,
+                Cluster * FsContext->BytesPerCluster,
                 FsContext->BytesPerCluster,
                 NULL)) {
             return 0;
@@ -465,7 +464,7 @@ int BiTraverseNtfsDirectory(FileContext *Context, const char *Name) {
  *     Read - How many bytes we read with no error.
  *
  * RETURN VALUE:
- *     __STDIO_FLAGS_ERROR/EOF if something went wrong, 0 otherwise.
+ *     1 if something went wrong, 0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
 int BiReadNtfsFile(FileContext *Context, void *Buffer, size_t Start, size_t Size, size_t *Read) {
     const char ExpectedFileSignature[4] = "FILE";
@@ -475,26 +474,24 @@ int BiReadNtfsFile(FileContext *Context, void *Buffer, size_t Start, size_t Size
     size_t Accum = 0;
     int Flags = 0;
 
-    if (FsContext->Directory) {
-        return __STDIO_FLAGS_ERROR;
-    } else if (Start > Context->FileLength) {
-        return __STDIO_FLAGS_EOF;
+    if (FsContext->Directory || Start > Context->FileLength) {
+        return 1;
     }
 
     if (Size > Context->FileLength - Start) {
-        Flags = __STDIO_FLAGS_EOF;
+        Flags = 1;
         Size = Context->FileLength - Start;
     }
 
-    if (__fread(
+    if (BmReadFile(
             &FsContext->Parent,
-            FsContext->MftOffset + FsContext->FileEntry * FsContext->BytesPerMftEntry,
             FsContext->ClusterBuffer,
+            FsContext->MftOffset + FsContext->FileEntry * FsContext->BytesPerMftEntry,
             FsContext->BytesPerMftEntry,
             NULL) ||
         memcmp(MftEntry->Signature, ExpectedFileSignature, 4) ||
         !ApplyFixups(FsContext, MftEntry->FixupOffset, MftEntry->NumberOfFixups)) {
-        return __STDIO_FLAGS_ERROR;
+        return 1;
     }
 
     /* The unnamed data stream (aka the main content stream) should have a type of 0x80. */
@@ -505,13 +502,13 @@ int BiReadNtfsFile(FileContext *Context, void *Buffer, size_t Start, size_t Size
     char *Current = FindAttribute(FsContext, 0x80, -1, &FirstVcn, &LastVcn);
     char *Output = Buffer;
     if (!Current) {
-        return __STDIO_FLAGS_ERROR;
+        return 1;
     }
 
     /* We're resident, yet, we somehow are over a cluster; Filesystem corruption, probably. */
     if (FirstVcn == UINT64_MAX &&
         Current + Start >= (char *)FsContext->ClusterBuffer + FsContext->BytesPerCluster) {
-        return __STDIO_FLAGS_ERROR;
+        return 1;
     }
 
     /* Now safely seek through the file into the starting cluster (for the given byte index). */
@@ -522,13 +519,13 @@ int BiReadNtfsFile(FileContext *Context, void *Buffer, size_t Start, size_t Size
         Start -= Clusters * FsContext->BytesPerCluster;
 
         if (FirstVcn > LastVcn || !TranslateVcn(FsContext, FirstVcn, &Cluster) ||
-            __fread(
+            BmReadFile(
                 &FsContext->Parent,
-                Cluster * FsContext->BytesPerCluster,
                 FsContext->ClusterBuffer,
+                Cluster * FsContext->BytesPerCluster,
                 FsContext->BytesPerCluster,
                 NULL)) {
-            return __STDIO_FLAGS_ERROR;
+            return 1;
         }
     }
 
@@ -549,17 +546,17 @@ int BiReadNtfsFile(FileContext *Context, void *Buffer, size_t Start, size_t Size
         }
 
         if (++FirstVcn > LastVcn || !TranslateVcn(FsContext, FirstVcn, &Cluster) ||
-            __fread(
+            BmReadFile(
                 &FsContext->Parent,
-                Cluster * FsContext->BytesPerCluster,
                 FsContext->ClusterBuffer,
+                Cluster * FsContext->BytesPerCluster,
                 FsContext->BytesPerCluster,
                 NULL)) {
             if (Read) {
                 *Read = Accum;
             }
 
-            return __STDIO_FLAGS_ERROR;
+            return 1;
         }
     }
 

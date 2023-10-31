@@ -4,6 +4,7 @@
 project(os/drivers/pci)
 
 add_executable(pci "knostdlib" YES
+    bus.c
     debug.c
     main.c
     pci.def)

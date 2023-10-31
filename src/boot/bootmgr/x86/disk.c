@@ -2,11 +2,9 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <boot.h>
-#include <crt_impl.h>
 #include <ctype.h>
 #include <file.h>
 #include <stdalign.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <x86/bios.h>
@@ -160,7 +158,7 @@ int BiOpenArchDevice(const char *Segment, FileContext *Context) {
  *     Read - How many bytes we read with no error.
  *
  * RETURN VALUE:
- *     __STDIO_FLAGS_ERROR/EOF if something went wrong, 0 otherwise.
+ *     1 if something went wrong, 0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
 int BiReadArchDevice(FileContext *Context, void *Buffer, size_t Start, size_t Size, size_t *Read) {
     uint8_t Drive = (uint8_t)(uint32_t)Context->PrivateData;
@@ -191,7 +189,7 @@ int BiReadArchDevice(FileContext *Context, void *Buffer, size_t Start, size_t Si
                 *Read = Accum;
             }
 
-            return __STDIO_FLAGS_ERROR;
+            return 1;
         }
 
         size_t Offset = Start % BytesPerSector;

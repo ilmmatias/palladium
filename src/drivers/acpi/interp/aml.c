@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <acpip.h>
-#include <stdlib.h>
 #include <string.h>
 
 static AcpiObject ObjectTreeRoot;
@@ -31,7 +30,7 @@ int AcpiExecuteMethod(AcpiObject *Object, int ArgCount, AcpiValue *Arguments, Ac
             if (Path) {
                 AcpipShowDebugMessage(
                     "attempt at executing non-method object, full path %s\n", Path);
-                free(Path);
+                AcpipFreeBlock(Path);
             } else {
                 AcpipShowDebugMessage(
                     "attempt at executing non-method object, top most name %.4s\n", Object->Name);
@@ -77,7 +76,7 @@ int AcpiExecuteMethod(AcpiObject *Object, int ArgCount, AcpiValue *Arguments, Ac
     while (Base != NULL) {
         AcpiObject *Next = Base->Next;
         AcpiRemoveReference(&Base->Value, 0);
-        free(Base);
+        AcpipFreeBlock(Base);
         Base = Next;
     }
 
@@ -109,7 +108,8 @@ int AcpiCopyValue(AcpiValue *Source, AcpiValue *Target) {
 
     switch (Source->Type) {
         case ACPI_STRING:
-            Target->String = malloc(sizeof(AcpiString) + strlen(Source->String->Data) + 1);
+            Target->String =
+                AcpipAllocateBlock(sizeof(AcpiString) + strlen(Source->String->Data) + 1);
             if (!Target->String) {
                 return 0;
             }
@@ -120,7 +120,7 @@ int AcpiCopyValue(AcpiValue *Source, AcpiValue *Target) {
             break;
 
         case ACPI_BUFFER:
-            Target->Buffer = malloc(sizeof(AcpiBuffer) + Source->Buffer->Size);
+            Target->Buffer = AcpipAllocateBlock(sizeof(AcpiBuffer) + Source->Buffer->Size);
             if (!Target->Buffer) {
                 return 0;
             }
@@ -132,8 +132,8 @@ int AcpiCopyValue(AcpiValue *Source, AcpiValue *Target) {
             break;
 
         case ACPI_PACKAGE:
-            Target->Package =
-                malloc(sizeof(AcpiPackage) + Source->Package->Size * sizeof(AcpiPackageElement));
+            Target->Package = AcpipAllocateBlock(
+                sizeof(AcpiPackage) + Source->Package->Size * sizeof(AcpiPackageElement));
             if (!Target->Package) {
                 return 0;
             }
@@ -268,14 +268,14 @@ void AcpiRemoveReference(AcpiValue *Value, int CleanupPointer) {
     switch (Value->Type) {
         case ACPI_STRING:
             if (NeedsCleanup && --Value->String->References <= 0) {
-                free(Value->String);
+                AcpipFreeBlock(Value->String);
             }
 
             break;
 
         case ACPI_BUFFER:
             if (NeedsCleanup && --Value->Buffer->References <= 0) {
-                free(Value->Buffer);
+                AcpipFreeBlock(Value->Buffer);
             }
 
             break;
@@ -288,7 +288,7 @@ void AcpiRemoveReference(AcpiValue *Value, int CleanupPointer) {
                     }
                 }
 
-                free(Value->Package);
+                AcpipFreeBlock(Value->Package);
             }
 
             break;
@@ -306,7 +306,7 @@ void AcpiRemoveReference(AcpiValue *Value, int CleanupPointer) {
 
         case ACPI_MUTEX: {
             if (NeedsCleanup && --Value->Mutex->References <= 0) {
-                free(Value->Mutex);
+                AcpipFreeBlock(Value->Mutex);
             }
 
             break;
@@ -322,7 +322,7 @@ void AcpiRemoveReference(AcpiValue *Value, int CleanupPointer) {
     }
 
     if (NeedsCleanup && CleanupPointer) {
-        free(Value);
+        AcpipFreeBlock(Value);
     }
 }
 
@@ -346,13 +346,13 @@ void AcpipPopulatePredefined(void) {
         "_TZ_",
     };
 
-    AcpiObject *Objects = calloc(PREDEFINED_ITEMS, sizeof(AcpiObject));
+    AcpiObject *Objects = AcpipAllocateZeroBlock(PREDEFINED_ITEMS, sizeof(AcpiObject));
     if (!Objects) {
         AcpipShowErrorMessage(
             ACPI_REASON_OUT_OF_MEMORY, "could not allocate the predefined object scopes\n");
     }
 
-    AcpiChildren *Children = calloc(PREDEFINED_ITEMS, sizeof(AcpiChildren));
+    AcpiChildren *Children = AcpipAllocateZeroBlock(PREDEFINED_ITEMS, sizeof(AcpiChildren));
     if (!Children) {
         AcpipShowErrorMessage(
             ACPI_REASON_OUT_OF_MEMORY, "could not allocate the predefined object scopes\n");
@@ -432,7 +432,7 @@ void AcpipPopulateTree(const uint8_t *Code, uint32_t Length) {
  *     New state containing the subscope, or NULL on failure.
  *-----------------------------------------------------------------------------------------------*/
 AcpipScope *AcpipEnterScope(AcpipState *State, AcpiObject *Object, uint32_t Length) {
-    AcpipScope *Scope = malloc(sizeof(AcpipScope));
+    AcpipScope *Scope = AcpipAllocateBlock(sizeof(AcpipScope));
 
     if (Scope) {
         Scope->LinkedObject = Object;
@@ -459,7 +459,7 @@ AcpipScope *AcpipEnterScope(AcpipState *State, AcpiObject *Object, uint32_t Leng
  *     New state containing the scope, or NULL on failure.
  *-----------------------------------------------------------------------------------------------*/
 AcpipScope *AcpipEnterIf(AcpipState *State, uint32_t Length) {
-    AcpipScope *Scope = malloc(sizeof(AcpipScope));
+    AcpipScope *Scope = AcpipAllocateBlock(sizeof(AcpipScope));
 
     if (Scope) {
         Scope->LinkedObject = State->Scope->LinkedObject;
@@ -492,7 +492,7 @@ AcpipScope *AcpipEnterWhile(
     const uint8_t *Predicate,
     uint32_t PredicateBacktrack,
     uint32_t Length) {
-    AcpipScope *Scope = malloc(sizeof(AcpipScope));
+    AcpipScope *Scope = AcpipAllocateBlock(sizeof(AcpipScope));
 
     if (Scope) {
         Scope->LinkedObject = State->Scope->LinkedObject;

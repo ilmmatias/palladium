@@ -133,16 +133,16 @@ jobs:
 
     - name: Create system root
       run: |
-        mkdir -p palladium/build.target/_root/System
+        mkdir -p _root/System
         palladium/build.host/create-boot-registry
-        cp palladium/build.boot/boot/bootsect/iso9660boot.com palladium/build.target/_root/iso9660boot.com
-        cat palladium/build.boot/boot/startup/startup.com palladium/build.boot/boot/bootmgr/bootmgr.exe > palladium/build.target/_root/bootmgr
-        cp palladium/build.target/kernel/kernel.exe palladium/build.target/_root/System/kernel.exe
-        cp palladium/build.target/drivers/acpi/acpi.sys palladium/build.target/_root/System/acpi.sys
-        cp palladium/build.target/drivers/pci/pci.sys palladium/build.target/_root/System/pci.sys
+        cp palladium/build.boot/boot/bootsect/iso9660boot.com _root/iso9660boot.com
+        cat palladium/build.boot/boot/startup/startup.com palladium/build.boot/boot/bootmgr/bootmgr.exe > _root/bootmgr
+        cp palladium/build.target/kernel/kernel.exe _root/System/kernel.exe
+        cp palladium/build.target/drivers/acpi/acpi.sys _root/System/acpi.sys
+        cp palladium/build.target/drivers/pci/pci.sys _root/System/pci.sys
 
     - name: Build boot image
-      run: mkisofs -iso-level 2 -R -b iso9660boot.com -no-emul-boot -o palladium/build.target/iso9660.iso palladium/build.target/_root
+      run: mkisofs -iso-level 2 -R -b iso9660boot.com -no-emul-boot -o palladium/build.target/iso9660.iso _root
 
     - uses: actions/upload-artifact@v3
       with:

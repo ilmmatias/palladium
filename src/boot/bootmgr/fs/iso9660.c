@@ -1,12 +1,11 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
-#include <crt_impl.h>
 #include <ctype.h>
 #include <file.h>
 #include <iso9660.h>
+#include <memory.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 typedef struct {
@@ -32,7 +31,7 @@ typedef struct {
 int BiProbeIso9660(FileContext *Context, uint16_t BytesPerSector) {
     const char ExpectedStandardIdentifier[5] = "CD001";
 
-    char *Buffer = malloc(2048);
+    char *Buffer = BmAllocateBlock(2048);
     Iso9660PrimaryVolumeDescriptor *VolumeDescriptor = (Iso9660PrimaryVolumeDescriptor *)Buffer;
     if (!Buffer) {
         return 0;
@@ -46,10 +45,10 @@ int BiProbeIso9660(FileContext *Context, uint16_t BytesPerSector) {
 
     uint64_t Offset = 0x8000;
     while (1) {
-        if (__fread(Context, Offset, Buffer, 2048, NULL) || VolumeDescriptor->TypeCode == 255 ||
+        if (BmReadFile(Context, Buffer, Offset, 2048, NULL) || VolumeDescriptor->TypeCode == 255 ||
             memcmp(VolumeDescriptor->StandardIdentifier, ExpectedStandardIdentifier, 5) ||
             VolumeDescriptor->Version != 1) {
-            free(Buffer);
+            BmFreeBlock(Buffer);
             return 0;
         } else if (VolumeDescriptor->TypeCode == 1) {
             break;
@@ -59,15 +58,15 @@ int BiProbeIso9660(FileContext *Context, uint16_t BytesPerSector) {
     }
 
     if (VolumeDescriptor->FileStructureVersion != 1) {
-        free(Buffer);
+        BmFreeBlock(Buffer);
         return 0;
     }
 
     /* The root directory should be located inside the PVD; As such, we should have nothing left
        to do. */
-    Iso9660Context *FsContext = malloc(sizeof(Iso9660Context));
+    Iso9660Context *FsContext = BmAllocateBlock(sizeof(Iso9660Context));
     if (!FsContext) {
-        free(Buffer);
+        BmFreeBlock(Buffer);
         return 0;
     }
 
@@ -78,10 +77,10 @@ int BiProbeIso9660(FileContext *Context, uint16_t BytesPerSector) {
     if (BytesPerSector == 2048) {
         FsContext->SectorBuffer = Buffer;
     } else {
-        FsContext->SectorBuffer = malloc(BytesPerSector);
+        FsContext->SectorBuffer = BmAllocateBlock(BytesPerSector);
         if (!FsContext->SectorBuffer) {
-            free(FsContext);
-            free(Buffer);
+            BmFreeBlock(FsContext);
+            BmFreeBlock(Buffer);
             return 0;
         }
     }
@@ -93,7 +92,7 @@ int BiProbeIso9660(FileContext *Context, uint16_t BytesPerSector) {
     Context->FileLength = VolumeDescriptor->RootDirectory.ExtentSize;
 
     if (FsContext->SectorBuffer != Buffer) {
-        free(Buffer);
+        BmFreeBlock(Buffer);
     }
 
     return 1;
@@ -126,10 +125,10 @@ int BiTraverseIso9660Directory(FileContext *Context, const char *Name) {
     /* We're not sure of the exact size of the disk, so we'll be searching sector-by-sector. */
     while (Remaining) {
         if (!Current || (void *)Current - FsContext->SectorBuffer >= FsContext->BytesPerSector) {
-            if (__fread(
+            if (BmReadFile(
                     &FsContext->Parent,
-                    Sector * FsContext->BytesPerSector,
                     FsContext->SectorBuffer,
+                    Sector * FsContext->BytesPerSector,
                     FsContext->BytesPerSector,
                     NULL)) {
                 return 0;
@@ -195,28 +194,26 @@ int BiTraverseIso9660Directory(FileContext *Context, const char *Name) {
  *     Read - How many bytes we read with no error.
  *
  * RETURN VALUE:
- *     __STDIO_FLAGS_ERROR/EOF if something went wrong, 0 otherwise.
+ *     1 if something went wrong, 0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
 int BiReadIso9660File(FileContext *Context, void *Buffer, size_t Start, size_t Size, size_t *Read) {
     Iso9660Context *FsContext = Context->PrivateData;
     int Flags = 0;
 
-    if (FsContext->Directory) {
-        return __STDIO_FLAGS_ERROR;
-    } else if (Start > Context->FileLength) {
-        return __STDIO_FLAGS_EOF;
+    if (FsContext->Directory || Start > Context->FileLength) {
+        return 1;
     }
 
     if (Size > Context->FileLength - Start) {
-        Flags = __STDIO_FLAGS_EOF;
+        Flags = 1;
         Size = Context->FileLength - Start;
     }
 
-    /* Files in ISO9660 are on sequential sectors, so we can just __fread the parent device. */
-    Flags |= __fread(
+    /* Files in ISO9660 are on sequential sectors, so we can just read the parent device. */
+    Flags |= BmReadFile(
         &FsContext->Parent,
-        FsContext->FileSector * FsContext->BytesPerSector + Start,
         Buffer,
+        FsContext->FileSector * FsContext->BytesPerSector + Start,
         Size,
         Read);
 

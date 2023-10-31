@@ -3,11 +3,10 @@
 
 #include <crt_impl.h>
 #include <memory.h>
-#include <stdio.h>
 #include <stdlib.h>
 
-MemoryArena *BmMemoryArena = NULL;
-int BmMemoryArenaSize = 0;
+MemoryArena *BiMemoryArena = NULL;
+int BiMemoryArenaSize = 0;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -20,19 +19,19 @@ int BmMemoryArenaSize = 0;
  *     Allocated address, or 0 if no address was found.
  *-----------------------------------------------------------------------------------------------*/
 uint64_t BmAllocateVirtualAddress(uint64_t Pages) {
-    if (!Pages || !BmMemoryArenaSize || (Pages << PAGE_SHIFT) > ARENA_PAGE_SIZE) {
+    if (!Pages || !BiMemoryArenaSize || (Pages << PAGE_SHIFT) > ARENA_PAGE_SIZE) {
         return 0;
     }
 
     /* First stage, allocate one of the random areas; This will randomize at least a few of the
        high bits (on amd64, it randomizes 9 bits). We just generate a random index into the arena
        list. */
-    unsigned int RandomIndex = (unsigned int)rand() % BmMemoryArenaSize;
-    MemoryArena *Entry = BmMemoryArena;
+    unsigned int RandomIndex = (unsigned int)rand() % BiMemoryArenaSize;
+    MemoryArena *Entry = BiMemoryArena;
     uint64_t Address = 0;
 
     if (!RandomIndex) {
-        BmMemoryArena = BmMemoryArena->Next;
+        BiMemoryArena = BiMemoryArena->Next;
         Address = Entry->Base;
     } else {
         while (--RandomIndex) {
@@ -52,6 +51,6 @@ uint64_t BmAllocateVirtualAddress(uint64_t Pages) {
         }
     }
 
-    BmMemoryArenaSize--;
+    BiMemoryArenaSize--;
     return Address;
 }

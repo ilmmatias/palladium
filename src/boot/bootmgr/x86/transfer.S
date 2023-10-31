@@ -11,12 +11,14 @@
  *     Pml4 (esp + 4) - Physical address of the PML4 structure.
  *     BootData (esp + 8) - Virtual address (64-bits) where the loader boot data is located.
  *     EntryPoint (esp + 16) - Virtual address (64-bits) of the kernel entry point.
+ *     StackTop (esp + 24) - Virtual address (64-bits) for the stack. It grows backwards on x86,
+ *                           so remember to sum the size before passing it to us!
  *
  * RETURN VALUE:
  *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
-.global _BiTransferExecution
-_BiTransferExecution:
+.global _BiFinishTransferExecution
+_BiFinishTransferExecution:
     /* Enable long mode and no-execute (for W^X) in the EFER. */
     mov $0xC0000080, %ecx
     rdmsr
@@ -73,13 +75,11 @@ _BiTransferExecution:
     lidt .LIdtSize
     sti
 
-    /* Skip the return address and Pml4, so that we can grab the entry point + boot data. */
+    /* Skip the return address and Pml4, so that we can grab the boot data and RIP+RSP. */
     add $8, %rsp
     pop %rcx
     pop %rax
-
-    /* Setup a proper aligned stack (16-bytes alignemnt), and jump execution. */
-    mov $0x7C00, %rsp
+    pop %rsp
     jmp *%rax
 
 .align 8

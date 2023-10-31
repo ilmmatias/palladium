@@ -8,7 +8,6 @@
 #include <pe.h>
 #include <registry.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 typedef struct {
@@ -51,9 +50,9 @@ static uint64_t LoadFile(
     size_t CurrentImageCount,
     ExportTable *OtherImages,
     ExportTable *ThisImage) {
-    printf("loading up %s\n", Path);
+    BmPrint("loading up %s\n", Path);
 
-    FILE *Stream = fopen(Path, "rb");
+    FileContext *Stream = BmOpenFile(Path);
     if (!Stream) {
         return 0;
     }
@@ -61,15 +60,15 @@ static uint64_t LoadFile(
     /* The PE data is prefixed with a MZ header and a MS-DOS stub; The offset into the PE data is
        guaranteed to be after the main MZ header. */
     uint32_t Offset;
-    if (fseek(Stream, 0x3C, SEEK_SET) || fread(&Offset, sizeof(uint32_t), 1, Stream) != 1) {
-        fclose(Stream);
+    if (BmReadFile(Stream, &Offset, 0x3C, sizeof(uint32_t), NULL)) {
+        BmCloseFile(Stream);
         return 0;
     }
 
     PeHeader InitialHeader;
     PeHeader *Header = &InitialHeader;
-    if (fseek(Stream, Offset, SEEK_SET) || fread(Header, sizeof(PeHeader), 1, Stream) != 1) {
-        fclose(Stream);
+    if (BmReadFile(Stream, Header, Offset, sizeof(PeHeader), NULL)) {
+        BmCloseFile(Stream);
         return 0;
     }
 
@@ -78,37 +77,48 @@ static uint64_t LoadFile(
     if (memcmp(Header->Signature, PE_SIGNATURE, 4) || Header->Machine != PE_MACHINE ||
         (Header->Characteristics & 0x2000) || Header->Magic != 0x20B || Header->Subsystem != 1 ||
         (Header->DllCharacteristics & 0x160) != 0x160) {
-        fclose(Stream);
+        BmCloseFile(Stream);
         return 0;
     }
 
-    uint64_t Pages = (Header->SizeOfImage + PAGE_SIZE - 1) >> PAGE_SHIFT;
+    /* Change the following parameter if we ever need to increase the stack size!
+       Our current default is 16KiB. */
+    const uint64_t StackSize = 0x4000;
+
+    uint64_t FirstStackPage = (Header->SizeOfImage + PAGE_SIZE - 1) >> PAGE_SHIFT;
+    uint64_t StackPageCount = IsKernel ? (StackSize + PAGE_SIZE - 1) >> PAGE_SHIFT : 0;
+
+    uint64_t Pages = FirstStackPage + StackPageCount;
     *ImageSize = Pages << PAGE_SHIFT;
 
-    *PageFlags = calloc(Pages, sizeof(int));
+    *PageFlags = BmAllocateZeroBlock(Pages, sizeof(int));
     if (!*PageFlags) {
-        fclose(Stream);
+        BmCloseFile(Stream);
         return 0;
     }
 
-    void *PhysicalAddress = BmAllocatePages(*ImageSize >> PAGE_SHIFT, MEMORY_KERNEL);
+    void *PhysicalAddress = BmAllocatePages(Pages, MEMORY_KERNEL);
     if (!PhysicalAddress) {
-        fclose(Stream);
+        BmCloseFile(Stream);
         return 0;
     }
 
     *VirtualAddress = BmAllocateVirtualAddress(Pages);
     if (!*VirtualAddress) {
-        fclose(Stream);
+        BmCloseFile(Stream);
         return 0;
+    }
+
+    /* We already know which flags we want for the stack pages (RW-only, no exec). */
+    for (uint64_t i = 0; i < StackPageCount; i++) {
+        (*PageFlags)[FirstStackPage + i] = PAGE_WRITE;
     }
 
     /* The kernel might use information from the base headers and section headers; SizeOfImage
        should have given us the code/data size + all headers, so we're assuming that and loading
        it all up to the base address. */
-    if (fseek(Stream, 0, SEEK_SET) ||
-        fread(PhysicalAddress, Header->SizeOfHeaders, 1, Stream) != 1) {
-        fclose(Stream);
+    if (BmReadFile(Stream, PhysicalAddress, 0, Header->SizeOfHeaders, NULL)) {
+        BmCloseFile(Stream);
         return 0;
     }
 
@@ -140,13 +150,13 @@ static uint64_t LoadFile(
         }
 
         if (Sections[i].SizeOfRawData) {
-            if (fseek(Stream, Sections[i].PointerToRawData, SEEK_SET) ||
-                fread(
+            if (BmReadFile(
+                    Stream,
                     (char *)PhysicalAddress + Sections[i].VirtualAddress,
+                    Sections[i].PointerToRawData,
                     Sections[i].SizeOfRawData,
-                    1,
-                    Stream) != 1) {
-                fclose(Stream);
+                    NULL)) {
+                BmCloseFile(Stream);
                 return 0;
             }
         }
@@ -160,7 +170,7 @@ static uint64_t LoadFile(
     }
 
     /* We should have loaded the whole file, so it's safe to close the handle. */
-    fclose(Stream);
+    BmCloseFile(Stream);
 
     /* Grab up this image's export table, and its name; We need to parse the path to get the
        image's name (get everything after the last slash). */
@@ -184,7 +194,8 @@ static uint64_t LoadFile(
             (uint32_t *)((char *)PhysicalAddress + ExportHeader->NamePointerRva);
 
         ThisImage->EntryCount = ExportHeader->NumberOfNamePointers;
-        ThisImage->Entries = calloc(ExportHeader->NumberOfNamePointers, sizeof(ExportEntry));
+        ThisImage->Entries =
+            BmAllocateZeroBlock(ExportHeader->NumberOfNamePointers, sizeof(ExportEntry));
 
         for (uint32_t i = 0; i < ExportHeader->NumberOfNamePointers; i++) {
             ThisImage->Entries[i].Name = (char *)PhysicalAddress + NamePointers[i];
@@ -321,7 +332,7 @@ static uint64_t LoadFile(
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-[[noreturn]] void BmLoadPalladium(const char *SystemFolder) {
+[[noreturn]] void BiLoadPalladium(const char *SystemFolder) {
     const char *Message = "An error occoured while trying to load the selected operating system.\n"
                           "Please, reboot your device and try again.\n";
 
@@ -330,12 +341,12 @@ static uint64_t LoadFile(
 
     do {
         /* This should BmPanic() on incompatible machines, no need for a return code. */
-        BmCheckCompatibility();
+        BiCheckCompatibility();
 
         size_t SystemFolderSize = strlen(SystemFolder);
         size_t KernelPathSize = SystemFolderSize + 12;
-        char *KernelPath = malloc(KernelPathSize);
-        char *RegistryPath = malloc(KernelPathSize);
+        char *KernelPath = BmAllocateBlock(KernelPathSize);
+        char *RegistryPath = BmAllocateBlock(KernelPathSize);
         if (!KernelPath || !RegistryPath) {
             break;
         }
@@ -389,7 +400,7 @@ static uint64_t LoadFile(
         }
 
         size_t ExportTableSize = 0;
-        ExportTable *Exports = malloc((DriverCount + 1) * sizeof(ExportTable));
+        ExportTable *Exports = BmAllocateBlock((DriverCount + 1) * sizeof(ExportTable));
         if (!Exports) {
             break;
         }
@@ -429,7 +440,7 @@ static uint64_t LoadFile(
             }
 
             size_t DriverPathSize = SystemFolderSize + strlen((char *)(Entry + 1)) + 2;
-            char *DriverPath = malloc(DriverPathSize);
+            char *DriverPath = BmAllocateBlock(DriverPathSize);
             if (!DriverPath) {
                 Fail = 1;
                 break;
@@ -460,7 +471,7 @@ static uint64_t LoadFile(
             break;
         }
 
-        BmTransferExecution(Images, DriverCount + 1);
+        BiTransferExecution(Images, DriverCount + 1);
     } while (0);
 
     BmPanic(Message);

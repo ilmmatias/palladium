@@ -4,8 +4,7 @@
 #ifndef _REGISTRY_H_
 #define _REGISTRY_H_
 
-#include <stdint.h>
-#include <stdio.h>
+#include <file.h>
 
 #define REG_FILE_SIGNATURE "REFF"
 #define REG_BLOCK_SIGNATURE "REGB"
@@ -41,12 +40,12 @@ typedef struct __attribute__((packed)) {
 
 typedef struct {
     char Buffer[REG_BLOCK_SIZE];
-    FILE *Stream;
+    FileContext *Stream;
 } RegHandle;
 
 extern RegHandle *BmBootRegistry;
 
-void BmInitRegistry(void);
+void BiInitRegistry(void);
 RegHandle *BmLoadRegistry(const char *Path);
 RegEntryHeader *BmFindRegistryEntry(RegHandle *Handle, RegEntryHeader *Parent, const char *Path);
 RegEntryHeader *BmGetRegistryEntry(RegHandle *Handle, RegEntryHeader *Parent, int Which);

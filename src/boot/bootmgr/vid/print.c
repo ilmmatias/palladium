@@ -1,6 +1,7 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
+#include <crt_impl.h>
 #include <font.h>
 #include <string.h>
 
@@ -10,8 +11,8 @@ extern uint16_t BiVideoHeight;
 extern uint32_t BiVideoBackground;
 extern uint32_t BiVideoForeground;
 
-static uint16_t CursorX = 0;
-static uint16_t CursorY = 0;
+uint16_t BiCursorX = 0;
+uint16_t BiCursorY = 0;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -68,18 +69,19 @@ static void DrawCharacter(char Character) {
     const uint8_t *Data = &BiFont.GlyphData[Info->Offset];
     uint16_t GlyphLeft = Info->Left;
     uint16_t GlyphTop = BiFont.Ascender - Info->Top;
-    uint32_t *Buffer = &BiVideoBuffer[(CursorY + GlyphTop) * BiVideoWidth + CursorX + GlyphLeft];
+    uint32_t *Buffer =
+        &BiVideoBuffer[(BiCursorY + GlyphTop) * BiVideoWidth + BiCursorX + GlyphLeft];
 
     /* We use a schema where each byte inside the glyph represents one pixel, the value of said
        pixel is the brightness of the pixel (0 being background); We just use Blend() to combine
        the background and foreground values based on the brightness. */
     for (uint16_t Top = 0; Top < Info->Height; Top++) {
-        if (CursorY + GlyphTop + Top >= BiVideoHeight) {
+        if (BiCursorY + GlyphTop + Top >= BiVideoHeight) {
             break;
         }
 
         for (uint16_t Left = 0; Left < Info->Width; Left++) {
-            if (CursorX + GlyphLeft + Left >= BiVideoWidth) {
+            if (BiCursorX + GlyphLeft + Left >= BiVideoWidth) {
                 break;
             }
 
@@ -108,72 +110,8 @@ void BmResetDisplay(void) {
         BiVideoBuffer[i] = BiVideoBackground;
     }
 
-    CursorX = 0;
-    CursorY = 0;
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function sets the background and foreground attributes of the screen.
- *
- * PARAMETERS:
- *     BackgroundColor - New background color (RGB, 24-bits).
- *     ForegroundColor - New foreground color (RGB, 24-bits).
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-void BmSetColor(uint32_t BackgroundColor, uint32_t ForegroundColor) {
-    BiVideoBackground = BackgroundColor;
-    BiVideoForeground = ForegroundColor;
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function returns the current background and foreground attributes.
- *
- * PARAMETERS:
- *     BackgroundColor - Output; Current background color.
- *     ForegroundColor - Output; Current foreground color.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-void BmGetColor(uint32_t *BackgroundColor, uint32_t *ForegroundColor) {
-    *BackgroundColor = BiVideoBackground;
-    *ForegroundColor = BiVideoForeground;
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function sets the X and Y positions of the console cursor simultaneously.
- *
- * PARAMETERS:
- *     X - New X position.
- *     Y - New Y position.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-void BmSetCursor(uint16_t X, uint16_t Y) {
-    CursorX = X;
-    CursorY = Y;
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function saves the X and Y positions of the console cursor simultaneously.
- *
- * PARAMETERS:
- *     X - Pointer to save location for the X position.
- *     Y - Pointer to save location for the Y position.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-void BmGetCursor(uint16_t *X, uint16_t *Y) {
-    *X = CursorX;
-    *Y = CursorY;
+    BiCursorX = 0;
+    BiCursorY = 0;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -191,11 +129,12 @@ void BmClearLine(int LeftOffset, int RightOffset) {
     int Size = BiVideoWidth - LeftOffset - RightOffset;
 
     for (int i = 0; i < BiFont.Height; i++) {
-        memset(BiVideoBuffer + (CursorY + i) * BiVideoWidth, 0, LeftOffset * 4);
-        memset(BiVideoBuffer + (CursorY + i + 1) * BiVideoWidth - RightOffset, 0, RightOffset * 4);
+        memset(BiVideoBuffer + (BiCursorY + i) * BiVideoWidth, 0, LeftOffset * 4);
+        memset(
+            BiVideoBuffer + (BiCursorY + i + 1) * BiVideoWidth - RightOffset, 0, RightOffset * 4);
 
         for (int j = 0; j < Size; j++) {
-            BiVideoBuffer[(CursorY + i) * BiVideoWidth + LeftOffset + j] = BiVideoBackground;
+            BiVideoBuffer[(BiCursorY + i) * BiVideoWidth + LeftOffset + j] = BiVideoBackground;
         }
     }
 }
@@ -215,23 +154,23 @@ void BmPutChar(char Character) {
     const int TabSize = BiFont.GlyphInfo[0x20].Width * 4;
 
     if (Character == '\n') {
-        CursorX = 0;
-        CursorY += BiFont.Height;
+        BiCursorX = 0;
+        BiCursorY += BiFont.Height;
     } else if (Character == '\t') {
-        CursorX = (CursorX + TabSize) & ~(TabSize - 1);
+        BiCursorX = (BiCursorX + TabSize) & ~(TabSize - 1);
     } else {
         DrawCharacter(Character);
-        CursorX += BiFont.GlyphInfo[(int)Character].Advance;
+        BiCursorX += BiFont.GlyphInfo[(int)Character].Advance;
     }
 
-    if (CursorX >= BiVideoWidth) {
-        CursorX = 0;
-        CursorY += BiFont.Height;
+    if (BiCursorX >= BiVideoWidth) {
+        BiCursorX = 0;
+        BiCursorY += BiFont.Height;
     }
 
-    if (CursorY >= BiVideoHeight) {
+    if (BiCursorY >= BiVideoHeight) {
         ScrollUp();
-        CursorY = BiVideoHeight - BiFont.Height;
+        BiCursorY = BiVideoHeight - BiFont.Height;
     }
 }
 
@@ -271,4 +210,45 @@ size_t BmGetStringWidth(const char *String) {
     }
 
     return Size;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     Wrapper around BmPutChar for __vprint.
+ *
+ * PARAMETERS:
+ *     Buffer - What we need to display.
+ *     Size - Size of that data; The data is not required to be NULL terminated, so this need to be
+ *            taken into account!
+ *     Context - Always NULL for us.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+static void PutBuffer(const void *buffer, int size, void *context) {
+    (void)context;
+    for (int i = 0; i < size; i++) {
+        BmPutChar(((const char *)buffer)[i]);
+    }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     printf() for the boot manager; Calling printf() will result in a linker error, use this
+ *     instead!
+ *
+ * PARAMETERS:
+ *     Message - Format string; Works the same as printf().
+ *     ... - Variadic arguments.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void BmPrint(const char *Format, ...) {
+    va_list vlist;
+    va_start(vlist, Format);
+
+    __vprintf(Format, vlist, NULL, PutBuffer);
+
+    va_end(vlist);
 }

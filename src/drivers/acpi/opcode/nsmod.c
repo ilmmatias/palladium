@@ -2,9 +2,6 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <acpip.h>
-#include <stddef.h>
-#include <stdio.h>
-#include <stdlib.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -65,7 +62,7 @@ int AcpipExecuteNsModOpcode(AcpipState *State, uint16_t Opcode) {
             AcpiValue Value;
             Value.Type = ACPI_SCOPE;
             Value.References = 1;
-            Value.Children = malloc(sizeof(AcpiChildren));
+            Value.Children = AcpipAllocateBlock(sizeof(AcpiChildren));
             if (!Value.Children) {
                 return 0;
             }

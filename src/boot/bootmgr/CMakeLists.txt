@@ -23,12 +23,12 @@ add_executable(bootmgr "kstdlib" NO
     fs/fat32.c
     fs/iso9660.c
     fs/ntfs.c
-    fs/stdio.c
     fs/vfs.c
 
     loader/menu.c
     loader/palladium.c
 
+    vid/attributes.c
     vid/font.c
     vid/print.c
 
@@ -40,4 +40,4 @@ add_executable(bootmgr "kstdlib" NO
 
 target_include_directories(bootmgr PRIVATE include)
 target_compile_options(bootmgr PRIVATE $<$<COMPILE_LANGUAGE:C,CXX>:-ffreestanding>)
-target_link_options(bootmgr PRIVATE -Wl,--subsystem=native,--entry=BmMain,--image-base=0x8000,--no-dynamicbase)
+target_link_options(bootmgr PRIVATE -Wl,--subsystem=native,--entry=BiMain,--image-base=0x8000,--no-dynamicbase)

@@ -85,6 +85,50 @@ SdtHeader *AcpipFindTable(char Signature[4], int Index) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
+ *     Wrapper around the OS' malloc (or malloc-like) routine.
+ *
+ * PARAMETERS:
+ *     Size - Size in bytes of the block.
+ *
+ * RETURN VALUE:
+ *     Start of the allocated block, or NULL on failure.
+ *-----------------------------------------------------------------------------------------------*/
+void *AcpipAllocateBlock(size_t Size) {
+    return MmAllocateBlock(Size);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     Wrapper around the OS' calloc (or calloc-like) routine.
+ *
+ * PARAMETERS:
+ *     Elements - How many elements we have.
+ *     ElementSize - Size in bytes of each element.
+ *
+ * RETURN VALUE:
+ *     Start of the allocated block, or NULL on failure.
+ *-----------------------------------------------------------------------------------------------*/
+void *AcpipAllocateZeroBlock(size_t Elements, size_t ElementSize) {
+    return MmAllocateZeroBlock(Elements, ElementSize);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     Wrapper around the OS' free() routine. Should be able to transparently free anything
+ *     allocated by AcpipAllocateBlock/ZeroBlock.
+ *
+ * PARAMETERS:
+ *     Block - Start of the block we're trying to free.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void AcpipFreeBlock(void *Block) {
+    MmFreeBlock(Block);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
  *     Wrapper around VidPutChar for __vprint.
  *
  * PARAMETERS:

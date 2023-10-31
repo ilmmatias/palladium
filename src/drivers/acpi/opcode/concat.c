@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <acpip.h>
-#include <stdlib.h>
 #include <string.h>
 
 /*-------------------------------------------------------------------------------------------------
@@ -40,7 +39,7 @@ int AcpipExecuteConcatOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Valu
 
                     Value->Type = ACPI_BUFFER;
                     Value->References = 1;
-                    Value->Buffer = malloc(sizeof(AcpiBuffer) + 16);
+                    Value->Buffer = AcpipAllocateBlock(sizeof(AcpiBuffer) + 16);
                     if (!Value->Buffer) {
                         AcpiRemoveReference(&State->Opcode->FixedArguments[2].TermArg, 0);
                         return 0;
@@ -64,8 +63,8 @@ int AcpipExecuteConcatOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Valu
 
                     Value->Type = ACPI_BUFFER;
                     Value->References = 1;
-                    Value->Buffer =
-                        malloc(sizeof(AcpiBuffer) + Left->Buffer->Size + Right->Buffer->Size);
+                    Value->Buffer = AcpipAllocateBlock(
+                        sizeof(AcpiBuffer) + Left->Buffer->Size + Right->Buffer->Size);
                     if (!Value->Buffer) {
                         AcpiRemoveReference(Left, 0);
                         AcpiRemoveReference(Right, 0);
@@ -95,7 +94,7 @@ int AcpipExecuteConcatOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Valu
 
                     Value->Type = ACPI_STRING;
                     Value->References = 1;
-                    Value->String = malloc(
+                    Value->String = AcpipAllocateBlock(
                         sizeof(AcpiString) + strlen(Left->String->Data) +
                         strlen(Right->String->Data) + 1);
                     if (!Value->String) {

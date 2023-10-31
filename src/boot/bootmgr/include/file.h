@@ -22,6 +22,10 @@ typedef struct {
     uint64_t FileLength;
 } FileContext;
 
+FileContext *BmOpenFile(const char *Path);
+void BmCloseFile(FileContext *Context);
+int BmReadFile(FileContext *Context, void *Buffer, size_t Start, size_t Size, size_t *Read);
+
 int BiCopyFileContext(FileContext *Context, FileContext *Copy);
 int BiReadDirectoryEntry(FileContext *Context, const char *Name);
 

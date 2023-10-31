@@ -2,9 +2,6 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <acpip.h>
-#include <stddef.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 /*-------------------------------------------------------------------------------------------------
@@ -56,7 +53,7 @@ int AcpipExecuteTermList(AcpipState *State) {
             Parent->Code = State->Scope->Code;
             Parent->RemainingLength -= State->Scope->Length;
 
-            free(State->Scope);
+            AcpipFreeBlock(State->Scope);
             State->Scope = Parent;
 
             continue;
@@ -77,7 +74,7 @@ int AcpipExecuteTermList(AcpipState *State) {
        of a Return). */
     while (State->Scope->Parent) {
         AcpipScope *Parent = State->Scope->Parent;
-        free(State->Scope);
+        AcpipFreeBlock(State->Scope);
         State->Scope = Parent;
     }
 

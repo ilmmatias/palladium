@@ -2,9 +2,9 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <boot.h>
+#include <memory.h>
 #include <registry.h>
 #include <rt.h>
-#include <stdlib.h>
 #include <string.h>
 
 RegHandle *BmBootRegistry = NULL;
@@ -19,7 +19,7 @@ RegHandle *BmBootRegistry = NULL;
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void BmInitRegistry(void) {
+void BiInitRegistry(void) {
     BmBootRegistry = BmLoadRegistry("boot()/bootmgr.reg");
     if (!BmBootRegistry) {
         BmPanic("An error occoured while trying to setup the boot manager environment.\n"
@@ -43,25 +43,25 @@ RegHandle *BmLoadRegistry(const char *Path) {
         return NULL;
     }
 
-    FILE *Stream = fopen(Path, "r");
+    FileContext *Stream = BmOpenFile(Path);
     if (!Stream) {
         return NULL;
     }
 
-    RegHandle *Handle = malloc(sizeof(RegHandle));
+    RegHandle *Handle = BmAllocateBlock(sizeof(RegHandle));
     if (!Handle) {
-        fclose(Stream);
+        BmCloseFile(Stream);
         return NULL;
-    } else if (fread(Handle->Buffer, REG_BLOCK_SIZE, 1, Stream) != 1) {
-        free(Handle);
-        fclose(Stream);
+    } else if (BmReadFile(Stream, Handle->Buffer, 0, REG_BLOCK_SIZE, NULL)) {
+        BmFreeBlock(Handle);
+        BmCloseFile(Stream);
         return NULL;
     }
 
     RegFileHeader *FileHeader = (RegFileHeader *)Handle->Buffer;
     if (memcmp(FileHeader->Signature, REG_FILE_SIGNATURE, 4)) {
-        free(Handle);
-        fclose(Stream);
+        BmFreeBlock(Handle);
+        BmCloseFile(Stream);
         return NULL;
     }
 
@@ -96,8 +96,8 @@ static RegEntryHeader *FindEntry(RegHandle *Handle, uint32_t KeyBlock, const cha
                 KeyBlock = Header->OffsetToNextBlock;
             }
 
-            if (!KeyBlock || fseek(Handle->Stream, KeyBlock, SEEK_SET) ||
-                fread(Handle->Buffer, REG_BLOCK_SIZE, 1, Handle->Stream) != 1 ||
+            if (!KeyBlock ||
+                BmReadFile(Handle->Stream, Handle->Buffer, KeyBlock, REG_BLOCK_SIZE, NULL) ||
                 memcmp(Header->Signature, REG_BLOCK_SIGNATURE, 4)) {
                 return NULL;
             }
@@ -129,10 +129,12 @@ static RegEntryHeader *FindEntry(RegHandle *Handle, uint32_t KeyBlock, const cha
  *     The user is expected to manage and free it at the end of its lifetime.
  *-----------------------------------------------------------------------------------------------*/
 RegEntryHeader *BmFindRegistryEntry(RegHandle *Handle, RegEntryHeader *Parent, const char *Path) {
-    char *CopyPath = strdup(Path);
+    char *CopyPath = BmAllocateBlock(strlen(Path) + 1);
     if (!CopyPath) {
         return NULL;
     }
+
+    strcpy(CopyPath, Path);
 
     RegEntryHeader *Current = Parent;
     for (char *Segment = strtok(CopyPath, "/"); Segment; Segment = strtok(NULL, "/")) {
@@ -154,7 +156,7 @@ RegEntryHeader *BmFindRegistryEntry(RegHandle *Handle, RegEntryHeader *Parent, c
 
     /* The buffer where the entry is currently located might be reused for loading other entries,
        so we'll be copying it to a new buffer (managed by the caller). */
-    RegEntryHeader *Entry = malloc(Current ? Current->Length : sizeof(RegEntryHeader) + 5);
+    RegEntryHeader *Entry = BmAllocateBlock(Current ? Current->Length : sizeof(RegEntryHeader) + 5);
 
     if (!Entry) {
         return NULL;
@@ -196,8 +198,8 @@ RegEntryHeader *BmGetRegistryEntry(RegHandle *Handle, RegEntryHeader *Parent, in
                 KeyBlock = Header->OffsetToNextBlock;
             }
 
-            if (!KeyBlock || fseek(Handle->Stream, KeyBlock, SEEK_SET) ||
-                fread(Handle->Buffer, REG_BLOCK_SIZE, 1, Handle->Stream) != 1 ||
+            if (!KeyBlock ||
+                BmReadFile(Handle->Stream, Handle->Buffer, KeyBlock, REG_BLOCK_SIZE, NULL) ||
                 memcmp(Header->Signature, REG_BLOCK_SIGNATURE, 4)) {
                 return NULL;
             }
@@ -212,7 +214,7 @@ RegEntryHeader *BmGetRegistryEntry(RegHandle *Handle, RegEntryHeader *Parent, in
         }
     }
 
-    RegEntryHeader *Entry = malloc(Current->Length);
+    RegEntryHeader *Entry = BmAllocateBlock(Current->Length);
 
     if (Entry) {
         memcpy(Entry, Current, Current->Length);

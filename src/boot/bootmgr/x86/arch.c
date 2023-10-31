@@ -5,7 +5,6 @@
 #include <crt_impl.h>
 #include <memory.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <x86/bios.h>
 #include <x86/cpuid.h>
@@ -93,7 +92,7 @@ static uint64_t SearchRsdp(char *Region, char *End, int *IsXsdt) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void BmInitArch(void *BootBlock) {
+void BiInitArch(void *BootBlock) {
     BiosBootBlock *Data = (BiosBootBlock *)BootBlock;
     BiosDetectDisks(Data);
 
@@ -105,8 +104,8 @@ void BmInitArch(void *BootBlock) {
         KernelRegion[i].Next = i == 511 ? NULL : &KernelRegion[i + 1];
     }
 
-    BmMemoryArena = KernelRegion;
-    BmMemoryArenaSize = 512;
+    BiMemoryArena = KernelRegion;
+    BiMemoryArenaSize = 512;
 
     /* RDSEED is seemingly a non determistic RNG, and we can use that to seed the PRNG on any new
        enough computer (it's VERY slow, so we should only use it as seed).
@@ -146,7 +145,7 @@ void BmInitArch(void *BootBlock) {
  * RETURN VALUE:
  *     None; Does not return if the host is incompatible.
  *-----------------------------------------------------------------------------------------------*/
-void BmCheckCompatibility(void) {
+void BiCheckCompatibility(void) {
     /* At the moment, the two features we care the most are XSAVE and LM (which implies SSE2). */
 
     uint32_t Eax, Ebx, Ecx, Edx;

@@ -29,7 +29,7 @@
 #define KEY_F11 0x101A
 #define KEY_F12 0x101B
 
-void BmInitKeyboard(void);
+void BiInitKeyboard(void);
 int BmPollKey(void);
 
 #endif /* _KEYBOARD_H_ */

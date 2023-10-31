@@ -3,7 +3,6 @@
 
 #include <acpip.h>
 #include <ctype.h>
-#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -112,23 +111,23 @@ int AcpipCastToString(AcpiValue *Value, int ImplicitCast, int Decimal) {
         case ACPI_INTEGER: {
             if (Decimal) {
                 int Size = snprintf(NULL, 0, "%ld", Value->Integer);
-                String = malloc(sizeof(AcpiString) + Size + 1);
+                String = AcpipAllocateBlock(sizeof(AcpiString) + Size + 1);
                 if (!String) {
                     return 0;
                 }
 
                 if (snprintf(String->Data, Size + 1, "%ld", Value->Integer) != Size) {
-                    free(String);
+                    AcpipFreeBlock(String);
                     return 0;
                 }
             } else {
-                String = malloc(sizeof(AcpiString) + 17);
+                String = AcpipAllocateBlock(sizeof(AcpiString) + 17);
                 if (!String) {
                     return 0;
                 }
 
                 if (snprintf(String->Data, 17, "%016lX", Value->Integer) != 16) {
-                    free(String);
+                    AcpipFreeBlock(String);
                     return 0;
                 }
             }
@@ -155,7 +154,7 @@ int AcpipCastToString(AcpiValue *Value, int ImplicitCast, int Decimal) {
                     Size += snprintf(NULL, 0, PrintfFormat, Value->Buffer->Data[i]);
                 }
 
-                String = malloc(sizeof(AcpiString) + Size + 1);
+                String = AcpipAllocateBlock(sizeof(AcpiString) + Size + 1);
                 if (!String) {
                     return 0;
                 }
@@ -175,7 +174,7 @@ int AcpipCastToString(AcpiValue *Value, int ImplicitCast, int Decimal) {
                         Value->Buffer->Data[i]);
                 }
             } else {
-                String = malloc(sizeof(AcpiString) + Value->Buffer->Size * 5);
+                String = AcpipAllocateBlock(sizeof(AcpiString) + Value->Buffer->Size * 5);
                 if (!String) {
                     return 0;
                 }
@@ -194,7 +193,7 @@ int AcpipCastToString(AcpiValue *Value, int ImplicitCast, int Decimal) {
                             PrintfSize,
                             PrintfFormat,
                             Value->Buffer->Data[i]) != PrintfSize - 1) {
-                        free(String);
+                        AcpipFreeBlock(String);
                         return 0;
                     }
                 }
@@ -206,7 +205,7 @@ int AcpipCastToString(AcpiValue *Value, int ImplicitCast, int Decimal) {
         /* For everything else, we'll just be converting their type into a string, and returning
            that. */
         default: {
-            String = malloc(sizeof(AcpiString) + strlen(Types[Value->Type]) + 1);
+            String = AcpipAllocateBlock(sizeof(AcpiString) + strlen(Types[Value->Type]) + 1);
             if (!String) {
                 return 0;
             }
@@ -246,7 +245,7 @@ int AcpipCastToBuffer(AcpiValue *Value) {
         /* Integers get their underlying in-memory representation copied as an 8-byte buffer. */
         case ACPI_INTEGER: {
             BufferSize = 16;
-            Buffer = malloc(sizeof(AcpiBuffer) + 16);
+            Buffer = AcpipAllocateBlock(sizeof(AcpiBuffer) + 16);
             if (!Buffer) {
                 AcpiRemoveReference(Value, 0);
                 return 0;
@@ -260,7 +259,7 @@ int AcpipCastToBuffer(AcpiValue *Value) {
            (instead of length==1). */
         case ACPI_STRING: {
             BufferSize = strlen(Value->String->Data);
-            Buffer = malloc(sizeof(AcpiBuffer) + (BufferSize ? ++BufferSize : 0));
+            Buffer = AcpipAllocateBlock(sizeof(AcpiBuffer) + (BufferSize ? ++BufferSize : 0));
             if (!Buffer) {
                 AcpiRemoveReference(Value, 0);
                 return 0;

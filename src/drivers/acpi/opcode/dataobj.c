@@ -3,8 +3,6 @@
 
 #include <acpip.h>
 #include <ctype.h>
-#include <stddef.h>
-#include <stdlib.h>
 #include <string.h>
 
 /*-------------------------------------------------------------------------------------------------
@@ -70,11 +68,11 @@ int AcpipExecuteDataObjOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Val
             if (LengthSoFar > PkgLength ||
                 PkgLength - LengthSoFar > State->Scope->RemainingLength ||
                 PkgLength - LengthSoFar > BufferSize) {
-                free(Value->Buffer);
+                AcpipFreeBlock(Value->Buffer);
                 return 0;
             }
 
-            Value->Buffer = calloc(1, sizeof(AcpiBuffer) + BufferSize);
+            Value->Buffer = AcpipAllocateZeroBlock(1, sizeof(AcpiBuffer) + BufferSize);
             if (!Value->Buffer) {
                 return 0;
             }
@@ -111,7 +109,8 @@ int AcpipExecuteDataObjOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Val
             }
 
             PkgLength -= LengthSoFar;
-            Value->Package = calloc(1, sizeof(AcpiPackage) + Size * sizeof(AcpiPackageElement));
+            Value->Package =
+                AcpipAllocateZeroBlock(1, sizeof(AcpiPackage) + Size * sizeof(AcpiPackageElement));
             if (!Value->Package) {
                 return 0;
             }

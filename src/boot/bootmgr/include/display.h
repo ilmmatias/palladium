@@ -12,15 +12,19 @@
 #define DISPLAY_COLOR_HIGHLIGHT 0x000000, 0xFFFFFF
 #define DISPLAY_COLOR_PANIC 0xAA0000, 0xFFFFFF
 
-void BmInitDisplay(void);
+void BiInitDisplay(void);
 void BmResetDisplay(void);
+
 void BmSetColor(uint32_t BackgroundColor, uint32_t ForegroundColor);
 void BmGetColor(uint32_t *BackgroundColor, uint32_t *ForegroundColor);
 void BmSetCursor(uint16_t X, uint16_t Y);
 void BmGetCursor(uint16_t *X, uint16_t *Y);
+
 void BmClearLine(int LeftOffset, int RightOffset);
+size_t BmGetStringWidth(const char *String);
+
 void BmPutChar(char Character);
 void BmPutString(const char *String);
-size_t BmGetStringWidth(const char *String);
+void BmPrint(const char *Format, ...);
 
 #endif /* _DISPLAY_H_ */

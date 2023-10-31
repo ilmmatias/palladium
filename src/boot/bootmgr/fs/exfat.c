@@ -1,12 +1,10 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
-#include <crt_impl.h>
 #include <ctype.h>
 #include <exfat.h>
 #include <file.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include <memory.h>
 #include <string.h>
 
 struct ExfatContext;
@@ -47,7 +45,7 @@ int BiProbeExfat(FileContext *Context) {
     const char ExpectedJumpBoot[3] = {0xEB, 0x76, 0x90};
     const char ExpectedFileSystemName[8] = "EXFAT   ";
 
-    char *Buffer = malloc(512);
+    char *Buffer = BmAllocateBlock(512);
     ExfatBootSector *BootSector = (ExfatBootSector *)Buffer;
     if (!Buffer) {
         return 0;
@@ -57,16 +55,16 @@ int BiProbeExfat(FileContext *Context) {
        https://learn.microsoft.com/en-us/windows/win32/fileio/exfat-specification to quickly do
        the probing. */
 
-    if (__fread(Context, 0, Buffer, 512, NULL) ||
+    if (BmReadFile(Context, Buffer, 0, 512, NULL) ||
         memcmp(BootSector->JumpBoot, ExpectedJumpBoot, 3) ||
         memcmp(BootSector->FileSystemName, ExpectedFileSystemName, 8)) {
-        free(Buffer);
+        BmFreeBlock(Buffer);
         return 0;
     }
 
     for (int i = 0; i < 53; i++) {
         if (BootSector->MustBeZero[i]) {
-            free(Buffer);
+            BmFreeBlock(Buffer);
             return 0;
         }
     }
@@ -74,17 +72,17 @@ int BiProbeExfat(FileContext *Context) {
     /* We can be somewhat confident now that the FS at least looks like exFAT; either the
        user wants to open the root directory (and leave at that), or open something inside it;
        either way, save the root directory to the new context struct. */
-    ExfatContext *FsContext = malloc(sizeof(ExfatContext));
+    ExfatContext *FsContext = BmAllocateBlock(sizeof(ExfatContext));
     if (!FsContext) {
-        free(Buffer);
+        BmFreeBlock(Buffer);
         return 0;
     }
 
     FsContext->ClusterShift = BootSector->BytesPerSectorShift + BootSector->SectorsPerClusterShift;
-    FsContext->ClusterBuffer = malloc(1 << FsContext->ClusterShift);
+    FsContext->ClusterBuffer = BmAllocateBlock(1 << FsContext->ClusterShift);
     if (!FsContext->ClusterBuffer) {
-        free(FsContext);
-        free(Buffer);
+        BmFreeBlock(FsContext);
+        BmFreeBlock(Buffer);
         return 0;
     }
 
@@ -97,14 +95,14 @@ int BiProbeExfat(FileContext *Context) {
 
     /* Grab the NoFatChain flag from the root directory (the first entry of a directory
        tells us that info). */
-    if (__fread(
+    if (BmReadFile(
             Context,
-            FsContext->ClusterOffset + ((FsContext->FileCluster - 2) << FsContext->ClusterShift),
             FsContext->ClusterBuffer,
+            FsContext->ClusterOffset + ((FsContext->FileCluster - 2) << FsContext->ClusterShift),
             sizeof(ExfatDirectoryEntry),
             NULL)) {
-        free(FsContext);
-        free(Buffer);
+        BmFreeBlock(FsContext);
+        BmFreeBlock(Buffer);
         return 0;
     }
 
@@ -117,7 +115,7 @@ int BiProbeExfat(FileContext *Context) {
     Context->PrivateData = FsContext;
     Context->FileLength = 0;
 
-    free(Buffer);
+    BmFreeBlock(Buffer);
     return 1;
 }
 
@@ -141,10 +139,10 @@ static int FollowCluster(ExfatContext *FsContext, void **Current, uint64_t *Clus
     } else if (Offset || !Current) {
         if (FsContext->NoFatChain) {
             (*Cluster)++;
-        } else if (__fread(
+        } else if (BmReadFile(
                        &FsContext->Parent,
-                       FsContext->FatOffset + (*Cluster << 2),
                        FsContext->ClusterBuffer,
+                       FsContext->FatOffset + (*Cluster << 2),
                        4,
                        NULL)) {
             return 0;
@@ -158,10 +156,10 @@ static int FollowCluster(ExfatContext *FsContext, void **Current, uint64_t *Clus
 
     if (Current) {
         *Current = FsContext->ClusterBuffer;
-        return !__fread(
+        return !BmReadFile(
             &FsContext->Parent,
-            FsContext->ClusterOffset + ((*Cluster - 2) << FsContext->ClusterShift),
             FsContext->ClusterBuffer,
+            FsContext->ClusterOffset + ((*Cluster - 2) << FsContext->ClusterShift),
             1 << FsContext->ClusterShift,
             NULL);
     } else {
@@ -303,7 +301,7 @@ static int FillDataRuns(ExfatContext *FsContext, uint64_t FileLength) {
         /* If possible, reuse our past allocated data run list, overwriting its entries. */
         ExfatDataRun *Entry = CurrentRun;
         if (!Entry) {
-            Entry = calloc(1, sizeof(ExfatContext));
+            Entry = BmAllocateZeroBlock(1, sizeof(ExfatContext));
             if (!Entry) {
                 return 0;
             }
@@ -341,7 +339,7 @@ static int FillDataRuns(ExfatContext *FsContext, uint64_t FileLength) {
  * PURPOSE:
  *     This function uses a data run list obtained from FillDataRuns to convert a Virtual Cluster
  *     Number (VCN) into a Logical Cluster Number (LCN, aka something we can just multiply by the
- *     size of a cluster and __fread).
+ *     size of a cluster and read it).
  *
  * PARAMETERS:
  *     FsContext - FS-specific data.
@@ -375,7 +373,7 @@ static int TranslateVcn(ExfatContext *FsContext, uint64_t Vcn, uint64_t *Lcn) {
  *     Read - How many bytes we read with no error.
  *
  * RETURN VALUE:
- *     __STDIO_FLAGS_ERROR/EOF if something went wrong, 0 otherwise.
+ *     1 if something went wrong, 0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
 int BiReadExfatFile(FileContext *Context, void *Buffer, size_t Start, size_t Size, size_t *Read) {
     ExfatContext *FsContext = Context->PrivateData;
@@ -384,14 +382,12 @@ int BiReadExfatFile(FileContext *Context, void *Buffer, size_t Start, size_t Siz
     size_t Accum = 0;
     int Flags = 0;
 
-    if (FsContext->Directory) {
-        return __STDIO_FLAGS_ERROR;
-    } else if (Start > Context->FileLength) {
-        return __STDIO_FLAGS_EOF;
+    if (FsContext->Directory || Start > Context->FileLength) {
+        return 1;
     }
 
     if (Size > Context->FileLength - Start) {
-        Flags = __STDIO_FLAGS_EOF;
+        Flags = 1;
         Size = Context->FileLength - Start;
     }
 
@@ -402,7 +398,7 @@ int BiReadExfatFile(FileContext *Context, void *Buffer, size_t Start, size_t Siz
             *Read = 0;
         }
 
-        return __STDIO_FLAGS_ERROR;
+        return 1;
     }
 
     uint64_t Vcn = 0;
@@ -415,13 +411,13 @@ int BiReadExfatFile(FileContext *Context, void *Buffer, size_t Start, size_t Siz
     while (Size) {
         uint64_t Lcn;
         if (!TranslateVcn(FsContext, Vcn++, &Lcn) ||
-            __fread(
+            BmReadFile(
                 &FsContext->Parent,
-                FsContext->ClusterOffset + ((Lcn - 2) << FsContext->ClusterShift),
                 FsContext->ClusterBuffer,
+                FsContext->ClusterOffset + ((Lcn - 2) << FsContext->ClusterShift),
                 1 << FsContext->ClusterShift,
                 NULL)) {
-            Flags = __STDIO_FLAGS_ERROR;
+            Flags = 1;
             break;
         }
 

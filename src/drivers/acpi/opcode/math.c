@@ -2,8 +2,6 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <acpip.h>
-#include <stdio.h>
-#include <stdlib.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:

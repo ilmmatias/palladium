@@ -10,6 +10,10 @@ EXPORTS
 
     MmAllocatePages
 
+    MmAllocateBlock
+    MmAllocateZeroBlock
+    MmFreeBlock
+
     VidResetDisplay
 
     VidSetColor
@@ -19,6 +23,8 @@ EXPORTS
 
     VidPutChar
     VidPutString
+
+    __vprintf
 
     isalnum
     isalpha
@@ -35,8 +41,6 @@ EXPORTS
 
     tolower
     toupper
-
-    __vprintf
 
     sscanf
 
@@ -60,10 +64,6 @@ EXPORTS
     strtod
     strtold
 
-    malloc
-    calloc
-    free
-
     rand
     srand
 
@@ -71,8 +71,6 @@ EXPORTS
     strncpy
     strcat
     strncat
-    strdup
-    strndup
 
     strlen
     strcmp
