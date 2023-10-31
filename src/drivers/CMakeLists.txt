@@ -4,4 +4,4 @@
 project(os/drivers)
 
 add_subdirectory(acpi)
-add_subdirectory(test)
+add_subdirectory(pci)

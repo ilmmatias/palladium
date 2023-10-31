@@ -73,6 +73,22 @@ static void DrawCharacter(char Character) {
     uint16_t GlyphTop = VidpFont.Ascender - Info->Top;
     uint32_t *Buffer = &VidpBuffer[(VidpCursorY + GlyphTop) * VidpWidth + VidpCursorX + GlyphLeft];
 
+    /* The code after us only cares about the foreground, so we're left to manually clear the
+       background. */
+    for (uint16_t Top = 0; Top < VidpFont.Height; Top++) {
+        if (VidpCursorY + Top >= VidpHeight) {
+            break;
+        }
+
+        for (uint16_t Left = 0; Left < VidpFont.Ascender + VidpFont.Descender; Left++) {
+            if (VidpCursorX + Left >= VidpWidth) {
+                break;
+            }
+
+            VidpBuffer[(VidpCursorY + Top) * VidpWidth + VidpCursorX + Left] = VidpBackground;
+        }
+    }
+
     /* We use a schema where each byte inside the glyph represents one pixel, the value of said
        pixel is the brightness of the pixel (0 being background); We just use Blend() to combine
        the background and foreground values based on the brightness. */
@@ -87,6 +103,7 @@ static void DrawCharacter(char Character) {
             }
 
             uint8_t Alpha = Data[Top * Info->Width + Left];
+
             if (Alpha) {
                 Buffer[Top * VidpWidth + Left] = Blend(VidpBackground, VidpForeground, Alpha);
             }

@@ -414,7 +414,7 @@ int CreateKernelRegistry(void) {
     }
 
     if (!CreateIntegerKey(Stream, Entries, "acpi.sys", REG_ENTRY_DWORD, 1) ||
-        !CreateIntegerKey(Stream, Entries, "test.sys", REG_ENTRY_DWORD, 1)) {
+        !CreateIntegerKey(Stream, Entries, "pci.sys", REG_ENTRY_DWORD, 1)) {
         fclose(Stream);
         return 1;
     }

@@ -43,7 +43,7 @@ static void InitializeChildren(AcpiObject *Root) {
                this not being one (and it making any difference). */
             AcpiExecuteMethod(AcpiSearchObject(Device, "_INI"), 0, NULL, NULL);
 
-            char *Path = AcpipGetObjectPath(Device);
+            char *Path = AcpiGetObjectPath(Device);
             if (Path) {
                 AcpipShowTraceMessage("initialized device, full path %s\n", Path);
                 free(Path);

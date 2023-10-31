@@ -89,7 +89,6 @@ void AcpipPopulateOverride(void);
 void AcpipPopulateTree(const uint8_t *Code, uint32_t Length);
 AcpiObject *AcpipCreateObject(AcpiName *Name, AcpiValue *Value);
 AcpiObject *AcpipResolveObject(AcpiName *Name);
-char *AcpipGetObjectPath(AcpiObject *Object);
 
 void AcpiCreateReference(AcpiValue *Source, AcpiValue *Target);
 void AcpiRemoveReference(AcpiValue *Value, int CleanupPointer);

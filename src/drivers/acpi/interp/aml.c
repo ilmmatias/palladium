@@ -27,7 +27,7 @@ extern AcpiObject *AcpipObjectTree;
 int AcpiExecuteMethod(AcpiObject *Object, int ArgCount, AcpiValue *Arguments, AcpiValue *Result) {
     if (!Object || Object->Value.Type != ACPI_METHOD) {
         if (Object) {
-            char *Path = AcpipGetObjectPath(Object);
+            char *Path = AcpiGetObjectPath(Object);
             if (Path) {
                 AcpipShowDebugMessage(
                     "attempt at executing non-method object, full path %s\n", Path);

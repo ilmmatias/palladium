@@ -50,16 +50,16 @@ cp obj.x86/boot/bootsect/iso9660boot.com _root/iso9660boot.com
 cat obj.x86/boot/startup/startup.com obj.x86/boot/bootmgr/bootmgr.exe > _root/bootmgr
 cp obj.amd64/kernel/kernel.exe _root/System/kernel.exe
 cp obj.amd64/drivers/acpi/acpi.sys _root/System/acpi.sys
-cp obj.amd64/drivers/test/test.sys _root/System/test.sys
+cp obj.amd64/drivers/pci/pci.sys _root/System/pci.sys
 
 if [ "$1" == "fat32" ]
 then
     dd if=/dev/zero of=obj.amd64/fat32.img count=64 bs=1M 2>/dev/null
     /usr/sbin/mkfs.fat -F32 obj.amd64/fat32.img 1>/dev/null
-    dd if=obj.x86/boot/bootsect/fat32boot.com of=obj.amd64/fat32.img seek=90 skip=90 count=422 bs=1 conv=notrunc 2>/dev/null
     mcopy -i obj.amd64/fat32.img _root/bootmgr ::/ 1>/dev/null
     mcopy -i obj.amd64/fat32.img _root/bootmgr.reg ::/ 1>/dev/null
     mcopy -i obj.amd64/fat32.img _root/System ::/ 1>/dev/null
+    dd if=obj.x86/boot/bootsect/fat32boot.com of=obj.amd64/fat32.img seek=90 skip=90 count=422 bs=1 conv=notrunc 2>/dev/null
     echo "[5/5] Running emulator"
     qemu-system-x86_64 -enable-kvm -M smm=off -cpu host -drive file=obj.amd64/fat32.img,index=0,media=disk,format=raw -no-reboot 1>/dev/null
 elif [ "$1" == "exfat" ]
@@ -68,14 +68,13 @@ then
     sudo mkdir -p /mnt/mount
     dd if=/dev/zero of=obj.amd64/exfat.img count=64 bs=1M 2>/dev/null
     sudo mkfs.exfat obj.amd64/exfat.img 1>/dev/null
-    dd if=obj.x86/boot/bootsect/exfatboot.com of=obj.amd64/exfat.img seek=120 skip=120 count=392 bs=1 conv=notrunc 2>/dev/null
-    dd if=obj.x86/boot/bootsect/exfatboot.com of=obj.amd64/exfat.img seek=512 skip=512 bs=1 conv=notrunc 2>/dev/null
-    sudo fsck.exfat -y obj.amd64/exfat.img 1>/dev/null 2>&1
     sudo mount -t exfat -o loop obj.amd64/exfat.img /mnt/mount 1>/dev/null
     sudo cp _root/bootmgr /mnt/mount/bootmgr 1>/dev/null
     sudo cp _root/bootmgr.reg /mnt/mount/bootmgr.reg 1>/dev/null
     sudo cp -Rf _root/System /mnt/mount/System 1>/dev/null
     sudo umount /mnt/mount 1>/dev/null
+    dd if=obj.x86/boot/bootsect/exfatboot.com of=obj.amd64/exfat.img seek=120 skip=120 count=392 bs=1 conv=notrunc 2>/dev/null
+    dd if=obj.x86/boot/bootsect/exfatboot.com of=obj.amd64/exfat.img seek=512 skip=512 bs=1 conv=notrunc 2>/dev/null
     echo "[5/5] Running emulator"
     qemu-system-x86_64 -enable-kvm -M smm=off -cpu host -drive file=obj.amd64/exfat.img,index=0,media=disk,format=raw -no-reboot 1>/dev/null
 elif [ "$1" == "ntfs" ]
@@ -84,13 +83,13 @@ then
     sudo mkdir -p /mnt/mount
     dd if=/dev/zero of=obj.amd64/ntfs.img count=64 bs=1M 2>/dev/null
     sudo mkfs.ntfs -F obj.amd64/ntfs.img 1>/dev/null 2>&1
-    dd if=obj.x86/boot/bootsect/ntfsboot.com of=obj.amd64/ntfs.img seek=80 skip=80 count=426 bs=1 conv=notrunc 2>/dev/null
-    dd if=obj.x86/boot/bootsect/ntfsboot.com of=obj.amd64/ntfs.img seek=512 skip=512 bs=1 conv=notrunc 2>/dev/null
     sudo mount -t ntfs -o loop obj.amd64/ntfs.img /mnt/mount 1>/dev/null
     sudo cp _root/bootmgr /mnt/mount/bootmgr 1>/dev/null
     sudo cp _root/bootmgr.reg /mnt/mount/bootmgr.reg 1>/dev/null
     sudo cp -Rf _root/System /mnt/mount/System 1>/dev/null
     sudo umount /mnt/mount 1>/dev/null
+    dd if=obj.x86/boot/bootsect/ntfsboot.com of=obj.amd64/ntfs.img seek=80 skip=80 count=426 bs=1 conv=notrunc 2>/dev/null
+    dd if=obj.x86/boot/bootsect/ntfsboot.com of=obj.amd64/ntfs.img seek=512 skip=512 bs=1 conv=notrunc 2>/dev/null
     echo "[5/5] Running emulator"
     qemu-system-x86_64 -enable-kvm -M smm=off -cpu host -drive file=obj.amd64/ntfs.img,index=0,media=disk,format=raw -no-reboot 1>/dev/null
 else

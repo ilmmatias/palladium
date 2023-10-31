@@ -193,7 +193,7 @@ AcpiObject *AcpipCreateObject(AcpiName *Name, AcpiValue *Value) {
                 if (Base->Value.Type != ACPI_DEVICE && Base->Value.Type != ACPI_REGION &&
                     Base->Value.Type != ACPI_POWER && Base->Value.Type != ACPI_PROCESSOR &&
                     Base->Value.Type != ACPI_THERMAL && Base->Value.Type != ACPI_SCOPE) {
-                    char *Path = AcpipGetObjectPath(Base);
+                    char *Path = AcpiGetObjectPath(Base);
                     if (Path) {
                         AcpipShowDebugMessage("duplicate object, full path %s\n", Path);
                         free(Path);
@@ -333,7 +333,7 @@ AcpiObject *AcpipResolveObject(AcpiName *Name) {
  * RETURN VALUE:
  *     Pointer to the object path string, or NULL on failure.
  *-----------------------------------------------------------------------------------------------*/
-char *AcpipGetObjectPath(AcpiObject *Object) {
+char *AcpiGetObjectPath(AcpiObject *Object) {
     int Parts = 0;
     for (AcpiObject *Current = Object; Current->Parent; Current = Current->Parent) {
         Parts++;

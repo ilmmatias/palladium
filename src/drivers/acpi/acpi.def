@@ -1,6 +1,7 @@
 LIBRARY acpi.sys
 EXPORTS
     AcpiSearchObject
+    AcpiGetObjectPath
     AcpiEvaluateObject
     AcpiExecuteMethod
 

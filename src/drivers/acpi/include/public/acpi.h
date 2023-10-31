@@ -162,6 +162,7 @@ typedef struct AcpiObject {
 } AcpiObject;
 
 AcpiObject *AcpiSearchObject(AcpiObject *Parent, const char *Name);
+char *AcpiGetObjectPath(AcpiObject *Object);
 int AcpiEvaluateObject(AcpiObject *Object, AcpiValue *Result, int ExpectedType);
 int AcpiExecuteMethod(AcpiObject *Object, int ArgCount, AcpiValue *Arguments, AcpiValue *Result);
 
