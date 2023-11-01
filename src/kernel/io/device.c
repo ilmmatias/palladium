@@ -25,14 +25,14 @@ int IoCreateDevice(const char *Name, IoReadFn Read, IoWriteFn Write) {
         return 0;
     }
 
-    IoDevice *Entry = MmAllocateBlock(sizeof(IoDevice));
+    IoDevice *Entry = MmAllocatePool(sizeof(IoDevice), "IOP ");
     if (!Entry) {
         return 0;
     }
 
-    Entry->Name = MmAllocateBlock(strlen(Name) + 1);
+    Entry->Name = MmAllocatePool(strlen(Name) + 1, "IOP ");
     if (!Entry->Name) {
-        MmFreeBlock(Entry);
+        MmFreePool(Entry, "IOP ");
         return 0;
     }
 
@@ -40,7 +40,7 @@ int IoCreateDevice(const char *Name, IoReadFn Read, IoWriteFn Write) {
     Entry->Read = Read;
     Entry->Write = Write;
 
-    RtPushSinglyLinkedList(&DeviceListHead, &Entry->ListEntry);
+    RtPushSinglyLinkedList(&DeviceListHead, &Entry->ListHeader);
     return 1;
 }
 
@@ -60,7 +60,7 @@ IoDevice *IoOpenDevice(const char *Name) {
     }
 
     for (RtSinglyLinkedListEntry *Entry = DeviceListHead.Next; Entry; Entry = Entry->Next) {
-        IoDevice *Device = CONTAINING_RECORD(Entry, IoDevice, ListEntry);
+        IoDevice *Device = CONTAINING_RECORD(Entry, IoDevice, ListHeader);
         if (!strcmp(Device->Name, Name)) {
             return Device;
         }

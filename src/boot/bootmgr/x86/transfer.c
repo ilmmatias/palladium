@@ -93,13 +93,6 @@ static void InstallIdtHandler(int Number, uint64_t Handler) {
 [[noreturn]] void BiTransferExecution(LoadedImage *Images, size_t ImageCount) {
     /* TODO: Add support for PML5 (under compatible processors). */
 
-    /* Currently, we load the kernel expecting at most 16TiB of addressable physical memory; Any
-       more than this, and we'll assume we're running on an incompatible platform. */
-    if (BiosMaxAddressableMemory > 0x100000000000) {
-        BmPanic("An error occoured while trying to load the selected operating system.\n"
-                "The maximum addressable RAM address in the memory map is too big.");
-    }
-
     /* Check for 1GiB page support; If we do support it, it reduces the amount of work to map all
        of the physical memory. */
     uint32_t Eax, Ebx, Ecx, Edx;
@@ -117,15 +110,11 @@ static void InstallIdtHandler(int Number, uint64_t Handler) {
                 "There is not enough RAM for the memory manager.");
     }
 
-    uint64_t Slices512GiB = (BiosMaxAddressableMemory + 0x7FFFFFFFFF) >> 39;
-    uint64_t Slices1GiB = (BiosMaxAddressableMemory + 0x3FFFFFFF) >> 30;
-    uint64_t Slices2MiB = (BiosMaxAddressableMemory + 0x1FFFFF) >> 21;
-
     do {
         int Fail = 0;
         uint64_t *Pml4 = BmAllocatePages(1, MEMORY_KERNEL);
         uint64_t *EarlyIdentPdpt = BmAllocatePages(1, MEMORY_KERNEL);
-        uint64_t *LateIdentPdpt = BmAllocatePages(Slices512GiB, MEMORY_KERNEL);
+        uint64_t *LateIdentPdpt = BmAllocatePages(1, MEMORY_KERNEL);
         uint64_t *KernelPdpt = BmAllocatePages(1, MEMORY_KERNEL);
         uint64_t *EarlyIdentPdt = BmAllocatePages(1, MEMORY_KERNEL);
         LoaderBootData *BootData = BmAllocateBlock(sizeof(LoaderBootData));
@@ -138,37 +127,34 @@ static void InstallIdtHandler(int Number, uint64_t Handler) {
         /* First 2MiB are the early identity mapping (which contains ourselves; Required for no
            crash upon entering long mode).
            Right after the higher half barrier, we have the actual identity mapping (supporting up
-           to 16TiB, mapped according to the max adressable memory).
+           to 16TiB). We map only 512GiB, and the kernel should map anything else after.
            The kernel and the kernel drivers are mapped at last, in whichever locations the ASLR
            layer chose. */
         memset(Pml4, 0, PAGE_SIZE);
         Pml4[0] = (uint64_t)EarlyIdentPdpt | 0x03;
+        Pml4[256] = (uint64_t)LateIdentPdpt | 0x03;
         Pml4[(ARENA_BASE >> 39) & 0x1FF] = (uint64_t)KernelPdpt | 0x03;
 
-        for (uint64_t i = 0; i < Slices512GiB; i++) {
-            Pml4[256 + i] = (uint64_t)(LateIdentPdpt + (i << 9)) | 0x03;
-        }
-
         if (Edx & bit_PDPE1GB) {
-            BmPrint("mapping %llu 1GiB slices of adressable physical memory\n", Slices1GiB);
-            memset(LateIdentPdpt, 0, Slices512GiB * PAGE_SIZE);
-            for (uint64_t i = 0; i < Slices1GiB; i++) {
+            BmPrint("mapping 512 1GiB slices of adressable physical memory\n");
+            memset(LateIdentPdpt, 0, PAGE_SIZE);
+            for (uint64_t i = 0; i < 512; i++) {
                 LateIdentPdpt[i] = (i << 30) | 0x83;
             }
         } else {
-            uint64_t *LateIdentPdt = BmAllocatePages(Slices1GiB, MEMORY_KERNEL);
+            uint64_t *LateIdentPdt = BmAllocatePages(512, MEMORY_KERNEL);
             if (!LateIdentPdt) {
                 break;
             }
 
-            memset(LateIdentPdpt, 0, Slices512GiB * PAGE_SIZE);
-            for (uint64_t i = 0; i < Slices1GiB; i++) {
+            memset(LateIdentPdpt, 0, 1 * PAGE_SIZE);
+            for (uint64_t i = 0; i < 512; i++) {
                 LateIdentPdpt[i] = (uint64_t)(LateIdentPdt + (i << 9)) | 0x03;
             }
 
-            BmPrint("mapping %llu 2MiB slices of adressable physical memory\n", Slices2MiB);
-            memset(LateIdentPdt, 0, Slices1GiB * PAGE_SIZE);
-            for (uint64_t i = 0; i < Slices2MiB; i++) {
+            BmPrint("mapping 262144 2MiB slices of adressable physical memory\n");
+            memset(LateIdentPdt, 0, 512 * PAGE_SIZE);
+            for (uint64_t i = 0; i < 262144; i++) {
                 LateIdentPdt[i] = (i << 21) | 0x83;
             }
         }

@@ -20,7 +20,7 @@ extern MiPageEntry *MiFreePageListTail;
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void MiPreparePageAllocator(void *LoaderData) {
+void MiInitializePageAllocator(void *LoaderData) {
     LoaderBootData *BootData = LoaderData;
 
     MiPageList = (MiPageEntry *)BootData->MemoryManager.PageAllocatorBase;

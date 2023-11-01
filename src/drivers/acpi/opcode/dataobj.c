@@ -115,6 +115,10 @@ int AcpipExecuteDataObjOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Val
                 return 0;
             }
 
+            for (uint64_t i = 0; i < Size; i++) {
+                Value->Package->Data[i].Type = 1;
+            }
+
             Value->Package->References = 1;
             Value->Package->Size = Size;
 

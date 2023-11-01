@@ -18,5 +18,5 @@ RtSinglyLinkedListEntry PcipBusListHead = {.Next = NULL};
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void PcipInitializeBus(PcipBus *Bus) {
-    RtPushSinglyLinkedList(&PcipBusListHead, &Bus->ListEntry);
+    RtPushSinglyLinkedList(&PcipBusListHead, &Bus->ListHeader);
 }

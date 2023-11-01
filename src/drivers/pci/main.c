@@ -23,8 +23,7 @@ void DriverEntry(void) {
        for either legacy PCI buses, or PCIe buses. */
     AcpiObject *SystemBus = AcpiSearchObject(NULL, "_SB_");
     if (!SystemBus) {
-        PcipShowErrorMessage(
-            KE_CORRUPTED_HARDWARE_STRUCTURES, "cannot find the \\_SB_ ACPI object\n");
+        PcipShowErrorMessage(KE_BAD_ACPI_TABLES, "cannot find the \\_SB_ ACPI object\n");
     }
 
     for (AcpiObject *Device = SystemBus->Value.Children->Objects; Device != NULL;
@@ -36,10 +35,9 @@ void DriverEntry(void) {
             continue;
         }
 
-        PcipBus *Bus = MmAllocateBlock(sizeof(PcipBus));
+        PcipBus *Bus = MmAllocatePool(sizeof(PcipBus), "PCI ");
         if (!Bus) {
-            PcipShowErrorMessage(
-                KE_EARLY_MEMORY_FAILURE, "could not allocate space for a PCI bus\n");
+            PcipShowErrorMessage(KE_OUT_OF_MEMORY, "could not allocate space for a PCI bus\n");
         }
 
         memset(Bus, 0, sizeof(PcipBus));

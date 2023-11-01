@@ -38,8 +38,6 @@ int AcpipExecuteTermList(AcpipState *State) {
                     !AcpipExecuteOpcode(State, &PredicateValue) ||
                     !AcpipCastToInteger(&PredicateValue, &Predicate, 1)) {
                     return 0;
-                } else if (!Predicate) {
-                    break;
                 }
 
                 if (Predicate) {

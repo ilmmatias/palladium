@@ -14,6 +14,6 @@ typedef struct MiPageEntry {
     struct MiPageEntry *PreviousGroup;
 } MiPageEntry;
 
-void MiPreparePageAllocator(void *LoaderData);
+void MiInitializePageAllocator(void *LoaderData);
 
 #endif /* _MI_H_ */

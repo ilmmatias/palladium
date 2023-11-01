@@ -13,7 +13,7 @@ typedef uint64_t (*IoReadFn)(IoDevice *Device, void *Buffer, uint64_t Offset, ui
 typedef uint64_t (*IoWriteFn)(IoDevice *Device, const void *Buffer, uint64_t Offset, uint64_t Size);
 
 struct IoDevice {
-    RtSinglyLinkedListEntry ListEntry;
+    RtSinglyLinkedListEntry ListHeader;
     const char *Name;
     IoReadFn Read;
     IoWriteFn Write;

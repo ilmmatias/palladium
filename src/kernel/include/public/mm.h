@@ -16,8 +16,7 @@
 
 uint64_t MmAllocatePages(uint32_t Pages);
 
-void *MmAllocateBlock(size_t Size);
-void *MmAllocateZeroBlock(size_t Elements, size_t ElementSize);
-void MmFreeBlock(void *Block);
+void *MmAllocatePool(size_t Size, const char Tag[4]);
+void MmFreePool(void *Base, const char Tag[4]);
 
 #endif /* _MM_H_ */

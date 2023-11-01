@@ -24,7 +24,6 @@ extern "C" {
 
 uint32_t RtGetHash(const void *Buffer, size_t Size);
 
-void RtInitializeSinglyLinkedList(RtSinglyLinkedListEntry *Head);
 void RtPushSinglyLinkedList(RtSinglyLinkedListEntry *Head, RtSinglyLinkedListEntry *Entry);
 RtSinglyLinkedListEntry *RtPopSinglyLinkedList(RtSinglyLinkedListEntry *Head);
 
@@ -33,6 +32,7 @@ void RtPushDoublyLinkedList(RtDoublyLinkedListEntry *Head, RtDoublyLinkedListEnt
 void RtAppendDoublyLinkedList(RtDoublyLinkedListEntry *Head, RtDoublyLinkedListEntry *Entry);
 RtDoublyLinkedListEntry *RtPopDoublyLinkedList(RtDoublyLinkedListEntry *Head);
 RtDoublyLinkedListEntry *RtTruncateDoublyLinkedList(RtDoublyLinkedListEntry *Head);
+void RtUnlinkDoublyLinkedList(RtDoublyLinkedListEntry *Entry);
 
 #ifdef __cplusplus
 }

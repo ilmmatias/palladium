@@ -10,8 +10,10 @@
 #define KI_ACPI_XSDT 1
 
 #define KE_FATAL_ERROR 0
-#define KE_CORRUPTED_HARDWARE_STRUCTURES 1
-#define KE_EARLY_MEMORY_FAILURE 2
+#define KE_BAD_ACPI_TABLES 1
+#define KE_BAD_POOL_HEADER 2
+#define KE_DOUBLE_POOL_FREE 3
+#define KE_OUT_OF_MEMORY 4
 
 uint64_t KiGetAcpiBaseAddress(void);
 int KiGetAcpiTableType(void);

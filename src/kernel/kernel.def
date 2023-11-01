@@ -7,10 +7,9 @@ EXPORTS
     KiGetAcpiBaseAddress
     KiGetAcpiTableType
 
-    MmAllocateBlock
     MmAllocatePages
-    MmAllocateZeroBlock
-    MmFreeBlock
+    MmAllocatePool
+    MmFreePool
 
     VidGetColor
     VidGetCursor
@@ -23,12 +22,12 @@ EXPORTS
     RtAppendDoublyLinkedList
     RtGetHash
     RtInitializeDoublyLinkedList
-    RtInitializeSinglyLinkedList
     RtPopDoublyLinkedList
     RtPopSinglyLinkedList
     RtPushDoublyLinkedList
     RtPushSinglyLinkedList
     RtTruncateDoublyLinkedList
+    RtUnlinkDoublyLinkedList
 
     __rand64
     __vprintf

@@ -26,13 +26,39 @@ int AcpipReadTarget(AcpipState *State, AcpiValue *Target, AcpiValue *Value) {
 
 int AcpipStoreTarget(AcpipState *State, AcpiValue *Target, AcpiValue *Value) {
     switch (Target->Type) {
+        case ACPI_INDEX: {
+            AcpiValue *Buffer = Target->BufferField.Source;
+            uint64_t Index = Target->BufferField.Index;
+
+            switch (Buffer->Type) {
+                case ACPI_PACKAGE: {
+                    if (Buffer->Package->Data[Index].Type) {
+                        AcpiRemoveReference(&Buffer->Package->Data[Index].Value, 0);
+                    }
+
+                    Buffer->Package->Data[Index].Type = 1;
+                    AcpiCopyValue(Value, &Buffer->Package->Data[Index].Value);
+
+                    break;
+                }
+
+                default: {
+                    AcpipShowDebugMessage(
+                        "attempt to store into index with source type %d\n",
+                        Target->BufferField.Source->Type);
+                    break;
+                }
+            }
+
+            break;
+        }
         case ACPI_LOCAL:
             AcpiRemoveReference(&State->Locals[Target->Integer], 0);
-            memcpy(&State->Locals[Target->Integer], Value, sizeof(AcpiValue));
+            AcpiCopyValue(Value, &State->Locals[Target->Integer]);
             break;
         case ACPI_ARG:
             AcpiRemoveReference(&State->Arguments[Target->Integer], 0);
-            memcpy(&State->Arguments[Target->Integer], Value, sizeof(AcpiValue));
+            AcpiCopyValue(Value, &State->Arguments[Target->Integer]);
             break;
         case ACPI_DEBUG:
             if (AcpipCastToString(Value, 1, 0)) {
@@ -142,6 +168,14 @@ int AcpipStoreTarget(AcpipState *State, AcpiValue *Target, AcpiValue *Value) {
                         "writing to a named field of type %d\n",
                         Target->Reference->Value.Type);
             }
+
+            break;
+        default:
+            if (Target->Type != ACPI_INTEGER) {
+                AcpipShowDebugMessage("attempt to store into target of type %d\n", Target->Type);
+            }
+
+            break;
     }
 
     return 1;

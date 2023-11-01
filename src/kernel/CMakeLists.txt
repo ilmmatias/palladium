@@ -21,8 +21,8 @@ add_executable(kernel "kernel" YES
     ke/entry.c
     ke/panic.c
 
-    mm/allocator.c
     mm/page.c
+    mm/pool.c
 
     vid/attributes.c
     vid/font.c

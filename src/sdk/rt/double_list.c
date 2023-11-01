@@ -77,7 +77,9 @@ RtDoublyLinkedListEntry *RtPopDoublyLinkedList(RtDoublyLinkedListEntry *Head) {
 
     RtDoublyLinkedListEntry *Entry = Head->Next;
     Head->Next = Entry->Next;
-    Entry->Prev = Head;
+    Entry->Next->Prev = Head;
+    Entry->Next = NULL;
+    Entry->Prev = NULL;
 
     return Entry;
 }
@@ -99,7 +101,27 @@ RtDoublyLinkedListEntry *RtTruncateDoublyLinkedList(RtDoublyLinkedListEntry *Hea
 
     RtDoublyLinkedListEntry *Entry = Head->Prev;
     Head->Prev = Entry->Prev;
-    Entry->Next = Head;
+    Entry->Prev->Next = Head;
+    Entry->Next = NULL;
+    Entry->Prev = NULL;
 
     return Entry;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function removes the given entry from the doubly linked list it is currently associated
+ *     with.
+ *
+ * PARAMETERS:
+ *     Entry - What we're trying to remove.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void RtUnlinkDoublyLinkedList(RtDoublyLinkedListEntry *Entry) {
+    if (Entry) {
+        Entry->Prev->Next = Entry->Next;
+        Entry->Next->Prev = Entry->Prev;
+    }
 }

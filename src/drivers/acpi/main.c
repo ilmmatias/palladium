@@ -109,11 +109,11 @@ void DriverEntry(void) {
     /* Initialize all devices inside the _SB_ scope. */
     InitializeChildren(SbScope);
 
-    /* Inform the ACPI BIOS that we're still using the classic PIC. */
+    /* Inform the ACPI BIOS that we intend on using APIC. */
     AcpiValue Argument;
     Argument.Type = ACPI_INTEGER;
     Argument.References = 1;
-    Argument.Integer = 0;
+    Argument.Integer = 1;
     AcpiExecuteMethod(AcpiSearchObject(NULL, "_PIC"), 1, &Argument, NULL);
 
     /* For the final step, we need to inform the BIOS we're ready to handle the ACPI/power events

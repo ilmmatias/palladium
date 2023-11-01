@@ -6,8 +6,10 @@
 
 static char *Messages[] = {
     "FATAL_ERROR",
-    "CORRUPTED_HARDWARE_STRUCTURES",
-    "EARLY_MEMORY_FAILURE",
+    "BAD_ACPI_TABLES",
+    "BAD_POOL_HEADER",
+    "DOUBLE_POOL_FREE",
+    "OUT_OF_MEMORY",
 };
 
 /*-------------------------------------------------------------------------------------------------
@@ -22,7 +24,7 @@ static char *Messages[] = {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 [[noreturn]] void KeFatalError(int Message) {
-    if (Message < KE_FATAL_ERROR || Message > KE_CORRUPTED_HARDWARE_STRUCTURES) {
+    if (Message < KE_FATAL_ERROR || Message > KE_OUT_OF_MEMORY) {
         Message = KE_FATAL_ERROR;
     }
 

@@ -21,7 +21,7 @@
  *-----------------------------------------------------------------------------------------------*/
 [[noreturn]] void KiSystemStartup(void *LoaderData) {
     VidpInitialize(LoaderData);
-    MiPreparePageAllocator(LoaderData);
+    MiInitializePageAllocator(LoaderData);
     KiSaveAcpiData(LoaderData);
     KiRunBootStartDrivers(LoaderData);
     while (1)

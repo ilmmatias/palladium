@@ -143,6 +143,7 @@ int AcpiCopyValue(AcpiValue *Source, AcpiValue *Target) {
 
             for (uint64_t i = 0; i < Source->Package->Size; i++) {
                 if (Source->Package->Data[i].Type) {
+                    Target->Package->Data[i].Type = 1;
                     if (!AcpiCopyValue(
                             &Source->Package->Data[i].Value, &Target->Package->Data[i].Value)) {
                         /* Recursive cleanup on failure (if we processed any items). */

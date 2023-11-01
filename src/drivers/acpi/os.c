@@ -94,7 +94,7 @@ SdtHeader *AcpipFindTable(char Signature[4], int Index) {
  *     Start of the allocated block, or NULL on failure.
  *-----------------------------------------------------------------------------------------------*/
 void *AcpipAllocateBlock(size_t Size) {
-    return MmAllocateBlock(Size);
+    return MmAllocatePool(Size, "ACPI");
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -109,7 +109,7 @@ void *AcpipAllocateBlock(size_t Size) {
  *     Start of the allocated block, or NULL on failure.
  *-----------------------------------------------------------------------------------------------*/
 void *AcpipAllocateZeroBlock(size_t Elements, size_t ElementSize) {
-    return MmAllocateZeroBlock(Elements, ElementSize);
+    return MmAllocatePool(Elements * ElementSize, "ACPI");
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -124,7 +124,7 @@ void *AcpipAllocateZeroBlock(size_t Elements, size_t ElementSize) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void AcpipFreeBlock(void *Block) {
-    MmFreeBlock(Block);
+    MmFreePool(Block, "ACPI");
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -241,7 +241,5 @@ void AcpipShowTraceMessage(const char *Format, ...) {
 
     va_end(vlist);
 
-    KeFatalError(
-        Reason == ACPI_REASON_OUT_OF_MEMORY ? KE_EARLY_MEMORY_FAILURE
-                                            : KE_CORRUPTED_HARDWARE_STRUCTURES);
+    KeFatalError(Reason == ACPI_REASON_OUT_OF_MEMORY ? KE_OUT_OF_MEMORY : KE_BAD_ACPI_TABLES);
 }

@@ -5,22 +5,6 @@
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function initializes a singly linked list.
- *
- * PARAMETERS:
- *     Head - Header entry of the list.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-void RtInitializeSinglyLinkedList(RtSinglyLinkedListEntry *Head) {
-    if (Head) {
-        Head->Next = NULL;
-    }
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
  *     This function inserts a new entry into a singly linked list.
  *
  * PARAMETERS:
@@ -54,6 +38,7 @@ RtSinglyLinkedListEntry *RtPopSinglyLinkedList(RtSinglyLinkedListEntry *Head) {
 
     RtSinglyLinkedListEntry *Entry = Head->Next;
     Head->Next = Entry->Next;
+    Entry->Next = NULL;
 
     return Entry;
 }
