@@ -4,7 +4,7 @@
 #ifndef _IO_H_
 #define _IO_H_
 
-#include <stdint.h>
+#include <rt.h>
 
 struct IoDevice;
 typedef struct IoDevice IoDevice;
@@ -13,6 +13,7 @@ typedef uint64_t (*IoReadFn)(IoDevice *Device, void *Buffer, uint64_t Offset, ui
 typedef uint64_t (*IoWriteFn)(IoDevice *Device, const void *Buffer, uint64_t Offset, uint64_t Size);
 
 struct IoDevice {
+    RtSinglyLinkedListEntry ListEntry;
     const char *Name;
     IoReadFn Read;
     IoWriteFn Write;

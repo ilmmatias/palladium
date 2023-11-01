@@ -1,17 +1,16 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
-#include <mm.h>
-#include <stddef.h>
+#include <crt_impl.h>   
 #include <string.h>
 
-typedef struct AllocatorEntry {
-    int Used;
-    size_t Size;
-    struct AllocatorEntry *Prev, *Next;
-} AllocatorEntry;
+typedef struct allocator_entry_t {
+    int used;
+    size_t size;
+    struct allocator_entry_t *prev, *next;
+} allocator_entry_t;
 
-static AllocatorEntry *AllocatorHead = NULL, *AllocatorTail = NULL;
+static allocator_entry_t *head = NULL, *tail = NULL;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -19,27 +18,27 @@ static AllocatorEntry *AllocatorHead = NULL, *AllocatorTail = NULL;
  *     allocation and one of the remaining size.
  *
  * PARAMETERS:
- *     Entry - The entry to split.
+ *     entry - The entry to split.
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-static void SplitEntry(AllocatorEntry *Entry, size_t Size) {
-    if (Entry->Size <= Size + sizeof(AllocatorEntry)) {
+static void split_entry(allocator_entry_t *entry, size_t size) {
+    if (entry->size <= size + sizeof(allocator_entry_t)) {
         return;
     }
 
-    AllocatorEntry *NewEntry = (AllocatorEntry *)((uintptr_t)Entry + sizeof(AllocatorEntry) + Size);
+    allocator_entry_t *new_entry = (allocator_entry_t *)((uintptr_t)entry + sizeof(allocator_entry_t) + size);
 
-    NewEntry->Used = 0;
-    NewEntry->Size = Entry->Size - (Size + sizeof(AllocatorEntry));
-    NewEntry->Prev = Entry;
-    NewEntry->Next = NULL;
+    new_entry->used = 0;
+    new_entry->size = entry->size - (size + sizeof(allocator_entry_t));
+    new_entry->prev = entry;
+    new_entry->next = NULL;
 
-    AllocatorTail = NewEntry;
+    tail = new_entry;
 
-    Entry->Size = Size;
-    Entry->Next = NewEntry;
+    entry->size = size;
+    entry->next = new_entry;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -48,23 +47,23 @@ static void SplitEntry(AllocatorEntry *Entry, size_t Size) {
  *     one entry.
  *
  * PARAMETERS:
- *     Base - The entry to start merging from.
+ *     base - The entry to start merging from.
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-static void MergeEntriesForward(AllocatorEntry *Base) {
-    while (Base->Next && Base + (Base->Size << 12) == Base->Next && !Base->Next->Used) {
-        Base->Size += Base->Next->Size;
-        Base->Next = Base->Next->Next;
+static void merge_forward(allocator_entry_t *base) {
+    while (base->next && base + (base->size << 12) == base->next && !base->next->used) {
+        base->size += base->next->size;
+        base->next = base->next->next;
 
-        if (Base->Next) {
-            Base->Next->Prev = Base;
+        if (base->next) {
+            base->next->prev = base;
         }
     }
 
-    if (!Base->Next) {
-        AllocatorTail = Base;
+    if (!base->next) {
+        tail = base;
     }
 }
 
@@ -74,29 +73,29 @@ static void MergeEntriesForward(AllocatorEntry *Base) {
  *     one entry.
  *
  * PARAMETERS:
- *     Base - The entry to start merging from.
+ *     base - The entry to start merging from.
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-static void MergeEntriesBackward(AllocatorEntry *Base) {
-    while (Base->Prev && Base->Prev + (Base->Prev->Size << 12) == Base && !Base->Prev->Used) {
-        Base->Prev->Size += Base->Size;
-        Base->Prev->Next = Base->Next;
+static void merge_backward(allocator_entry_t *base) {
+    while (base->prev && base->prev + (base->prev->size << 12) == base && !base->prev->used) {
+        base->prev->size += base->size;
+        base->prev->next = base->next;
 
-        if (Base->Next) {
-            Base->Next->Prev = Base->Prev;
+        if (base->next) {
+            base->next->prev = base->prev;
         }
 
-        Base = Base->Prev;
+        base = base->prev;
     }
 
-    if (!Base->Prev) {
-        AllocatorHead = Base;
+    if (!base->prev) {
+        head = base;
     }
 
-    if (!Base->Next) {
-        AllocatorTail = Base;
+    if (!base->next) {
+        tail = base;
     }
 }
 
@@ -106,47 +105,46 @@ static void MergeEntriesBackward(AllocatorEntry *Base) {
  *     and uses it to create a new entry.
  *
  * PARAMETERS:
- *     Size - The size of the entry to find or create.
+ *     size - The size of the entry to find or create.
  *
  * RETURN VALUE:
  *     A pointer to the allocated entry, or NULL if there is no more free regions in the memory
  *     map.
  *-----------------------------------------------------------------------------------------------*/
-static AllocatorEntry *FindFreeEntry(size_t Size) {
-    AllocatorEntry *Entry = AllocatorHead;
-    size_t Mask = MM_PAGE_SIZE - 1;
+static allocator_entry_t *find_free(size_t size) {
+    allocator_entry_t *entry = head;
+    size_t mask = __PAGE_SIZE - 1;
 
-    while (Entry) {
-        if (!Entry->Used && Entry->Size >= Size) {
-            Entry->Used = 1;
-            return Entry;
+    while (entry) {
+        if (!entry->used && entry->size >= size) {
+            entry->used = 1;
+            return entry;
         }
 
-        Entry = Entry->Next;
+        entry = entry->next;
     }
 
-    uint64_t EntryPage = MmAllocatePages((Size + sizeof(AllocatorEntry) + Mask) >> MM_PAGE_SHIFT);
-    if (!EntryPage) {
+    entry = __allocate_pages((size + sizeof(allocator_entry_t) + mask) >> __PAGE_SHIFT);
+    if (entry) {
         return NULL;
     }
 
-    Entry = MI_PADDR_TO_VADDR(EntryPage);
-    Size = ((Size + sizeof(AllocatorEntry) + Mask) & ~Mask) - sizeof(AllocatorEntry);
+    size = ((size + sizeof(allocator_entry_t) + mask) & ~mask) - sizeof(allocator_entry_t);
 
-    Entry->Used = 1;
-    Entry->Size = Size;
-    Entry->Prev = AllocatorTail;
-    Entry->Next = NULL;
+    entry->used = 1;
+    entry->size = size;
+    entry->prev = tail;
+    entry->next = NULL;
 
-    if (AllocatorTail) {
-        AllocatorTail->Next = Entry;
+    if (tail) {
+        tail->next = entry;
     } else {
-        AllocatorHead = Entry;
+        head = entry;
     }
 
-    AllocatorTail = Entry;
+    tail = entry;
 
-    return Entry;
+    return entry;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -154,19 +152,19 @@ static AllocatorEntry *FindFreeEntry(size_t Size) {
  *     This function allocates a block of memory of the specified size.
  *
  * PARAMETERS:
- *     Size - The size of the block to allocate.
+ *     size - The size of the block to allocate.
  *
  * RETURN VALUE:
  *     A pointer to the allocated block, or NULL if there is was no free entry and requesting
  *     a new page failed.
  *-----------------------------------------------------------------------------------------------*/
-void *MmAllocateBlock(size_t Size) {
-    Size = (Size + 15) & ~0x0F;
-    AllocatorEntry *Entry = FindFreeEntry(Size);
+void *malloc(size_t size) {
+    size = (size + 15) & ~0x0F;
+    allocator_entry_t *entry = find_free(size);
 
-    if (Entry) {
-        SplitEntry(Entry, Size);
-        return Entry + 1;
+    if (entry) {
+        split_entry(entry, size);
+        return entry + 1;
     }
 
     return NULL;
@@ -178,22 +176,22 @@ void *MmAllocateBlock(size_t Size) {
  *     afterwards.
  *
  * PARAMETERS:
- *     Elements - How many elements the array has.
- *     ElementSize - The size of each element.
+ *     num - How many elements the array has.
+ *     size - The size of each element.
  *
  * RETURN VALUE:
  *     A pointer to the allocated block, or NULL if there is was no free entry and requesting
  *     a new page failed.
  *-----------------------------------------------------------------------------------------------*/
-void *MmAllocateZeroBlock(size_t Elements, size_t ElementSize) {
-    size_t Size = Elements * ElementSize;
-    void *Base = MmAllocateBlock(Size);
+void *calloc(size_t num, size_t size) {
+    size *= num;
+    void *base = malloc(size);
 
-    if (Base) {
-        memset(Base, 0, Size);
+    if (base) {
+        memset(base, 0, size);
     }
 
-    return Base;
+    return base;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -201,14 +199,14 @@ void *MmAllocateZeroBlock(size_t Elements, size_t ElementSize) {
  *     This function frees a block of memory.
  *
  * PARAMETERS:
- *     Block - The base address of the block to free.
+ *     ptr - The base address of the block to free.
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void MmFreeBlock(void *Block) {
-    AllocatorEntry *Entry = (AllocatorEntry *)Block - 1;
-    Entry->Used = 0;
-    MergeEntriesForward(Entry);
-    MergeEntriesBackward(Entry);
+void free(void *ptr) {
+    allocator_entry_t *entry = (allocator_entry_t *)ptr - 1;
+    entry->used = 0;
+    merge_forward(entry);
+    merge_backward(entry);
 }

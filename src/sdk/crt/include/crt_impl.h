@@ -30,6 +30,14 @@ struct fpos_t {
 
 #ifndef __CRT_STDIO_H
 
+#if defined(ARCH_x86) || defined(ARCH_amd64)
+#define __PAGE_SHIFT 12
+#else
+#error "Undefined ARCH for the CRT module!"
+#endif /* ARCH */
+
+#define __PAGE_SIZE (1ull << (__PAGE_SHIFT))
+
 #define __STDIO_FLAGS_READ 0x01
 #define __STDIO_FLAGS_WRITE 0x02
 #define __STDIO_FLAGS_APPEND 0x04
@@ -58,6 +66,8 @@ int __vscanf(
     void *context,
     int (*read_ch)(void *context),
     void (*unread_ch)(void *context, int ch));
+
+void *__allocate_pages(size_t pages);
 
 double __strtod_hex(const char *str, double sign);
 double __strtod_dec(const char *str, double sign);

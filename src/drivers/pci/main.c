@@ -3,6 +3,7 @@
 
 #include <acpi.h>
 #include <ke.h>
+#include <mm.h>
 #include <pcip.h>
 #include <string.h>
 
@@ -35,20 +36,24 @@ void DriverEntry(void) {
             continue;
         }
 
-        PcipBus Bus;
-        memset(&Bus, 0, sizeof(PcipBus));
+        PcipBus *Bus = MmAllocateBlock(sizeof(PcipBus));
+        if (!Bus) {
+            PcipShowErrorMessage(
+                KE_EARLY_MEMORY_FAILURE, "could not allocate space for a PCI bus\n");
+        }
 
-        Bus.Object = Device;
+        memset(Bus, 0, sizeof(PcipBus));
+        Bus->Object = Device;
 
         if (AcpiEvaluateObject(AcpiSearchObject(Device, "_SEG"), &Value, ACPI_INTEGER)) {
-            Bus.Seg = Value.Integer;
+            Bus->Seg = Value.Integer;
         }
 
         if (AcpiEvaluateObject(AcpiSearchObject(Device, "_BBN"), &Value, ACPI_INTEGER)) {
-            Bus.Bbn = Value.Integer;
+            Bus->Bbn = Value.Integer;
         }
 
-        PcipInitializeBus(&Bus);
+        PcipInitializeBus(Bus);
         PcipShowInfoMessage("initialized root bus at ACPI path \\_SB_.%.4s\n", Device->Name);
     }
 }

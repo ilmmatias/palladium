@@ -3,16 +3,10 @@
 
 #include <io.h>
 #include <mm.h>
-#include <stddef.h>
+#include <rt.h>
 #include <string.h>
 
-typedef struct DeviceListEntry {
-    IoDevice Device;
-    struct DeviceListEntry *Next;
-} DeviceListEntry;
-
-static DeviceListEntry *DeviceListHead = NULL;
-static DeviceListEntry *DeviceListTail = NULL;
+static RtSinglyLinkedListEntry DeviceListHead = {.Next = NULL};
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -31,30 +25,22 @@ int IoCreateDevice(const char *Name, IoReadFn Read, IoWriteFn Write) {
         return 0;
     }
 
-    DeviceListEntry *Entry = MmAllocateBlock(sizeof(DeviceListEntry));
+    IoDevice *Entry = MmAllocateBlock(sizeof(IoDevice));
     if (!Entry) {
         return 0;
     }
 
-    Entry->Device.Name = MmAllocateBlock(strlen(Name) + 1);
-    if (!Entry->Device.Name) {
+    Entry->Name = MmAllocateBlock(strlen(Name) + 1);
+    if (!Entry->Name) {
         MmFreeBlock(Entry);
         return 0;
     }
 
-    strcpy((char *)Entry->Device.Name, Name);
-    Entry->Device.Read = Read;
-    Entry->Device.Write = Write;
-    Entry->Next = NULL;
+    strcpy((char *)Entry->Name, Name);
+    Entry->Read = Read;
+    Entry->Write = Write;
 
-    if (DeviceListTail) {
-        DeviceListTail->Next = Entry;
-    } else {
-        DeviceListHead = Entry;
-    }
-
-    DeviceListTail = Entry;
-
+    RtPushSinglyLinkedList(&DeviceListHead, &Entry->ListEntry);
     return 1;
 }
 
@@ -73,13 +59,11 @@ IoDevice *IoOpenDevice(const char *Name) {
         return NULL;
     }
 
-    DeviceListEntry *Entry = DeviceListHead;
-    while (Entry) {
-        if (!strcmp(Entry->Device.Name, Name)) {
-            return &Entry->Device;
+    for (RtSinglyLinkedListEntry *Entry = DeviceListHead.Next; Entry; Entry = Entry->Next) {
+        IoDevice *Device = CONTAINING_RECORD(Entry, IoDevice, ListEntry);
+        if (!strcmp(Device->Name, Name)) {
+            return Device;
         }
-
-        Entry = Entry->Next;
     }
 
     return NULL;

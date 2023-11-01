@@ -3,89 +3,89 @@ EXPORTS
     IoCreateDevice
     IoOpenDevice
 
+    KeFatalError
     KiGetAcpiBaseAddress
     KiGetAcpiTableType
 
-    KeFatalError
-
-    MmAllocatePages
-
     MmAllocateBlock
+    MmAllocatePages
     MmAllocateZeroBlock
     MmFreeBlock
 
-    VidResetDisplay
-
-    VidSetColor
     VidGetColor
-    VidSetCursor
     VidGetCursor
-
     VidPutChar
     VidPutString
+    VidResetDisplay
+    VidSetColor
+    VidSetCursor
 
+    RtAppendDoublyLinkedList
+    RtGetHash
+    RtInitializeDoublyLinkedList
+    RtInitializeSinglyLinkedList
+    RtPopDoublyLinkedList
+    RtPopSinglyLinkedList
+    RtPushDoublyLinkedList
+    RtPushSinglyLinkedList
+    RtTruncateDoublyLinkedList
+
+    __rand64
     __vprintf
 
     isalnum
     isalpha
-    islower
-    isupper
-    isdigit
-    isxdigit
-    iscntrl
-    isgraph
-    isspace
     isblank
+    iscntrl
+    isdigit
+    isgraph
+    islower
     isprint
     ispunct
-
+    isspace
+    isupper
+    isxdigit
     tolower
     toupper
 
-    sscanf
-
-    vsscanf
-
-    sprintf
     snprintf
-
-    vsprintf
+    sprintf
+    sscanf
     vsnprintf
+    vsprintf
+    vsscanf
 
     atof
     atoi
     atol
     atoll
+    rand
+    srand
+    strtod
+    strtof
     strtol
+    strtold
     strtoll
     strtoul
     strtoull
-    strtof
-    strtod
-    strtold
 
-    rand
-    srand
-
-    strcpy
-    strncpy
-    strcat
-    strncat
-
-    strlen
-    strcmp
-    strncmp
-    strchr
-    strrchr
-    strspn
-    strcspn
-    strpbrk
-    strstr
-    strtok
-
+    memccpy
     memchr
     memcmp
-    memset
     memcpy
     memmove
-    memccpy
+    memset
+    strcat
+    strchr
+    strcmp
+    strcpy
+    strcspn
+    strlen
+    strncat
+    strncmp
+    strncpy
+    strpbrk
+    strrchr
+    strspn
+    strstr
+    strtok

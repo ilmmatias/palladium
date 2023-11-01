@@ -5,6 +5,7 @@
 #define _PCIP_H_
 
 #include <acpi.h>
+#include <rt.h>
 
 /* The flags below control how much debugging info should be displayed on boot.
    On normal debugging, you probably want only PCI_ENABLE_INFO.  */
@@ -12,15 +13,11 @@
 #define PCI_ENABLE_TRACE 0
 
 typedef struct {
+    RtSinglyLinkedListEntry ListEntry;
     AcpiObject *Object;
     uint64_t Seg;
     uint64_t Bbn;
 } PcipBus;
-
-typedef struct PcipBusList {
-    PcipBus Bus;
-    struct PcipBusList *Next;
-} PcipBusList;
 
 void PcipShowInfoMessage(const char *Format, ...);
 [[noreturn]] void PcipShowErrorMessage(int Code, const char *Format, ...);

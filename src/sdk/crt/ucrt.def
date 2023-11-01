@@ -2,64 +2,102 @@ LIBRARY ucrt.dll
 EXPORTS
     isalnum
     isalpha
-    islower
-    isupper
-    isdigit
-    isxdigit
-    iscntrl
-    isgraph
-    isspace
     isblank
+    iscntrl
+    isdigit
+    isgraph
+    islower
     isprint
     ispunct
-
+    isspace
+    isupper
+    isxdigit
     tolower
     toupper
 
-    sscanf
-
-    vsscanf
-
-    sprintf
+    clearerr
+    fclose
+    feof
+    ferror
+    fflush
+    fgetc
+    fgetpos
+    fgets
+    fopen
+    fprintf
+    fputc
+    fputs
+    fread
+    freopen
+    fscanf
+    fseek
+    fsetpos
+    ftell
+    fwrite
+    getchar
+    getchar
+    gets
+    gets
+    printf
+    putchar
+    putchar
+    puts
+    puts
+    rewind
+    scanf
+    setbuf
+    setvbuf
     snprintf
-
-    vsprintf
+    sprintf
+    sscanf
+    stderr
+    stdin
+    stdout
+    ungetc
+    vfprintf
+    vfscanf
+    vprintf
+    vscanf
     vsnprintf
+    vsprintf
+    vsscanf
 
     atof
     atoi
     atol
     atoll
+    calloc
+    free
+    malloc
+    rand
+    srand
+    strtod
+    strtof
     strtol
+    strtold
     strtoll
     strtoul
     strtoull
-    strtof
-    strtod
-    strtold
 
-    rand
-    srand
-
-    strcpy
-    strncpy
-    strcat
-    strncat
-
-    strlen
-    strcmp
-    strncmp
-    strchr
-    strrchr
-    strspn
-    strcspn
-    strpbrk
-    strstr
-    strtok
-
+    memccpy
     memchr
     memcmp
-    memset
     memcpy
     memmove
-    memccpy
+    memset
+    strcat
+    strchr
+    strcmp
+    strcpy
+    strcspn
+    strdup
+    strlen
+    strncat
+    strncmp
+    strncpy
+    strndup
+    strpbrk
+    strrchr
+    strspn
+    strstr
+    strtok
