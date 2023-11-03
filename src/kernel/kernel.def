@@ -9,8 +9,9 @@ EXPORTS
 
     MmAllocatePages
     MmAllocatePool
+    MmDereferencePage
     MmFreePool
-    MmReferencePages
+    MmReferencePage
 
     VidGetColor
     VidGetCursor

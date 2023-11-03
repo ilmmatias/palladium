@@ -6,7 +6,6 @@
 
 extern MiPageEntry *MiPageList;
 extern MiPageEntry *MiFreePageListHead;
-extern MiPageEntry *MiFreePageListTail;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -21,6 +20,7 @@ extern MiPageEntry *MiFreePageListTail;
  *-----------------------------------------------------------------------------------------------*/
 void MiInitializePageAllocator(void *LoaderData) {
     LoaderBootData *BootData = LoaderData;
+    MiPageEntry *Tail = NULL;
 
     MiPageList = (MiPageEntry *)BootData->MemoryManager.PageAllocatorBase;
 
@@ -50,10 +50,8 @@ void MiInitializePageAllocator(void *LoaderData) {
                 We either need to append to the end of the free list,
                 Or we need to extend the last entry. */
 
-        if (MiFreePageListTail &&
-            MiFreePageListTail->GroupBase + (MiFreePageListTail->GroupPages << MM_PAGE_SHIFT) ==
-                Region->BaseAddress) {
-            MiFreePageListTail->GroupPages += Region->Length >> MM_PAGE_SHIFT;
+        if (Tail && Tail->GroupBase + (Tail->GroupPages << MM_PAGE_SHIFT) == Region->BaseAddress) {
+            Tail->GroupPages += Region->Length >> MM_PAGE_SHIFT;
             continue;
         }
 
@@ -63,14 +61,14 @@ void MiInitializePageAllocator(void *LoaderData) {
         Group->GroupBase = Region->BaseAddress;
         Group->GroupPages = Region->Length >> MM_PAGE_SHIFT;
         Group->NextGroup = NULL;
-        Group->PreviousGroup = MiFreePageListTail;
+        Group->PreviousGroup = Tail;
 
-        if (MiFreePageListTail) {
-            MiFreePageListTail->NextGroup = Group;
+        if (Tail) {
+            Tail->NextGroup = Group;
         } else {
             MiFreePageListHead = Group;
         }
 
-        MiFreePageListTail = Group;
+        Tail = Group;
     }
 }

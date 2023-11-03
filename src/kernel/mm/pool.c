@@ -7,7 +7,6 @@
 #include <string.h>
 
 #define SMALL_BLOCK_COUNT ((uint32_t)((MM_PAGE_SIZE - 16) >> 4))
-#define HUGE_BLOCK_COUNT 256
 
 typedef struct {
     RtSList ListHeader;
@@ -15,15 +14,9 @@ typedef struct {
     uint32_t Head;
 } PoolHeader;
 
-typedef struct {
-    RtSList ListHeader;
-    uint32_t Pages;
-} PoolPagesHeader;
-
 extern MiPageEntry *MiPageList;
 
 RtSList SmallBlocks[SMALL_BLOCK_COUNT] = {};
-RtSList HugeBlocks[HUGE_BLOCK_COUNT + 1] = {};
 
 uint64_t MiPoolStart = 0;
 uint64_t MiPoolBitmapHint = 0;
@@ -40,45 +33,6 @@ RtBitmap MiPoolBitmap;
  *     Virtual (mapped) pointer to the allocated space, or NULL if we failed to allocate it.
  *-----------------------------------------------------------------------------------------------*/
 static void *AllocatePoolPages(uint32_t Pages) {
-    uint32_t Head = Pages > HUGE_BLOCK_COUNT ? HUGE_BLOCK_COUNT : Pages - 1;
-
-    /* Everything up to HUGE_BLOCK_COUNT are lists where each entry is an exact amount of pages,
-       the entry past that represents anything over those limits. */
-    for (uint32_t i = Head; i <= HUGE_BLOCK_COUNT; i++) {
-        if (!HugeBlocks[i].Next ||
-            CONTAINING_RECORD(HugeBlocks[i].Next, PoolPagesHeader, ListHeader)->Pages < Pages) {
-            continue;
-        }
-
-        PoolPagesHeader *Header =
-            CONTAINING_RECORD(RtPopSList(&HugeBlocks[i]), PoolPagesHeader, ListHeader);
-
-        if (Header->Pages > Pages) {
-            PoolPagesHeader *RemainingSpace =
-                (PoolPagesHeader *)((char *)Header + (Pages << MM_PAGE_SHIFT));
-
-            RemainingSpace->Pages = Header->Pages - Pages;
-
-            RtPushSList(
-                &HugeBlocks
-                    [RemainingSpace->Pages > HUGE_BLOCK_COUNT ? HUGE_BLOCK_COUNT
-                                                              : RemainingSpace->Pages - 1],
-                &RemainingSpace->ListHeader);
-        }
-
-        /* Mark the start and end of the allocation (FreePoolPages depends on this). */
-        uint64_t PhysicalAddress = MiGetPhysicalAddress(Header);
-        MiPageList[PhysicalAddress >> 12].StartOfAllocation = 1;
-
-        if (Pages != 1) {
-            PhysicalAddress = MiGetPhysicalAddress((char *)Header + ((Pages - 1) << MM_PAGE_SHIFT));
-        }
-
-        MiPageList[PhysicalAddress >> 12].EndOfAllocation = 1;
-        return Header;
-    }
-
-    /* Nothing left on the free list (that we can use), let's reach into the bitmap. */
     uint64_t Offset = RtFindClearBitsAndSet(&MiPoolBitmap, MiPoolBitmapHint, Pages);
     if (Offset == (uint64_t)-1) {
         return NULL;
@@ -93,6 +47,8 @@ static void *AllocatePoolPages(uint32_t Pages) {
             !MiMapPage(VirtualAddress + (i << MM_PAGE_SHIFT), PhysicalAddress, MI_MAP_WRITE)) {
             return NULL;
         }
+
+        /* FreePoolPages uses these two markers to count how many pages the allocation has. */
 
         if (!i) {
             MiPageList[PhysicalAddress >> MM_PAGE_SHIFT].StartOfAllocation = 1;
@@ -125,15 +81,13 @@ static void FreePoolPages(void *Base) {
     uint64_t Pages = 1;
     uint64_t LastPhysicalAddress = FirstPhysicalAddress;
     for (uint64_t i = 1; !MiPageList[LastPhysicalAddress >> MM_PAGE_SHIFT].EndOfAllocation; i++) {
+        MmDereferencePage(LastPhysicalAddress);
         LastPhysicalAddress = MiGetPhysicalAddress((char *)Base + (i << MM_PAGE_SHIFT));
         Pages++;
     }
 
-    PoolPagesHeader *Header = Base;
-    Header->Pages = Pages;
-
-    uint32_t Head = Pages > HUGE_BLOCK_COUNT ? HUGE_BLOCK_COUNT : Pages - 1;
-    RtPushSList(&HugeBlocks[Head], &Header->ListHeader);
+    MmDereferencePage(LastPhysicalAddress);
+    RtClearBits(&MiPoolBitmap, FirstPhysicalAddress >> MM_PAGE_SHIFT, Pages);
 
     MiPageList[FirstPhysicalAddress >> MM_PAGE_SHIFT].StartOfAllocation = 0;
     MiPageList[LastPhysicalAddress >> MM_PAGE_SHIFT].EndOfAllocation = 0;

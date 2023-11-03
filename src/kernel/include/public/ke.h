@@ -14,7 +14,8 @@
 #define KE_BAD_ACPI_TABLES 1
 #define KE_BAD_POOL_HEADER 2
 #define KE_DOUBLE_POOL_FREE 3
-#define KE_OUT_OF_MEMORY 4
+#define KE_DOUBLE_PAGE_FREE 4
+#define KE_OUT_OF_MEMORY 5
 
 uint64_t KiGetAcpiBaseAddress(void);
 int KiGetAcpiTableType(void);

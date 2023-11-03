@@ -9,6 +9,7 @@ static char *Messages[] = {
     "BAD_ACPI_TABLES",
     "BAD_POOL_HEADER",
     "DOUBLE_POOL_FREE",
+    "DOUBLE_PAGE_FREE",
     "OUT_OF_MEMORY",
 };
 
