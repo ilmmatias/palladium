@@ -1,7 +1,7 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
-#include <crt_impl.h>   
+#include <crt_impl.h>
 #include <string.h>
 
 typedef struct allocator_entry_t {
@@ -28,7 +28,8 @@ static void split_entry(allocator_entry_t *entry, size_t size) {
         return;
     }
 
-    allocator_entry_t *new_entry = (allocator_entry_t *)((uintptr_t)entry + sizeof(allocator_entry_t) + size);
+    allocator_entry_t *new_entry =
+        (allocator_entry_t *)((uintptr_t)entry + sizeof(allocator_entry_t) + size);
 
     new_entry->used = 0;
     new_entry->size = entry->size - (size + sizeof(allocator_entry_t));
@@ -125,7 +126,7 @@ static allocator_entry_t *find_free(size_t size) {
     }
 
     entry = __allocate_pages((size + sizeof(allocator_entry_t) + mask) >> __PAGE_SHIFT);
-    if (entry) {
+    if (!entry) {
         return NULL;
     }
 

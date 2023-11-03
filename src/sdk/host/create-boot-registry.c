@@ -209,9 +209,7 @@ static int CreateIntegerKey(
     }
 
     uint32_t Block;
-    RegBlockHeader *BlockHeader = (RegBlockHeader *)BlockBuffer;
     uint32_t Length = sizeof(RegEntryHeader) + NameLength + (1 << (Type - 1));
-
     uint8_t *Entry = FindFreeEntry(Stream, FirstBlockOffset, Length, &Block);
     if (!Entry) {
         return 0;
@@ -266,9 +264,7 @@ CreateStringKey(FILE *Stream, uint32_t FirstBlockOffset, const char *Name, const
     }
 
     uint32_t Block;
-    RegBlockHeader *BlockHeader = (RegBlockHeader *)BlockBuffer;
     uint32_t Length = sizeof(RegEntryHeader) + NameLength + ValueLength;
-
     uint8_t *Entry = FindFreeEntry(Stream, FirstBlockOffset, Length, &Block);
     if (!Entry) {
         return 0;
