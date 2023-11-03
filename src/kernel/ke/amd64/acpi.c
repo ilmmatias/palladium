@@ -21,7 +21,7 @@ static int AcpiTableType;
 void KiSaveAcpiData(void *LoaderData) {
     LoaderBootData *BootData = LoaderData;
     AcpiBaseAddress = BootData->Acpi.BaseAdress;
-    AcpiTableType = BootData->Acpi.IsXsdt;
+    AcpiTableType = BootData->Acpi.IsXsdt + 1;
 }
 
 /*-------------------------------------------------------------------------------------------------

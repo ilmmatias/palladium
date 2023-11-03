@@ -5,10 +5,10 @@ project(os/sdk/rt)
 
 set(SOURCES
     ${SOURCES}
-    double_list.c
+    bitmap.c
     hash.c
-    placeholder.c
-    single_list.c)
+    list.c
+    placeholder.c)
 
 include(kernel.cmake)
 

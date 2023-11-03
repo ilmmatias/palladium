@@ -37,6 +37,7 @@ typedef struct __attribute__((packed)) {
     struct {
         uint64_t MemorySize;
         uint64_t PageAllocatorBase;
+        uint64_t PoolBitmapBase;
     } MemoryManager;
     struct {
         BiosMemoryRegion *Entries;

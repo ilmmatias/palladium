@@ -5,6 +5,44 @@
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
+ *     This function inserts a new entry into a singly linked list.
+ *
+ * PARAMETERS:
+ *     Head - Header entry of the list.
+ *     Entry - What we're inserting.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void RtPushSList(RtSList *Head, RtSList *Entry) {
+    Entry->Next = Head->Next;
+    Head->Next = Entry;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function removes the last inserted entry from a singly linked list.
+ *
+ * PARAMETERS:
+ *     Head - Header entry of the list.
+ *
+ * RETURN VALUE:
+ *     NULL if the list was entry, what we removed otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+RtSList *RtPopSList(RtSList *Head) {
+    if (!Head->Next) {
+        return NULL;
+    }
+
+    RtSList *Entry = Head->Next;
+    Head->Next = Entry->Next;
+    Entry->Next = NULL;
+
+    return Entry;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
  *     This function initializes a doubly linked list.
  *
  * PARAMETERS:
@@ -13,11 +51,9 @@
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void RtInitializeDoublyLinkedList(RtDoublyLinkedListEntry *Head) {
-    if (Head) {
-        Head->Next = Head;
-        Head->Prev = Head;
-    }
+void RtInitializeDList(RtDList *Head) {
+    Head->Next = Head;
+    Head->Prev = Head;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -31,13 +67,11 @@ void RtInitializeDoublyLinkedList(RtDoublyLinkedListEntry *Head) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void RtPushDoublyLinkedList(RtDoublyLinkedListEntry *Head, RtDoublyLinkedListEntry *Entry) {
-    if (Head && Entry) {
-        Entry->Next = Head->Next;
-        Entry->Prev = Head;
-        Head->Next->Prev = Entry;
-        Head->Next = Entry;
-    }
+void RtPushDList(RtDList *Head, RtDList *Entry) {
+    Entry->Next = Head->Next;
+    Entry->Prev = Head;
+    Head->Next->Prev = Entry;
+    Head->Next = Entry;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -51,13 +85,11 @@ void RtPushDoublyLinkedList(RtDoublyLinkedListEntry *Head, RtDoublyLinkedListEnt
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void RtAppendDoublyLinkedList(RtDoublyLinkedListEntry *Head, RtDoublyLinkedListEntry *Entry) {
-    if (Head && Entry) {
-        Entry->Next = Head;
-        Entry->Prev = Head->Prev;
-        Head->Prev->Next = Entry;
-        Head->Prev = Entry;
-    }
+void RtAppendDList(RtDList *Head, RtDList *Entry) {
+    Entry->Next = Head;
+    Entry->Prev = Head->Prev;
+    Head->Prev->Next = Entry;
+    Head->Prev = Entry;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -70,12 +102,9 @@ void RtAppendDoublyLinkedList(RtDoublyLinkedListEntry *Head, RtDoublyLinkedListE
  * RETURN VALUE:
  *     NULL if the list was entry, what we removed otherwise.
  *-----------------------------------------------------------------------------------------------*/
-RtDoublyLinkedListEntry *RtPopDoublyLinkedList(RtDoublyLinkedListEntry *Head) {
-    if (!Head) {
-        return NULL;
-    }
+RtDList *RtPopDList(RtDList *Head) {
+    RtDList *Entry = Head->Next;
 
-    RtDoublyLinkedListEntry *Entry = Head->Next;
     Head->Next = Entry->Next;
     Entry->Next->Prev = Head;
     Entry->Next = NULL;
@@ -94,12 +123,9 @@ RtDoublyLinkedListEntry *RtPopDoublyLinkedList(RtDoublyLinkedListEntry *Head) {
  * RETURN VALUE:
  *     NULL if the list was entry, what we removed otherwise.
  *-----------------------------------------------------------------------------------------------*/
-RtDoublyLinkedListEntry *RtTruncateDoublyLinkedList(RtDoublyLinkedListEntry *Head) {
-    if (!Head) {
-        return NULL;
-    }
+RtDList *RtTruncateDList(RtDList *Head) {
+    RtDList *Entry = Head->Prev;
 
-    RtDoublyLinkedListEntry *Entry = Head->Prev;
     Head->Prev = Entry->Prev;
     Entry->Prev->Next = Head;
     Entry->Next = NULL;
@@ -119,9 +145,7 @@ RtDoublyLinkedListEntry *RtTruncateDoublyLinkedList(RtDoublyLinkedListEntry *Hea
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void RtUnlinkDoublyLinkedList(RtDoublyLinkedListEntry *Entry) {
-    if (Entry) {
-        Entry->Prev->Next = Entry->Next;
-        Entry->Next->Prev = Entry->Prev;
-    }
+void RtUnlinkDList(RtDList *Entry) {
+    Entry->Prev->Next = Entry->Next;
+    Entry->Next->Prev = Entry->Prev;
 }

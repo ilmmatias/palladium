@@ -3,7 +3,6 @@
 
 #include <amd64/boot.h>
 #include <mi.h>
-#include <stddef.h>
 
 extern MiPageEntry *MiPageList;
 extern MiPageEntry *MiFreePageListHead;

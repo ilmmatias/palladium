@@ -6,7 +6,7 @@
 #include <rt.h>
 #include <string.h>
 
-static RtSinglyLinkedListEntry DeviceListHead = {.Next = NULL};
+static RtSList DeviceListHead = {.Next = NULL};
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -21,18 +21,18 @@ static RtSinglyLinkedListEntry DeviceListHead = {.Next = NULL};
  *     1 on success, 0 on failure (either out of memory, or the name already exists).
  *-----------------------------------------------------------------------------------------------*/
 int IoCreateDevice(const char *Name, IoReadFn Read, IoWriteFn Write) {
-    if (!Name || !Read || !Write || IoOpenDevice(Name)) {
+    if (IoOpenDevice(Name)) {
         return 0;
     }
 
-    IoDevice *Entry = MmAllocatePool(sizeof(IoDevice), "IOP ");
+    IoDevice *Entry = MmAllocatePool(sizeof(IoDevice), "Io  ");
     if (!Entry) {
         return 0;
     }
 
-    Entry->Name = MmAllocatePool(strlen(Name) + 1, "IOP ");
+    Entry->Name = MmAllocatePool(strlen(Name) + 1, "Io  ");
     if (!Entry->Name) {
-        MmFreePool(Entry, "IOP ");
+        MmFreePool(Entry, "Io  ");
         return 0;
     }
 
@@ -40,7 +40,7 @@ int IoCreateDevice(const char *Name, IoReadFn Read, IoWriteFn Write) {
     Entry->Read = Read;
     Entry->Write = Write;
 
-    RtPushSinglyLinkedList(&DeviceListHead, &Entry->ListHeader);
+    RtPushSList(&DeviceListHead, &Entry->ListHeader);
     return 1;
 }
 
@@ -55,11 +55,7 @@ int IoCreateDevice(const char *Name, IoReadFn Read, IoWriteFn Write) {
  *     Pointer to the device on success, NULL otherwise.
  *-----------------------------------------------------------------------------------------------*/
 IoDevice *IoOpenDevice(const char *Name) {
-    if (!Name) {
-        return NULL;
-    }
-
-    for (RtSinglyLinkedListEntry *Entry = DeviceListHead.Next; Entry; Entry = Entry->Next) {
+    for (RtSList *Entry = DeviceListHead.Next; Entry; Entry = Entry->Next) {
         IoDevice *Device = CONTAINING_RECORD(Entry, IoDevice, ListHeader);
         if (!strcmp(Device->Name, Name)) {
             return Device;

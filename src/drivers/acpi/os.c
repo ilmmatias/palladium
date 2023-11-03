@@ -41,6 +41,11 @@ static int Checksum(const char *Table, uint32_t Length) {
  *     Pointer to the header of the entry, or NULL on failure.
  *-----------------------------------------------------------------------------------------------*/
 SdtHeader *AcpipFindTable(char Signature[4], int Index) {
+    if (KiGetAcpiTableType() == KI_ACPI_NONE) {
+        /* If we got loaded, all further drivers on this architecture probably depend on ACPI. */
+        KeFatalError(KE_BAD_ACPI_TABLES);
+    }
+
     /* DSDT is contained inside the XDsdt (or the Dsdt) field of the FADT; Other than that, just
        do a linear search on the R/XSDT. */
 
@@ -94,7 +99,7 @@ SdtHeader *AcpipFindTable(char Signature[4], int Index) {
  *     Start of the allocated block, or NULL on failure.
  *-----------------------------------------------------------------------------------------------*/
 void *AcpipAllocateBlock(size_t Size) {
-    return MmAllocatePool(Size, "ACPI");
+    return MmAllocatePool(Size, "Acpi");
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -109,7 +114,7 @@ void *AcpipAllocateBlock(size_t Size) {
  *     Start of the allocated block, or NULL on failure.
  *-----------------------------------------------------------------------------------------------*/
 void *AcpipAllocateZeroBlock(size_t Elements, size_t ElementSize) {
-    return MmAllocatePool(Elements * ElementSize, "ACPI");
+    return MmAllocatePool(Elements * ElementSize, "Acpi");
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -124,7 +129,7 @@ void *AcpipAllocateZeroBlock(size_t Elements, size_t ElementSize) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void AcpipFreeBlock(void *Block) {
-    MmFreePool(Block, "ACPI");
+    MmFreePool(Block, "Acpi");
 }
 
 /*-------------------------------------------------------------------------------------------------

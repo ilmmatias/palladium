@@ -13,7 +13,7 @@
 #define PCI_ENABLE_TRACE 0
 
 typedef struct {
-    RtSinglyLinkedListEntry ListHeader;
+    RtSList ListHeader;
     AcpiObject *Object;
     uint64_t Seg;
     uint64_t Bbn;

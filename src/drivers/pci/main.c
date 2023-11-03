@@ -35,7 +35,7 @@ void DriverEntry(void) {
             continue;
         }
 
-        PcipBus *Bus = MmAllocatePool(sizeof(PcipBus), "PCI ");
+        PcipBus *Bus = MmAllocatePool(sizeof(PcipBus), "Pci ");
         if (!Bus) {
             PcipShowErrorMessage(KE_OUT_OF_MEMORY, "could not allocate space for a PCI bus\n");
         }

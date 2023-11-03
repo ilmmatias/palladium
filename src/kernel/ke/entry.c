@@ -9,8 +9,6 @@
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function is the kernel's architecture-independent entry point.
- *     We're responsible for the "stage 0" of the system boot (initializing the memory manager,
- *     IO manager, boot-start drivers, and the process manager).
  *     The next phase of boot is done after the process manager creates the system thread.
  *
  * PARAMETERS:
@@ -20,10 +18,17 @@
  *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
 [[noreturn]] void KiSystemStartup(void *LoaderData) {
+    /* Stage 0: Early output initialization; We need those, or we can't show error messages. */
     VidpInitialize(LoaderData);
+
+    /* Stage 1: Memory manager initialization. */
     MiInitializePageAllocator(LoaderData);
+    MiInitializeVirtualMemory(LoaderData);
+
+    /* Stage 2: Root drivers should be already loaded, wrap them up by calling their entry. */
     KiSaveAcpiData(LoaderData);
     KiRunBootStartDrivers(LoaderData);
+
     while (1)
         ;
 }

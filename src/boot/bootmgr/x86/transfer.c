@@ -23,6 +23,7 @@ typedef struct __attribute__((packed)) {
     struct {
         uint64_t MemorySize;
         uint64_t PageAllocatorBase;
+        uint64_t PoolBitmapBase;
     } MemoryManager;
     struct {
         uint64_t BaseAddress;
@@ -103,9 +104,20 @@ static void InstallIdtHandler(int Number, uint64_t Handler) {
        MmSize should always be `PagesOfMemory * sizeof(MiPageEntry)`, if MiPageEntry changes
        on the kernel, the size here needs to change too! */
     uint64_t PagesOfMemory = (BiosMemorySize + PAGE_SIZE - 1) >> PAGE_SHIFT;
-    uint64_t MmSize = PagesOfMemory * 29;
+    uint64_t MmSize = PagesOfMemory * 32;
     void *MmBase = BmAllocatePages((MmSize + PAGE_SIZE - 1) >> PAGE_SHIFT, MEMORY_KERNEL);
     if (!MmBase) {
+        BmPanic("An error occoured while trying to load the selected operating system.\n"
+                "There is not enough RAM for the memory manager.");
+    }
+
+    /* Pre-allocate the pool bitmap as well (so that the kernel can initialize everything
+       without trashing the loader struct before driver initialization). */
+    uint64_t PoolSize = 0x2000000000;
+    uint64_t PoolBitmapSize = (PoolSize >> PAGE_SHIFT) >> 3;
+    void *PoolBitmapBase =
+        BmAllocatePages((PoolBitmapSize + PAGE_SIZE - 1) >> PAGE_SHIFT, MEMORY_KERNEL);
+    if (!PoolBitmapBase) {
         BmPanic("An error occoured while trying to load the selected operating system.\n"
                 "There is not enough RAM for the memory manager.");
     }
@@ -141,11 +153,14 @@ static void InstallIdtHandler(int Number, uint64_t Handler) {
            Right after the higher half barrier, we have the actual identity mapping (supporting
            up to 16TiB). We map only 512GiB, and the kernel should map anything else after. The
            kernel and the kernel drivers are mapped at last, in whichever locations the ASLR
-           layer chose. */
+           layer chose.
+           The last entry of the address space contains a self-reference (so that the kernel can
+           easily manipulate the page map). */
         memset(Pml4, 0, PAGE_SIZE);
         Pml4[0] = (uint64_t)EarlyIdentPdpt | 0x03;
         Pml4[256] = (uint64_t)LateIdentPdpt | 0x03;
         Pml4[(ARENA_BASE >> 39) & 0x1FF] = (uint64_t)KernelPdpt | 0x03;
+        Pml4[511] = (uint64_t)Pml4 | 0x03;
 
         if (Edx & bit_PDPE1GB) {
             BmPrint("mapping %llu 1GiB slices of adressable physical memory\n", Slices1GiB);
@@ -242,6 +257,7 @@ static void InstallIdtHandler(int Number, uint64_t Handler) {
         BootData->Acpi.IsXsdt = BiosIsXsdt;
         BootData->MemoryManager.MemorySize = BiosMemorySize;
         BootData->MemoryManager.PageAllocatorBase = (uint64_t)MmBase + 0xFFFF800000000000;
+        BootData->MemoryManager.PoolBitmapBase = (uint64_t)PoolBitmapBase + 0xFFFF800000000000;
         BootData->MemoryMap.BaseAddress = (uint64_t)BiosMemoryMap + 0xFFFF800000000000;
         BootData->MemoryMap.Count = BiosMemoryMapEntries;
         BootData->Display.BaseAddress = (uint64_t)BiVideoBuffer + 0xFFFF800000000000;

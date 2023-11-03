@@ -177,9 +177,7 @@ void VidPutChar(char Character) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void VidPutString(const char *String) {
-    if (String) {
-        while (*String) {
-            VidPutChar(*(String++));
-        }
+    while (*String) {
+        VidPutChar(*(String++));
     }
 }

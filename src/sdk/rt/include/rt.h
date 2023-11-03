@@ -10,13 +10,18 @@
 #define CONTAINING_RECORD(address, type, field) \
     ((type *)((char *)(address) - (uintptr_t)(&((type *)0)->field)))
 
-typedef struct RtSinglyLinkedListEntry {
-    struct RtSinglyLinkedListEntry *Next;
-} RtSinglyLinkedListEntry;
+typedef struct RtSList {
+    struct RtSList *Next;
+} RtSList;
 
-typedef struct RtDoublyLinkedListEntry {
-    struct RtDoublyLinkedListEntry *Next, *Prev;
-} RtDoublyLinkedListEntry;
+typedef struct RtDList {
+    struct RtDList *Next, *Prev;
+} RtDList;
+
+typedef struct {
+    uint64_t *Buffer;
+    size_t NumberOfBits;
+} RtBitmap;
 
 #ifdef __cplusplus
 extern "C" {
@@ -24,15 +29,27 @@ extern "C" {
 
 uint32_t RtGetHash(const void *Buffer, size_t Size);
 
-void RtPushSinglyLinkedList(RtSinglyLinkedListEntry *Head, RtSinglyLinkedListEntry *Entry);
-RtSinglyLinkedListEntry *RtPopSinglyLinkedList(RtSinglyLinkedListEntry *Head);
+void RtPushSList(RtSList *Head, RtSList *Entry);
+RtSList *RtPopSList(RtSList *Head);
 
-void RtInitializeDoublyLinkedList(RtDoublyLinkedListEntry *Head);
-void RtPushDoublyLinkedList(RtDoublyLinkedListEntry *Head, RtDoublyLinkedListEntry *Entry);
-void RtAppendDoublyLinkedList(RtDoublyLinkedListEntry *Head, RtDoublyLinkedListEntry *Entry);
-RtDoublyLinkedListEntry *RtPopDoublyLinkedList(RtDoublyLinkedListEntry *Head);
-RtDoublyLinkedListEntry *RtTruncateDoublyLinkedList(RtDoublyLinkedListEntry *Head);
-void RtUnlinkDoublyLinkedList(RtDoublyLinkedListEntry *Entry);
+void RtInitializeDList(RtDList *Head);
+void RtPushDList(RtDList *Head, RtDList *Entry);
+void RtAppendDList(RtDList *Head, RtDList *Entry);
+RtDList *RtPopDList(RtDList *Head);
+RtDList *RtTruncateDList(RtDList *Head);
+void RtUnlinkDList(RtDList *Entry);
+
+void RtInitializeBitmap(RtBitmap *Header, uint64_t *Buffer, uint64_t NumberOfBits);
+void RtClearBit(RtBitmap *Header, uint64_t Bit);
+void RtClearBits(RtBitmap *Header, uint64_t Start, uint64_t NumberOfBits);
+void RtClearAllBits(RtBitmap *Header);
+void RtSetBit(RtBitmap *Header, uint64_t Bit);
+void RtSetBits(RtBitmap *Header, uint64_t Start, uint64_t NumberOfBits);
+void RtSetAllBits(RtBitmap *Header);
+uint64_t RtFindClearBits(RtBitmap *Header, uint64_t Hint, uint64_t NumberOfBits);
+uint64_t RtFindClearBitsAndSet(RtBitmap *Header, uint64_t Hint, uint64_t NumberOfBits);
+uint64_t RtFindSetBits(RtBitmap *Header, uint64_t Hint, uint64_t NumberOfBits);
+uint64_t RtFindSetBitsAndClear(RtBitmap *Header, uint64_t Hint, uint64_t NumberOfBits);
 
 #ifdef __cplusplus
 }

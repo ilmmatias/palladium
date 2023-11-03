@@ -6,8 +6,9 @@
 
 #include <stdint.h>
 
-#define KI_ACPI_RDST 0
-#define KI_ACPI_XSDT 1
+#define KI_ACPI_NONE 0
+#define KI_ACPI_RDST 1
+#define KI_ACPI_XSDT 2
 
 #define KE_FATAL_ERROR 0
 #define KE_BAD_ACPI_TABLES 1

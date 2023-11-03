@@ -3,7 +3,7 @@
 
 #include <pcip.h>
 
-RtSinglyLinkedListEntry PcipBusListHead = {.Next = NULL};
+RtSList PcipBusListHead = {};
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -18,5 +18,5 @@ RtSinglyLinkedListEntry PcipBusListHead = {.Next = NULL};
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void PcipInitializeBus(PcipBus *Bus) {
-    RtPushSinglyLinkedList(&PcipBusListHead, &Bus->ListHeader);
+    RtPushSList(&PcipBusListHead, &Bus->ListHeader);
 }

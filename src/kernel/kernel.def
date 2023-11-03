@@ -10,6 +10,7 @@ EXPORTS
     MmAllocatePages
     MmAllocatePool
     MmFreePool
+    MmReferencePages
 
     VidGetColor
     VidGetCursor
@@ -19,15 +20,26 @@ EXPORTS
     VidSetColor
     VidSetCursor
 
-    RtAppendDoublyLinkedList
+    RtAppendDList
+    RtClearAllBits
+    RtClearBit
+    RtClearBits
+    RtFindClearBits
+    RtFindClearBitsAndSet
+    RtFindSetBits
+    RtFindSetBitsAndClear
     RtGetHash
-    RtInitializeDoublyLinkedList
-    RtPopDoublyLinkedList
-    RtPopSinglyLinkedList
-    RtPushDoublyLinkedList
-    RtPushSinglyLinkedList
-    RtTruncateDoublyLinkedList
-    RtUnlinkDoublyLinkedList
+    RtInitializeBitmap
+    RtInitializeDList
+    RtPopDList
+    RtPopSList
+    RtPushDList
+    RtPushSList
+    RtSetAllBits
+    RtSetBit
+    RtSetBits
+    RtTruncateDList
+    RtUnlinkDList
 
     __rand64
     __vprintf
