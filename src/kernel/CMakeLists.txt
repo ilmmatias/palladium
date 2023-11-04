@@ -6,7 +6,9 @@ project(os/kernel)
 if(ARCH STREQUAL "amd64")
     set(SOURCES
         ke/${ARCH}/acpi.c
+        ke/${ARCH}/apic.c
         ke/${ARCH}/driver.c
+        ke/${ARCH}/platform.c
 
         mm/${ARCH}/map.c
         mm/${ARCH}/page.c
@@ -19,6 +21,7 @@ add_executable(kernel "kernel" YES
 
     io/device.c
 
+    ke/acpi.c
     ke/entry.c
     ke/panic.c
 

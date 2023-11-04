@@ -38,8 +38,13 @@ void VidSetColor(uint32_t BackgroundColor, uint32_t ForegroundColor) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void VidGetColor(uint32_t *BackgroundColor, uint32_t *ForegroundColor) {
-    *BackgroundColor = VidpBackground;
-    *ForegroundColor = VidpForeground;
+    if (BackgroundColor) {
+        *BackgroundColor = VidpBackground;
+    }
+
+    if (ForegroundColor) {
+        *ForegroundColor = VidpForeground;
+    }
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -70,6 +75,11 @@ void VidSetCursor(uint16_t X, uint16_t Y) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void VidGetCursor(uint16_t *X, uint16_t *Y) {
-    *X = VidpCursorX;
-    *Y = VidpCursorY;
+    if (X) {
+        *X = VidpCursorX;
+    }
+
+    if (Y) {
+        *Y = VidpCursorY;
+    }
 }

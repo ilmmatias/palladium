@@ -6,10 +6,6 @@
 
 #include <stdint.h>
 
-#define KI_ACPI_NONE 0
-#define KI_ACPI_RDST 1
-#define KI_ACPI_XSDT 2
-
 #define KE_FATAL_ERROR 0
 #define KE_BAD_ACPI_TABLES 1
 #define KE_BAD_POOL_HEADER 2
@@ -17,8 +13,16 @@
 #define KE_DOUBLE_PAGE_FREE 4
 #define KE_OUT_OF_MEMORY 5
 
-uint64_t KiGetAcpiBaseAddress(void);
-int KiGetAcpiTableType(void);
+#define KE_MESSAGE_ERROR 0
+#define KE_MESSAGE_TRACE 1
+#define KE_MESSAGE_DEBUG 2
+#define KE_MESSAGE_INFO 3
+
+#define KE_ENABLE_MESSAGE_TRACE 0
+#define KE_ENABLE_MESSAGE_DEBUG 1
+#define KE_ENABLE_MESSAGE_INFO 1
+
+void *KiFindAcpiTable(const char Signature[4], int Index);
 
 [[noreturn]] void KeFatalError(int Message);
 

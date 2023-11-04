@@ -4,6 +4,7 @@
 #ifndef _VID_H_
 #define _VID_H_
 
+#include <stdarg.h>
 #include <stdint.h>
 
 #define VID_COLOR_DEFAULT 0x000000, 0xAAAAAA
@@ -20,5 +21,7 @@ void VidGetCursor(uint16_t *X, uint16_t *Y);
 
 void VidPutChar(char Character);
 void VidPutString(const char *String);
+void VidPrintVariadic(int Type, const char *Prefix, const char *Message, va_list Arguments);
+void VidPrint(int Type, const char *Prefix, const char *Message, ...);
 
 #endif /* _VID_H_ */

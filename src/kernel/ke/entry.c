@@ -25,8 +25,11 @@
     MiInitializePageAllocator(LoaderData);
     MiInitializeVirtualMemory(LoaderData);
 
-    /* Stage 2: Root drivers should be already loaded, wrap them up by calling their entry. */
+    /* Stage 2: Early platform/arch initialization. */
     KiSaveAcpiData(LoaderData);
+    KiInitializePlatform();
+
+    /* Stage 2: Root drivers should be already loaded, wrap them up by calling their entry. */
     KiRunBootStartDrivers(LoaderData);
 
     while (1)

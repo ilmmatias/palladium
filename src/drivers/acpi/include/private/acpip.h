@@ -7,13 +7,6 @@
 #include <acpi.h>
 #include <sdt.h>
 
-/* The flags below control how much debugging info should be displayed on boot.
-   On normal debugging, you probably want only ACPI_ENABLE_INFO (which only shows the "enabled
-   ACPI" message).  */
-#define ACPI_ENABLE_INFO 1
-#define ACPI_ENABLE_DEBUG 1
-#define ACPI_ENABLE_TRACE 0
-
 #define ACPI_ARG_NONE 0
 #define ACPI_ARG_BYTE 1
 #define ACPI_ARG_WORD 2

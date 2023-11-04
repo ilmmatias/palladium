@@ -4,8 +4,7 @@ EXPORTS
     IoOpenDevice
 
     KeFatalError
-    KiGetAcpiBaseAddress
-    KiGetAcpiTableType
+    KiFindAcpiTable
 
     MmAllocatePages
     MmAllocatePool
@@ -15,6 +14,8 @@ EXPORTS
 
     VidGetColor
     VidGetCursor
+    VidPrint
+    VidPrintVariadic
     VidPutChar
     VidPutString
     VidResetDisplay

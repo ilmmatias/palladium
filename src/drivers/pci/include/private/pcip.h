@@ -7,11 +7,6 @@
 #include <acpi.h>
 #include <rt.h>
 
-/* The flags below control how much debugging info should be displayed on boot.
-   On normal debugging, you probably want only PCI_ENABLE_INFO.  */
-#define PCI_ENABLE_INFO 1
-#define PCI_ENABLE_TRACE 0
-
 typedef struct {
     RtSList ListHeader;
     AcpiObject *Object;

@@ -1,7 +1,8 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
-#include <stddef.h>
+#include <crt_impl.h>
+#include <ke.h>
 #include <string.h>
 #include <vidp.h>
 
@@ -180,4 +181,112 @@ void VidPutString(const char *String) {
     while (*String) {
         VidPutChar(*(String++));
     }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     Wrapper around VidPutChar for __vprint.
+ *
+ * PARAMETERS:
+ *     Buffer - What we need to display.
+ *     Size - Size of that data; The data is not required to be NULL terminated, so this need to be
+ *            taken into account!
+ *     Context - Always NULL for us.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+static void PutBuffer(const void *buffer, int size, void *context) {
+    (void)context;
+    for (int i = 0; i < size; i++) {
+        VidPutChar(((const char *)buffer)[i]);
+    }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function outputs a message into the screen; For most cases, you probably want VidPrint,
+ *     but you can use this to "rename" the VidPrint function, if your driver needs/wants that.
+ *
+ * PARAMETERS:
+ *     Type - Type of the message; This is used to set up the prefix and its color.
+ *     Prefix - Name of the driver/module (to be attached to the start of the message).
+ *     Message - Format string; Works the same as printf().
+ *     Arguments - Variadic arguments.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void VidPrintVariadic(int Type, const char *Prefix, const char *Message, va_list Arguments) {
+    /* Make sure this specific type of message wasn't disabled at compile time. */
+    switch (Type) {
+        case KE_MESSAGE_TRACE:
+            if (!KE_ENABLE_MESSAGE_TRACE) {
+                return;
+            }
+
+            break;
+        case KE_MESSAGE_DEBUG:
+            if (!KE_ENABLE_MESSAGE_DEBUG) {
+                return;
+            }
+
+            break;
+        case KE_MESSAGE_INFO:
+            if (!KE_ENABLE_MESSAGE_INFO) {
+                return;
+            }
+
+            break;
+    }
+
+    uint32_t OriginalBackground;
+    uint32_t OriginalForeground;
+    VidGetColor(&OriginalBackground, &OriginalForeground);
+
+    const char *Suffix;
+    switch (Type) {
+        case KE_MESSAGE_ERROR:
+            VidSetColor(OriginalBackground, 0xFF0000);
+            Suffix = " Error: ";
+            break;
+        case KE_MESSAGE_TRACE:
+            VidSetColor(OriginalBackground, 0x00FF00);
+            Suffix = " Trace: ";
+            break;
+        case KE_MESSAGE_DEBUG:
+            VidSetColor(OriginalBackground, 0xFFFF00);
+            Suffix = " Debug: ";
+            break;
+        default:
+            VidSetColor(OriginalBackground, 0x0000FF);
+            Suffix = " Info: ";
+            break;
+    }
+
+    VidPutString(Prefix);
+    VidPutString(Suffix);
+    VidSetColor(OriginalBackground, OriginalForeground);
+
+    __vprintf(Message, Arguments, NULL, PutBuffer);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function outputs a message into the screen.
+ *
+ * PARAMETERS:
+ *     Type - Type of the message; Depending on how the kernel was built, the message won't show.
+ *     Prefix - Name of the driver/module (to be attached to the start of the message).
+ *     Message - Format string; Works the same as printf().
+ *     ... - Variadic arguments.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void VidPrint(int Type, const char *Prefix, const char *Message, ...) {
+    va_list Arguments;
+    va_start(Arguments, Format);
+    VidPrintVariadic(Type, Prefix, Message, Arguments);
+    va_end(Arguments);
 }

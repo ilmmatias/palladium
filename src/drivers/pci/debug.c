@@ -4,33 +4,11 @@
 #include <crt_impl.h>
 #include <ke.h>
 #include <pcip.h>
-#include <stdarg.h>
 #include <vid.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     Wrapper around VidPutChar for __vprint.
- *
- * PARAMETERS:
- *     Buffer - What we need to display.
- *     Size - Size of that data; The data is not required to be NULL terminated, so this need to be
- *            taken into account!
- *     Context - Always NULL for us.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-static void PutBuffer(const void *buffer, int size, void *context) {
-    (void)context;
-    for (int i = 0; i < size; i++) {
-        VidPutChar(((const char *)buffer)[i]);
-    }
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function shows an info message to the screen if allowed
- *     (PCI_ENABLE_INFO set to 1).
+ *     This function shows an info message to the screen if allowed.
  *
  * PARAMETERS:
  *     Message - Format string; Works the same as printf().
@@ -39,16 +17,11 @@ static void PutBuffer(const void *buffer, int size, void *context) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void PcipShowInfoMessage(const char *Format, ...) {
-    if (PCI_ENABLE_INFO) {
-        va_list vlist;
-        va_start(vlist, Format);
-
-        VidPutString("PCI Info: ");
-        __vprintf(Format, vlist, NULL, PutBuffer);
-
-        va_end(vlist);
-    }
+void PcipShowInfoMessage(const char *Message, ...) {
+    va_list Arguments;
+    va_start(Arguments, Format);
+    VidPrintVariadic(KE_MESSAGE_INFO, "PCI Driver", Message, Arguments);
+    va_end(Arguments);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -64,14 +37,12 @@ void PcipShowInfoMessage(const char *Format, ...) {
  * RETURN VALUE:
  *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
-[[noreturn]] void PcipShowErrorMessage(int Code, const char *Format, ...) {
-    va_list vlist;
-    va_start(vlist, Format);
+[[noreturn]] void PcipShowErrorMessage(int Code, const char *Message, ...) {
+    va_list Arguments;
 
-    VidPutString("PCI Error: ");
-    __vprintf(Format, vlist, NULL, PutBuffer);
-
-    va_end(vlist);
+    va_start(Arguments, Format);
+    VidPrintVariadic(KE_MESSAGE_ERROR, "PCI Driver", Message, Arguments);
+    va_end(Arguments);
 
     KeFatalError(Code);
 }
