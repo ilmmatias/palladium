@@ -30,7 +30,8 @@ typedef struct __attribute__((packed)) {
         uint32_t Count;
     } MemoryMap;
     struct {
-        uint64_t BaseAddress;
+        uint64_t BackBufferBase;
+        uint64_t FrontBufferBase;
         uint16_t Width;
         uint16_t Height;
     } Display;
@@ -120,6 +121,15 @@ static void InstallIdtHandler(int Number, uint64_t Handler) {
     if (!PoolBitmapBase) {
         BmPanic("An error occoured while trying to load the selected operating system.\n"
                 "There is not enough RAM for the memory manager.");
+    }
+
+    /* A double buffer is required so that we can implement scrolling on the boot terminal
+       without reading the (really slow) back buffer. */
+    void *ScreenFrontBase = BmAllocatePages(
+        (BiVideoWidth * BiVideoHeight * 4 + PAGE_SIZE - 1) >> PAGE_SHIFT, MEMORY_KERNEL);
+    if (!ScreenFrontBase) {
+        BmPanic("An error occoured while trying to load the selected operating system.\n"
+                "There is not enough RAM for the screen's front buffer.");
     }
 
     uint64_t Slices1GiB = (BiosMaxAddressableMemory + 0x3FFFFFFF) >> 30;
@@ -260,7 +270,8 @@ static void InstallIdtHandler(int Number, uint64_t Handler) {
         BootData->MemoryManager.PoolBitmapBase = (uint64_t)PoolBitmapBase + 0xFFFF800000000000;
         BootData->MemoryMap.BaseAddress = (uint64_t)BiosMemoryMap + 0xFFFF800000000000;
         BootData->MemoryMap.Count = BiosMemoryMapEntries;
-        BootData->Display.BaseAddress = (uint64_t)BiVideoBuffer + 0xFFFF800000000000;
+        BootData->Display.BackBufferBase = (uint64_t)BiVideoBuffer + 0xFFFF800000000000;
+        BootData->Display.FrontBufferBase = (uint64_t)ScreenFrontBase + 0xFFFF800000000000;
         BootData->Display.Width = BiVideoWidth;
         BootData->Display.Height = BiVideoHeight;
         BootData->Images.BaseAddress = (uint64_t)Images + 0xFFFF800000000000;

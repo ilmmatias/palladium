@@ -2,6 +2,8 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <amd64/apic.h>
+#include <amd64/msr.h>
+#include <amd64/port.h>
 #include <cpuid.h>
 #include <ke.h>
 #include <mm.h>
@@ -9,39 +11,71 @@
 
 static RtSList LapicListHead = {};
 static RtSList IoapicListHead = {};
+static RtSList IoapicOverrideListHead = {};
 static void *LapicAddress = NULL;
 static int X2ApicEnabled = 0;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function reads the specified MSR leaf.
+ *     This function tries searching for the specified APIC id in our processor list.
  *
  * PARAMETERS:
- *     Number - Which leaf we should read.
+ *     Id - What we want to find.
  *
  * RETURN VALUE:
- *     What RDMSR returned.
+ *     Pointer to the LapicEntry struct, or NULL if we didn't find it.
  *-----------------------------------------------------------------------------------------------*/
-static uint64_t ReadMsr(uint32_t Number) {
-    uint32_t LowPart;
-    uint32_t HighPart;
-    __asm__ volatile("rdmsr" : "=a"(LowPart), "=d"(HighPart) : "c"(Number));
-    return LowPart | ((uint64_t)HighPart << 32);
+static LapicEntry *GetLapic(uint32_t Id) {
+    RtSList *Entry = LapicListHead.Next;
+
+    while (Entry) {
+        LapicEntry *Lapic = CONTAINING_RECORD(Entry, LapicEntry, ListHeader);
+
+        if (Lapic->ApicId == Id) {
+            return Lapic;
+        }
+
+        Entry = Entry->Next;
+    }
+
+    return NULL;
 }
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function writes into the specified MSR leaf.
+ *     This function reads the given Local APIC register.
  *
  * PARAMETERS:
- *     Number - Which leaf we should write into.
- *     Value - What we want to write.
+ *     Number - Which register we want to read.
+ *
+ * RETURN VALUE:
+ *     What we've read.
+ *-----------------------------------------------------------------------------------------------*/
+static uint32_t ReadLapicRegister(uint32_t Number) {
+    if (X2ApicEnabled) {
+        return ReadMsr(0x800 + (Number >> 4));
+    } else {
+        return *(volatile uint32_t *)((char *)LapicAddress + Number);
+    }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function writes data into the given Local APIC register.
+ *
+ * PARAMETERS:
+ *     Number - Which register we want to write into.
+ *     Data - What we want to write.
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-static void WriteMsr(uint32_t Number, uint64_t Value) {
-    __asm__ volatile("wrmsr" ::"a"((uint32_t)Value), "c"(Number), "d"(Value >> 32));
+static void WriteLapicRegister(uint32_t Number, uint32_t Data) {
+    if (X2ApicEnabled) {
+        WriteMsr(0x800 + (Number >> 4), Data);
+    } else {
+        *(volatile uint32_t *)((char *)LapicAddress + Number) = Data;
+    }
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -79,36 +113,66 @@ static void WriteIoapicRegister(IoapicEntry *Entry, uint8_t Number, uint32_t Dat
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function disables the given IOAPIC IRQ.
+ *     This function disables the given GSI.
  *
  * PARAMETERS:
- *     Entry - Header containing the IOAPIC entry info.
- *     Irq - Which IRQ we wish to disable.
+ *     Gsi - Which interrupt we wish to disable.
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-static void MaskIoapicVector(IoapicEntry *Entry, uint8_t Irq) {
-    WriteIoapicRegister(Entry, IOAPIC_REDIR_REG_LOW(Irq), 0x10000);
+static void MaskIoapicVector(uint8_t Gsi) {
+    RtSList *ListEntry = IoapicListHead.Next;
+
+    while (ListEntry) {
+        IoapicEntry *Entry = CONTAINING_RECORD(ListEntry, IoapicEntry, ListHeader);
+
+        if (Entry->GsiBase <= Gsi && Gsi < Entry->GsiBase + Entry->MaxRedirEntry) {
+            WriteIoapicRegister(Entry, IOAPIC_REDIR_REG_LOW(Gsi - Entry->GsiBase), 0x10000);
+            return;
+        }
+
+        ListEntry = ListEntry->Next;
+    }
 }
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function enables and sets up the given IOAPIC IRQ.
+ *     This function enables and sets up the given GSI.
  *
  * PARAMETERS:
- *     Entry - Header containing the IOAPIC entry info.
- *     Irq - Which IRQ we wish to enable.
+ *     Gsi - Which interrupt we wish to enable.
  *     TargetVector - Which vector should be raised on the target CPU once this IRQ triggers.
+ *     PinPolarity - 0: Active high, 1: Active low. You probably want this set to 0.
+ *     TriggerMode - 0: Edge, 1: Level. You probably want this set to 0.
  *     ApicId - Which CPU wants to handle this vector.
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-static void
-UnmaskIoapicVector(IoapicEntry *Entry, uint8_t Irq, uint8_t TargetVector, uint8_t ApicId) {
-    WriteIoapicRegister(Entry, IOAPIC_REDIR_REG_LOW(Irq), TargetVector);
-    WriteIoapicRegister(Entry, IOAPIC_REDIR_REG_HIGH(Irq), (uint32_t)ApicId << 24);
+static void UnmaskIoapicVector(
+    uint8_t Gsi,
+    uint8_t TargetVector,
+    int PinPolarity,
+    int TriggerMode,
+    uint8_t ApicId) {
+    RtSList *ListEntry = IoapicListHead.Next;
+
+    while (ListEntry) {
+        IoapicEntry *Entry = CONTAINING_RECORD(ListEntry, IoapicEntry, ListHeader);
+
+        if (Entry->GsiBase <= Gsi && Gsi < Entry->GsiBase + Entry->MaxRedirEntry) {
+            WriteIoapicRegister(
+                Entry,
+                IOAPIC_REDIR_REG_LOW(Gsi - Entry->GsiBase),
+                TargetVector | (PinPolarity << 13) | (TriggerMode << 15));
+            WriteIoapicRegister(
+                Entry, IOAPIC_REDIR_REG_HIGH(Gsi - Entry->GsiBase), (uint32_t)ApicId << 24);
+            return;
+        }
+
+        ListEntry = ListEntry->Next;
+    }
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -149,6 +213,12 @@ void KiInitializeApic(void) {
 
         switch (Record->Type) {
             case LAPIC_RECORD: {
+                /* Prevent a bunch of entries with the same APIC ID (but probably different ACPI
+                   IDs) filling our processor list. */
+                if (GetLapic(Record->Lapic.ApicId)) {
+                    break;
+                }
+
                 LapicEntry *Entry = MmAllocatePool(sizeof(LapicEntry), "Apic");
                 if (!Entry) {
                     VidPrint(
@@ -178,32 +248,40 @@ void KiInitializeApic(void) {
                     KeFatalError(KE_OUT_OF_MEMORY);
                 }
 
-                Entry->IoapicId = Record->Ioapic.IoapicId;
+                Entry->Id = Record->Ioapic.IoapicId;
                 Entry->GsiBase = Record->Ioapic.GsiBase;
                 Entry->VirtualAddress = MI_PADDR_TO_VADDR(Record->Ioapic.Address);
-
-                Entry->ApicId = (ReadIoapicRegister(Entry, IOAPIC_ID_REG) >> 24) & 0xF0;
                 Entry->MaxRedirEntry = (ReadIoapicRegister(Entry, IOAPIC_VER_REG) >> 16) + 1;
 
                 /* Set some sane defaults for all IOAPICs we find. */
                 for (uint8_t i = 0; i < Entry->MaxRedirEntry; i++) {
-                    MaskIoapicVector(Entry, i);
+                    WriteIoapicRegister(Entry, IOAPIC_REDIR_REG_LOW(i), 0x10000);
                 }
 
                 RtPushSList(&IoapicListHead, &Entry->ListHeader);
                 VidPrint(
                     KE_MESSAGE_DEBUG,
                     "Kernel APIC",
-                    "added IOAPIC %hhu (APIC %u, GSI base %u, size %u) to the list\n",
-                    Entry->IoapicId,
-                    Entry->ApicId,
+                    "added IOAPIC %hhu (GSI base %u, size %u) to the list\n",
+                    Entry->Id,
                     Entry->GsiBase,
                     Entry->MaxRedirEntry);
 
                 break;
             }
 
+            case LAPIC_ADDRESS_OVERRIDE_RECORD: {
+                LapicAddress = MI_PADDR_TO_VADDR(Record->LapicAddressOverride.Address);
+                break;
+            }
+
             case X2APIC_RECORD: {
+                /* Prevent a bunch of entries with the same APIC ID (but probably different ACPI
+                   IDs) filling our processor list. */
+                if (GetLapic(Record->X2Apic.X2ApicId)) {
+                    break;
+                }
+
                 LapicEntry *Entry = MmAllocatePool(sizeof(LapicEntry), "Apic");
                 if (!Entry) {
                     VidPrint(
@@ -211,8 +289,8 @@ void KiInitializeApic(void) {
                     KeFatalError(KE_OUT_OF_MEMORY);
                 }
 
-                Entry->ApicId = Record->Lapic.ApicId;
-                Entry->AcpiId = Record->Lapic.AcpiId;
+                Entry->ApicId = Record->X2Apic.X2ApicId;
+                Entry->AcpiId = Record->X2Apic.AcpiId;
                 Entry->IsX2Apic = 1;
                 RtPushSList(&LapicListHead, &Entry->ListHeader);
                 VidPrint(
@@ -229,5 +307,51 @@ void KiInitializeApic(void) {
         Position += Record->Length;
     }
 
+    /* The spec says that we might not always have to mask everything on the PIC, but we always
+       do that anyways.
+       The boot manager should have already remapped the IRQs (for handling early kernel
+       exceptions). */
+    WritePortByte(0x21, 0xFF);
+    WritePortByte(0xA1, 0xFF);
+
+    /* Hardware enable the Local APIC if it wasn't enabled. */
+    WriteMsr(0x1B, ReadMsr(0x1B) | 0x800);
+
+    /* And setup the Spurious Interrupt Vector Register, this should finish enabling the LAPIC. */
+    WriteLapicRegister(0xF0, ReadLapicRegister(0xF0) | 0x100);
+
+    Position = (char *)(Madt + 1);
+    while (Position < (char *)Madt + Madt->Length) {
+        MadtRecord *Record = (MadtRecord *)Position;
+        if (Record->Type != IOAPIC_SOURCE_OVERRIDE_RECORD) {
+            Position += Record->Length;
+            continue;
+        }
+
+        IoapicOverrideEntry *Entry = MmAllocatePool(sizeof(IoapicOverrideEntry), "Apic");
+        if (!Entry) {
+            VidPrint(
+                KE_MESSAGE_ERROR,
+                "Kernel APIC",
+                "couldn't allocate space for an IOAPIC source override\n");
+            KeFatalError(KE_OUT_OF_MEMORY);
+        }
+
+        Entry->Irq = Record->IoapicSourceOverride.IrqSource;
+        Entry->Gsi = Record->IoapicSourceOverride.Gsi;
+        Entry->PinPolarity = (Record->IoapicSourceOverride.Flags & 2) != 0;
+        Entry->TriggerMode = (Record->IoapicSourceOverride.Flags & 8) != 0;
+        RtPushSList(&IoapicOverrideListHead, &Entry->ListHeader);
+        VidPrint(
+            KE_MESSAGE_DEBUG,
+            "Kernel APIC",
+            "added IOAPIC redir (IRQ %hhu, GSI %hhu) to the list\n",
+            Entry->Irq,
+            Entry->Gsi);
+
+        Position += Record->Length;
+    }
+
+    (void)MaskIoapicVector;
     (void)UnmaskIoapicVector;
 }

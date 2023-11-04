@@ -4,7 +4,8 @@
 #include <amd64/boot.h>
 #include <vid.h>
 
-extern uint32_t *VidpBuffer;
+extern uint32_t *VidpBackBuffer;
+extern uint32_t *VidpFrontBuffer;
 extern uint16_t VidpWidth;
 extern uint16_t VidpHeight;
 
@@ -22,7 +23,8 @@ extern uint16_t VidpHeight;
  *-----------------------------------------------------------------------------------------------*/
 void VidpInitialize(void *LoaderData) {
     LoaderBootData *BootData = LoaderData;
-    VidpBuffer = (uint32_t *)BootData->Display.BaseAddress;
+    VidpBackBuffer = (uint32_t *)BootData->Display.BackBufferBase;
+    VidpFrontBuffer = (uint32_t *)BootData->Display.FrontBufferBase;
     VidpWidth = BootData->Display.Width;
     VidpHeight = BootData->Display.Height;
     VidResetDisplay();

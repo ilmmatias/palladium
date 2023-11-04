@@ -8,7 +8,8 @@
 
 extern const VidpFontData VidpFont;
 
-uint32_t *VidpBuffer = NULL;
+uint32_t *VidpBackBuffer = NULL;
+uint32_t *VidpFrontBuffer = NULL;
 uint16_t VidpWidth = 0;
 uint16_t VidpHeight = 0;
 
@@ -16,6 +17,21 @@ uint32_t VidpBackground = 0x000000;
 uint32_t VidpForeground = 0xAAAAAA;
 uint16_t VidpCursorX = 0;
 uint16_t VidpCursorY = 0;
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function copies the front buffer into the back buffer (flusing its contents into the
+ *     screen).
+ *
+ * PARAMETERS:
+ *     None.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+static void Flush(void) {
+    memcpy(VidpBackBuffer, VidpFrontBuffer, VidpWidth * VidpHeight * 4);
+}
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -30,8 +46,8 @@ uint16_t VidpCursorY = 0;
 static void ScrollUp(void) {
     const uint32_t ScreenSize = VidpWidth * VidpHeight;
     const uint32_t LineSize = VidpWidth * VidpFont.Height;
-    memmove(VidpBuffer, VidpBuffer + LineSize, (ScreenSize - LineSize) * 4);
-    memset(VidpBuffer + ScreenSize - LineSize, 0, LineSize * 4);
+    memmove(VidpFrontBuffer, VidpFrontBuffer + LineSize, (ScreenSize - LineSize) * 4);
+    memset(VidpFrontBuffer + ScreenSize - LineSize, 0, LineSize * 4);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -72,7 +88,8 @@ static void DrawCharacter(char Character) {
     const uint8_t *Data = &VidpFont.GlyphData[Info->Offset];
     uint16_t GlyphLeft = Info->Left;
     uint16_t GlyphTop = VidpFont.Ascender - Info->Top;
-    uint32_t *Buffer = &VidpBuffer[(VidpCursorY + GlyphTop) * VidpWidth + VidpCursorX + GlyphLeft];
+    uint32_t *Buffer =
+        &VidpFrontBuffer[(VidpCursorY + GlyphTop) * VidpWidth + VidpCursorX + GlyphLeft];
 
     /* The code after us only cares about the foreground, so we're left to manually clear the
        background. */
@@ -86,7 +103,7 @@ static void DrawCharacter(char Character) {
                 break;
             }
 
-            VidpBuffer[(VidpCursorY + Top) * VidpWidth + VidpCursorX + Left] = VidpBackground;
+            VidpFrontBuffer[(VidpCursorY + Top) * VidpWidth + VidpCursorX + Left] = VidpBackground;
         }
     }
 
@@ -128,8 +145,10 @@ void VidResetDisplay(void) {
     VidpCursorY = 0;
 
     for (int i = 0; i < VidpWidth * VidpHeight; i++) {
-        VidpBuffer[i] = VidpBackground;
+        VidpFrontBuffer[i] = VidpBackground;
     }
+
+    Flush();
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -145,10 +164,12 @@ void VidResetDisplay(void) {
 void VidPutChar(char Character) {
     /* It's probably safe to use the size of 4 spaces? */
     const int TabSize = VidpFont.GlyphInfo[0x20].Width * 4;
+    int NeedsFlush = 0;
 
     if (Character == '\n') {
         VidpCursorX = 0;
         VidpCursorY += VidpFont.Height;
+        NeedsFlush = 1;
     } else if (Character == '\t') {
         VidpCursorX = (VidpCursorX + TabSize) & ~(TabSize - 1);
     } else {
@@ -159,11 +180,16 @@ void VidPutChar(char Character) {
     if (VidpCursorX >= VidpWidth) {
         VidpCursorX = 0;
         VidpCursorY += VidpFont.Height;
+        NeedsFlush = 1;
     }
 
     if (VidpCursorY >= VidpHeight) {
         ScrollUp();
         VidpCursorY = VidpHeight - VidpFont.Height;
+    }
+
+    if (NeedsFlush) {
+        Flush();
     }
 }
 

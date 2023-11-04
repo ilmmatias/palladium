@@ -72,11 +72,18 @@ typedef struct {
 
 typedef struct {
     RtSList ListHeader;
-    uint8_t IoapicId;
-    uint8_t ApicId;
+    uint8_t Id;
     uint32_t GsiBase;
     uint8_t MaxRedirEntry;
     char *VirtualAddress;
 } IoapicEntry;
+
+typedef struct {
+    RtSList ListHeader;
+    uint8_t Irq;
+    uint8_t Gsi;
+    int PinPolarity;
+    int TriggerMode;
+} IoapicOverrideEntry;
 
 #endif /* _AMD64_APIC_H_ */

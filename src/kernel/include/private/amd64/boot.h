@@ -44,7 +44,8 @@ typedef struct __attribute__((packed)) {
         uint32_t Count;
     } MemoryMap;
     struct {
-        uint64_t BaseAddress;
+        uint64_t BackBufferBase;
+        uint64_t FrontBufferBase;
         uint16_t Width;
         uint16_t Height;
     } Display;
