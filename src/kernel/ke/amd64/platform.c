@@ -14,5 +14,6 @@
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void KiInitializePlatform(void) {
+    KiInitializeIdt();
     KiInitializeApic();
 }

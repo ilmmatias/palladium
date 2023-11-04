@@ -87,12 +87,12 @@ _BiFinishTransferExecution:
 .LGdtSize: .short .LGdtSize - .LGdtDescs - 1
 .LGdtBase: .long .LGdtDescs, 0
 
-.LIdtSize: .short .LIdtSize - _IdtDescs - 1
-.LIdtBase: .long _IdtDescs, 0
-
 .align 16
 .global _IdtDescs
 _IdtDescs: .fill 512, 8, 0
+
+.LIdtSize: .short .LIdtSize - _IdtDescs - 1
+.LIdtBase: .long _IdtDescs, 0
 
 .macro irq_err num
 IrqStub\num:

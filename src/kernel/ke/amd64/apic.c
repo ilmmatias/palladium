@@ -51,7 +51,7 @@ static LapicEntry *GetLapic(uint32_t Id) {
  * RETURN VALUE:
  *     What we've read.
  *-----------------------------------------------------------------------------------------------*/
-static uint32_t ReadLapicRegister(uint32_t Number) {
+[[maybe_unused]] static uint32_t ReadLapicRegister(uint32_t Number) {
     if (X2ApicEnabled) {
         return ReadMsr(0x800 + (Number >> 4));
     } else {
@@ -121,7 +121,7 @@ static void WriteIoapicRegister(IoapicEntry *Entry, uint8_t Number, uint32_t Dat
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-static void MaskIoapicVector(uint8_t Gsi) {
+[[maybe_unused]] static void MaskIoapicVector(uint8_t Gsi) {
     RtSList *ListEntry = IoapicListHead.Next;
 
     while (ListEntry) {
@@ -150,7 +150,7 @@ static void MaskIoapicVector(uint8_t Gsi) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-static void UnmaskIoapicVector(
+[[maybe_unused]] static void UnmaskIoapicVector(
     uint8_t Gsi,
     uint8_t TargetVector,
     int PinPolarity,
@@ -193,9 +193,6 @@ void KiInitializeApic(void) {
         KeFatalError(KE_BAD_ACPI_TABLES);
     }
 
-    /* We're setting up the interrupt controller, we should probably only enable interrupts after
-       we're done. */
-    __asm__ volatile("cli");
     LapicAddress = MI_PADDR_TO_VADDR(Madt->LapicAddress);
 
     uint32_t Eax, Ebx, Ecx, Edx;
@@ -256,6 +253,7 @@ void KiInitializeApic(void) {
                 /* Set some sane defaults for all IOAPICs we find. */
                 for (uint8_t i = 0; i < Entry->MaxRedirEntry; i++) {
                     WriteIoapicRegister(Entry, IOAPIC_REDIR_REG_LOW(i), 0x10000);
+                    WriteIoapicRegister(Entry, IOAPIC_REDIR_REG_HIGH(i), 0);
                 }
 
                 RtPushSList(&IoapicListHead, &Entry->ListHeader);
@@ -317,8 +315,9 @@ void KiInitializeApic(void) {
     /* Hardware enable the Local APIC if it wasn't enabled. */
     WriteMsr(0x1B, ReadMsr(0x1B) | 0x800);
 
-    /* And setup the Spurious Interrupt Vector Register, this should finish enabling the LAPIC. */
-    WriteLapicRegister(0xF0, ReadLapicRegister(0xF0) | 0x100);
+    /* And setup the remaining registers, this should finish enabling the LAPIC. */
+    WriteLapicRegister(0x80, 0);
+    WriteLapicRegister(0xF0, 0x1FF);
 
     Position = (char *)(Madt + 1);
     while (Position < (char *)Madt + Madt->Length) {
@@ -352,6 +351,19 @@ void KiInitializeApic(void) {
         Position += Record->Length;
     }
 
-    (void)MaskIoapicVector;
-    (void)UnmaskIoapicVector;
+    __asm__ volatile("sti");
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function signals to the APIC that we're done handling an interrupt.
+ *
+ * PARAMETERS:
+ *     None.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void KiSendEoi(void) {
+    WriteLapicRegister(0xB0, 0);
 }

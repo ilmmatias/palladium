@@ -8,6 +8,8 @@ if(ARCH STREQUAL "amd64")
         ke/${ARCH}/acpi.c
         ke/${ARCH}/apic.c
         ke/${ARCH}/driver.c
+        ke/${ARCH}/idt.c
+        ke/${ARCH}/idt.S
         ke/${ARCH}/platform.c
 
         mm/${ARCH}/map.c

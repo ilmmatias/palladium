@@ -6,6 +6,8 @@
 
 #include <ki.h>
 
+void KiInitializeIdt(void);
 void KiInitializeApic(void);
+void KiSendEoi(void);
 
 #endif /* _AMD64_KI_H_ */
