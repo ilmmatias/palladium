@@ -63,7 +63,7 @@ NO_ERRCODE 31
     .set i, i + 1
 .endr
 
-.extern KiInterruptHandler
+.extern HalpInterruptHandler
 CommonStub:
     /* AMD64 has no PUSHA/POPA, so we're forced to save state manually.
        No XMM state is saved, as you shouldn't be using it in kernel mode; Only the thread
@@ -85,7 +85,7 @@ CommonStub:
     push %r15
 
     mov %rsp, %rcx
-    call KiInterruptHandler
+    call HalpInterruptHandler
 
     pop %r15
     pop %r14
@@ -108,8 +108,8 @@ CommonStub:
 
 .section .rodata
 
-.global KiInterruptHandlerTable
-KiInterruptHandlerTable:
+.global HalpInterruptHandlerTable
+HalpInterruptHandlerTable:
 .set i, 0
 .rept 256
     ENTRY %i

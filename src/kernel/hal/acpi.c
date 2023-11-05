@@ -1,12 +1,13 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
-#include <ki.h>
+#include <halp.h>
+#include <ke.h>
 #include <mi.h>
 #include <string.h>
 
-uint64_t KiAcpiBaseAddress = 0;
-int KiAcpiTableType = KI_ACPI_NONE;
+uint64_t HalpAcpiBaseAddress = 0;
+int HalpAcpiTableType = HALP_ACPI_NONE;
 
 typedef struct __attribute__((packed)) {
     char Signature[4];
@@ -56,23 +57,25 @@ static int Checksum(const char *Table, uint32_t Length) {
  * RETURN VALUE:
  *     Pointer to the header of the entry, or NULL on failure.
  *-----------------------------------------------------------------------------------------------*/
-void *KiFindAcpiTable(const char Signature[4], int Index) {
-    if (KiAcpiTableType == KI_ACPI_NONE) {
+void *HalFindAcpiTable(const char Signature[4], int Index) {
+    if (HalpAcpiTableType == HALP_ACPI_NONE) {
         KeFatalError(KE_BAD_ACPI_TABLES);
     }
 
     /* DSDT is contained inside the XDsdt (or the Dsdt) field of the FADT; Other than that, just
        do a linear search on the R/XSDT. */
 
-    SdtHeader *Header = MI_PADDR_TO_VADDR(KiAcpiBaseAddress);
+    SdtHeader *Header = MI_PADDR_TO_VADDR(HalpAcpiBaseAddress);
     uint32_t *RsdtTables = (uint32_t *)(Header + 1);
     uint64_t *XsdtTables = (uint64_t *)(Header + 1);
 
-    int IsXsdt = KiAcpiTableType == KI_ACPI_XSDT;
+    int IsXsdt = HalpAcpiTableType == HALP_ACPI_XSDT;
     int Occourances = 0;
 
+    /* The DSDT is no guaranteed to be in any of the R/XSDT entries, so we need to grab its
+       pointer inside the FADT. */
     if (!memcmp(Signature, "DSDT", 4)) {
-        FadtHeader *Fadt = (FadtHeader *)KiFindAcpiTable("FACP", 0);
+        FadtHeader *Fadt = (FadtHeader *)HalFindAcpiTable("FACP", 0);
         if (!Header) {
             return NULL;
         }

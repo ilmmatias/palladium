@@ -1,0 +1,193 @@
+/* SPDX-FileCopyrightText: (C) 2023 ilmmatias
+ * SPDX-License-Identifier: BSD-3-Clause */
+
+#include <amd64/apic.h>
+#include <hal.h>
+#include <ke.h>
+#include <mm.h>
+#include <vid.h>
+
+static RtSList IoapicListHead = {};
+static RtSList IoapicOverrideListHead = {};
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function reads the given IOAPIC register.
+ *
+ * PARAMETERS:
+ *     Entry - Header containing the IOAPIC entry info.
+ *     Number - Which register we want to read.
+ *
+ * RETURN VALUE:
+ *     What we've read.
+ *-----------------------------------------------------------------------------------------------*/
+static uint32_t ReadIoapicRegister(IoapicEntry *Entry, uint8_t Number) {
+    *(volatile uint32_t *)(Entry->VirtualAddress + IOAPIC_INDEX) = Number;
+    return *(volatile uint32_t *)(Entry->VirtualAddress + IOAPIC_DATA);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function writes data into the given IOAPIC register.
+ *
+ * PARAMETERS:
+ *     Entry - Header containing the IOAPIC entry info.
+ *     Number - Which register we want to write into.
+ *     Data - What we want to write.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+static void WriteIoapicRegister(IoapicEntry *Entry, uint8_t Number, uint32_t Data) {
+    *(volatile uint32_t *)(Entry->VirtualAddress + IOAPIC_INDEX) = Number;
+    *(volatile uint32_t *)(Entry->VirtualAddress + IOAPIC_DATA) = Data;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function disables the given GSI.
+ *
+ * PARAMETERS:
+ *     Gsi - Which interrupt we wish to disable.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+[[maybe_unused]] static void MaskIoapicVector(uint8_t Gsi) {
+    RtSList *ListEntry = IoapicListHead.Next;
+
+    while (ListEntry) {
+        IoapicEntry *Entry = CONTAINING_RECORD(ListEntry, IoapicEntry, ListHeader);
+
+        if (Entry->GsiBase <= Gsi && Gsi < Entry->GsiBase + Entry->MaxRedirEntry) {
+            WriteIoapicRegister(Entry, IOAPIC_REDIR_REG_LOW(Gsi - Entry->GsiBase), 0x10000);
+            return;
+        }
+
+        ListEntry = ListEntry->Next;
+    }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function enables and sets up the given GSI.
+ *
+ * PARAMETERS:
+ *     Gsi - Which interrupt we wish to enable.
+ *     TargetVector - Which vector should be raised on the target CPU once this IRQ triggers.
+ *     PinPolarity - 0: Active high, 1: Active low. You probably want this set to 0.
+ *     TriggerMode - 0: Edge, 1: Level. You probably want this set to 0.
+ *     ApicId - Which CPU wants to handle this vector.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+[[maybe_unused]] static void UnmaskIoapicVector(
+    uint8_t Gsi,
+    uint8_t TargetVector,
+    int PinPolarity,
+    int TriggerMode,
+    uint8_t ApicId) {
+    RtSList *ListEntry = IoapicListHead.Next;
+
+    while (ListEntry) {
+        IoapicEntry *Entry = CONTAINING_RECORD(ListEntry, IoapicEntry, ListHeader);
+
+        if (Entry->GsiBase <= Gsi && Gsi < Entry->GsiBase + Entry->MaxRedirEntry) {
+            WriteIoapicRegister(
+                Entry,
+                IOAPIC_REDIR_REG_LOW(Gsi - Entry->GsiBase),
+                TargetVector | (PinPolarity << 13) | (TriggerMode << 15));
+            WriteIoapicRegister(
+                Entry, IOAPIC_REDIR_REG_HIGH(Gsi - Entry->GsiBase), (uint32_t)ApicId << 24);
+            return;
+        }
+
+        ListEntry = ListEntry->Next;
+    }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function parses the APIC/MADT table, collecting all IOAPICs in the system.
+ *
+ * PARAMETERS:
+ *     None.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void HalpInitializeIoapic(void) {
+    MadtHeader *Madt = HalFindAcpiTable("APIC", 0);
+    if (!Madt) {
+        VidPrint(KE_MESSAGE_ERROR, "APIC", "couldn't find the MADT table\n");
+        KeFatalError(KE_BAD_ACPI_TABLES);
+    }
+
+    char *Position = (char *)(Madt + 1);
+    while (Position < (char *)Madt + Madt->Length) {
+        MadtRecord *Record = (MadtRecord *)Position;
+
+        switch (Record->Type) {
+            case IOAPIC_RECORD: {
+                IoapicEntry *Entry = MmAllocatePool(sizeof(IoapicEntry), "Apic");
+                if (!Entry) {
+                    VidPrint(
+                        KE_MESSAGE_ERROR, "Kernel HAL", "couldn't allocate space for an IOAPIC\n");
+                    KeFatalError(KE_OUT_OF_MEMORY);
+                }
+
+                Entry->Id = Record->Ioapic.IoapicId;
+                Entry->GsiBase = Record->Ioapic.GsiBase;
+                Entry->VirtualAddress = MI_PADDR_TO_VADDR(Record->Ioapic.Address);
+                Entry->MaxRedirEntry = (ReadIoapicRegister(Entry, IOAPIC_VER_REG) >> 16) + 1;
+
+                /* Set some sane defaults for all IOAPICs we find. */
+                for (uint8_t i = 0; i < Entry->MaxRedirEntry; i++) {
+                    WriteIoapicRegister(Entry, IOAPIC_REDIR_REG_LOW(i), 0x10000);
+                    WriteIoapicRegister(Entry, IOAPIC_REDIR_REG_HIGH(i), 0);
+                }
+
+                RtPushSList(&IoapicListHead, &Entry->ListHeader);
+                VidPrint(
+                    KE_MESSAGE_DEBUG,
+                    "Kernel HAL",
+                    "added IOAPIC %hhu (GSI base %u, size %u) to the list\n",
+                    Entry->Id,
+                    Entry->GsiBase,
+                    Entry->MaxRedirEntry);
+
+                break;
+            }
+
+            /* Legacy IRQ -> GSI mappings; We need this to handle any legacy device (such as a
+               PIT). */
+            case IOAPIC_SOURCE_OVERRIDE_RECORD: {
+                IoapicOverrideEntry *Entry = MmAllocatePool(sizeof(IoapicOverrideEntry), "Apic");
+                if (!Entry) {
+                    VidPrint(
+                        KE_MESSAGE_ERROR,
+                        "Kernel HAL",
+                        "couldn't allocate space for an IOAPIC source override\n");
+                    KeFatalError(KE_OUT_OF_MEMORY);
+                }
+
+                Entry->Irq = Record->IoapicSourceOverride.IrqSource;
+                Entry->Gsi = Record->IoapicSourceOverride.Gsi;
+                Entry->PinPolarity = (Record->IoapicSourceOverride.Flags & 2) != 0;
+                Entry->TriggerMode = (Record->IoapicSourceOverride.Flags & 8) != 0;
+                RtPushSList(&IoapicOverrideListHead, &Entry->ListHeader);
+                VidPrint(
+                    KE_MESSAGE_DEBUG,
+                    "Kernel HAL",
+                    "added IOAPIC redir (IRQ %hhu, GSI %hhu) to the list\n",
+                    Entry->Irq,
+                    Entry->Gsi);
+
+                break;
+            }
+        }
+
+        Position += Record->Length;
+    }
+}

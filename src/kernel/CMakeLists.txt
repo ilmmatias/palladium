@@ -5,12 +5,14 @@ project(os/kernel)
 
 if(ARCH STREQUAL "amd64")
     set(SOURCES
-        ke/${ARCH}/acpi.c
-        ke/${ARCH}/apic.c
+        hal/${ARCH}/acpi.c
+        hal/${ARCH}/apic.c
+        hal/${ARCH}/idt.c
+        hal/${ARCH}/idt.S
+        hal/${ARCH}/ioapic.c
+        hal/${ARCH}/platform.c
+
         ke/${ARCH}/driver.c
-        ke/${ARCH}/idt.c
-        ke/${ARCH}/idt.S
-        ke/${ARCH}/platform.c
 
         mm/${ARCH}/map.c
         mm/${ARCH}/page.c
@@ -21,9 +23,10 @@ endif()
 add_executable(kernel "kernel" YES
     ${SOURCES}
 
+    hal/acpi.c
+
     io/device.c
 
-    ke/acpi.c
     ke/entry.c
     ke/panic.c
 

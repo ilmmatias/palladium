@@ -1,6 +1,7 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
+#include <halp.h>
 #include <ki.h>
 #include <mi.h>
 #include <rt.h>
@@ -26,8 +27,8 @@
     MiInitializeVirtualMemory(LoaderData);
 
     /* Stage 2: Early platform/arch initialization. */
-    KiSaveAcpiData(LoaderData);
-    KiInitializePlatform();
+    HalpSaveAcpiData(LoaderData);
+    HalpInitializePlatform();
 
     /* Stage 2: Root drivers should be already loaded, wrap them up by calling their entry. */
     KiRunBootStartDrivers(LoaderData);

@@ -6,12 +6,6 @@
 
 #include <ke.h>
 
-#define KI_ACPI_NONE 0
-#define KI_ACPI_RDST 1
-#define KI_ACPI_XSDT 2
-
-void KiSaveAcpiData(void *LoaderData);
-void KiInitializePlatform(void);
 void KiRunBootStartDrivers(void *LoaderData);
 
 #endif /* _KI_H_ */

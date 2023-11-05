@@ -1,7 +1,7 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
-#include <amd64/ki.h>
+#include <amd64/halp.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -13,7 +13,8 @@
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void KiInitializePlatform(void) {
-    KiInitializeIdt();
-    KiInitializeApic();
+void HalpInitializePlatform(void) {
+    HalpInitializeIdt();
+    HalpInitializeIoapic();
+    HalpInitializeApic();
 }

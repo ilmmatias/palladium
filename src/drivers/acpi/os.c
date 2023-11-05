@@ -2,7 +2,7 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <acpip.h>
-#include <crt_impl.h>
+#include <hal.h>
 #include <ke.h>
 #include <mm.h>
 #include <vid.h>
@@ -18,7 +18,7 @@
  *     Pointer to the header of the entry, or NULL on failure.
  *-----------------------------------------------------------------------------------------------*/
 SdtHeader *AcpipFindTable(char Signature[4], int Index) {
-    return KiFindAcpiTable(Signature, Index);
+    return HalFindAcpiTable(Signature, Index);
 }
 
 /*-------------------------------------------------------------------------------------------------

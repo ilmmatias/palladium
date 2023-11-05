@@ -22,8 +22,6 @@
 #define KE_ENABLE_MESSAGE_DEBUG 1
 #define KE_ENABLE_MESSAGE_INFO 1
 
-void *KiFindAcpiTable(const char Signature[4], int Index);
-
 [[noreturn]] void KeFatalError(int Message);
 
 #endif /* _KE_H_ */

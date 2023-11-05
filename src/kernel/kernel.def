@@ -1,10 +1,11 @@
 LIBRARY kernel.exe
 EXPORTS
+    HalFindAcpiTable
+
     IoCreateDevice
     IoOpenDevice
 
     KeFatalError
-    KiFindAcpiTable
 
     MmAllocatePages
     MmAllocatePool
