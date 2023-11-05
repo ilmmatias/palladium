@@ -7,6 +7,7 @@ if(ARCH STREQUAL "amd64")
     set(SOURCES
         hal/${ARCH}/acpi.c
         hal/${ARCH}/apic.c
+        hal/${ARCH}/hpet.c
         hal/${ARCH}/idt.c
         hal/${ARCH}/idt.S
         hal/${ARCH}/ioapic.c

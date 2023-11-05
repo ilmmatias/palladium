@@ -4,11 +4,18 @@
 #ifndef _AMD64_HALP_H_
 #define _AMD64_HALP_H_
 
-#include <halp.h>
+#include <amd64/hal.h>
 
 void HalpInitializeIdt(void);
-void HalpInitializeIoapic(void);
+
 void HalpInitializeApic(void);
+uint32_t HalpGetCurrentApicId(void);
 void HalpSendEoi(void);
+
+void HalpInitializeIoapic(void);
+void HalpEnableIrq(uint8_t Irq, uint8_t Vector);
+void HalpEnableGsi(uint8_t Gsi, uint8_t Vector);
+
+void HalpInitializeHpet(void);
 
 #endif /* _AMD64_HALP_H_ */

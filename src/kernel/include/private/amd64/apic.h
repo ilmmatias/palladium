@@ -74,7 +74,7 @@ typedef struct {
     RtSList ListHeader;
     uint8_t Id;
     uint32_t GsiBase;
-    uint8_t MaxRedirEntry;
+    uint8_t Size;
     char *VirtualAddress;
 } IoapicEntry;
 

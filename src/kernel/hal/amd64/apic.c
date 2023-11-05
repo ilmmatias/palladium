@@ -50,7 +50,7 @@ static LapicEntry *GetLapic(uint32_t Id) {
  * RETURN VALUE:
  *     What we've read.
  *-----------------------------------------------------------------------------------------------*/
-[[maybe_unused]] static uint32_t ReadLapicRegister(uint32_t Number) {
+static uint32_t ReadLapicRegister(uint32_t Number) {
     if (X2ApicEnabled) {
         return ReadMsr(0x800 + (Number >> 4));
     } else {
@@ -91,7 +91,7 @@ static void WriteLapicRegister(uint32_t Number, uint32_t Data) {
 void HalpInitializeApic(void) {
     MadtHeader *Madt = HalFindAcpiTable("APIC", 0);
     if (!Madt) {
-        VidPrint(KE_MESSAGE_ERROR, "APIC", "couldn't find the MADT table\n");
+        VidPrint(KE_MESSAGE_ERROR, "Kernel HAL", "couldn't find the MADT table\n");
         KeFatalError(KE_BAD_ACPI_TABLES);
     }
 
@@ -121,7 +121,7 @@ void HalpInitializeApic(void) {
                 LapicEntry *Entry = MmAllocatePool(sizeof(LapicEntry), "Apic");
                 if (!Entry) {
                     VidPrint(
-                        KE_MESSAGE_ERROR, "Kernel APIC", "couldn't allocate space for a LAPIC\n");
+                        KE_MESSAGE_ERROR, "Kernel HAL", "couldn't allocate space for a LAPIC\n");
                     KeFatalError(KE_OUT_OF_MEMORY);
                 }
 
@@ -130,9 +130,9 @@ void HalpInitializeApic(void) {
                 Entry->IsX2Apic = 0;
                 RtPushSList(&LapicListHead, &Entry->ListHeader);
                 VidPrint(
-                    KE_MESSAGE_DEBUG,
-                    "Kernel APIC",
-                    "added LAPIC %u (ACPI ID %u) to the list\n",
+                    KE_MESSAGE_INFO,
+                    "Kernel HAL",
+                    "found LAPIC %u (ACPI ID %u)\n",
                     Entry->ApicId,
                     Entry->AcpiId);
 
@@ -154,7 +154,7 @@ void HalpInitializeApic(void) {
                 LapicEntry *Entry = MmAllocatePool(sizeof(LapicEntry), "Apic");
                 if (!Entry) {
                     VidPrint(
-                        KE_MESSAGE_ERROR, "Kernel APIC", "couldn't allocate space for a x2APIC\n");
+                        KE_MESSAGE_ERROR, "Kernel HAL", "couldn't allocate space for a x2APIC\n");
                     KeFatalError(KE_OUT_OF_MEMORY);
                 }
 
@@ -163,9 +163,9 @@ void HalpInitializeApic(void) {
                 Entry->IsX2Apic = 1;
                 RtPushSList(&LapicListHead, &Entry->ListHeader);
                 VidPrint(
-                    KE_MESSAGE_DEBUG,
-                    "Kernel APIC",
-                    "added x2APIC %u (ACPI ID %u) to the list\n",
+                    KE_MESSAGE_INFO,
+                    "Kernel HAL",
+                    "found x2APIC %u (ACPI ID %u)\n",
                     Entry->ApicId,
                     Entry->AcpiId);
 
@@ -191,6 +191,20 @@ void HalpInitializeApic(void) {
     WriteLapicRegister(0xF0, 0x1FF);
 
     __asm__ volatile("sti");
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function grabs the APIC ID of the current processor.
+ *
+ * PARAMETERS:
+ *     None.
+ *
+ * RETURN VALUE:
+ *     APIC ID of the current processor.
+ *-----------------------------------------------------------------------------------------------*/
+uint32_t HalpGetCurrentApicId(void) {
+    return ReadLapicRegister(0x20);
 }
 
 /*-------------------------------------------------------------------------------------------------

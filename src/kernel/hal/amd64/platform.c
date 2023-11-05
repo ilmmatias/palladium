@@ -17,4 +17,5 @@ void HalpInitializePlatform(void) {
     HalpInitializeIdt();
     HalpInitializeIoapic();
     HalpInitializeApic();
+    HalpInitializeHpet();
 }
