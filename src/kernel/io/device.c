@@ -2,11 +2,13 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <io.h>
+#include <ke.h>
 #include <mm.h>
 #include <rt.h>
 #include <string.h>
 
 static RtSList DeviceListHead = {.Next = NULL};
+static KeSpinLock Lock = {0};
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -40,7 +42,10 @@ int IoCreateDevice(const char *Name, IoReadFn Read, IoWriteFn Write) {
     Entry->Read = Read;
     Entry->Write = Write;
 
+    KeAcquireSpinLock(&Lock);
     RtPushSList(&DeviceListHead, &Entry->ListHeader);
+    KeReleaseSpinLock(&Lock);
+
     return 1;
 }
 
@@ -55,12 +60,16 @@ int IoCreateDevice(const char *Name, IoReadFn Read, IoWriteFn Write) {
  *     Pointer to the device on success, NULL otherwise.
  *-----------------------------------------------------------------------------------------------*/
 IoDevice *IoOpenDevice(const char *Name) {
+    KeAcquireSpinLock(&Lock);
+
     for (RtSList *Entry = DeviceListHead.Next; Entry; Entry = Entry->Next) {
         IoDevice *Device = CONTAINING_RECORD(Entry, IoDevice, ListHeader);
         if (!strcmp(Device->Name, Name)) {
+            KeReleaseSpinLock(&Lock);
             return Device;
         }
     }
 
+    KeReleaseSpinLock(&Lock);
     return NULL;
 }

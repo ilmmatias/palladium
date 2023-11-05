@@ -18,6 +18,8 @@ uint32_t VidpForeground = 0xAAAAAA;
 uint16_t VidpCursorX = 0;
 uint16_t VidpCursorY = 0;
 
+KeSpinLock VidpLock = {0};
+
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function copies the front buffer into the back buffer (flusing its contents into the
@@ -140,6 +142,8 @@ static void DrawCharacter(char Character) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void VidResetDisplay(void) {
+    KeAcquireSpinLock(&VidpLock);
+
     /* While the color/attribute is left untouched, the cursor is always reset to 0;0. */
     VidpCursorX = 0;
     VidpCursorY = 0;
@@ -149,11 +153,13 @@ void VidResetDisplay(void) {
     }
 
     Flush();
+    KeReleaseSpinLock(&VidpLock);
 }
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function displays a character using the current bg/fg attribute values.
+ *     Internal "display character and update attributes" function; Only call this after acquiring
+ *     the lock!
  *
  * PARAMETERS:
  *     Character - The character.
@@ -161,15 +167,13 @@ void VidResetDisplay(void) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void VidPutChar(char Character) {
+static void PutChar(char Character) {
     /* It's probably safe to use the size of 4 spaces? */
     const int TabSize = VidpFont.GlyphInfo[0x20].Width * 4;
-    int NeedsFlush = 0;
 
     if (Character == '\n') {
         VidpCursorX = 0;
         VidpCursorY += VidpFont.Height;
-        NeedsFlush = 1;
     } else if (Character == '\t') {
         VidpCursorX = (VidpCursorX + TabSize) & ~(TabSize - 1);
     } else {
@@ -180,22 +184,17 @@ void VidPutChar(char Character) {
     if (VidpCursorX >= VidpWidth) {
         VidpCursorX = 0;
         VidpCursorY += VidpFont.Height;
-        NeedsFlush = 1;
     }
 
     if (VidpCursorY >= VidpHeight) {
         ScrollUp();
         VidpCursorY = VidpHeight - VidpFont.Height;
     }
-
-    if (NeedsFlush) {
-        Flush();
-    }
 }
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function outputs the specified character buffer into the screen.
+ *     Unlocked version of VidPutString; Only call this after acquiring the lock!
  *
  * PARAMETERS:
  *     String - What to output.
@@ -203,9 +202,9 @@ void VidPutChar(char Character) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void VidPutString(const char *String) {
+static void PutString(const char *String) {
     while (*String) {
-        VidPutChar(*(String++));
+        PutChar(*(String++));
     }
 }
 
@@ -225,8 +224,41 @@ void VidPutString(const char *String) {
 static void PutBuffer(const void *buffer, int size, void *context) {
     (void)context;
     for (int i = 0; i < size; i++) {
-        VidPutChar(((const char *)buffer)[i]);
+        PutChar(((const char *)buffer)[i]);
     }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function displays a character using the current bg/fg attribute values.
+ *
+ * PARAMETERS:
+ *     Character - The character.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void VidPutChar(char Character) {
+    KeAcquireSpinLock(&VidpLock);
+    PutChar(Character);
+    Flush();
+    KeReleaseSpinLock(&VidpLock);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function outputs the specified character buffer into the screen.
+ *
+ * PARAMETERS:
+ *     String - What to output.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void VidPutString(const char *String) {
+    KeAcquireSpinLock(&VidpLock);
+    PutString(String);
+    KeReleaseSpinLock(&VidpLock);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -244,57 +276,62 @@ static void PutBuffer(const void *buffer, int size, void *context) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void VidPrintVariadic(int Type, const char *Prefix, const char *Message, va_list Arguments) {
+    KeAcquireSpinLock(&VidpLock);
+
     /* Make sure this specific type of message wasn't disabled at compile time. */
     switch (Type) {
         case KE_MESSAGE_TRACE:
             if (!KE_ENABLE_MESSAGE_TRACE) {
+                KeReleaseSpinLock(&VidpLock);
                 return;
             }
 
             break;
         case KE_MESSAGE_DEBUG:
             if (!KE_ENABLE_MESSAGE_DEBUG) {
+                KeReleaseSpinLock(&VidpLock);
                 return;
             }
 
             break;
         case KE_MESSAGE_INFO:
             if (!KE_ENABLE_MESSAGE_INFO) {
+                KeReleaseSpinLock(&VidpLock);
                 return;
             }
 
             break;
     }
 
-    uint32_t OriginalBackground;
-    uint32_t OriginalForeground;
-    VidGetColor(&OriginalBackground, &OriginalForeground);
+    uint32_t OriginalForeground = VidpForeground;
 
     const char *Suffix;
     switch (Type) {
         case KE_MESSAGE_ERROR:
-            VidSetColor(OriginalBackground, 0xFF0000);
+            VidpForeground = 0xFF0000;
             Suffix = " Error: ";
             break;
         case KE_MESSAGE_TRACE:
-            VidSetColor(OriginalBackground, 0x00FF00);
+            VidpForeground = 0x00FF00;
             Suffix = " Trace: ";
             break;
         case KE_MESSAGE_DEBUG:
-            VidSetColor(OriginalBackground, 0xFFFF00);
+            VidpForeground = 0xFFFF00;
             Suffix = " Debug: ";
             break;
         default:
-            VidSetColor(OriginalBackground, 0x0000FF);
+            VidpForeground = 0x0000FF;
             Suffix = " Info: ";
             break;
     }
 
-    VidPutString(Prefix);
-    VidPutString(Suffix);
-    VidSetColor(OriginalBackground, OriginalForeground);
+    PutString(Prefix);
+    PutString(Suffix);
+    VidpForeground = OriginalForeground;
 
     __vprintf(Message, Arguments, NULL, PutBuffer);
+    Flush();
+    KeReleaseSpinLock(&VidpLock);
 }
 
 /*-------------------------------------------------------------------------------------------------

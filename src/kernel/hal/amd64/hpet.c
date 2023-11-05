@@ -9,7 +9,7 @@
 
 static void *HpetAddress = NULL;
 static uint64_t Period = 0;
-static uint64_t Frequency = 0;
+static uint64_t PeriodInNs = 0;
 static uint64_t MinimumTicks = 0;
 
 /*-------------------------------------------------------------------------------------------------
@@ -78,10 +78,13 @@ void HalpInitializeHpet(void) {
 
     uint64_t Caps = ReadHpetRegister(HPET_CAP_REG);
     Period = Caps >> 32;
-    Frequency = 0x38D7EA4C68000 / Period;
+    PeriodInNs = Period / 1000000;
     MinimumTicks = Hpet->MinimumTicks;
     VidPrint(
-        KE_MESSAGE_INFO, "Kernel HAL", "using HPET as timer source (freq = %llu HZ)\n", Frequency);
+        KE_MESSAGE_INFO,
+        "Kernel HAL",
+        "using HPET as timer source (freq = %llu HZ)\n",
+        1000000000000000 / Period);
 
     /* We don't care about legacy replacement, allocate one of the supported vectors instead. */
     Caps = ReadHpetRegister(HPET_TIMER_CAP_REG(0));
@@ -102,4 +105,33 @@ void HalpInitializeHpet(void) {
     WriteHpetRegister(HPET_TIMER_CAP_REG(0), (Caps & ~0x7E08) | (Gsi << 9) | 0x06);
     WriteHpetRegister(HPET_VAL_REG, 0);
     WriteHpetRegister(HPET_CFG_REG, 0x01);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function returns the period (in nanoseconds) of the HAL timer.
+ *
+ * PARAMETERS:
+ *     None.
+ *
+ * RETURN VALUE:
+ *     Period of the timer.
+ *-----------------------------------------------------------------------------------------------*/
+uint64_t HalGetTimerPeriod(void) {
+    return PeriodInNs;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function returns how many timer ticks have elapsed since the timer was initialized.
+ *
+ * PARAMETERS:
+ *     None.
+ *
+ * RETURN VALUE:
+ *     How many ticks have elapsed since system boot. Multiply it by the timer period to get how
+ *     many nanoseconds have elapsed.
+ *-----------------------------------------------------------------------------------------------*/
+uint64_t HalGetTimerTicks(void) {
+    return ReadHpetRegister(HPET_VAL_REG);
 }

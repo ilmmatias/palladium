@@ -22,6 +22,13 @@
 #define KE_ENABLE_MESSAGE_DEBUG 1
 #define KE_ENABLE_MESSAGE_INFO 1
 
+typedef int KeSpinLock;
+
+int KeTryAcquireSpinLock(KeSpinLock *Lock);
+void KeAcquireSpinLock(KeSpinLock *Lock);
+void KeReleaseSpinLock(KeSpinLock *Lock);
+int KeTestSpinLock(KeSpinLock *Lock);
+
 [[noreturn]] void KeFatalError(int Message);
 
 #endif /* _KE_H_ */

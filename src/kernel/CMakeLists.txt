@@ -25,10 +25,12 @@ add_executable(kernel "kernel" YES
     ${SOURCES}
 
     hal/acpi.c
+    hal/timer.c
 
     io/device.c
 
     ke/entry.c
+    ke/lock.c
     ke/panic.c
 
     mm/page.c

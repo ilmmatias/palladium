@@ -22,6 +22,8 @@ uint64_t MiPoolStart = 0;
 uint64_t MiPoolBitmapHint = 0;
 RtBitmap MiPoolBitmap;
 
+static KeSpinLock Lock = {0};
+
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function allocates a the specified amount of pages from the pool space.
@@ -106,6 +108,8 @@ static void FreePoolPages(void *Base) {
  *     a new page failed.
  *-----------------------------------------------------------------------------------------------*/
 void *MmAllocatePool(size_t Size, const char Tag[4]) {
+    KeAcquireSpinLock(&Lock);
+
     if (!Size) {
         Size = 1;
     }
@@ -114,7 +118,9 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
        pointer size isn't 64-bits. */
     uint32_t Head = (Size + 0x0F) >> 4;
     if (Head > SMALL_BLOCK_COUNT) {
-        return AllocatePoolPages((Size + MM_PAGE_SIZE - 1) >> MM_PAGE_SHIFT);
+        void *Base = AllocatePoolPages((Size + MM_PAGE_SIZE - 1) >> MM_PAGE_SHIFT);
+        KeReleaseSpinLock(&Lock);
+        return Base;
     }
 
     /* Start at an exact match, and try everything onwards too (if there was nothing free). */
@@ -140,11 +146,13 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
             RtPushSList(&SmallBlocks[i - Head - 2], &RemainingSpace->ListHeader);
         }
 
+        KeReleaseSpinLock(&Lock);
         return Header + 1;
     }
 
     PoolHeader *Header = (PoolHeader *)AllocatePoolPages(1);
     if (!Header) {
+        KeReleaseSpinLock(&Lock);
         return NULL;
     }
 
@@ -161,6 +169,7 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
         RtPushSList(&SmallBlocks[SMALL_BLOCK_COUNT - Head - 2], &RemainingSpace->ListHeader);
     }
 
+    KeReleaseSpinLock(&Lock);
     return Header + 1;
 }
 
@@ -175,10 +184,13 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void MmFreePool(void *Base, const char Tag[4]) {
+    KeAcquireSpinLock(&Lock);
+
     /* MmAllocatePool guarantees anything that is inside the small pool buckets is never going to
        be page aligned. */
     if (!((uint64_t)Base & (MM_PAGE_SIZE - 1))) {
         FreePoolPages(Base);
+        KeReleaseSpinLock(&Lock);
         return;
     }
 
@@ -193,4 +205,5 @@ void MmFreePool(void *Base, const char Tag[4]) {
     }
 
     RtPushSList(&SmallBlocks[Header->Head - 1], &Header->ListHeader);
+    KeReleaseSpinLock(&Lock);
 }

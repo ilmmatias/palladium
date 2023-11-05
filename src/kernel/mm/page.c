@@ -10,6 +10,8 @@ MiPageEntry *MiFreePageListHead = NULL;
 static MiPageEntry *DeferredFreePageListHead = NULL;
 static int DeferredFreePageListSize = 0;
 
+static KeSpinLock PageListLock = {0};
+
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function merges us with all neighbouring groups (if possible).
@@ -109,10 +111,13 @@ uint64_t MmAllocatePages(uint32_t Pages) {
         Pages = 1;
     }
 
+    KeAcquireSpinLock(&PageListLock);
+
     /* Deferred free pages are always size 1, we can/should use them if possible. */
     if (DeferredFreePageListHead && Pages == 1) {
         MiPageEntry *Page = DeferredFreePageListHead;
         DeferredFreePageListHead = Page->NextGroup;
+        KeReleaseSpinLock(&PageListLock);
         return Page->GroupBase;
     }
 
@@ -134,6 +139,7 @@ uint64_t MmAllocatePages(uint32_t Pages) {
     } while (Retry);
 
     if (!Group) {
+        KeReleaseSpinLock(&PageListLock);
         return 0;
     }
 
@@ -148,6 +154,7 @@ uint64_t MmAllocatePages(uint32_t Pages) {
             MiPageList[(Base >> MM_PAGE_SHIFT) + i].References = 1;
         }
 
+        KeReleaseSpinLock(&PageListLock);
         return Base;
     }
 
@@ -169,6 +176,7 @@ uint64_t MmAllocatePages(uint32_t Pages) {
         MiPageList[(Group->GroupBase >> MM_PAGE_SHIFT) + i].References = 1;
     }
 
+    KeReleaseSpinLock(&PageListLock);
     return Group->GroupBase;
 }
 
@@ -183,9 +191,13 @@ uint64_t MmAllocatePages(uint32_t Pages) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void MmReferencePage(uint64_t PhysicalAddress) {
+    KeAcquireSpinLock(&PageListLock);
+
     if (MiPageList[PhysicalAddress >> MM_PAGE_SHIFT].References != UINT8_MAX) {
         MiPageList[PhysicalAddress >> MM_PAGE_SHIFT].References++;
     }
+
+    KeReleaseSpinLock(&PageListLock);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -200,8 +212,15 @@ void MmReferencePage(uint64_t PhysicalAddress) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void MmDereferencePage(uint64_t PhysicalAddress) {
+    KeAcquireSpinLock(&PageListLock);
+
     if (!MiPageList[PhysicalAddress >> MM_PAGE_SHIFT].References--) {
         KeFatalError(KE_DOUBLE_PAGE_FREE);
+    }
+
+    if (MiPageList[PhysicalAddress >> MM_PAGE_SHIFT].References) {
+        KeReleaseSpinLock(&PageListLock);
+        return;
     }
 
     MiPageEntry *Entry = &MiPageList[PhysicalAddress >> 12];
@@ -216,4 +235,6 @@ void MmDereferencePage(uint64_t PhysicalAddress) {
     if (DeferredFreePageListSize >= 32) {
         DeferredFreePages();
     }
+
+    KeReleaseSpinLock(&PageListLock);
 }

@@ -1,11 +1,18 @@
 LIBRARY kernel.exe
 EXPORTS
     HalFindAcpiTable
+    HalGetTimerPeriod
+    HalGetTimerTicks
+    HalWaitTimer
 
     IoCreateDevice
     IoOpenDevice
 
+    KeAcquireSpinLock
     KeFatalError
+    KeReleaseSpinLock
+    KeTestSpinLock
+    KeTryAcquireSpinLock
 
     MmAllocatePages
     MmAllocatePool
