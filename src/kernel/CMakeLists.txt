@@ -16,12 +16,14 @@ if(ARCH STREQUAL "amd64")
         hal/${ARCH}/platform.c
         hal/${ARCH}/smp.c
         hal/${ARCH}/smp.S
+        hal/${ARCH}/timer.c
 
         ke/${ARCH}/driver.c
+        ke/${ARCH}/notify.c
 
         mm/${ARCH}/map.c
         mm/${ARCH}/page.c
-        
+
         vid/${ARCH}/initialize.c)
 endif()
 
@@ -34,6 +36,7 @@ add_executable(kernel "kernel" YES
     io/device.c
 
     ke/entry.c
+    ke/event.c
     ke/lock.c
     ke/panic.c
 

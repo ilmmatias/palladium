@@ -43,22 +43,6 @@ static void WriteHpetRegister(uint32_t Number, uint64_t Data) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function is called whenever the HPET triggers an interrupt.
- *
- * PARAMETERS:
- *     State - I/O; Pointer into the stack to where the current register state was saved.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-static void InterruptHandler(RegisterState *) {
-    if (ReadHpetRegister(HPET_STS_REG)) {
-        WriteHpetRegister(HPET_STS_REG, 1);
-    }
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
  *     This function finds and initializes the HPET (High Precision Event Time).
  *
  * PARAMETERS:
@@ -83,26 +67,9 @@ void HalpInitializeHpet(void) {
     VidPrint(
         KE_MESSAGE_INFO,
         "Kernel HAL",
-        "using HPET as timer source (freq = %llu HZ)\n",
-        1000000000000000 / Period);
+        "using HPET as tick timer source (period = %llu ns)\n",
+        Period);
 
-    /* We don't care about legacy replacement, allocate one of the supported vectors instead. */
-    Caps = ReadHpetRegister(HPET_TIMER_CAP_REG(0));
-    if (!(Caps >> 32)) {
-        VidPrint(
-            KE_MESSAGE_ERROR, "Kernel HAL", "the HPET timer does not has any valid IOAPIC input\n");
-        KeFatalError(KE_FATAL_ERROR);
-    }
-
-    uint32_t Gsi = __builtin_ctz(Caps >> 32);
-    uint8_t Irq = HalInstallInterruptHandler(InterruptHandler);
-    if (Irq == (uint8_t)-1) {
-        VidPrint(KE_MESSAGE_ERROR, "Kernel HAL", "could not allocate an IRQ for the HPET\n");
-        KeFatalError(KE_FATAL_ERROR);
-    }
-
-    HalpEnableGsi(Gsi, Irq);
-    WriteHpetRegister(HPET_TIMER_CAP_REG(0), (Caps & ~0x7E08) | (Gsi << 9) | 0x06);
     WriteHpetRegister(HPET_VAL_REG, 0);
     WriteHpetRegister(HPET_CFG_REG, 0x01);
 }

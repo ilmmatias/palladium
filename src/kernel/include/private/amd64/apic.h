@@ -68,6 +68,7 @@ typedef struct {
     uint32_t ApicId;
     uint32_t AcpiId;
     int IsX2Apic;
+    int Online;
 } LapicEntry;
 
 typedef struct {

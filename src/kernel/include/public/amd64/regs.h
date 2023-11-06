@@ -29,6 +29,6 @@ typedef struct __attribute__((packed)) {
     uint64_t Rflags;
     uint64_t Rsp;
     uint64_t Ss;
-} RegisterState;
+} HalRegisterState;
 
 #endif /* _AMD64_REGS_H_ */

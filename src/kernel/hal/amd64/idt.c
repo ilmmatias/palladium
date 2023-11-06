@@ -7,35 +7,13 @@
 #include <rt.h>
 #include <vid.h>
 
-typedef struct __attribute__((packed)) {
-    uint16_t BaseLow;
-    uint16_t Cs;
-    uint8_t Ist;
-    uint8_t Attributes;
-    uint16_t BaseMid;
-    uint32_t BaseHigh;
-    uint32_t Reserved;
-} IdtEntry;
-
-typedef struct __attribute__((packed)) {
-    uint16_t Limit;
-    uint64_t Base;
-} IdtDescriptor;
-
 typedef struct {
     RtSList ListHeader;
-    void (*Handler)(RegisterState *);
+    void (*Handler)(HalRegisterState *);
 } IdtHandler;
 
+extern void KiHandleEvent(void *);
 extern uint64_t HalpInterruptHandlerTable[256];
-
-static __attribute__((aligned(0x10))) IdtEntry Entries[256];
-static IdtDescriptor Descriptor;
-
-static struct {
-    RtSList ListHead;
-    uint32_t Usage;
-} Slots[224];
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -48,14 +26,20 @@ static struct {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void HalpInterruptHandler(RegisterState *State) {
+void HalpInterruptHandler(HalRegisterState *State) {
     if (State->InterruptNumber < 32) {
-        VidPrint(KE_MESSAGE_ERROR, "Kernel", "received exception %llu\n", State->InterruptNumber);
+        VidPrint(
+            KE_MESSAGE_ERROR,
+            "Kernel HAL",
+            "processor %u received exception %llu\n",
+            HalpGetCurrentProcessor()->ApicId,
+            State->InterruptNumber);
         while (1)
             ;
     }
 
-    RtSList *ListHeader = Slots[State->InterruptNumber - 32].ListHead.Next;
+    RtSList *ListHeader =
+        HalpGetCurrentProcessor()->IdtSlots[State->InterruptNumber - 32].ListHead.Next;
     while (ListHeader) {
         CONTAINING_RECORD(ListHeader, IdtHandler, ListHeader)->Handler(State);
         ListHeader = ListHeader->Next;
@@ -70,29 +54,62 @@ void HalpInterruptHandler(RegisterState *State) {
  *     any incoming interrupts with HalpInterruptHandler.
  *
  * PARAMETERS:
- *     None.
+ *     Processor - Pointer to the processor-specific structure.
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void HalpInitializeIdt(void) {
+void HalpInitializeIdt(HalpProcessor *Processor) {
     /* Interrupts remain disabled up until the Local APIC is configured (our interrupt handler
        is setup to send EOI to the APIC, not the PIC). */
     __asm__ volatile("cli");
 
     for (int i = 0; i < 256; i++) {
-        Entries[i].BaseLow = HalpInterruptHandlerTable[i];
-        Entries[i].Cs = 0x08;
-        Entries[i].Ist = 0;
-        Entries[i].Attributes = 0x8E;
-        Entries[i].BaseMid = HalpInterruptHandlerTable[i] >> 16;
-        Entries[i].BaseHigh = HalpInterruptHandlerTable[i] >> 32;
-        Entries[i].Reserved = 0;
+        Processor->IdtEntries[i].BaseLow = HalpInterruptHandlerTable[i];
+        Processor->IdtEntries[i].Cs = 0x08;
+        Processor->IdtEntries[i].Ist = 0;
+        Processor->IdtEntries[i].Attributes = 0x8E;
+        Processor->IdtEntries[i].BaseMid = HalpInterruptHandlerTable[i] >> 16;
+        Processor->IdtEntries[i].BaseHigh = HalpInterruptHandlerTable[i] >> 32;
+        Processor->IdtEntries[i].Reserved = 0;
     }
 
-    Descriptor.Limit = sizeof(Entries) - 1;
-    Descriptor.Base = (uint64_t)Entries;
-    __asm__ volatile("lidt %0" :: "m"(Descriptor));
+    for (int i = 0; i < 224; i++) {
+        Processor->IdtSlots[i].Usage = 0;
+        Processor->IdtSlots[i].ListHead.Next = NULL;
+    }
+
+    Processor->IdtDescriptor.Limit = sizeof(Processor->IdtEntries) - 1;
+    Processor->IdtDescriptor.Base = (uint64_t)Processor->IdtEntries;
+    __asm__ volatile("lidt %0" :: "m"(Processor->IdtDescriptor));
+
+    /* Register the DPC/event handler. */
+    HalInstallInterruptHandlerAt(0xDE, (void (*)(HalRegisterState *))KiHandleEvent);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function installs an interrupt handler at the given vector.
+ *
+ * PARAMETERS:
+ *     Vector - Where to install the handler.
+ *     Handler - Which function will handle it.
+ *
+ * RETURN VALUE:
+ *     1 on success, 0 otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+int HalInstallInterruptHandlerAt(uint8_t Vector, void (*Handler)(HalRegisterState *)) {
+    IdtHandler *Entry = MmAllocatePool(sizeof(IdtHandler), "Apic");
+    if (!Entry) {
+        return 0;
+    }
+
+    HalpProcessor *Processor = HalpGetCurrentProcessor();
+    Processor->IdtSlots[Vector].Usage++;
+    Entry->Handler = Handler;
+    RtPushSList(&Processor->IdtSlots[Vector].ListHead, &Entry->ListHeader);
+
+    return 1;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -106,25 +123,17 @@ void HalpInitializeIdt(void) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-uint8_t HalInstallInterruptHandler(void (*Handler)(RegisterState *)) {
+uint8_t HalInstallInterruptHandler(void (*Handler)(HalRegisterState *)) {
+    HalpProcessor *Processor = HalpGetCurrentProcessor();
     uint32_t SmallestUsage = UINT32_MAX;
     uint8_t Index = 0;
 
     for (uint8_t i = 0; i < 224; i++) {
-        if (Slots[i].Usage < SmallestUsage) {
-            SmallestUsage = Slots[i].Usage;
+        if (Processor->IdtSlots[i].Usage < SmallestUsage) {
+            SmallestUsage = Processor->IdtSlots[i].Usage;
             Index = i;
         }
     }
 
-    IdtHandler *Entry = MmAllocatePool(sizeof(IdtHandler), "Apic");
-    if (!Entry) {
-        return -1;
-    }
-
-    Slots[Index].Usage++;
-    Entry->Handler = Handler;
-    RtPushSList(&Slots[Index].ListHead, &Entry->ListHeader);
-
-    return Index;
+    return HalInstallInterruptHandlerAt(Index, Handler) ? Index : -1;
 }

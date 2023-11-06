@@ -81,12 +81,8 @@ static uint64_t LoadFile(
         return 0;
     }
 
-    /* Change the following parameter if we ever need to increase the stack size!
-       Our current default is 16KiB. */
-    const uint64_t StackSize = 0x4000;
-
     uint64_t FirstStackPage = (Header->SizeOfImage + PAGE_SIZE - 1) >> PAGE_SHIFT;
-    uint64_t StackPageCount = IsKernel ? (StackSize + PAGE_SIZE - 1) >> PAGE_SHIFT : 0;
+    uint64_t StackPageCount = IsKernel ? (SIZEOF_PROCESSOR + PAGE_SIZE - 1) >> PAGE_SHIFT : 0;
 
     uint64_t Pages = FirstStackPage + StackPageCount;
     *ImageSize = Pages << PAGE_SHIFT;

@@ -10,37 +10,6 @@
 #include <x86/cpuid.h>
 #include <x86/idt.h>
 
-#define LOADER_MAGIC "BMGR"
-#define LOADER_CURRENT_VERSION 0x0000
-
-typedef struct __attribute__((packed)) {
-    char Magic[4];
-    uint16_t Version;
-    struct {
-        uint64_t BaseAdress;
-        int IsXsdt;
-    } Acpi;
-    struct {
-        uint64_t MemorySize;
-        uint64_t PageAllocatorBase;
-        uint64_t PoolBitmapBase;
-    } MemoryManager;
-    struct {
-        uint64_t BaseAddress;
-        uint32_t Count;
-    } MemoryMap;
-    struct {
-        uint64_t BackBufferBase;
-        uint64_t FrontBufferBase;
-        uint16_t Width;
-        uint16_t Height;
-    } Display;
-    struct {
-        uint64_t BaseAddress;
-        uint32_t Count;
-    } Images;
-} LoaderBootData;
-
 extern uint64_t BiosRsdtLocation;
 extern int BiosIsXsdt;
 
@@ -57,7 +26,7 @@ extern uint16_t BiVideoHeight;
     uint64_t *Pml4,
     uint64_t BootData,
     uint64_t EntryPoint,
-    uint64_t StackTop);
+    uint64_t ProcessorStruct);
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -282,7 +251,7 @@ static void InstallIdtHandler(int Number, uint64_t Handler) {
             Pml4,
             (uint64_t)BootData + 0xFFFF800000000000,
             Images[0].EntryPoint,
-            Images[0].VirtualAddress + Images[0].ImageSize);
+            Images[0].VirtualAddress + Images[0].ImageSize - SIZEOF_PROCESSOR);
     } while (0);
 
     BmPanic("An error occoured while trying to load the selected operating system.\n"

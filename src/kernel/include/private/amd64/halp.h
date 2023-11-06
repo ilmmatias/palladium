@@ -5,13 +5,42 @@
 #define _AMD64_HALP_H_
 
 #include <amd64/hal.h>
+#include <halp.h>
 
-void HalpInitializeIdt(void);
-void HalpInitializeGdt(void);
+typedef struct __attribute__((packed)) {
+    char Stack[0x4000];
+    int Online;
+    uint32_t ApicId;
+    uint64_t GdtEntries[5];
+    struct __attribute__((packed)) {
+        uint16_t BaseLow;
+        uint16_t Cs;
+        uint8_t Ist;
+        uint8_t Attributes;
+        uint16_t BaseMid;
+        uint32_t BaseHigh;
+        uint32_t Reserved;
+    } IdtEntries[256];
+    struct {
+        RtSList ListHead;
+        uint32_t Usage;
+    } IdtSlots[224];
+    struct __attribute__((packed)) {
+        uint16_t Limit;
+        uint64_t Base;
+    } GdtDescriptor, IdtDescriptor;
+} HalpProcessor;
+
+HalpProcessor *HalpGetCurrentProcessor(void);
+
+void HalpInitializeIdt(HalpProcessor *Processor);
+void HalpInitializeGdt(HalpProcessor *Processor);
 void HalpFlushGdt(void);
 
 void HalpInitializeApic(void);
-uint32_t HalpGetCurrentApicId(void);
+void HalpEnableApic(void);
+uint64_t HalpReadLapicRegister(uint32_t Number);
+void HalpWriteLapicRegister(uint32_t Number, uint64_t Data);
 void HalpClearApicErrors(void);
 void HalpSendIpi(uint32_t Target, uint32_t Vector);
 void HalpWaitIpiDelivery(void);
@@ -22,6 +51,7 @@ void HalpEnableIrq(uint8_t Irq, uint8_t Vector);
 void HalpEnableGsi(uint8_t Gsi, uint8_t Vector);
 
 void HalpInitializeHpet(void);
+void HalpInitializeApicTimer(void);
 
 void HalpInitializeSmp(void);
 

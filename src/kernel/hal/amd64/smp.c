@@ -3,22 +3,20 @@
 
 #include <amd64/apic.h>
 #include <amd64/halp.h>
+#include <amd64/msr.h>
 #include <ke.h>
 #include <mm.h>
 #include <rt.h>
 #include <string.h>
 #include <vid.h>
 
-typedef struct {
-    char Stack[0x4000];
-    int Online;
-} HalpProcessor;
-
 extern RtSList HalpLapicListHead;
 
 extern void HalpApEntry(void);
 extern uint64_t HalpKernelPageMap;
 extern HalpProcessor *HalpApStructure;
+
+uint32_t HalpProcessorCount = 1;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -32,7 +30,7 @@ extern HalpProcessor *HalpApStructure;
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void HalpInitializeSmp(void) {
-    uint32_t ApicId = HalpGetCurrentApicId();
+    uint32_t ApicId = HalpReadLapicRegister(0x20);
     RtSList *ListHeader = HalpLapicListHead.Next;
 
     /* Copy the AP startup code into 0x8000 (as the STARTUP IPI makes the API start at
@@ -45,11 +43,15 @@ void HalpInitializeSmp(void) {
                      : "=r"(*(uint64_t *)MI_PADDR_TO_VADDR(
                          (uint64_t)&HalpKernelPageMap - (uint64_t)HalpApEntry + 0x8000)));
 
+    HalpGetCurrentProcessor()->Online = 1;
+    HalpGetCurrentProcessor()->ApicId = ApicId;
+
     while (ListHeader) {
         LapicEntry *Entry = CONTAINING_RECORD(ListHeader, LapicEntry, ListHeader);
 
         /* KiSystemStartup is already initializing the BSP. */
         if (Entry->ApicId == ApicId) {
+            Entry->Online = 1;
             ListHeader = ListHeader->Next;
             continue;
         }
@@ -60,6 +62,7 @@ void HalpInitializeSmp(void) {
         }
 
         Processor->Online = 0;
+        Processor->ApicId = Entry->ApicId;
         *(HalpProcessor **)MI_PADDR_TO_VADDR(
             (uint64_t)&HalpApStructure - (uint64_t)HalpApEntry + 0x8000) = Processor;
 
@@ -81,15 +84,31 @@ void HalpInitializeSmp(void) {
             HalpWaitIpiDelivery();
         }
 
-        for (int i = 0; i < 100; i++) {
+        for (int i = 0; i < 1000; i++) {
             if (Processor->Online) {
-                VidPrint(KE_MESSAGE_DEBUG, "Kernel HAL", "AP came online!\n");
+                Entry->Online = 1;
+                HalpProcessorCount++;
                 break;
             }
 
-            HalWaitTimer(10 * HAL_MILLISECS);
+            HalWaitTimer(1 * HAL_MILLISECS);
         }
 
         ListHeader = ListHeader->Next;
     }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function gets a pointer to the processor-specific structure of the current processor.
+ *     This only works after HalpInitializePlatform().
+ *
+ * PARAMETERS:
+ *     None.
+ *
+ * RETURN VALUE:
+ *     Pointer to the processor struct.
+ *-----------------------------------------------------------------------------------------------*/
+HalpProcessor *HalpGetCurrentProcessor(void) {
+    return (HalpProcessor *)ReadMsr(0xC0000102);
 }

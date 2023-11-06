@@ -104,12 +104,8 @@ void RtAppendDList(RtDList *Head, RtDList *Entry) {
  *-----------------------------------------------------------------------------------------------*/
 RtDList *RtPopDList(RtDList *Head) {
     RtDList *Entry = Head->Next;
-
     Head->Next = Entry->Next;
-    Entry->Next->Prev = Head;
-    Entry->Next = NULL;
-    Entry->Prev = NULL;
-
+    Head->Next->Prev = Head;
     return Entry;
 }
 
@@ -125,12 +121,8 @@ RtDList *RtPopDList(RtDList *Head) {
  *-----------------------------------------------------------------------------------------------*/
 RtDList *RtTruncateDList(RtDList *Head) {
     RtDList *Entry = Head->Prev;
-
     Head->Prev = Entry->Prev;
     Entry->Prev->Next = Head;
-    Entry->Next = NULL;
-    Entry->Prev = NULL;
-
     return Entry;
 }
 

@@ -7,6 +7,7 @@
 #include <amd64/regs.h>
 #include <hal.h>
 
-uint8_t HalInstallInterruptHandler(void (*Handler)(RegisterState *));
+int HalInstallInterruptHandlerAt(uint8_t Vector, void (*Handler)(HalRegisterState *));
+uint8_t HalInstallInterruptHandler(void (*Handler)(HalRegisterState *));
 
 #endif /* _AMD64_HAL_H_ */

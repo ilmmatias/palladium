@@ -6,6 +6,8 @@
 
 #include <ke.h>
 
+void KiNotifyProcessors(void);
+
 void KiRunBootStartDrivers(void *LoaderData);
 
 #endif /* _KI_H_ */

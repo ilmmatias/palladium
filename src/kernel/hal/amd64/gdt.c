@@ -1,17 +1,9 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
-#include <stdint.h>
-
-typedef struct __attribute__((packed)) {
-    uint16_t Limit;
-    uint64_t Base;
-} GdtDescriptor;
+#include <amd64/halp.h>
 
 extern void HalpFlushGdt(void);
-
-static __attribute__((aligned(0x10))) uint64_t Entries[5];
-static GdtDescriptor Descriptor;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -19,21 +11,21 @@ static GdtDescriptor Descriptor;
  *     InitializeIdt, means we're safe to unmap the first 2MiB (and map the SMP entry point to it).
  *
  * PARAMETERS:
- *     None.
+ *     Processor - Pointer to the processor-specific structure.
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void HalpInitializeGdt(void) {
-    Entries[0] = 0x0000000000000000;
-    Entries[1] = 0x00AF9A000000FFFF;
-    Entries[2] = 0x00AF92000000FFFF;
-    Entries[3] = 0x00AFFA000000FFFF;
-    Entries[4] = 0x00AFF2000000FFFF;
+void HalpInitializeGdt(HalpProcessor *Processor) {
+    Processor->GdtEntries[0] = 0x0000000000000000;
+    Processor->GdtEntries[1] = 0x00AF9A000000FFFF;
+    Processor->GdtEntries[2] = 0x00AF92000000FFFF;
+    Processor->GdtEntries[3] = 0x00AFFA000000FFFF;
+    Processor->GdtEntries[4] = 0x00AFF2000000FFFF;
 
-    Descriptor.Limit = sizeof(Entries) - 1;
-    Descriptor.Base = (uint64_t)Entries;
+    Processor->GdtDescriptor.Limit = sizeof(Processor->GdtEntries) - 1;
+    Processor->GdtDescriptor.Base = (uint64_t)Processor->GdtEntries;
 
-    __asm__ volatile("lgdt %0" :: "m"(Descriptor));
+    __asm__ volatile("lgdt %0" :: "m"(Processor->GdtDescriptor));
     HalpFlushGdt();
 }

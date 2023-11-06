@@ -85,14 +85,12 @@ HalpApEntry:
 
     /* Setup the stack, indicate we're only, and finally get out of assembly (and low address)
        land. */
-    mov HalpApStructure - HalpApEntry(%ebx), %rsp
-    add $0x4000, %rsp
+    mov HalpApStructure - HalpApEntry(%ebx), %rdx
+    lea 0x4000(%rdx), %rsp
     movb $1, (%rsp)
     movabs $KiSystemStartup, %rax
     mov $0, %rcx
     jmp *%rax
-0:
-    jmp 0b
 
 
 .fill 128, 1, 0

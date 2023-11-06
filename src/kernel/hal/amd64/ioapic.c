@@ -196,7 +196,8 @@ void HalpEnableIrq(uint8_t Irq, uint8_t Vector) {
         ListHeader = ListHeader->Next;
     }
 
-    UnmaskIoapicVector(Gsi, Vector + 32, PinPolarity, TriggerMode, HalpGetCurrentApicId());
+    UnmaskIoapicVector(
+        Gsi, Vector + 32, PinPolarity, TriggerMode, HalpGetCurrentProcessor()->ApicId);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -211,5 +212,5 @@ void HalpEnableIrq(uint8_t Irq, uint8_t Vector) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void HalpEnableGsi(uint8_t Gsi, uint8_t Vector) {
-    UnmaskIoapicVector(Gsi, Vector + 32, 0, 1, HalpGetCurrentApicId());
+    UnmaskIoapicVector(Gsi, Vector + 32, 0, 1, HalpGetCurrentProcessor()->ApicId);
 }
