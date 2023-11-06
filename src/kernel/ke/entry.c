@@ -18,20 +18,22 @@
  * RETURN VALUE:
  *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
-[[noreturn]] void KiSystemStartup(void *LoaderData) {
-    /* Stage 0: Early output initialization; We need those, or we can't show error messages. */
-    VidpInitialize(LoaderData);
+[[noreturn]] void KiSystemStartup(int IsBsp, void *LoaderData) {
+    if (IsBsp) {
+        /* Stage 0: Early output initialization; We need those, or we can't show error messages. */
+        VidpInitialize(LoaderData);
 
-    /* Stage 1: Memory manager initialization. */
-    MiInitializePageAllocator(LoaderData);
-    MiInitializeVirtualMemory(LoaderData);
+        /* Stage 1: Memory manager initialization. */
+        MiInitializePageAllocator(LoaderData);
+        MiInitializeVirtualMemory(LoaderData);
 
-    /* Stage 2: Early platform/arch initialization. */
-    HalpSaveAcpiData(LoaderData);
-    HalpInitializePlatform();
+        /* Stage 2: Early platform/arch initialization. */
+        HalpSaveAcpiData(LoaderData);
+        HalpInitializePlatform();
 
-    /* Stage 2: Root drivers should be already loaded, wrap them up by calling their entry. */
-    KiRunBootStartDrivers(LoaderData);
+        /* Stage 3: Root drivers should be already loaded, wrap them up by calling their entry. */
+        KiRunBootStartDrivers(LoaderData);
+    }
 
     while (1)
         ;

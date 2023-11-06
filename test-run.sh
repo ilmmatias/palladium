@@ -61,7 +61,7 @@ then
     mcopy -i build.target/fat32.img _root/System ::/ 1>/dev/null
     dd if=build.boot/boot/bootsect/fat32boot.com of=build.target/fat32.img seek=90 skip=90 count=422 bs=1 conv=notrunc 2>/dev/null
     echo "[5/5] Running emulator"
-    qemu-system-x86_64 -enable-kvm -M smm=off -cpu host -drive file=build.target/fat32.img,index=0,media=disk,format=raw -no-reboot 1>/dev/null
+    qemu-system-x86_64 -enable-kvm -M smm=off -cpu host -smp 4 -drive file=build.target/fat32.img,index=0,media=disk,format=raw -no-reboot 1>/dev/null
 elif [ "$1" == "exfat" ]
 then
     sudo rm -rf /mnt/mount
@@ -76,7 +76,7 @@ then
     dd if=build.boot/boot/bootsect/exfatboot.com of=build.target/exfat.img seek=120 skip=120 count=392 bs=1 conv=notrunc 2>/dev/null
     dd if=build.boot/boot/bootsect/exfatboot.com of=build.target/exfat.img seek=512 skip=512 bs=1 conv=notrunc 2>/dev/null
     echo "[5/5] Running emulator"
-    qemu-system-x86_64 -enable-kvm -M smm=off -cpu host -drive file=build.target/exfat.img,index=0,media=disk,format=raw -no-reboot 1>/dev/null
+    qemu-system-x86_64 -enable-kvm -M smm=off -cpu host -smp 4 -drive file=build.target/exfat.img,index=0,media=disk,format=raw -no-reboot 1>/dev/null
 elif [ "$1" == "ntfs" ]
 then
     sudo rm -rf /mnt/mount
@@ -91,11 +91,11 @@ then
     dd if=build.boot/boot/bootsect/ntfsboot.com of=build.target/ntfs.img seek=80 skip=80 count=426 bs=1 conv=notrunc 2>/dev/null
     dd if=build.boot/boot/bootsect/ntfsboot.com of=build.target/ntfs.img seek=512 skip=512 bs=1 conv=notrunc 2>/dev/null
     echo "[5/5] Running emulator"
-    qemu-system-x86_64 -enable-kvm -M smm=off -cpu host -drive file=build.target/ntfs.img,index=0,media=disk,format=raw -no-reboot 1>/dev/null
+    qemu-system-x86_64 -enable-kvm -M smm=off -cpu host -smp 4 -drive file=build.target/ntfs.img,index=0,media=disk,format=raw -no-reboot 1>/dev/null
 else
     mkisofs -iso-level 2 -R -b iso9660boot.com -no-emul-boot -o build.target/iso9660.iso _root 1>/dev/null 2>&1
     echo "[5/5] Running emulator"
-    qemu-system-x86_64 -enable-kvm -M smm=off -cpu host -cdrom build.target/iso9660.iso -no-reboot
+    qemu-system-x86_64 -enable-kvm -M smm=off -cpu host -smp 4 -cdrom build.target/iso9660.iso -d cpu -no-reboot
 fi
 
 rm -rf _root

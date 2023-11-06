@@ -63,10 +63,10 @@ static void UnmaskIoapicVector(
     int PinPolarity,
     int TriggerMode,
     uint32_t ApicId) {
-    RtSList *ListEntry = IoapicListHead.Next;
+    RtSList *ListHeader = IoapicListHead.Next;
 
-    while (ListEntry) {
-        IoapicEntry *Entry = CONTAINING_RECORD(ListEntry, IoapicEntry, ListHeader);
+    while (ListHeader) {
+        IoapicEntry *Entry = CONTAINING_RECORD(ListHeader, IoapicEntry, ListHeader);
 
         if (Entry->GsiBase <= Gsi && Gsi < Entry->GsiBase + Entry->Size) {
             WriteIoapicRegister(
@@ -77,7 +77,7 @@ static void UnmaskIoapicVector(
             return;
         }
 
-        ListEntry = ListEntry->Next;
+        ListHeader = ListHeader->Next;
     }
 }
 
@@ -179,12 +179,12 @@ void HalpInitializeIoapic(void) {
  *-----------------------------------------------------------------------------------------------*/
 void HalpEnableIrq(uint8_t Irq, uint8_t Vector) {
     uint8_t Gsi = Irq;
-    RtSList *ListEntry = IoapicOverrideListHead.Next;
+    RtSList *ListHeader = IoapicOverrideListHead.Next;
     int PinPolarity = 0;
     int TriggerMode = 0;
 
-    while (ListEntry) {
-        IoapicOverrideEntry *Entry = CONTAINING_RECORD(ListEntry, IoapicOverrideEntry, ListHeader);
+    while (ListHeader) {
+        IoapicOverrideEntry *Entry = CONTAINING_RECORD(ListHeader, IoapicOverrideEntry, ListHeader);
 
         if (Entry->Irq == Irq) {
             Gsi = Entry->Gsi;
@@ -193,7 +193,7 @@ void HalpEnableIrq(uint8_t Irq, uint8_t Vector) {
             break;
         }
 
-        ListEntry = ListEntry->Next;
+        ListHeader = ListHeader->Next;
     }
 
     UnmaskIoapicVector(Gsi, Vector + 32, PinPolarity, TriggerMode, HalpGetCurrentApicId());

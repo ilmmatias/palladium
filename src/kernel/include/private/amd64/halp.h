@@ -7,9 +7,14 @@
 #include <amd64/hal.h>
 
 void HalpInitializeIdt(void);
+void HalpInitializeGdt(void);
+void HalpFlushGdt(void);
 
 void HalpInitializeApic(void);
 uint32_t HalpGetCurrentApicId(void);
+void HalpClearApicErrors(void);
+void HalpSendIpi(uint32_t Target, uint32_t Vector);
+void HalpWaitIpiDelivery(void);
 void HalpSendEoi(void);
 
 void HalpInitializeIoapic(void);
@@ -17,5 +22,7 @@ void HalpEnableIrq(uint8_t Irq, uint8_t Vector);
 void HalpEnableGsi(uint8_t Gsi, uint8_t Vector);
 
 void HalpInitializeHpet(void);
+
+void HalpInitializeSmp(void);
 
 #endif /* _AMD64_HALP_H_ */

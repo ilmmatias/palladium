@@ -7,11 +7,15 @@ if(ARCH STREQUAL "amd64")
     set(SOURCES
         hal/${ARCH}/acpi.c
         hal/${ARCH}/apic.c
+        hal/${ARCH}/gdt.c
+        hal/${ARCH}/gdt.S
         hal/${ARCH}/hpet.c
         hal/${ARCH}/idt.c
         hal/${ARCH}/idt.S
         hal/${ARCH}/ioapic.c
         hal/${ARCH}/platform.c
+        hal/${ARCH}/smp.c
+        hal/${ARCH}/smp.S
 
         ke/${ARCH}/driver.c
 

@@ -10,7 +10,8 @@
 #include <mm.h>
 #include <vid.h>
 
-static RtSList LapicListHead = {};
+RtSList HalpLapicListHead = {};
+
 static void *LapicAddress = NULL;
 static int X2ApicEnabled = 0;
 
@@ -25,16 +26,16 @@ static int X2ApicEnabled = 0;
  *     Pointer to the LapicEntry struct, or NULL if we didn't find it.
  *-----------------------------------------------------------------------------------------------*/
 static LapicEntry *GetLapic(uint32_t Id) {
-    RtSList *Entry = LapicListHead.Next;
+    RtSList *ListHeader = HalpLapicListHead.Next;
 
-    while (Entry) {
-        LapicEntry *Lapic = CONTAINING_RECORD(Entry, LapicEntry, ListHeader);
+    while (ListHeader) {
+        LapicEntry *Entry = CONTAINING_RECORD(ListHeader, LapicEntry, ListHeader);
 
-        if (Lapic->ApicId == Id) {
-            return Lapic;
+        if (Entry->ApicId == Id) {
+            return Entry;
         }
 
-        Entry = Entry->Next;
+        ListHeader = ListHeader->Next;
     }
 
     return NULL;
@@ -50,7 +51,7 @@ static LapicEntry *GetLapic(uint32_t Id) {
  * RETURN VALUE:
  *     What we've read.
  *-----------------------------------------------------------------------------------------------*/
-static uint32_t ReadLapicRegister(uint32_t Number) {
+static uint64_t ReadLapicRegister(uint32_t Number) {
     if (X2ApicEnabled) {
         return ReadMsr(0x800 + (Number >> 4));
     } else {
@@ -69,7 +70,7 @@ static uint32_t ReadLapicRegister(uint32_t Number) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-static void WriteLapicRegister(uint32_t Number, uint32_t Data) {
+static void WriteLapicRegister(uint32_t Number, uint64_t Data) {
     if (X2ApicEnabled) {
         WriteMsr(0x800 + (Number >> 4), Data);
     } else {
@@ -128,7 +129,7 @@ void HalpInitializeApic(void) {
                 Entry->ApicId = Record->Lapic.ApicId;
                 Entry->AcpiId = Record->Lapic.AcpiId;
                 Entry->IsX2Apic = 0;
-                RtPushSList(&LapicListHead, &Entry->ListHeader);
+                RtPushSList(&HalpLapicListHead, &Entry->ListHeader);
                 VidPrint(
                     KE_MESSAGE_INFO,
                     "Kernel HAL",
@@ -161,7 +162,7 @@ void HalpInitializeApic(void) {
                 Entry->ApicId = Record->X2Apic.X2ApicId;
                 Entry->AcpiId = Record->X2Apic.AcpiId;
                 Entry->IsX2Apic = 1;
-                RtPushSList(&LapicListHead, &Entry->ListHeader);
+                RtPushSList(&HalpLapicListHead, &Entry->ListHeader);
                 VidPrint(
                     KE_MESSAGE_INFO,
                     "Kernel HAL",
@@ -205,6 +206,55 @@ void HalpInitializeApic(void) {
  *-----------------------------------------------------------------------------------------------*/
 uint32_t HalpGetCurrentApicId(void) {
     return ReadLapicRegister(0x20);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function clears all errors on the Local APIC.
+ *
+ * PARAMETERS:
+ *     None.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void HalpClearApicErrors(void) {
+    WriteLapicRegister(0x280, 0);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function sends an IPI to another processor.
+ *
+ * PARAMETERS:
+ *     Target - APIC ID of the target.
+ *     Vector - Interrupt vector/action we want to trigger in the target.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void HalpSendIpi(uint32_t Target, uint32_t Vector) {
+    if (X2ApicEnabled) {
+        WriteLapicRegister(0x300, ((uint64_t)Target << 32) | Vector);
+    } else {
+        WriteLapicRegister(0x310, Target << 24);
+        WriteLapicRegister(0x300, Vector);
+    }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function busy loops until the Local APIC says a previously sent IPI was delivered.
+ *
+ * PARAMETERS:
+ *     None.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void HalpWaitIpiDelivery(void) {
+    while (ReadLapicRegister(0x300) & 0x1000)
+        ;
 }
 
 /*-------------------------------------------------------------------------------------------------

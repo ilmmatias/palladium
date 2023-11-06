@@ -77,9 +77,10 @@ _BiFinishTransferExecution:
 
     /* Skip the return address and Pml4, so that we can grab the boot data and RIP+RSP. */
     add $8, %rsp
-    pop %rcx
+    pop %rdx
     pop %rax
     pop %rsp
+    mov $1, %rcx
     jmp *%rax
 
 .align 8

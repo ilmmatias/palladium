@@ -62,11 +62,12 @@ int IoCreateDevice(const char *Name, IoReadFn Read, IoWriteFn Write) {
 IoDevice *IoOpenDevice(const char *Name) {
     KeAcquireSpinLock(&Lock);
 
-    for (RtSList *Entry = DeviceListHead.Next; Entry; Entry = Entry->Next) {
-        IoDevice *Device = CONTAINING_RECORD(Entry, IoDevice, ListHeader);
-        if (!strcmp(Device->Name, Name)) {
+    RtSList *ListHeader = DeviceListHead.Next;
+    while (ListHeader) {
+        IoDevice *Entry = CONTAINING_RECORD(ListHeader, IoDevice, ListHeader);
+        if (!strcmp(Entry->Name, Name)) {
             KeReleaseSpinLock(&Lock);
-            return Device;
+            return Entry;
         }
     }
 

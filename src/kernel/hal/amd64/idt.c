@@ -50,12 +50,7 @@ static struct {
  *-----------------------------------------------------------------------------------------------*/
 void HalpInterruptHandler(RegisterState *State) {
     if (State->InterruptNumber < 32) {
-        VidPrint(
-            KE_MESSAGE_ERROR,
-            "Kernel",
-            "received exception %llu (%llx)\n",
-            State->InterruptNumber,
-            State->InterruptNumber);
+        VidPrint(KE_MESSAGE_ERROR, "Kernel", "received exception %llu\n", State->InterruptNumber);
         while (1)
             ;
     }

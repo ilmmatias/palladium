@@ -1,11 +1,11 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
-#include <amd64/halp.h>
+.text
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function runs any early arch-specific initialization routines.
+ *     This function makes a previous LGDT take action, and reloads all segments.
  *
  * PARAMETERS:
  *     None.
@@ -13,11 +13,17 @@
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void HalpInitializePlatform(void) {
-    HalpInitializeGdt();
-    HalpInitializeIdt();
-    HalpInitializeIoapic();
-    HalpInitializeApic();
-    HalpInitializeHpet();
-    HalpInitializeSmp();
-}
+.global HalpFlushGdt
+HalpFlushGdt:
+    movabs $0f, %rax
+    push $0x08
+    push %rax
+    lretq
+0:
+    mov $0x10, %ax
+    mov %ax, %ds
+    mov %ax, %es
+    mov %ax, %ss
+    mov %ax, %fs
+    mov %ax, %gs
+    ret
