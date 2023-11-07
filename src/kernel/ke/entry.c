@@ -4,7 +4,7 @@
 #include <halp.h>
 #include <ki.h>
 #include <mi.h>
-#include <rt.h>
+#include <psp.h>
 #include <vidp.h>
 
 /*-------------------------------------------------------------------------------------------------
@@ -20,17 +20,18 @@
  * RETURN VALUE:
  *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
-[[noreturn]] void KiSystemStartup(int IsBsp, void *Processor, void *LoaderData) {
+[[noreturn]] void KiSystemStartup(int IsBsp, void *Processor, LoaderBootData *BootData) {
     if (IsBsp) {
         /* Stage 0: Early output initialization; We need this, or we can't show error messages. */
-        VidpInitialize(LoaderData);
+        VidpInitialize(BootData);
 
         /* Stage 1: Memory manager initialization. */
-        MiInitializePageAllocator(LoaderData);
-        MiInitializeVirtualMemory(LoaderData);
+        MiInitializePageAllocator(BootData);
+        MiInitializePool(BootData);
 
         /* Stage 2.1: Save all remaining info from the boot loader. */
-        HalpSaveAcpiData(LoaderData);
+        KiSaveAcpiData(BootData);
+        KiSaveBootStartDrivers(BootData);
     }
 
     /* Stage 2.2: Early platform/arch initialization. */
@@ -38,10 +39,57 @@
 
     if (IsBsp) {
         /* Stage 2.3: APs should be up, show how many we have. */
-        VidPrint(KE_MESSAGE_INFO, "Kernel", "%u processors online\n", HalpProcessorCount);
+        VidPrint(VID_MESSAGE_INFO, "Kernel", "%u processors online\n", HalpProcessorCount);
 
-        /* Stage 3: Spin up all boot-time drivers; Can't load anything else without them. */
-        KiRunBootStartDrivers(LoaderData);
+        /* Stage 3.1: Create the initial system thread. */
+        PspCreateSystemThread();
+    }
+
+    /* Stage 3.2: Create the idle thread, and spin up the scheduler. */
+    PspCreateIdleThread();
+    PspInitializeScheduler(IsBsp);
+
+    while (1)
+        ;
+}
+
+static void TestThread(void *) {
+    HalProcessor *CurrentProcessor = HalGetCurrentProcessor();
+    VidPrint(
+        VID_MESSAGE_INFO, "Kernel", "test thread started up on processor %p\n", CurrentProcessor);
+
+    while (1) {
+        HalProcessor *Processor = HalGetCurrentProcessor();
+        if (Processor != CurrentProcessor) {
+            CurrentProcessor = Processor;
+            VidPrint(
+                VID_MESSAGE_INFO,
+                "Kernel",
+                "test thread switched to processor %p\n",
+                CurrentProcessor);
+        }
+    }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function is the post-scheduler entry point; We're responsible for finishing the boot
+ *     process.
+ *
+ * PARAMETERS:
+ *     LoaderData - Where bootmgr placed our boot data.
+ *
+ * RETURN VALUE:
+ *     Does not return.
+ *-----------------------------------------------------------------------------------------------*/
+[[noreturn]] void KiContinueSystemStartup(void *) {
+    /* Stage 4: Initialize all boot drivers; We can't load anything further than this without
+       them. */
+    KiRunBootStartDrivers();
+
+    /* Spin up some threads to see if the other processors will take them. */
+    for (uint32_t i = 0; i < HalpProcessorCount; i++) {
+        PsReadyThread(PsCreateThread(TestThread, NULL));
     }
 
     while (1)

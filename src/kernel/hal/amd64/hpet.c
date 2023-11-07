@@ -1,7 +1,6 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
-#include <amd64/halp.h>
 #include <amd64/hpet.h>
 #include <ke.h>
 #include <mm.h>
@@ -52,9 +51,9 @@ static void WriteHpetRegister(uint32_t Number, uint64_t Data) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void HalpInitializeHpet(void) {
-    HpetHeader *Hpet = HalFindAcpiTable("HPET", 0);
+    HpetHeader *Hpet = KiFindAcpiTable("HPET", 0);
     if (!Hpet) {
-        VidPrint(KE_MESSAGE_ERROR, "Kernel HAL", "couldn't find the HPET table\n");
+        VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "couldn't find the HPET table\n");
         KeFatalError(KE_BAD_ACPI_TABLES);
     }
 
@@ -65,7 +64,7 @@ void HalpInitializeHpet(void) {
     PeriodInNs = Period / 1000000;
     MinimumTicks = Hpet->MinimumTicks;
     VidPrint(
-        KE_MESSAGE_INFO,
+        VID_MESSAGE_INFO,
         "Kernel HAL",
         "using HPET as tick timer source (period = %llu ns)\n",
         Period);

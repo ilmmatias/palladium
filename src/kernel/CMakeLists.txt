@@ -5,46 +5,45 @@ project(os/kernel)
 
 if(ARCH STREQUAL "amd64")
     set(SOURCES
-        hal/${ARCH}/acpi.c
         hal/${ARCH}/apic.c
+        hal/${ARCH}/context.c
         hal/${ARCH}/gdt.c
         hal/${ARCH}/gdt.S
         hal/${ARCH}/hpet.c
         hal/${ARCH}/idt.c
         hal/${ARCH}/idt.S
         hal/${ARCH}/ioapic.c
+        hal/${ARCH}/map.c
         hal/${ARCH}/platform.c
         hal/${ARCH}/smp.c
         hal/${ARCH}/smp.S
-        hal/${ARCH}/timer.c
-
-        ke/${ARCH}/driver.c
-        ke/${ARCH}/notify.c
-
-        mm/${ARCH}/map.c
-        mm/${ARCH}/page.c
-
-        vid/${ARCH}/initialize.c)
+        hal/${ARCH}/timer.c)
 endif()
 
 add_executable(kernel "kernel" YES
     ${SOURCES}
 
-    hal/acpi.c
     hal/timer.c
 
     io/device.c
 
+    ke/acpi.c
+    ke/driver.c
     ke/entry.c
-    ke/event.c
     ke/lock.c
     ke/panic.c
 
+    mm/initialize.c
     mm/page.c
     mm/pool.c
 
+    ps/idle.c
+    ps/scheduler.c
+    ps/thread.c
+
     vid/attributes.c
     vid/font.c
+    vid/initialize.c
     vid/print.c
 
     kernel.def)

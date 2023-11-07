@@ -1,36 +1,38 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
-#include <amd64/boot.h>
+#include <boot.h>
 #include <mi.h>
+#include <rt.h>
 
 extern MiPageEntry *MiPageList;
 extern MiPageEntry *MiFreePageListHead;
 
+extern uint64_t MiPoolStart;
+extern RtBitmap MiPoolBitmap;
+
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function sets up the architecture-dependent page allocator bits, getting ready to do
- *     physical page allocations.
+ *     This function initializes the physical page allocator (and the page database).
  *
  * PARAMETERS:
- *     LoaderData - Data prepared by the boot loader for us.
+ *     BootData - Data prepared by the boot loader for us.
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void MiInitializePageAllocator(void *LoaderData) {
-    LoaderBootData *BootData = LoaderData;
+void MiInitializePageAllocator(LoaderBootData *BootData) {
     MiPageEntry *Tail = NULL;
 
     MiPageList = (MiPageEntry *)BootData->MemoryManager.PageAllocatorBase;
 
     for (uint32_t i = 0; i < BootData->MemoryMap.Count; i++) {
-        BiosMemoryRegion *Region = &BootData->MemoryMap.Entries[i];
+        BootMemoryRegion *Region = &BootData->MemoryMap.Entries[i];
 
         /* Available and `boot manager used` are considered the same for us (free for usage after
            we save required data from bootmgr), while anything else is considered reserved. */
-        if (Region->Type != BIOS_MEMORY_REGION_TYPE_AVAILABLE &&
-            Region->Type != BIOS_MEMORY_REGION_TYPE_USED) {
+        if (Region->Type != BOOT_MEMORY_REGION_TYPE_AVAILABLE &&
+            Region->Type != BOOT_MEMORY_REGION_TYPE_USED) {
             continue;
         }
 
@@ -71,4 +73,23 @@ void MiInitializePageAllocator(void *LoaderData) {
 
         Tail = Group;
     }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function sets up the kernel pool allocator.
+ *
+ * PARAMETERS:
+ *     BootData - Data prepared by the boot loader for us.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void MiInitializePool(LoaderBootData *BootData) {
+    uint64_t Size = (MI_POOL_SIZE + MM_PAGE_SIZE) >> MM_PAGE_SHIFT;
+
+    MiPoolStart = MI_POOL_START;
+
+    RtInitializeBitmap(&MiPoolBitmap, (uint64_t *)BootData->MemoryManager.PoolBitmapBase, Size);
+    RtClearAllBits(&MiPoolBitmap);
 }

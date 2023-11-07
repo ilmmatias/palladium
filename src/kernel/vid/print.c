@@ -280,22 +280,22 @@ void VidPrintVariadic(int Type, const char *Prefix, const char *Message, va_list
 
     /* Make sure this specific type of message wasn't disabled at compile time. */
     switch (Type) {
-        case KE_MESSAGE_TRACE:
-            if (!KE_ENABLE_MESSAGE_TRACE) {
+        case VID_MESSAGE_TRACE:
+            if (!VID_ENABLE_MESSAGE_TRACE) {
                 KeReleaseSpinLock(&VidpLock);
                 return;
             }
 
             break;
-        case KE_MESSAGE_DEBUG:
-            if (!KE_ENABLE_MESSAGE_DEBUG) {
+        case VID_MESSAGE_DEBUG:
+            if (!VID_ENABLE_MESSAGE_DEBUG) {
                 KeReleaseSpinLock(&VidpLock);
                 return;
             }
 
             break;
-        case KE_MESSAGE_INFO:
-            if (!KE_ENABLE_MESSAGE_INFO) {
+        case VID_MESSAGE_INFO:
+            if (!VID_ENABLE_MESSAGE_INFO) {
                 KeReleaseSpinLock(&VidpLock);
                 return;
             }
@@ -307,15 +307,15 @@ void VidPrintVariadic(int Type, const char *Prefix, const char *Message, va_list
 
     const char *Suffix;
     switch (Type) {
-        case KE_MESSAGE_ERROR:
+        case VID_MESSAGE_ERROR:
             VidpForeground = 0xFF0000;
             Suffix = " Error: ";
             break;
-        case KE_MESSAGE_TRACE:
+        case VID_MESSAGE_TRACE:
             VidpForeground = 0x00FF00;
             Suffix = " Trace: ";
             break;
-        case KE_MESSAGE_DEBUG:
+        case VID_MESSAGE_DEBUG:
             VidpForeground = 0xFFFF00;
             Suffix = " Debug: ";
             break;

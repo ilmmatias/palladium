@@ -2,9 +2,7 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <amd64/halp.h>
-#include <ke.h>
 #include <mm.h>
-#include <rt.h>
 #include <vid.h>
 
 typedef struct {
@@ -12,7 +10,7 @@ typedef struct {
     void (*Handler)(HalRegisterState *);
 } IdtHandler;
 
-extern void KiHandleEvent(void *);
+extern void PspHandleEvent(HalRegisterState *);
 extern uint64_t HalpInterruptHandlerTable[256];
 
 /*-------------------------------------------------------------------------------------------------
@@ -27,19 +25,20 @@ extern uint64_t HalpInterruptHandlerTable[256];
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void HalpInterruptHandler(HalRegisterState *State) {
+    HalpProcessor *Processor = (HalpProcessor *)HalGetCurrentProcessor();
+
     if (State->InterruptNumber < 32) {
         VidPrint(
-            KE_MESSAGE_ERROR,
+            VID_MESSAGE_ERROR,
             "Kernel HAL",
             "processor %u received exception %llu\n",
-            HalpGetCurrentProcessor()->ApicId,
+            Processor->ApicId,
             State->InterruptNumber);
         while (1)
             ;
     }
 
-    RtSList *ListHeader =
-        HalpGetCurrentProcessor()->IdtSlots[State->InterruptNumber - 32].ListHead.Next;
+    RtSList *ListHeader = Processor->IdtSlots[State->InterruptNumber - 32].ListHead.Next;
     while (ListHeader) {
         CONTAINING_RECORD(ListHeader, IdtHandler, ListHeader)->Handler(State);
         ListHeader = ListHeader->Next;
@@ -84,7 +83,7 @@ void HalpInitializeIdt(HalpProcessor *Processor) {
     __asm__ volatile("lidt %0" :: "m"(Processor->IdtDescriptor));
 
     /* Register the DPC/event handler. */
-    HalInstallInterruptHandlerAt(0xDE, (void (*)(HalRegisterState *))KiHandleEvent);
+    HalInstallInterruptHandlerAt(0xDE, PspHandleEvent);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -104,7 +103,7 @@ int HalInstallInterruptHandlerAt(uint8_t Vector, void (*Handler)(HalRegisterStat
         return 0;
     }
 
-    HalpProcessor *Processor = HalpGetCurrentProcessor();
+    HalpProcessor *Processor = (HalpProcessor *)HalGetCurrentProcessor();
     Processor->IdtSlots[Vector].Usage++;
     Entry->Handler = Handler;
     RtPushSList(&Processor->IdtSlots[Vector].ListHead, &Entry->ListHeader);
@@ -124,7 +123,7 @@ int HalInstallInterruptHandlerAt(uint8_t Vector, void (*Handler)(HalRegisterStat
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 uint8_t HalInstallInterruptHandler(void (*Handler)(HalRegisterState *)) {
-    HalpProcessor *Processor = HalpGetCurrentProcessor();
+    HalpProcessor *Processor = (HalpProcessor *)HalGetCurrentProcessor();
     uint32_t SmallestUsage = UINT32_MAX;
     uint8_t Index = 0;
 

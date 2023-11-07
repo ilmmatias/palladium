@@ -1,8 +1,7 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
-#include <amd64/boot.h>
-#include <vid.h>
+#include <vidp.h>
 
 extern uint32_t *VidpBackBuffer;
 extern uint32_t *VidpFrontBuffer;
@@ -16,13 +15,12 @@ extern uint16_t VidpHeight;
  *     special here.
  *
  * PARAMETERS:
- *     LoaderData - Data prepared by the boot loader for us.
+ *     BootData - Data prepared by the boot loader for us.
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void VidpInitialize(void *LoaderData) {
-    LoaderBootData *BootData = LoaderData;
+void VidpInitialize(LoaderBootData *BootData) {
     VidpBackBuffer = (uint32_t *)BootData->Display.BackBufferBase;
     VidpFrontBuffer = (uint32_t *)BootData->Display.FrontBufferBase;
     VidpWidth = BootData->Display.Width;

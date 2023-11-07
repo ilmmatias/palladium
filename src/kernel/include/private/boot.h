@@ -1,14 +1,14 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
-#ifndef _AMD64_BOOT_H_
-#define _AMD64_BOOT_H_
+#ifndef _BOOT_H_
+#define _BOOT_H_
 
 #include <stdint.h>
 
-#define BIOS_MEMORY_REGION_TYPE_AVAILABLE 1
-#define BIOS_MEMORY_REGION_TYPE_USED 0x1000
-#define BIOS_MEMORY_REGION_TYPE_KERNEL 0x1001
+#define BOOT_MEMORY_REGION_TYPE_AVAILABLE 1
+#define BOOT_MEMORY_REGION_TYPE_USED 0x1000
+#define BOOT_MEMORY_REGION_TYPE_KERNEL 0x1001
 
 #define LOADER_MAGIC "BMGR"
 #define LOADER_CURRENT_VERSION 0x0000
@@ -17,7 +17,7 @@ typedef struct __attribute__((packed)) {
     uint64_t BaseAddress;
     uint64_t Length;
     uint32_t Type;
-} BiosMemoryRegion;
+} BootMemoryRegion;
 
 typedef struct __attribute__((packed)) {
     uint64_t VirtualAddress;
@@ -25,7 +25,7 @@ typedef struct __attribute__((packed)) {
     uint64_t ImageSize;
     uint64_t EntryPoint;
     uint32_t PageFlags;
-} LoaderImage;
+} BootLoaderImage;
 
 typedef struct __attribute__((packed)) {
     char Magic[4];
@@ -40,7 +40,7 @@ typedef struct __attribute__((packed)) {
         uint64_t PoolBitmapBase;
     } MemoryManager;
     struct {
-        BiosMemoryRegion *Entries;
+        BootMemoryRegion *Entries;
         uint32_t Count;
     } MemoryMap;
     struct {
@@ -50,9 +50,9 @@ typedef struct __attribute__((packed)) {
         uint16_t Height;
     } Display;
     struct {
-        LoaderImage *Entries;
+        BootLoaderImage *Entries;
         uint32_t Count;
     } Images;
 } LoaderBootData;
 
-#endif /* _AMD64_BOOT_H_ */
+#endif /* _BOOT_H_ */

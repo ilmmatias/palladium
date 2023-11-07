@@ -1,13 +1,12 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
-#include <halp.h>
-#include <ke.h>
+#include <ki.h>
 #include <mi.h>
 #include <string.h>
 
-uint64_t HalpAcpiBaseAddress = 0;
-int HalpAcpiTableType = HALP_ACPI_NONE;
+static uint64_t BaseAddress = 0;
+static int TableType = KI_ACPI_NONE;
 
 typedef struct __attribute__((packed)) {
     char Signature[4];
@@ -49,6 +48,22 @@ static int Checksum(const char *Table, uint32_t Length) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
+ *     This function saves the ACPI main (RSDT/XSDT) table base address, which the ACPI driver
+ *     can access through the KiAcpi* functions.
+ *
+ * PARAMETERS:
+ *     BootData - Data prepared by the boot loader for us.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void KiSaveAcpiData(LoaderBootData *BootData) {
+    BaseAddress = BootData->Acpi.BaseAdress;
+    TableType = BootData->Acpi.IsXsdt + 1;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
  *     This function searches for a specific table inside the RSDT/XSDT.
  *
  * PARAMETERS:
@@ -57,25 +72,25 @@ static int Checksum(const char *Table, uint32_t Length) {
  * RETURN VALUE:
  *     Pointer to the header of the entry, or NULL on failure.
  *-----------------------------------------------------------------------------------------------*/
-void *HalFindAcpiTable(const char Signature[4], int Index) {
-    if (HalpAcpiTableType == HALP_ACPI_NONE) {
+void *KiFindAcpiTable(const char Signature[4], int Index) {
+    if (TableType == KI_ACPI_NONE) {
         KeFatalError(KE_BAD_ACPI_TABLES);
     }
 
     /* DSDT is contained inside the XDsdt (or the Dsdt) field of the FADT; Other than that, just
        do a linear search on the R/XSDT. */
 
-    SdtHeader *Header = MI_PADDR_TO_VADDR(HalpAcpiBaseAddress);
+    SdtHeader *Header = MI_PADDR_TO_VADDR(BaseAddress);
     uint32_t *RsdtTables = (uint32_t *)(Header + 1);
     uint64_t *XsdtTables = (uint64_t *)(Header + 1);
 
-    int IsXsdt = HalpAcpiTableType == HALP_ACPI_XSDT;
+    int IsXsdt = TableType == KI_ACPI_XSDT;
     int Occourances = 0;
 
     /* The DSDT is no guaranteed to be in any of the R/XSDT entries, so we need to grab its
        pointer inside the FADT. */
     if (!memcmp(Signature, "DSDT", 4)) {
-        FadtHeader *Fadt = (FadtHeader *)HalFindAcpiTable("FACP", 0);
+        FadtHeader *Fadt = (FadtHeader *)KiFindAcpiTable("FACP", 0);
         if (!Header) {
             return NULL;
         }

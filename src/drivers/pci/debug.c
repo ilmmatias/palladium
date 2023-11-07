@@ -19,7 +19,7 @@
 void PcipShowInfoMessage(const char *Message, ...) {
     va_list Arguments;
     va_start(Arguments, Format);
-    VidPrintVariadic(KE_MESSAGE_INFO, "PCI Driver", Message, Arguments);
+    VidPrintVariadic(VID_MESSAGE_INFO, "PCI Driver", Message, Arguments);
     va_end(Arguments);
 }
 
@@ -40,7 +40,7 @@ void PcipShowInfoMessage(const char *Message, ...) {
     va_list Arguments;
 
     va_start(Arguments, Format);
-    VidPrintVariadic(KE_MESSAGE_ERROR, "PCI Driver", Message, Arguments);
+    VidPrintVariadic(VID_MESSAGE_ERROR, "PCI Driver", Message, Arguments);
     va_end(Arguments);
 
     KeFatalError(Code);

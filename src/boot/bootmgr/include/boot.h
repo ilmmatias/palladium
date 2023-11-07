@@ -49,9 +49,9 @@ typedef struct __attribute__((packed)) {
     } Images;
 } LoaderBootData;
 
-/* The following parameter should always follow sizeof(HalpProcessor). */
+/* The following parameter should always be bigger or equal to sizeof(HalpProcessor). */
 #if defined(ARCH_x86) || defined(ARCH_amd64)
-#define SIZEOF_PROCESSOR 0x5E44
+#define SIZEOF_PROCESSOR 0x6000
 #else
 #error "Undefined ARCH for the bootmgr module!"
 #endif /* ARCH */

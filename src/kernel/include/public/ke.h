@@ -13,16 +13,11 @@
 #define KE_DOUBLE_PAGE_FREE 4
 #define KE_OUT_OF_MEMORY 5
 
-#define KE_MESSAGE_ERROR 0
-#define KE_MESSAGE_TRACE 1
-#define KE_MESSAGE_DEBUG 2
-#define KE_MESSAGE_INFO 3
-
-#define KE_ENABLE_MESSAGE_TRACE 0
-#define KE_ENABLE_MESSAGE_DEBUG 1
-#define KE_ENABLE_MESSAGE_INFO 1
+#define KE_STACK_SIZE 0x4000
 
 typedef int KeSpinLock;
+
+void *KiFindAcpiTable(const char Signature[4], int Index);
 
 int KeTryAcquireSpinLock(KeSpinLock *Lock);
 void KeAcquireSpinLock(KeSpinLock *Lock);

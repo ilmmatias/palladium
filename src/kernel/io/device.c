@@ -4,7 +4,6 @@
 #include <io.h>
 #include <ke.h>
 #include <mm.h>
-#include <rt.h>
 #include <string.h>
 
 static RtSList DeviceListHead = {.Next = NULL};

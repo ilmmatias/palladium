@@ -1,9 +1,8 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
-#include <ke.h>
+#include <halp.h>
 #include <mi.h>
-#include <rt.h>
 #include <string.h>
 
 #define SMALL_BLOCK_COUNT ((uint32_t)((MM_PAGE_SIZE - 16) >> 4))
@@ -46,7 +45,7 @@ static void *AllocatePoolPages(uint32_t Pages) {
     for (uint32_t i = 0; i < Pages; i++) {
         uint64_t PhysicalAddress = MmAllocatePages(1);
         if (!PhysicalAddress ||
-            !MiMapPage(VirtualAddress + (i << MM_PAGE_SHIFT), PhysicalAddress, MI_MAP_WRITE)) {
+            !HalpMapPage(VirtualAddress + (i << MM_PAGE_SHIFT), PhysicalAddress, MI_MAP_WRITE)) {
             return NULL;
         }
 
@@ -75,7 +74,7 @@ static void *AllocatePoolPages(uint32_t Pages) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 static void FreePoolPages(void *Base) {
-    uint64_t FirstPhysicalAddress = MiGetPhysicalAddress(Base);
+    uint64_t FirstPhysicalAddress = HalpGetPhysicalAddress(Base);
     if (!MiPageList[FirstPhysicalAddress >> MM_PAGE_SHIFT].StartOfAllocation) {
         KeFatalError(KE_BAD_POOL_HEADER);
     }
@@ -84,7 +83,7 @@ static void FreePoolPages(void *Base) {
     uint64_t LastPhysicalAddress = FirstPhysicalAddress;
     for (uint64_t i = 1; !MiPageList[LastPhysicalAddress >> MM_PAGE_SHIFT].EndOfAllocation; i++) {
         MmDereferencePage(LastPhysicalAddress);
-        LastPhysicalAddress = MiGetPhysicalAddress((char *)Base + (i << MM_PAGE_SHIFT));
+        LastPhysicalAddress = HalpGetPhysicalAddress((char *)Base + (i << MM_PAGE_SHIFT));
         Pages++;
     }
 
@@ -118,8 +117,15 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
        pointer size isn't 64-bits. */
     uint32_t Head = (Size + 0x0F) >> 4;
     if (Head > SMALL_BLOCK_COUNT) {
-        void *Base = AllocatePoolPages((Size + MM_PAGE_SIZE - 1) >> MM_PAGE_SHIFT);
+        uint64_t Pages = (Size + MM_PAGE_SIZE - 1) >> MM_PAGE_SHIFT;
+        void *Base = AllocatePoolPages(Pages);
+
         KeReleaseSpinLock(&Lock);
+
+        if (Base) {
+            memset(Base, 0, Pages << MM_PAGE_SHIFT);
+        }
+
         return Base;
     }
 
@@ -138,7 +144,6 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
 
         Header->Head = Head;
         memcpy(Header->Tag, Tag, 4);
-        memset(Header + 1, 0, Head << 4);
 
         if (i - Head > 1) {
             PoolHeader *RemainingSpace = (PoolHeader *)((char *)Header + (Head << 4) + 16);
@@ -147,6 +152,8 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
         }
 
         KeReleaseSpinLock(&Lock);
+        memset(Header + 1, 0, Head << 4);
+
         return Header + 1;
     }
 
@@ -159,7 +166,6 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
     Header->ListHeader.Next = NULL;
     Header->Head = Head;
     memcpy(Header->Tag, Tag, 4);
-    memset(Header + 1, 0, Head << 4);
 
     /* Wrap up by slicing the allocated page, we can add the remainder to the free list if
        it's big enough. */
@@ -170,6 +176,8 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
     }
 
     KeReleaseSpinLock(&Lock);
+    memset(Header + 1, 0, Head << 4);
+
     return Header + 1;
 }
 

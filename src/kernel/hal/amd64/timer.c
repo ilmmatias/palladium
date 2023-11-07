@@ -2,10 +2,9 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <amd64/halp.h>
-#include <ke.h>
 #include <vid.h>
 
-extern void KiHandleEvent(void*);
+extern void PspHandleEvent(HalRegisterState *);
 
 static uint64_t Period = 0;
 static uint8_t Irq = 0;
@@ -37,11 +36,14 @@ void HalpInitializeApicTimer(void) {
     }
 
     /* Allocate a vector and enable interrupts (and we're done). */
-    Irq = HalInstallInterruptHandler((void (*)(HalRegisterState*))KiHandleEvent);
+    Irq = HalInstallInterruptHandler(PspHandleEvent);
     if (Irq == (uint8_t)-1) {
-        VidPrint(KE_MESSAGE_ERROR, "Kernel HAL", "could not allocate an IRQ for the event timer\n");
+        VidPrint(
+            VID_MESSAGE_ERROR, "Kernel HAL", "could not allocate an IRQ for the event timer\n");
         KeFatalError(KE_FATAL_ERROR);
     }
+
+    HalpWriteLapicRegister(0x320, Irq + 32);
 
     /* Round to closest, or we might be very off. */
     Period = (40000000 + Accum / 2) / Accum;
@@ -58,6 +60,10 @@ void HalpInitializeApicTimer(void) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void HalpSetEvent(uint64_t Time) {
+    if (Time < Period) {
+        Time = Period;
+    }
+
     HalpWriteLapicRegister(0x3E0, 0);
     HalpWriteLapicRegister(0x380, Time / Period);
 }

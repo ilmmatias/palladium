@@ -4,10 +4,17 @@
 #ifndef _KI_H_
 #define _KI_H_
 
+#include <boot.h>
+#include <hal.h>
 #include <ke.h>
 
-void KiNotifyProcessors(void);
+#define KI_ACPI_NONE 0
+#define KI_ACPI_RDST 1
+#define KI_ACPI_XSDT 2
 
-void KiRunBootStartDrivers(void *LoaderData);
+void KiSaveAcpiData(LoaderBootData *BootData);
+
+void KiSaveBootStartDrivers(LoaderBootData *BootData);
+void KiRunBootStartDrivers(void);
 
 #endif /* _KI_H_ */

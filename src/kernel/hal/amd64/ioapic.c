@@ -3,7 +3,6 @@
 
 #include <amd64/apic.h>
 #include <amd64/halp.h>
-#include <ke.h>
 #include <mm.h>
 #include <vid.h>
 
@@ -92,9 +91,9 @@ static void UnmaskIoapicVector(
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void HalpInitializeIoapic(void) {
-    MadtHeader *Madt = HalFindAcpiTable("APIC", 0);
+    MadtHeader *Madt = KiFindAcpiTable("APIC", 0);
     if (!Madt) {
-        VidPrint(KE_MESSAGE_ERROR, "Kernel HAL", "couldn't find the MADT table\n");
+        VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "couldn't find the MADT table\n");
         KeFatalError(KE_BAD_ACPI_TABLES);
     }
 
@@ -107,7 +106,7 @@ void HalpInitializeIoapic(void) {
                 IoapicEntry *Entry = MmAllocatePool(sizeof(IoapicEntry), "Apic");
                 if (!Entry) {
                     VidPrint(
-                        KE_MESSAGE_ERROR, "Kernel HAL", "couldn't allocate space for an IOAPIC\n");
+                        VID_MESSAGE_ERROR, "Kernel HAL", "couldn't allocate space for an IOAPIC\n");
                     KeFatalError(KE_OUT_OF_MEMORY);
                 }
 
@@ -124,7 +123,7 @@ void HalpInitializeIoapic(void) {
 
                 RtPushSList(&IoapicListHead, &Entry->ListHeader);
                 VidPrint(
-                    KE_MESSAGE_INFO,
+                    VID_MESSAGE_INFO,
                     "Kernel HAL",
                     "found IOAPIC %hhu (GSI base %u, size %u)\n",
                     Entry->Id,
@@ -140,7 +139,7 @@ void HalpInitializeIoapic(void) {
                 IoapicOverrideEntry *Entry = MmAllocatePool(sizeof(IoapicOverrideEntry), "Apic");
                 if (!Entry) {
                     VidPrint(
-                        KE_MESSAGE_ERROR,
+                        VID_MESSAGE_ERROR,
                         "Kernel HAL",
                         "couldn't allocate space for an IOAPIC source override\n");
                     KeFatalError(KE_OUT_OF_MEMORY);
@@ -152,7 +151,7 @@ void HalpInitializeIoapic(void) {
                 Entry->TriggerMode = (Record->IoapicSourceOverride.Flags & 8) != 0;
                 RtPushSList(&IoapicOverrideListHead, &Entry->ListHeader);
                 VidPrint(
-                    KE_MESSAGE_DEBUG,
+                    VID_MESSAGE_DEBUG,
                     "Kernel HAL",
                     "added IOAPIC redir (IRQ %hhu, GSI %hhu) to the list\n",
                     Entry->Irq,
@@ -197,7 +196,11 @@ void HalpEnableIrq(uint8_t Irq, uint8_t Vector) {
     }
 
     UnmaskIoapicVector(
-        Gsi, Vector + 32, PinPolarity, TriggerMode, HalpGetCurrentProcessor()->ApicId);
+        Gsi,
+        Vector + 32,
+        PinPolarity,
+        TriggerMode,
+        ((HalpProcessor *)HalGetCurrentProcessor())->ApicId);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -212,5 +215,5 @@ void HalpEnableIrq(uint8_t Irq, uint8_t Vector) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void HalpEnableGsi(uint8_t Gsi, uint8_t Vector) {
-    UnmaskIoapicVector(Gsi, Vector + 32, 0, 1, HalpGetCurrentProcessor()->ApicId);
+    UnmaskIoapicVector(Gsi, Vector + 32, 0, 1, ((HalpProcessor *)HalGetCurrentProcessor())->ApicId);
 }

@@ -1,17 +1,8 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
-#include <amd64/boot.h>
-#include <ke.h>
 #include <mi.h>
-#include <rt.h>
 #include <string.h>
-
-extern uint64_t MiPoolStart;
-extern RtBitmap MiPoolBitmap;
-
-static const uint64_t PoolSize = 0x2000000000;
-static const uint64_t PoolBitmapSize = PoolSize >> MM_PAGE_SHIFT;
 
 static uint64_t *const Addresses[] = {
     (uint64_t *)0xFFFFFFFFFFFFF000,
@@ -19,27 +10,6 @@ static uint64_t *const Addresses[] = {
     (uint64_t *)0xFFFFFFFFC0000000,
     (uint64_t *)0xFFFFFF8000000000,
 };
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function sets up the architecture-dependent virtual memory (aka memory mapping) bits.
- *     After this, the pool allocator is ready to be initialized and used.
- *
- * PARAMETERS:
- *     LoaderData - Data prepared by the boot loader for us.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-void MiInitializeVirtualMemory(void *LoaderData) {
-    LoaderBootData *BootData = LoaderData;
-
-    MiPoolStart = 0xFFFF908000000000;
-
-    RtInitializeBitmap(
-        &MiPoolBitmap, (uint64_t *)BootData->MemoryManager.PoolBitmapBase, PoolBitmapSize);
-    RtClearAllBits(&MiPoolBitmap);
-}
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -51,7 +21,7 @@ void MiInitializeVirtualMemory(void *LoaderData) {
  * RETURN VALUE:
  *     Physical address, or 0 on failure.
  *-----------------------------------------------------------------------------------------------*/
-uint64_t MiGetPhysicalAddress(void *VirtualAddress) {
+uint64_t HalpGetPhysicalAddress(void *VirtualAddress) {
     uint64_t Indexes[] = {
         ((uint64_t)VirtualAddress >> 39) & 0x1FF,
         ((uint64_t)VirtualAddress >> 30) & 0x3FFFF,
@@ -81,7 +51,7 @@ uint64_t MiGetPhysicalAddress(void *VirtualAddress) {
  * RETURN VALUE:
  *     1 on success, 0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int MiMapPage(void *VirtualAddress, uint64_t PhysicalAddress, int Flags) {
+int HalpMapPage(void *VirtualAddress, uint64_t PhysicalAddress, int Flags) {
     uint64_t Indexes[] = {
         ((uint64_t)VirtualAddress >> 39) & 0x1FF,
         ((uint64_t)VirtualAddress >> 30) & 0x3FFFF,

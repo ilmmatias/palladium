@@ -7,9 +7,8 @@
 #include <amd64/hal.h>
 #include <halp.h>
 
-typedef struct __attribute__((packed)) {
-    char Stack[0x4000];
-    int Online;
+typedef struct {
+    HalProcessor Base;
     uint32_t ApicId;
     uint64_t GdtEntries[5];
     struct __attribute__((packed)) {
@@ -30,8 +29,6 @@ typedef struct __attribute__((packed)) {
         uint64_t Base;
     } GdtDescriptor, IdtDescriptor;
 } HalpProcessor;
-
-HalpProcessor *HalpGetCurrentProcessor(void);
 
 void HalpInitializeIdt(HalpProcessor *Processor);
 void HalpInitializeGdt(HalpProcessor *Processor);

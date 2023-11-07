@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <acpip.h>
-#include <hal.h>
 #include <ke.h>
 #include <mm.h>
 #include <vid.h>
@@ -18,7 +17,7 @@
  *     Pointer to the header of the entry, or NULL on failure.
  *-----------------------------------------------------------------------------------------------*/
 SdtHeader *AcpipFindTable(char Signature[4], int Index) {
-    return HalFindAcpiTable(Signature, Index);
+    return KiFindAcpiTable(Signature, Index);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -79,7 +78,7 @@ void AcpipFreeBlock(void *Block) {
 void AcpipShowInfoMessage(const char *Message, ...) {
     va_list Arguments;
     va_start(Arguments, Format);
-    VidPrintVariadic(KE_MESSAGE_INFO, "ACPI Driver", Message, Arguments);
+    VidPrintVariadic(VID_MESSAGE_INFO, "ACPI Driver", Message, Arguments);
     va_end(Arguments);
 }
 
@@ -97,7 +96,7 @@ void AcpipShowInfoMessage(const char *Message, ...) {
 void AcpipShowDebugMessage(const char *Message, ...) {
     va_list Arguments;
     va_start(Arguments, Format);
-    VidPrintVariadic(KE_MESSAGE_DEBUG, "ACPI Driver", Message, Arguments);
+    VidPrintVariadic(VID_MESSAGE_DEBUG, "ACPI Driver", Message, Arguments);
     va_end(Arguments);
 }
 
@@ -116,7 +115,7 @@ void AcpipShowDebugMessage(const char *Message, ...) {
 void AcpipShowTraceMessage(const char *Message, ...) {
     va_list Arguments;
     va_start(Arguments, Format);
-    VidPrintVariadic(KE_MESSAGE_TRACE, "ACPI Driver", Message, Arguments);
+    VidPrintVariadic(VID_MESSAGE_TRACE, "ACPI Driver", Message, Arguments);
     va_end(Arguments);
 }
 
@@ -137,7 +136,7 @@ void AcpipShowTraceMessage(const char *Message, ...) {
     va_list Arguments;
 
     va_start(Arguments, Format);
-    VidPrintVariadic(KE_MESSAGE_ERROR, "ACPI Driver", Message, Arguments);
+    VidPrintVariadic(VID_MESSAGE_ERROR, "ACPI Driver", Message, Arguments);
     va_end(Arguments);
 
     KeFatalError(Reason == ACPI_REASON_OUT_OF_MEMORY ? KE_OUT_OF_MEMORY : KE_BAD_ACPI_TABLES);

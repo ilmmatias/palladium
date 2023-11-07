@@ -4,6 +4,7 @@
 #ifndef _VIDP_H_
 #define _VIDP_H_
 
+#include <boot.h>
 #include <vid.h>
 
 typedef struct {
@@ -23,6 +24,6 @@ typedef struct {
     const uint8_t *GlyphData;
 } VidpFontData;
 
-void VidpInitialize(void *LoaderData);
+void VidpInitialize(LoaderBootData *BootData);
 
 #endif /* _VIDP_H_ */

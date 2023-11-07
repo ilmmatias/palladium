@@ -1,6 +1,6 @@
 LIBRARY kernel.exe
 EXPORTS
-    HalFindAcpiTable
+    HalGetCurrentProcessor
     HalGetTimerPeriod
     HalGetTimerTicks
     HalWaitTimer
@@ -13,12 +13,16 @@ EXPORTS
     KeReleaseSpinLock
     KeTestSpinLock
     KeTryAcquireSpinLock
+    KiFindAcpiTable
 
     MmAllocatePages
     MmAllocatePool
     MmDereferencePage
     MmFreePool
     MmReferencePage
+
+    PsCreateThread
+    PsReadyThread
 
     VidGetColor
     VidGetCursor

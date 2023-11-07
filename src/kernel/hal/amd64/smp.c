@@ -4,11 +4,8 @@
 #include <amd64/apic.h>
 #include <amd64/halp.h>
 #include <amd64/msr.h>
-#include <ke.h>
 #include <mm.h>
-#include <rt.h>
 #include <string.h>
-#include <vid.h>
 
 extern RtSList HalpLapicListHead;
 
@@ -16,6 +13,7 @@ extern void HalpApEntry(void);
 extern uint64_t HalpKernelPageMap;
 extern HalpProcessor *HalpApStructure;
 
+RtSList HalpProcessorListHead = {};
 uint32_t HalpProcessorCount = 1;
 
 /*-------------------------------------------------------------------------------------------------
@@ -43,8 +41,12 @@ void HalpInitializeSmp(void) {
                      : "=r"(*(uint64_t *)MI_PADDR_TO_VADDR(
                          (uint64_t)&HalpKernelPageMap - (uint64_t)HalpApEntry + 0x8000)));
 
-    HalpGetCurrentProcessor()->Online = 1;
-    HalpGetCurrentProcessor()->ApicId = ApicId;
+    HalGetCurrentProcessor()->Online = 1;
+    ((HalpProcessor *)HalGetCurrentProcessor())->ApicId = ApicId;
+
+    RtInitializeDList(&HalGetCurrentProcessor()->ThreadQueue);
+    KeReleaseSpinLock(&HalGetCurrentProcessor()->ThreadQueueLock);
+    RtPushSList(&HalpProcessorListHead, &HalGetCurrentProcessor()->ListHeader);
 
     while (ListHeader) {
         LapicEntry *Entry = CONTAINING_RECORD(ListHeader, LapicEntry, ListHeader);
@@ -61,8 +63,14 @@ void HalpInitializeSmp(void) {
             continue;
         }
 
-        Processor->Online = 0;
+        Processor->Base.Online = 0;
         Processor->ApicId = Entry->ApicId;
+
+        /* Initialize the scheduler queue before any other processor has any chances to access
+           us. */
+        RtInitializeDList(&Processor->Base.ThreadQueue);
+        KeReleaseSpinLock(&Processor->Base.ThreadQueueLock);
+
         *(HalpProcessor **)MI_PADDR_TO_VADDR(
             (uint64_t)&HalpApStructure - (uint64_t)HalpApEntry + 0x8000) = Processor;
 
@@ -85,8 +93,9 @@ void HalpInitializeSmp(void) {
         }
 
         for (int i = 0; i < 1000; i++) {
-            if (Processor->Online) {
+            if (Processor->Base.Online) {
                 Entry->Online = 1;
+                RtPushSList(&HalpProcessorListHead, &Processor->Base.ListHeader);
                 HalpProcessorCount++;
                 break;
             }
@@ -109,6 +118,6 @@ void HalpInitializeSmp(void) {
  * RETURN VALUE:
  *     Pointer to the processor struct.
  *-----------------------------------------------------------------------------------------------*/
-HalpProcessor *HalpGetCurrentProcessor(void) {
-    return (HalpProcessor *)ReadMsr(0xC0000102);
+HalProcessor *HalGetCurrentProcessor(void) {
+    return (HalProcessor *)ReadMsr(0xC0000102);
 }

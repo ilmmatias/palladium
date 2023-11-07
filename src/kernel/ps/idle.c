@@ -3,14 +3,15 @@
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function handles any pending kernel events.
+ *     This function executes when a processor has no threads to execute.
  *
  * PARAMETERS:
  *     None.
  *
  * RETURN VALUE:
- *     None..
+ *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
-void KiHandleEvent(void *Context) {
-    (void)Context;
+[[noreturn]] void PspIdleThread(void *) {
+    while (1)
+        ;
 }

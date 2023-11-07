@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <amd64/apic.h>
-#include <amd64/halp.h>
 #include <amd64/msr.h>
 #include <amd64/port.h>
 #include <cpuid.h>
@@ -91,9 +90,9 @@ void HalpWriteLapicRegister(uint32_t Number, uint64_t Data) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void HalpInitializeApic(void) {
-    MadtHeader *Madt = HalFindAcpiTable("APIC", 0);
+    MadtHeader *Madt = KiFindAcpiTable("APIC", 0);
     if (!Madt) {
-        VidPrint(KE_MESSAGE_ERROR, "Kernel HAL", "couldn't find the MADT table\n");
+        VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "couldn't find the MADT table\n");
         KeFatalError(KE_BAD_ACPI_TABLES);
     }
 
@@ -122,7 +121,7 @@ void HalpInitializeApic(void) {
                 LapicEntry *Entry = MmAllocatePool(sizeof(LapicEntry), "Apic");
                 if (!Entry) {
                     VidPrint(
-                        KE_MESSAGE_ERROR, "Kernel HAL", "couldn't allocate space for a LAPIC\n");
+                        VID_MESSAGE_ERROR, "Kernel HAL", "couldn't allocate space for a LAPIC\n");
                     KeFatalError(KE_OUT_OF_MEMORY);
                 }
 
@@ -132,7 +131,7 @@ void HalpInitializeApic(void) {
                 Entry->Online = 0;
                 RtPushSList(&HalpLapicListHead, &Entry->ListHeader);
                 VidPrint(
-                    KE_MESSAGE_INFO,
+                    VID_MESSAGE_INFO,
                     "Kernel HAL",
                     "found LAPIC %u (ACPI ID %u)\n",
                     Entry->ApicId,
@@ -156,7 +155,7 @@ void HalpInitializeApic(void) {
                 LapicEntry *Entry = MmAllocatePool(sizeof(LapicEntry), "Apic");
                 if (!Entry) {
                     VidPrint(
-                        KE_MESSAGE_ERROR, "Kernel HAL", "couldn't allocate space for a x2APIC\n");
+                        VID_MESSAGE_ERROR, "Kernel HAL", "couldn't allocate space for a x2APIC\n");
                     KeFatalError(KE_OUT_OF_MEMORY);
                 }
 
@@ -166,7 +165,7 @@ void HalpInitializeApic(void) {
                 Entry->Online = 0;
                 RtPushSList(&HalpLapicListHead, &Entry->ListHeader);
                 VidPrint(
-                    KE_MESSAGE_INFO,
+                    VID_MESSAGE_INFO,
                     "Kernel HAL",
                     "found x2APIC %u (ACPI ID %u)\n",
                     Entry->ApicId,

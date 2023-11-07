@@ -12,6 +12,15 @@
 #define VID_COLOR_HIGHLIGHT 0x000000, 0xFFFFFF
 #define VID_COLOR_PANIC 0xAA0000, 0xFFFFFF
 
+#define VID_MESSAGE_ERROR 0
+#define VID_MESSAGE_TRACE 1
+#define VID_MESSAGE_DEBUG 2
+#define VID_MESSAGE_INFO 3
+
+#define VID_ENABLE_MESSAGE_TRACE 0
+#define VID_ENABLE_MESSAGE_DEBUG 1
+#define VID_ENABLE_MESSAGE_INFO 1
+
 void VidResetDisplay(void);
 
 void VidSetColor(uint32_t BackgroundColor, uint32_t ForegroundColor);
