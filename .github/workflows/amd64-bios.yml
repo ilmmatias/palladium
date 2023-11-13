@@ -133,8 +133,31 @@ jobs:
 
     - name: Create system root
       run: |
+        mkdir -p _root/Boot
         mkdir -p _root/System
-        palladium/build.host/create-boot-registry
+
+        cat <<EOF >_root/Boot/bootmgr.ini
+        DefaultSelection=BootInstall
+        Timeout=5
+
+        [BootInstall]
+        Type=palladium
+        Text=Boot from the Installation Disk
+        Icon=boot()/Boot/install.bmp
+        SystemFolder=boot()/System
+        Drivers=[
+            acpi.sys
+            pci.sys
+        ]
+
+        [Test]
+        Type=chainload
+        Text=Boot from the First Hard Disk
+        Icon=boot()/Boot/os.bmp
+        Path=bios(80)
+        EOF
+
+        cp icons/* _root/Boot/
         cp palladium/build.boot/boot/bootsect/iso9660boot.com _root/iso9660boot.com
         cat palladium/build.boot/boot/startup/startup.com palladium/build.boot/boot/bootmgr/bootmgr.exe > _root/bootmgr
         cp palladium/build.target/kernel/kernel.exe _root/System/kernel.exe

@@ -77,6 +77,7 @@ Main$Setup:
     ; The exFAT code is a bit too big for just 512 bytes, but exFAT does reserve 8 extra sectors
     ; for us too, we just need to load them in.
     mov eax, 1
+    add eax, dword ptr [PartitionOffset]
     mov bx, 07E00h
     mov cx, 1
     call ReadSectors
@@ -169,7 +170,7 @@ Main$NotFound:
 Main$Found:
     ; Now we can load all of the file data just after the boot sector, and jump to it.
     mov ebp, [si + 52]
-    mov bx, 4000h
+    mov bx, 920h
     mov es, bx
     xor bx, bx
 
@@ -187,7 +188,7 @@ Main$LoopSkipRead:
     jc Main$Loop
 
     pop dx
-    push 4000h
+    push 920h
     push 0
     retf
 Main endp
@@ -279,9 +280,6 @@ Error endp
 
 DiskError db "Disk error", 0
 OverflowError db "Data error", 0
-ImageError db "BOOTMGR is missing", 0
-ImageName dw 'B', 'O', 'O', 'T', 'M', 'G', 'R'
-ImageSize equ ($ - ImageName) / 2
 
 .errnz ($ - FatBpb) gt 510
 org 7DFEh
@@ -423,6 +421,10 @@ GetNextCluster$FollowFat:
     cmp ebp, 0FFFFFFF6h
     ret
 GetNextCluster endp
+
+ImageError db "BOOTMGR is missing", 0
+ImageName dw 'B', 'O', 'O', 'T', 'M', 'G', 'R'
+ImageSize equ ($ - ImageName) / 2
 
 .errnz ($ - FatBpb) gt 1020
 org 7FFCh

@@ -4,6 +4,8 @@
 #ifndef _X86_KEYBOARD_H_
 #define _X86_KEYBOARD_H_
 
+#include <stdint.h>
+
 #define STATUS_HAS_OUTPUT 0x01
 
 #define PORT_DATA 0x60

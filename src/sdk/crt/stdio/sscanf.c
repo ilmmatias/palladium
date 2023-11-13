@@ -17,7 +17,7 @@
  * RETURN VALUE:
  *     How many arguments have been filled.
  *-----------------------------------------------------------------------------------------------*/
-int sscanf(char *buffer, const char *format, ...) {
+int sscanf(const char *buffer, const char *format, ...) {
     va_list vlist;
     va_start(vlist, format);
     int size = vsscanf(buffer, format, vlist);

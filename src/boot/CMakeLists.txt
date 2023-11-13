@@ -5,7 +5,6 @@ project(os/boot)
 
 if(ARCH STREQUAL "x86")
     add_subdirectory(bootsect)
-    add_subdirectory(startup)
 endif()
 
 add_subdirectory(bootmgr)

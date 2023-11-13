@@ -4,6 +4,7 @@
 #include <ki.h>
 #include <mi.h>
 #include <string.h>
+#include <vid.h>
 
 static uint64_t BaseAddress = 0;
 static int TableType = KI_ACPI_NONE;
@@ -59,7 +60,7 @@ static int Checksum(const char *Table, uint32_t Length) {
  *-----------------------------------------------------------------------------------------------*/
 void KiSaveAcpiData(LoaderBootData *BootData) {
     BaseAddress = BootData->Acpi.BaseAdress;
-    TableType = BootData->Acpi.IsXsdt + 1;
+    TableType = BootData->Acpi.TableType;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -74,6 +75,7 @@ void KiSaveAcpiData(LoaderBootData *BootData) {
  *-----------------------------------------------------------------------------------------------*/
 void *KiFindAcpiTable(const char Signature[4], int Index) {
     if (TableType == KI_ACPI_NONE) {
+        VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "the host is not ACPI-compliant\n");
         KeFatalError(KE_BAD_ACPI_TABLES);
     }
 

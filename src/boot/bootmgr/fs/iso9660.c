@@ -5,30 +5,266 @@
 #include <file.h>
 #include <iso9660.h>
 #include <memory.h>
-#include <stdio.h>
 #include <string.h>
 
 typedef struct {
-    FileContext Parent;
+    BmPartition *Partition;
+    BmFileReadFn ReadPartition;
     void *SectorBuffer;
-    uint16_t BytesPerSector;
-    uint64_t FileSector;
+    uint32_t RootSector;
+    uint32_t RootSize;
+} Iso9660FsContext;
+
+typedef struct {
+    Iso9660FsContext *FsContext;
+    uint32_t FirstSector;
+    uint32_t Size;
     int Directory;
 } Iso9660Context;
 
+static char *Iterate(void *ContextPtr, int Index);
+
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function tries probing an open device/partition for ISO9660.
+ *     This function tries to read what should be an ISO9660 file. Calling it on a directory will
+ *     fail.
  *
  * PARAMETERS:
- *     Context - I/O; Device where the caller is trying to probe for FSes. If the FS is ISO9660,
- *               we'll modify it to be an ISO9660 context.
- *     BytesPerSector - Size of each disk sector (for fields that use LBA values).
+ *     ContextPtr - Pointer to Iso9660Context struct.
+ *     Offset - Starting byte index (in the file).
+ *     Size - How many bytes to read into the buffer.
+ *     Buffer - Output buffer.
  *
  * RETURN VALUE:
- *     1 if the FS was ISO9660, 0 if we need to keep on searching.
+ *     0 if something went wrong, 1 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int BiProbeIso9660(FileContext *Context, uint16_t BytesPerSector) {
+static int Read(void *ContextPtr, uint64_t Offset, uint64_t Size, void *Buffer) {
+    Iso9660Context *Context = ContextPtr;
+    Iso9660FsContext *FsContext = Context->FsContext;
+
+    if (Context->Directory || Offset + Size > Context->Size) {
+        return 0;
+    }
+
+    /* Files in ISO9660 are on sequential sectors, so we can just read the parent device. */
+    return FsContext->ReadPartition(
+        FsContext->Partition, (Context->FirstSector << 11) + Offset, Size, Buffer);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function does traversal on what should be a ISO9660 directory (if its a file, we error
+ *     out), searching for a specific named node.
+ *
+ * PARAMETERS:
+ *     ContextPtr - Pointer to Iso9660Context struct.
+ *     Name - Which entry we're looking for.
+ *
+ * RETURN VALUE:
+ *     File handle on success, NULL otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+static BmFile *ReadEntry(void *ContextPtr, const char *Name) {
+    Iso9660Context *Context = ContextPtr;
+    Iso9660FsContext *FsContext = Context->FsContext;
+    uint32_t Remaining = Context->Size;
+    uint32_t Sector = Context->FirstSector;
+    char *Current = NULL;
+
+    if (!Context->Directory) {
+        return NULL;
+    }
+
+    /* We're not sure of the exact size of the disk, so we'll be searching sector-by-sector. */
+    while (Remaining) {
+        if (!Current || (void *)Current - FsContext->SectorBuffer >= 2048) {
+            if (!FsContext->ReadPartition(
+                    FsContext->Partition, Sector << 11, 2048, FsContext->SectorBuffer)) {
+                return NULL;
+            }
+
+            Current = FsContext->SectorBuffer;
+            Sector++;
+        }
+
+        Iso9660DirectoryRecord *Record = (Iso9660DirectoryRecord *)Current;
+        char *ThisNamePos = Current + sizeof(Iso9660DirectoryRecord);
+        const char *SearchNamePos = Name;
+        int Match = 1;
+
+        /* We currently can't handle level 3 multi-extent (over 4GiB) files. */
+        if ((Record->FileFlags & 0x80) || !Record->DirectoryRecordLength) {
+            return NULL;
+        }
+
+        /* The filename to search for on the FS depends on if we're a directory, and if we have a
+           dot within the filename; Other than that, we handle both searching fully on spec and bit
+           out of spec (no ;1 on the end). */
+        while (*SearchNamePos && Record->NameLength) {
+            if (tolower(*ThisNamePos) != tolower(*SearchNamePos)) {
+                Match = 0;
+                break;
+            }
+
+            ThisNamePos++;
+            SearchNamePos++;
+            Record->NameLength--;
+        }
+
+        if (!((Match && !Record->NameLength) ||
+              (!*SearchNamePos &&
+               ((Record->NameLength == 2 && *ThisNamePos == ';' && *(ThisNamePos + 1) == '1') ||
+                (Record->NameLength == 3 && *ThisNamePos == '.' && *(ThisNamePos + 1) == ';' &&
+                 *(ThisNamePos + 2) == '1'))))) {
+            Current += Record->DirectoryRecordLength;
+            Remaining -= Record->DirectoryRecordLength;
+            continue;
+        }
+
+        BmFile *Handle = BmAllocateBlock(sizeof(BmFile) + sizeof(Iso9660Context));
+        if (!Handle) {
+            return NULL;
+        }
+
+        Context = (Iso9660Context *)(Handle + 1);
+        Context->FsContext = FsContext;
+        Context->FirstSector = Record->ExtentSector;
+        Context->Size = Record->ExtentSize;
+        Context->Directory = Record->FileFlags & 0x02;
+
+        Handle->Size = Record->ExtentSize;
+        Handle->Context = Context;
+        Handle->Close = NULL;
+        Handle->Read = Read;
+        Handle->ReadEntry = ReadEntry;
+        Handle->Iterate = Iterate;
+
+        return Handle;
+    }
+
+    return NULL;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function gets the name of the Nth entry on what should be a ISO9660 directory (if its
+ *     a file, we error out).
+ *
+ * PARAMETERS:
+ *     ContextPtr - Pointer to Iso9660Context struct.
+ *     Index - Which entry we're looking for.
+ *
+ * RETURN VALUE:
+ *     File name on success, NULL otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+static char *Iterate(void *ContextPtr, int Index) {
+    Iso9660Context *Context = ContextPtr;
+    Iso9660FsContext *FsContext = Context->FsContext;
+    uint32_t Remaining = Context->Size;
+    uint32_t Sector = Context->FirstSector;
+    char *Current = NULL;
+
+    if (!Context->Directory) {
+        return NULL;
+    }
+
+    /* We're not sure of the exact size of the disk, so we'll be searching sector-by-sector. */
+    int CurrentIndex = 0;
+    while (Remaining) {
+        if (CurrentIndex > Index) {
+            return NULL;
+        } else if (!Current || (void *)Current - FsContext->SectorBuffer >= 2048) {
+            if (!FsContext->ReadPartition(
+                    FsContext->Partition, Sector << 11, 2048, FsContext->SectorBuffer)) {
+                return NULL;
+            }
+
+            Current = FsContext->SectorBuffer;
+            Sector++;
+        }
+
+        Iso9660DirectoryRecord *Record = (Iso9660DirectoryRecord *)Current;
+        char *NamePos = Current + sizeof(Iso9660DirectoryRecord);
+
+        /* We currently can't handle level 3 multi-extent (over 4GiB) files. */
+        if ((Record->FileFlags & 0x80) || !Record->DirectoryRecordLength) {
+            return NULL;
+        }
+
+        if ((Record->NameLength == 1 && *NamePos <= 1) || CurrentIndex++ != Index) {
+            Current += Record->DirectoryRecordLength;
+            Remaining -= Record->DirectoryRecordLength;
+            continue;
+        }
+
+        /* On fully-on-spec disks, this will probably overallocate memory by a few bytes, but it
+           shouldn't be too bad. */
+        char *Name = BmAllocateZeroBlock(Record->NameLength + 1, 1);
+        if (!Name) {
+            return NULL;
+        }
+
+        int DestPos = 0;
+        while (Record->NameLength--) {
+            if ((Record->NameLength == 1 && *NamePos == ';' && *(NamePos + 1) == '1') ||
+                (Record->NameLength == 2 && *NamePos == '.' && *(NamePos + 1) == ';' &&
+                 *(NamePos + 2) == '1')) {
+                break;
+            }
+
+            Name[DestPos++] = *(NamePos++);
+        }
+
+        return Name;
+    }
+
+    return NULL;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function creates a root directory file handle.
+ *
+ * PARAMETERS:
+ *     ContextPtr - ISO9660-specific disk data.
+ *
+ * RETURN VALUE:
+ *     New handle on success, NULL otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+static BmFile *OpenRoot(void *ContextPtr) {
+    Iso9660FsContext *FsContext = ContextPtr;
+    BmFile *Handle = BmAllocateBlock(sizeof(BmFile) + sizeof(Iso9660Context));
+    if (!Handle) {
+        return NULL;
+    }
+
+    Iso9660Context *Context = (Iso9660Context *)(Handle + 1);
+    Context->FsContext = FsContext;
+    Context->FirstSector = FsContext->RootSector;
+    Context->Size = FsContext->RootSize;
+    Context->Directory = 1;
+
+    Handle->Size = 0;
+    Handle->Context = Context;
+    Handle->Close = NULL;
+    Handle->Read = Read;
+    Handle->ReadEntry = ReadEntry;
+    Handle->Iterate = Iterate;
+
+    return Handle;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function probes the given partition for the ISO9660 filesystem.
+ *
+ * PARAMETERS:
+ *     Partition - Which partition we're checking.
+ *     ReadPartition - Function to read some bytes from the partition.
+ *
+ * RETURN VALUE:
+ *     1 on success, 0 otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+int BiProbeIso9660(BmPartition *Partition, BmFileReadFn ReadPartition) {
     const char ExpectedStandardIdentifier[5] = "CD001";
 
     char *Buffer = BmAllocateBlock(2048);
@@ -38,14 +274,13 @@ int BiProbeIso9660(FileContext *Context, uint16_t BytesPerSector) {
     }
 
     /* If this is a valid ISO9660 device, it should have a Primary Volume Descriptor (PVD) we
-       can sanity check. The volume descriptors all start at the 32KiB mark (independent of
-       sector size).
+       can sanity check.
        The implementation here (and on the boot sector) is based of the specification available at
        https://wiki.osdev.org/ISO_9660. */
 
     uint64_t Offset = 0x8000;
     while (1) {
-        if (BmReadFile(Context, Buffer, Offset, 2048, NULL) || VolumeDescriptor->TypeCode == 255 ||
+        if (!ReadPartition(Partition, Offset, 2048, Buffer) || VolumeDescriptor->TypeCode == 255 ||
             memcmp(VolumeDescriptor->StandardIdentifier, ExpectedStandardIdentifier, 5) ||
             VolumeDescriptor->Version != 1) {
             BmFreeBlock(Buffer);
@@ -64,158 +299,20 @@ int BiProbeIso9660(FileContext *Context, uint16_t BytesPerSector) {
 
     /* The root directory should be located inside the PVD; As such, we should have nothing left
        to do. */
-    Iso9660Context *FsContext = BmAllocateBlock(sizeof(Iso9660Context));
+    Iso9660FsContext *FsContext = BmAllocateBlock(sizeof(Iso9660FsContext));
     if (!FsContext) {
         BmFreeBlock(Buffer);
         return 0;
     }
 
-    FsContext->BytesPerSector = BytesPerSector;
-    FsContext->FileSector = VolumeDescriptor->RootDirectory.ExtentSector;
-    FsContext->Directory = 1;
+    FsContext->Partition = Partition;
+    FsContext->ReadPartition = ReadPartition;
+    FsContext->SectorBuffer = Buffer;
+    FsContext->RootSector = VolumeDescriptor->RootDirectory.ExtentSector;
+    FsContext->RootSize = VolumeDescriptor->RootDirectory.ExtentSize;
 
-    if (BytesPerSector == 2048) {
-        FsContext->SectorBuffer = Buffer;
-    } else {
-        FsContext->SectorBuffer = BmAllocateBlock(BytesPerSector);
-        if (!FsContext->SectorBuffer) {
-            BmFreeBlock(FsContext);
-            BmFreeBlock(Buffer);
-            return 0;
-        }
-    }
-
-    memcpy(&FsContext->Parent, Context, sizeof(FileContext));
-    Context->Type = FILE_TYPE_ISO9660;
-    Context->PrivateSize = sizeof(Iso9660Context);
-    Context->PrivateData = FsContext;
-    Context->FileLength = VolumeDescriptor->RootDirectory.ExtentSize;
-
-    if (FsContext->SectorBuffer != Buffer) {
-        BmFreeBlock(Buffer);
-    }
+    Partition->FsContext = FsContext;
+    Partition->OpenRoot = OpenRoot;
 
     return 1;
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function does traversal on what should be a ISO9660 directory (if its a file, we error
- *     out), searching for a specific node.
- *
- * PARAMETERS:
- *     Context - Device/node private data.
- *     Name - What entry to find inside the directory.
- *
- * RETURN VALUE:
- *     1 for success, otherwise 0.
- *-----------------------------------------------------------------------------------------------*/
-int BiTraverseIso9660Directory(FileContext *Context, const char *Name) {
-    Iso9660Context *FsContext = Context->PrivateData;
-    uint64_t Remaining = Context->FileLength;
-    uint64_t Sector = FsContext->FileSector;
-    char *Current = NULL;
-
-    if (!FsContext->Directory) {
-        return 0;
-    }
-
-    int HasDot = strchr(Name, '.') != NULL;
-
-    /* We're not sure of the exact size of the disk, so we'll be searching sector-by-sector. */
-    while (Remaining) {
-        if (!Current || (void *)Current - FsContext->SectorBuffer >= FsContext->BytesPerSector) {
-            if (BmReadFile(
-                    &FsContext->Parent,
-                    FsContext->SectorBuffer,
-                    Sector * FsContext->BytesPerSector,
-                    FsContext->BytesPerSector,
-                    NULL)) {
-                return 0;
-            }
-
-            Current = FsContext->SectorBuffer;
-            Sector++;
-        }
-
-        Iso9660DirectoryRecord *Record = (Iso9660DirectoryRecord *)Current;
-        char *ThisNamePos = Current + sizeof(Iso9660DirectoryRecord);
-        const char *SearchNamePos = Name;
-        int Match = 1;
-
-        /* We currently can't handle level 3 multi-extent (over 4GiB) files. */
-        if ((Record->FileFlags & 0x80) || !Record->DirectoryRecordLength) {
-            return 0;
-        }
-
-        /* The filename to search for on the FS depends on if we're a directory, and if we have a
-           dot within the filename; Other than that, we handle both searching fully on spec and bit
-           out of spec (no ;1 on the end). */
-        while (*SearchNamePos && Record->NameLength) {
-            if (tolower(*ThisNamePos) != tolower(*SearchNamePos)) {
-                Match = 0;
-                break;
-            }
-
-            ThisNamePos++;
-            SearchNamePos++;
-            Record->NameLength--;
-        }
-
-        if ((Match && !Record->NameLength) ||
-            (!*SearchNamePos &&
-             ((((Record->FileFlags & 0x02) || HasDot) && Record->NameLength == 2 &&
-               *ThisNamePos == ';' && *(ThisNamePos + 1) == '1') ||
-              ((!(Record->FileFlags & 0x02) && !HasDot) && Record->NameLength == 3 &&
-               *ThisNamePos == '.' && *(ThisNamePos + 1) == ';' && *(ThisNamePos + 2) == '1')))) {
-            FsContext->FileSector = Record->ExtentSector;
-            FsContext->Directory = Record->FileFlags & 0x02;
-            Context->FileLength = Record->ExtentSize;
-            return 1;
-        }
-
-        Current += Record->DirectoryRecordLength;
-        Remaining -= Record->DirectoryRecordLength;
-    }
-
-    return 0;
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function tries to read what should be an ISO9660 file. Calling it on a directory will
- *     fail.
- *
- * PARAMETERS:
- *     Context - Device/node private data.
- *     Buffer - Output buffer.
- *     Start - Starting byte index (in the file).
- *     Size - How many bytes to read into the buffer.
- *     Read - How many bytes we read with no error.
- *
- * RETURN VALUE:
- *     1 if something went wrong, 0 otherwise.
- *-----------------------------------------------------------------------------------------------*/
-int BiReadIso9660File(FileContext *Context, void *Buffer, size_t Start, size_t Size, size_t *Read) {
-    Iso9660Context *FsContext = Context->PrivateData;
-    int Flags = 0;
-
-    if (FsContext->Directory || Start > Context->FileLength) {
-        return 1;
-    }
-
-    if (Size > Context->FileLength - Start) {
-        Flags = 1;
-        Size = Context->FileLength - Start;
-    }
-
-    /* Files in ISO9660 are on sequential sectors, so we can just read the parent device. */
-    Flags |= BmReadFile(
-        &FsContext->Parent,
-        Buffer,
-        FsContext->FileSector * FsContext->BytesPerSector + Start,
-        Size,
-        Read);
-
-    return Flags;
 }

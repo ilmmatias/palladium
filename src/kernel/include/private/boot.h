@@ -6,17 +6,18 @@
 
 #include <stdint.h>
 
-#define BOOT_MEMORY_REGION_TYPE_AVAILABLE 1
-#define BOOT_MEMORY_REGION_TYPE_USED 0x1000
-#define BOOT_MEMORY_REGION_TYPE_KERNEL 0x1001
+#define BOOT_MD_FREE 0
+#define BOOT_MD_HARDWARE 1
+#define BOOT_MD_BOOTMGR 2
+#define BOOT_MD_KERNEL 3
 
 #define LOADER_MAGIC "BMGR"
 #define LOADER_CURRENT_VERSION 0x0000
 
 typedef struct __attribute__((packed)) {
+    int Type;
     uint64_t BaseAddress;
     uint64_t Length;
-    uint32_t Type;
 } BootMemoryRegion;
 
 typedef struct __attribute__((packed)) {
@@ -32,7 +33,7 @@ typedef struct __attribute__((packed)) {
     uint16_t Version;
     struct {
         uint64_t BaseAdress;
-        int IsXsdt;
+        int TableType;
     } Acpi;
     struct {
         uint64_t MemorySize;

@@ -22,6 +22,8 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Werror")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror")
 
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+
 set(CMAKE_LINK_DEF_FILE_FLAG "")
 
 add_link_options(-nostdlib -nodefaultlibs)

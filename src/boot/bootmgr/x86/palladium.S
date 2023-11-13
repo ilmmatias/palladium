@@ -17,8 +17,8 @@
  * RETURN VALUE:
  *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
-.global _BiFinishTransferExecution
-_BiFinishTransferExecution:
+.global _BiJumpPalladium
+_BiJumpPalladium:
     /* Enable long mode and no-execute (for W^X) in the EFER. */
     mov $0xC0000080, %ecx
     rdmsr

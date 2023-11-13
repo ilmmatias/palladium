@@ -10,9 +10,8 @@
 #define DISPLAY_COLOR_DEFAULT 0x000000, 0xAAAAAA
 #define DISPLAY_COLOR_INVERSE 0xAAAAAA, 0x000000
 #define DISPLAY_COLOR_HIGHLIGHT 0x000000, 0xFFFFFF
-#define DISPLAY_COLOR_PANIC 0xAA0000, 0xFFFFFF
 
-void BiInitDisplay(void);
+void BiInitializeDisplay(void);
 void BmResetDisplay(void);
 
 void BmSetColor(uint32_t BackgroundColor, uint32_t ForegroundColor);

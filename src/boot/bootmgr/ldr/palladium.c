@@ -3,10 +3,11 @@
 
 #include <boot.h>
 #include <display.h>
-#include <keyboard.h>
+#include <file.h>
+#include <ini.h>
+#include <loader.h>
 #include <memory.h>
 #include <pe.h>
-#include <registry.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -52,56 +53,59 @@ static uint64_t LoadFile(
     ExportTable *ThisImage) {
     BmPrint("loading up %s\n", Path);
 
-    FileContext *Stream = BmOpenFile(Path);
+    BmFile *Stream = BmOpenFile(Path);
     if (!Stream) {
         return 0;
     }
 
-    /* The PE data is prefixed with a MZ header and a MS-DOS stub; The offset into the PE data is
-       guaranteed to be after the main MZ header. */
-    uint32_t Offset;
-    if (BmReadFile(Stream, &Offset, 0x3C, sizeof(uint32_t), NULL)) {
+    /* Preload the entire file (to prevent multiple small reads). */
+    char *Buffer = BmAllocateBlock(Stream->Size);
+    if (!Buffer) {
+        BmCloseFile(Stream);
+        return 0;
+    } else if (!BmReadFile(Stream, 0, Stream->Size, Buffer)) {
+        BmFreeBlock(Buffer);
         BmCloseFile(Stream);
         return 0;
     }
 
-    PeHeader InitialHeader;
-    PeHeader *Header = &InitialHeader;
-    if (BmReadFile(Stream, Header, Offset, sizeof(PeHeader), NULL)) {
-        BmCloseFile(Stream);
-        return 0;
-    }
+    BmCloseFile(Stream);
+
+    /* The PE data is prefixed with a MZ header and a MS-DOS stub; The offset into the PE data is
+       guaranteed to be after the main MZ header. */
+    uint32_t Offset = *(uint32_t *)(Buffer + 0x3C);
+    PeHeader64 *Header = (PeHeader64 *)(Buffer + Offset);
 
     /* Following the information at https://learn.microsoft.com/en-us/windows/win32/debug/pe-format
        for the implementation. */
     if (memcmp(Header->Signature, PE_SIGNATURE, 4) || Header->Machine != PE_MACHINE ||
         (Header->Characteristics & 0x2000) || Header->Magic != 0x20B || Header->Subsystem != 1 ||
         (Header->DllCharacteristics & 0x160) != 0x160) {
-        BmCloseFile(Stream);
+        BmFreeBlock(Buffer);
         return 0;
     }
 
-    uint64_t FirstStackPage = (Header->SizeOfImage + PAGE_SIZE - 1) >> PAGE_SHIFT;
-    uint64_t StackPageCount = IsKernel ? (SIZEOF_PROCESSOR + PAGE_SIZE - 1) >> PAGE_SHIFT : 0;
+    uint64_t FirstStackPage = (Header->SizeOfImage + BI_PAGE_SIZE - 1) >> BI_PAGE_SHIFT;
+    uint64_t StackPageCount = IsKernel ? (SIZEOF_PROCESSOR + BI_PAGE_SIZE - 1) >> BI_PAGE_SHIFT : 0;
 
     uint64_t Pages = FirstStackPage + StackPageCount;
-    *ImageSize = Pages << PAGE_SHIFT;
+    *ImageSize = Pages << BI_PAGE_SHIFT;
 
     *PageFlags = BmAllocateZeroBlock(Pages, sizeof(int));
     if (!*PageFlags) {
-        BmCloseFile(Stream);
+        BmFreeBlock(Buffer);
         return 0;
     }
 
-    void *PhysicalAddress = BmAllocatePages(Pages, MEMORY_KERNEL);
+    void *PhysicalAddress = BmAllocatePages(*ImageSize, BM_MD_KERNEL);
     if (!PhysicalAddress) {
-        BmCloseFile(Stream);
+        BmFreeBlock(Buffer);
         return 0;
     }
 
     *VirtualAddress = BmAllocateVirtualAddress(Pages);
     if (!*VirtualAddress) {
-        BmCloseFile(Stream);
+        BmFreeBlock(Buffer);
         return 0;
     }
 
@@ -113,14 +117,11 @@ static uint64_t LoadFile(
     /* The kernel might use information from the base headers and section headers; SizeOfImage
        should have given us the code/data size + all headers, so we're assuming that and loading
        it all up to the base address. */
-    if (BmReadFile(Stream, PhysicalAddress, 0, Header->SizeOfHeaders, NULL)) {
-        BmCloseFile(Stream);
-        return 0;
-    }
+    memcpy(PhysicalAddress, Buffer, Header->SizeOfHeaders);
 
     uint64_t ExpectedBase = Header->ImageBase;
     uint64_t BaseDiff = *VirtualAddress - ExpectedBase;
-    Header = (PeHeader *)((char *)PhysicalAddress + Offset);
+    Header = (PeHeader64 *)((char *)PhysicalAddress + Offset);
     Header->ImageBase = *VirtualAddress;
 
     if (EntryAddress) {
@@ -141,20 +142,15 @@ static uint64_t LoadFile(
             Size = Sections[i].SizeOfRawData;
         }
 
-        for (uint32_t Page = 0; Page < ((Size + PAGE_SIZE - 1) >> PAGE_SHIFT); Page++) {
-            (*PageFlags)[(Sections[i].VirtualAddress >> PAGE_SHIFT) + Page] = Flags;
+        for (uint32_t Page = 0; Page < ((Size + BI_PAGE_SIZE - 1) >> BI_PAGE_SHIFT); Page++) {
+            (*PageFlags)[(Sections[i].VirtualAddress >> BI_PAGE_SHIFT) + Page] = Flags;
         }
 
         if (Sections[i].SizeOfRawData) {
-            if (BmReadFile(
-                    Stream,
-                    (char *)PhysicalAddress + Sections[i].VirtualAddress,
-                    Sections[i].PointerToRawData,
-                    Sections[i].SizeOfRawData,
-                    NULL)) {
-                BmCloseFile(Stream);
-                return 0;
-            }
+            memcpy(
+                (char *)PhysicalAddress + Sections[i].VirtualAddress,
+                Buffer + Sections[i].PointerToRawData,
+                Sections[i].SizeOfRawData);
         }
 
         if (Sections[i].VirtualSize > Sections[i].SizeOfRawData) {
@@ -165,8 +161,8 @@ static uint64_t LoadFile(
         }
     }
 
-    /* We should have loaded the whole file, so it's safe to close the handle. */
-    BmCloseFile(Stream);
+    /* We should have loaded the whole file, so it's safe to free the buffer. */
+    BmFreeBlock(Buffer);
 
     /* Grab up this image's export table, and its name; We need to parse the path to get the
        image's name (get everything after the last slash). */
@@ -319,78 +315,43 @@ static uint64_t LoadFile(
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function loads up the system located in the given folder, jumping to execution
+ *     This function loads up the system located in the entry, jumping to execution
  *     afterwards.
  *
  * PARAMETERS:
- *     SystemFolder - Full path of the system folder (device()/path/to/System).
+ *     Entry - Menu entry data containing the full path of the system folder
+ *             (device()/path/to/System).
  *
  * RETURN VALUE:
- *     None.
+ *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
-[[noreturn]] void BiLoadPalladium(const char *SystemFolder) {
-    const char *Message = "An error occoured while trying to load the selected operating system.\n"
-                          "Please, reboot your device and try again.\n";
-
-    BmSetColor(DISPLAY_COLOR_DEFAULT);
-    BmResetDisplay();
+[[noreturn]] void BiLoadPalladium(BmMenuEntry *Entry) {
+    const char *FailReason = "Could not allocate enough memory for loading the kernel file.\n"
+                             "Your system might not have enough usable memory.\n";
+    const char *ExtraParameter = "";
 
     do {
-        /* This should BmPanic() on incompatible machines, no need for a return code. */
-        BiCheckCompatibility();
-
-        size_t SystemFolderSize = strlen(SystemFolder);
+        size_t SystemFolderSize = strlen(Entry->Palladium.SystemFolder);
         size_t KernelPathSize = SystemFolderSize + 12;
         char *KernelPath = BmAllocateBlock(KernelPathSize);
-        char *RegistryPath = BmAllocateBlock(KernelPathSize);
-        if (!KernelPath || !RegistryPath) {
+        if (!KernelPath) {
             break;
         }
 
-        snprintf(KernelPath, KernelPathSize, "%s/kernel.exe", SystemFolder);
-        snprintf(RegistryPath, KernelPathSize, "%s/kernel.reg", SystemFolder);
-
-        /* Load up the kernel registry, it should be located adjacent to the kernel image.
-           We need it to find all the boot-time drivers (like important FS drivers). */
-        RegHandle *Handle = BmLoadRegistry(RegistryPath);
-        if (!Handle) {
-            Message =
-                "An error occoured while trying to load the selected operating system.\n"
-                "The kernel registry file inside the System folder is invalid or corrupted.\n";
-            break;
-        }
-
-        /* Failing this is a probable "inaccessible boot device" error later on the kernel
-           initialization process, so crash early. */
-        RegEntryHeader *DriverEntries = BmFindRegistryEntry(Handle, NULL, "Drivers");
-        if (!DriverEntries) {
-            Message =
-                "An error occoured while trying to load the selected operating system.\n"
-                "The kernel registry file inside the System folder is invalid or corrupted.\n";
-            break;
-        }
+        snprintf(KernelPath, KernelPathSize, "%s/kernel.exe", Entry->Palladium.SystemFolder);
 
         /* First pass, collect the driver count, as we'll be allocating the LoadedImage array all
-           at once. */
+        at once. */
         int DriverCount = 0;
-        for (int i = 0;; i++) {
-            RegEntryHeader *Entry = BmGetRegistryEntry(Handle, DriverEntries, i);
-
-            if (!Entry) {
-                break;
-            } else if (
-                Entry->Type != REG_ENTRY_DWORD ||
-                !*((uint32_t *)((char *)Entry + Entry->Length - 4))) {
-                continue;
-            }
-
+        for (RtSList *ListHeader = Entry->Palladium.DriverListHead; ListHeader;
+             ListHeader = ListHeader->Next) {
             DriverCount++;
         }
 
         /* We're forced to use BmAllocatePages, as we need to mark this page as KERNEL instead of
            BOOT. */
-        LoadedImage *Images = BmAllocatePages(
-            ((DriverCount + 1) * sizeof(LoadedImage) + PAGE_SIZE - 1) >> PAGE_SHIFT, MEMORY_KERNEL);
+        LoadedImage *Images =
+            BmAllocatePages((DriverCount + 1) * sizeof(LoadedImage), BM_MD_KERNEL);
         if (!Images) {
             break;
         }
@@ -414,50 +375,53 @@ static uint64_t LoadFile(
             Exports);
 
         if (!Images[0].PhysicalAddress) {
-            Message = "An error occoured while trying to load the selected operating system.\n"
-                      "The kernel file inside the System folder is invalid or corrupted.\n";
+            FailReason = "Could not load the kernel file at `%s`.\n"
+                         "You might need to repair your installation.\n";
+            ExtraParameter = KernelPath;
             break;
         }
 
         /* Second pass, load up all the drivers, solving any driver->kernel imports. */
         int Fail = 0;
-
-        DriverCount = 0;
-
-        for (int i = 0;; i++) {
-            RegEntryHeader *Entry = BmGetRegistryEntry(Handle, DriverEntries, i);
-
-            if (!Entry) {
-                break;
-            } else if (
-                Entry->Type != REG_ENTRY_DWORD ||
-                !*((uint32_t *)((char *)Entry + Entry->Length - 4))) {
-                continue;
+        for (int Index = 0; Index < DriverCount; Index++) {
+            /* The load order matters, as such, we need to go backwards. */
+            RtSList *ListHeader = Entry->Palladium.DriverListHead;
+            for (int i = 0; i < DriverCount - Index - 1; i++) {
+                ListHeader = ListHeader->Next;
             }
 
-            size_t DriverPathSize = SystemFolderSize + strlen((char *)(Entry + 1)) + 2;
+            BmIniArray *DriverEntry = CONTAINING_RECORD(ListHeader, BmIniArray, ListHeader);
+            size_t DriverPathSize = SystemFolderSize + strlen(DriverEntry->Value) + 2;
             char *DriverPath = BmAllocateBlock(DriverPathSize);
             if (!DriverPath) {
+                FailReason = "Could not allocate enough memory for loading a driver file.\n"
+                             "Your system might not have enough usable memory.\n";
                 Fail = 1;
                 break;
             }
 
-            snprintf(DriverPath, DriverPathSize, "%s/%s", SystemFolder, Entry + 1);
-
-            Images[DriverCount + 1].PhysicalAddress = LoadFile(
+            snprintf(
                 DriverPath,
-                &Images[DriverCount + 1].VirtualAddress,
-                &Images[DriverCount + 1].EntryPoint,
-                &Images[DriverCount + 1].ImageSize,
-                &Images[DriverCount + 1].PageFlags,
+                DriverPathSize,
+                "%s/%s",
+                Entry->Palladium.SystemFolder,
+                DriverEntry->Value);
+
+            Images[Index + 1].PhysicalAddress = LoadFile(
+                DriverPath,
+                &Images[Index + 1].VirtualAddress,
+                &Images[Index + 1].EntryPoint,
+                &Images[Index + 1].ImageSize,
+                &Images[Index + 1].PageFlags,
                 0,
                 ExportTableSize++,
                 Exports,
-                Exports + i + 1);
+                Exports + Index + 1);
 
-            if (!Images[++DriverCount].PhysicalAddress) {
-                Message = "An error occoured while trying to load the selected operating system.\n"
-                          "One of the boot-time drivers is invalid or corrupted.\n";
+            if (!Images[Index + 1].PhysicalAddress) {
+                FailReason = "Could not load the driver file at `%s`.\n"
+                             "You might need to repair your installation.\n";
+                ExtraParameter = DriverPath;
                 Fail = 1;
                 break;
             }
@@ -467,8 +431,10 @@ static uint64_t LoadFile(
             break;
         }
 
-        BiTransferExecution(Images, DriverCount + 1);
+        BiStartPalladium(Images, DriverCount + 1);
     } while (0);
 
-    BmPanic(Message);
+    BmPrint(FailReason, ExtraParameter);
+    while (1)
+        ;
 }

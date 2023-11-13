@@ -61,11 +61,11 @@ int ungetc(int ch, FILE *stream);
 
 int scanf(const char *format, ...);
 int fscanf(FILE *stream, const char *format, ...);
-int sscanf(char *buffer, const char *format, ...);
+int sscanf(const char *buffer, const char *format, ...);
 
 int vscanf(const char *format, va_list vlist);
 int vfscanf(FILE *stream, const char *format, va_list vlist);
-int vsscanf(char *buffer, const char *format, va_list vlist);
+int vsscanf(const char *buffer, const char *format, va_list vlist);
 
 int printf(const char *format, ...);
 int fprintf(FILE *stream, const char *format, ...);

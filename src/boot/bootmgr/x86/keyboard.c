@@ -3,7 +3,6 @@
 
 #include <display.h>
 #include <keyboard.h>
-#include <stdint.h>
 #include <x86/keyboard.h>
 
 /* Scan Code Set 1 (the old PC-XT keyboard scan codes, which the controller should be emulating
@@ -66,11 +65,13 @@ static int RightShiftPressed = 0;
  *     None.
  *
  * RETURN VALUE:
- *     Output of the data port.
+ *     Output of the data port, or -1 if we're still empty.
  *-----------------------------------------------------------------------------------------------*/
-static uint8_t PollData(void) {
-    while (!(ReadPort(PORT_STATUS) & STATUS_HAS_OUTPUT))
-        ;
+static int PollData(void) {
+    if (!(ReadPort(PORT_STATUS) & STATUS_HAS_OUTPUT)) {
+        return -1;
+    }
+
     return ReadPort(PORT_DATA);
 }
 
@@ -84,7 +85,7 @@ static uint8_t PollData(void) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void BiInitKeyboard(void) {
+void BiInitializeKeyboard(void) {
     /* TODO: We need a proper init sequence, resetting the controller and detecting multiple PS/2
        devices (and which one is the keyboard). */
     ReadPort(PORT_DATA);
@@ -99,11 +100,14 @@ void BiInitKeyboard(void) {
  *     None.
  *
  * RETURN VALUE:
- *     Keyboard input.
+ *     Keyboard input, or -1 if we're still empty.
  *-----------------------------------------------------------------------------------------------*/
 int BmPollKey(void) {
     while (1) {
         int ScanCode = PollData();
+        if (ScanCode == -1) {
+            return -1;
+        }
 
         /* Manually handle shift+caps lock (both onpress and onrelease); Those should be
            transparently handled by us (there is no KEY_LSHIFT_PRESS or KEY_LSHIFT_RELEASE). */
@@ -127,7 +131,8 @@ int BmPollKey(void) {
         /* E0 is the extended scan code prefix; We mostly support what's already in the normal
            table, plus arrow keys. */
         if (ScanCode == 0xE0) {
-            ScanCode = PollData();
+            while ((ScanCode = PollData()) == -1)
+                ;
 
             if (ScanCode > 0x90) {
                 continue;

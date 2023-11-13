@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <memory.h>
-#include <stdint.h>
 #include <string.h>
 
 typedef struct AllocatorEntry {
@@ -114,7 +113,7 @@ static void MergeEntriesBackward(AllocatorEntry *Base) {
  *-----------------------------------------------------------------------------------------------*/
 static AllocatorEntry *FindFreeEntry(size_t Size) {
     AllocatorEntry *Entry = AllocatorHead;
-    size_t Mask = PAGE_SIZE - 1;
+    size_t Mask = BI_PAGE_SIZE - 1;
 
     while (Entry) {
         if (!Entry->Used && Entry->Size >= Size) {
@@ -125,7 +124,7 @@ static AllocatorEntry *FindFreeEntry(size_t Size) {
         Entry = Entry->Next;
     }
 
-    Entry = BmAllocatePages((Size + sizeof(AllocatorEntry) + Mask) >> PAGE_SHIFT, MEMORY_BOOT);
+    Entry = BmAllocatePages(Size, BM_MD_BOOTMGR);
     Size = ((Size + sizeof(AllocatorEntry) + Mask) & ~Mask) - sizeof(AllocatorEntry);
 
     if (!Entry) {

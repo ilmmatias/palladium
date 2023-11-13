@@ -258,6 +258,7 @@ void VidPutChar(char Character) {
 void VidPutString(const char *String) {
     KeAcquireSpinLock(&VidpLock);
     PutString(String);
+    Flush();
     KeReleaseSpinLock(&VidpLock);
 }
 

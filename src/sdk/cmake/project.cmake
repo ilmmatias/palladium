@@ -28,7 +28,13 @@ function(add_executable target type has_lib)
             $<$<COMPILE_LANGUAGE:C,CXX>:-mno-sse2>)
     endif()
 
-    target_compile_options(${target} PRIVATE --target=${TARGET_${ARCH}}-w64-mingw32 -DARCH_${ARCH})
+    target_compile_options(
+        ${target}
+        PRIVATE
+        --target=${TARGET_${ARCH}}-w64-mingw32
+        -DARCH_${ARCH}
+        -fno-stack-protector)
+
     target_link_options(
     	${target}
     	PRIVATE
@@ -66,7 +72,13 @@ function(add_library target type)
             $<$<COMPILE_LANGUAGE:C,CXX>:-mno-sse2>)
     endif()
 
-    target_compile_options(${target} PRIVATE --target=${TARGET_${ARCH}}-w64-mingw32 -DARCH_${ARCH})
+    target_compile_options(
+        ${target}
+        PRIVATE
+        --target=${TARGET_${ARCH}}-w64-mingw32
+        -DARCH_${ARCH}
+        -fno-stack-protector)
+
     target_link_options(
         	${target}
         	PRIVATE

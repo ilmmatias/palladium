@@ -5,7 +5,7 @@
 #include <memory.h>
 #include <stdlib.h>
 
-MemoryArena *BiMemoryArena = NULL;
+BiMemoryArenaEntry *BiMemoryArena = NULL;
 int BiMemoryArenaSize = 0;
 
 /*-------------------------------------------------------------------------------------------------
@@ -19,7 +19,7 @@ int BiMemoryArenaSize = 0;
  *     Allocated address, or 0 if no address was found.
  *-----------------------------------------------------------------------------------------------*/
 uint64_t BmAllocateVirtualAddress(uint64_t Pages) {
-    if (!Pages || !BiMemoryArenaSize || (Pages << PAGE_SHIFT) > ARENA_PAGE_SIZE) {
+    if (!Pages || !BiMemoryArenaSize || (Pages << BI_PAGE_SHIFT) > BI_ARENA_PAGE_SIZE) {
         return 0;
     }
 
@@ -27,7 +27,7 @@ uint64_t BmAllocateVirtualAddress(uint64_t Pages) {
        high bits (on amd64, it randomizes 9 bits). We just generate a random index into the arena
        list. */
     unsigned int RandomIndex = (unsigned int)rand() % BiMemoryArenaSize;
-    MemoryArena *Entry = BiMemoryArena;
+    BiMemoryArenaEntry *Entry = BiMemoryArena;
     uint64_t Address = 0;
 
     if (!RandomIndex) {
@@ -44,8 +44,8 @@ uint64_t BmAllocateVirtualAddress(uint64_t Pages) {
 
     /* Second stage, 10 attempts at randomizing the remaining bits. */
     for (int i = 0; i < 10; i++) {
-        uint64_t RandomOffset = __rand64() & (ARENA_PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
-        if (ARENA_PAGE_SIZE - RandomOffset >= (Pages << PAGE_SHIFT)) {
+        uint64_t RandomOffset = __rand64() & (BI_ARENA_PAGE_SIZE - 1) & ~(BI_PAGE_SIZE - 1);
+        if (BI_ARENA_PAGE_SIZE - RandomOffset >= (Pages << BI_PAGE_SHIFT)) {
             Address += RandomOffset;
             break;
         }

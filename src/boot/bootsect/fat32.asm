@@ -119,7 +119,7 @@ Main$Found:
     shl ebp, 16
     or ebp, ebx
 
-    mov bx, 4000h
+    mov bx, 920h
     mov es, bx
     xor bx, bx
 
@@ -129,7 +129,7 @@ Main$Loop:
     jc Main$Loop
 
     pop dx
-    push 4000h
+    push 920h
     push 0
     retf
 Main endp
@@ -239,6 +239,8 @@ GetNextCluster proc
     div ecx
 
     movzx ecx, [ReservedSectors]
+    add eax, ecx
+    mov ecx, [HiddenSectors]
     add eax, ecx
 
     push bx

@@ -19,8 +19,8 @@ NtfsBpb label byte
     Media db 0F8h
     BytesPerCluster dd 0
     NumberOfHeads dw 0
+    HiddenSectors dd 0
     SectorsPerMftEntry dd 0
-    BytesPerMftEntry dd 0
     BootDrive db 80h
     BpbFlags db 0
     BpbSignature db 80h
@@ -33,7 +33,7 @@ NtfsBpb label byte
     IndexEntrySize db 1
     Reserved4 db 0, 0, 0
     MftOffset dq 0
-    Checksum dd 0
+    BytesPerMftEntry dd 0
 
 ;--------------------------------------------------------------------------------------------------
 ; PURPOSE:
@@ -110,12 +110,15 @@ Main$LoadMoreSectors:
     mov edx, dword ptr [MftCluster + 4]
     mov ebx, [SectorsPerCluster]
     call Multiply64x32
+    add eax, [HiddenSectors]
+    adc edx, 0
     mov dword ptr [MftOffset], eax
     mov dword ptr [MftOffset + 4], edx
 
     ; NTFS is a beast of a FS, even for just finding a file in the root directory.
     ; We're forced to use more sectors, which fortunately, we have 15 spare.
     mov eax, 1
+    add eax, [HiddenSectors]
     xor edx, edx
     mov bx, 07E00h
     mov ecx, 2
@@ -298,13 +301,12 @@ LoadBootmgr proc
     add eax, dword ptr [MftOffset]
     adc edx, dword ptr [MftOffset + 4]
 
-    ; There should be enough space for a cluster/MFT entry, as long as the FS isn't corrupt/bogus.
-    mov bx, 1000h
+    mov bx, 820h
     mov es, bx
     xor bx, bx
     call ReadSectors
 
-    mov bx, 1000h
+    mov bx, 820h
     mov es, bx
     xor bx, bx
 
@@ -329,11 +331,19 @@ LoadBootmgr proc
     call FindAttribute
     jc LoadBootmgr$Corrupt
 
-    mov bx, 2000h
+LoadBootmgr$TraverseBlock:
+    mov bx, 920h
     mov es, bx
     xor bx, bx
+    push eax
+    push edx
+    mov ecx, [SectorsPerCluster]
+    call TranslateVcn
+    call ReadSectors
 
-LoadBootmgr$TraverseBlock:
+    mov bx, 920h
+    mov es, bx
+    xor bx, bx
     xor di, di
     call ApplyFixups
 
@@ -342,8 +352,15 @@ LoadBootmgr$TraverseBlock:
     jnc LoadBootmgr$Found
     jz LoadBootmgr$NotFound
 
+    pop edx
+    pop eax
+    inc eax
+    adc edx, 0
+    jmp LoadBootmgr$TraverseBlock
+
 LoadBootmgr$Found:
     ; EBX:ECX contains the file size, but we use those registers for the multiplication below.
+    add esp, 8
     push ebx
     push ecx
 
@@ -355,12 +372,12 @@ LoadBootmgr$Found:
     add eax, dword ptr [MftOffset]
     adc edx, dword ptr [MftOffset + 4]
 
-    mov bx, 1000h
+    mov bx, 820h
     mov es, bx
     xor bx, bx
     call ReadSectors
 
-    mov bx, 1000h
+    mov bx, 820h
     mov es, bx
 
     pop ecx
@@ -379,7 +396,7 @@ LoadBootmgr$Found:
     cmp ebx, 38000h
     ja LoadBootmgr$Overflow
 
-    mov bp, 4000h
+    mov bp, 920h
     mov es, bp
     mov si, di
     xor di, di
@@ -394,60 +411,43 @@ LoadBootmgr$Found:
     jmp LoadBootmgr$End
 
 LoadBootmgr$LoadNonResident:
-    ; Either copy a whole cluster, or however many bytes are left.
+    ; FindAttribute loads up the cluster number for the first VCN, and pushes the VCN into the
+    ; stack; We just need to read the current cluster, and translate the next (in a loop) until
+    ; we run out of data to read (ECX is zero).
     cmp ebx, [BytesPerCluster]
     jb LoadBootmgr$UseRemainingSize
     mov ecx, [BytesPerCluster]
-    jmp LoadBootmgr$CopyCluster
+    jmp LoadBootmgr$LoadCluster
 LoadBootmgr$UseRemainingSize:
     mov ecx, ebx
 
-LoadBootmgr$CopyCluster:
-    ; We'll always be loading the cluster to the temp buffer (right at the start); So, always
-    ; reset the source.
-    mov bp, 2000h
-    mov ds, bp
-    xor bp, bp
-    mov si, bp
-
+LoadBootmgr$LoadCluster:
+    push eax
+    push edx
     push ebx
     push ecx
-    xchg ecx, ebx
-    call CopyLargeBuffer
+    mov ecx, [SectorsPerCluster]
+    call TranslateVcn
+
+    mov bx, di
+    call ReadSectors
+    mov di, bx
     pop ecx
     pop ebx
 
     sub ebx, ecx
     jz LoadBootmgr$End
 
-    ; The virtual clusters are sequential, but we do need to convert them into logical clusters
-    ; first, followed by converting into sectors.
-    inc eax
-    adc edx, 0
-    push eax
-    push edx
-    call TranslateVcn
-
-    ; We need to handle ReadSectors() trashing most/all of the registers we use.
-    pushad
-    push es
-    xor di, di
-    mov ds, di
-    mov di, 2000h
-    mov es, di
-    xor bx, bx
-    mov ecx, [SectorsPerCluster]
-    call ReadSectors
-    pop es
-    popad
-
     pop edx
     pop eax
+    inc eax
+    adc edx, 0
     jmp LoadBootmgr$LoadNonResident
 
 LoadBootmgr$End:
+    add sp, 8
     pop dx
-    push 4000h
+    push 920h
     push 0
     retf
 
@@ -535,7 +535,7 @@ FindAttribute proc
 FindAttribute$Loop:
     ; Check for overflow; That means either the FS is corrupt/not really NTFS, or we really
     ; didn't find the attribute.
-    cmp di, word ptr [BytesPerMftEntry]
+    cmp si, word ptr [BytesPerMftEntry]
     jae FindAttribute$End
 
     cmp dword ptr es:[si], eax
@@ -563,20 +563,7 @@ FindAttribute$NonResident:
 
     mov eax, es:[si + 16]
     mov edx, es:[si + 20]
-    push eax
-    push edx
-    call TranslateVcn
 
-    push es
-    mov di, 2000h
-    mov es, di
-    xor bx, bx
-    mov ecx, [SectorsPerCluster]
-    call ReadSectors
-    pop es
-
-    pop edx
-    pop eax
     pop esi
     pop ebx
     cmp esi, esi
@@ -619,7 +606,7 @@ TranslateVcn proc
     ; the revelant data is safe.
     xor si, si
     mov ds, si
-    mov si, 1000h
+    mov si, 820h
     mov es, si
     mov si, [DataRuns]
 
@@ -677,6 +664,8 @@ TranslateVcn$Next:
     jmp TranslateVcn$Loop
 
 TranslateVcn$End:
+    add eax, [HiddenSectors]
+    adc edx, 0
     pop es
     pop ds
     pop edi
@@ -696,12 +685,11 @@ TranslateVcn endp
 ;
 ; RETURN VALUE:
 ;     Carry flag set if we didn't find it; Otherwise, EAX:EDX points to file MFT entry, and
-;     EBX:ECX points to the  file length.
+;     EBX:ECX points to the file length.
 ;     On failure, zero flag set if this entry has no sub nodes; Otherwise, EAX:EDX points to the
 ;     sub node VCN.
 ;--------------------------------------------------------------------------------------------------
 TraverseIndexBlock proc
-    push ecx
     push ebp
     push esi
 
@@ -732,7 +720,6 @@ TraverseIndexBlock$Loop:
     test byte ptr es:[di + 12], 1
     pop esi
     pop ebp
-    pop ecx
     stc
     ret
 
@@ -781,7 +768,6 @@ TraverseIndexBlock$EndCheck:
 
     pop esi
     pop ebp
-    pop ecx
     clc
     ret
 
@@ -792,7 +778,6 @@ TraverseIndexBlock$Next:
 TraverseIndexBlock$Overflow:
     pop esi
     pop ebp
-    pop ecx
     stc
     cmp esi, esi
     ret

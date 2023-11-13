@@ -98,13 +98,13 @@ Main$Search:
 
 Main$Load:
     mov eax, [si + 2]
-    mov bx, 4000h
+    mov bx, 920h
     mov es, bx
     xor bx, bx
     call ReadSectors
 
     pop dx
-    push 4000h
+    push 920h
     push 0
     retf
 

@@ -7,88 +7,24 @@
 #include <memory.h>
 #include <string.h>
 
-struct Fat32Context;
-
-typedef struct Fat32DataRun {
-    struct Fat32Context *Parent;
-    int Used;
-    uint32_t Vcn;
-    uint32_t Lcn;
-    struct Fat32DataRun *Next;
-} Fat32DataRun;
-
-typedef struct Fat32Context {
-    FileContext Parent;
+typedef struct {
+    BmPartition *Partition;
+    BmFileReadFn ReadPartition;
     void *ClusterBuffer;
-    Fat32DataRun *DataRuns;
     uint16_t BytesPerCluster;
     uint32_t FatOffset;
     uint32_t ClusterOffset;
+    uint32_t RootCluster;
+} Fat32FsContext;
+
+typedef struct {
+    Fat32FsContext *FsContext;
     uint32_t FileCluster;
+    uint64_t Size;
     int Directory;
 } Fat32Context;
 
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function tries probing an open device/partition for FAT32.
- *
- * PARAMETERS:
- *     Context - I/O; Device where the caller is trying to probe for FSes. If the FS is FAT32,
- *               we'll modify it to be an FAT32 context.
- *
- * RETURN VALUE:
- *     1 if the FS was FAT32, 0 if we need to keep on searching.
- *-----------------------------------------------------------------------------------------------*/
-int BiProbeFat32(FileContext *Context) {
-    const char ExpectedSystemIdentifier[8] = "FAT32   ";
-
-    char *Buffer = BmAllocateBlock(512);
-    Fat32BootSector *BootSector = (Fat32BootSector *)Buffer;
-    if (!Buffer) {
-        return 0;
-    }
-
-    /* We're using the process from http://jdebp.info/FGA/determining-filesystem-type.html to
-       determine if this is really FAT32 (or if it at least looks like it). */
-    if (BmReadFile(Context, Buffer, 0, 512, NULL) ||
-        memcmp(BootSector->SystemIdentifier, ExpectedSystemIdentifier, 8) ||
-        !(BootSector->BytesPerSector >= 256 && BootSector->BytesPerSector <= 4096) ||
-        !BootSector->SectorsPerCluster || BootSector->SectorsPerCluster > 128 ||
-        (BootSector->Signature != 0x28 && BootSector->Signature != 0x29)) {
-        return 0;
-    }
-
-    Fat32Context *FsContext = BmAllocateBlock(sizeof(Fat32Context));
-    if (!FsContext) {
-        BmFreeBlock(Buffer);
-        return 0;
-    }
-
-    FsContext->BytesPerCluster = BootSector->BytesPerSector * BootSector->SectorsPerCluster;
-    FsContext->ClusterBuffer = BmAllocateBlock(FsContext->BytesPerCluster);
-    if (!FsContext->ClusterBuffer) {
-        BmFreeBlock(FsContext);
-        BmFreeBlock(Buffer);
-        return 0;
-    }
-
-    FsContext->DataRuns = NULL;
-    FsContext->FatOffset = BootSector->ReservedSectors * BootSector->BytesPerSector;
-    FsContext->ClusterOffset =
-        BootSector->NumberOfFats * BootSector->SectorsPerFat * BootSector->BytesPerSector +
-        FsContext->FatOffset;
-    FsContext->FileCluster = BootSector->RootDirectoryCluster;
-    FsContext->Directory = 1;
-
-    memcpy(&FsContext->Parent, Context, sizeof(FileContext));
-    Context->Type = FILE_TYPE_FAT32;
-    Context->PrivateSize = sizeof(Fat32Context);
-    Context->PrivateData = FsContext;
-    Context->FileLength = 0;
-
-    BmFreeBlock(Buffer);
-    return 1;
-}
+static char *Iterate(void *ContextPtr, int Index);
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -102,18 +38,17 @@ int BiProbeFat32(FileContext *Context) {
  * RETURN VALUE:
  *     1 for success, otherwise 0.
  *-----------------------------------------------------------------------------------------------*/
-static int FollowCluster(Fat32Context *FsContext, void **Current, uint32_t *Cluster) {
+static int FollowCluster(Fat32FsContext *FsContext, void **Current, uint32_t *Cluster) {
     ptrdiff_t Offset = Current ? *Current - FsContext->ClusterBuffer : 0;
 
     if (Offset && Offset < FsContext->BytesPerCluster) {
         return 1;
     } else if (Offset || !Current) {
-        if (BmReadFile(
-                &FsContext->Parent,
-                FsContext->ClusterBuffer,
+        if (!FsContext->ReadPartition(
+                FsContext->Partition,
                 FsContext->FatOffset + (*Cluster << 2),
                 4,
-                NULL)) {
+                FsContext->ClusterBuffer)) {
             return 0;
         }
 
@@ -126,12 +61,11 @@ static int FollowCluster(Fat32Context *FsContext, void **Current, uint32_t *Clus
 
     if (Current) {
         *Current = FsContext->ClusterBuffer;
-        return !BmReadFile(
-            &FsContext->Parent,
-            FsContext->ClusterBuffer,
+        return FsContext->ReadPartition(
+            FsContext->Partition,
             FsContext->ClusterOffset + (*Cluster - 2) * FsContext->BytesPerCluster,
             FsContext->BytesPerCluster,
-            NULL);
+            FsContext->ClusterBuffer);
     } else {
         return 1;
     }
@@ -249,24 +183,78 @@ static void ConvertIntoShortName(const char *Name, char ShortName[11]) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function does traversal on what should be a FAT32 directory (if its a file, we error
- *     out), searching for a specific node.
+ *     This function tries to read what should be a FAT32 file. Calling it on a directory will
+ *     fail.
  *
  * PARAMETERS:
- *     Context - Device/node private data.
- *     Name - What entry to find inside the directory.
+ *     ContextPtr - Pointer to Fat32Context struct.
+ *     Offset - Starting byte index (in the file).
+ *     Size - How many bytes to read into the buffer.
+ *     Buffer - Output buffer.
  *
  * RETURN VALUE:
- *     1 for success, otherwise 0.
+ *     0 if something went wrong, 1 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int BiTraverseFat32Directory(FileContext *Context, const char *Name) {
-    Fat32Context *FsContext = Context->PrivateData;
+static int Read(void *ContextPtr, uint64_t Offset, uint64_t Size, void *Buffer) {
+    Fat32Context *Context = ContextPtr;
+    Fat32FsContext *FsContext = Context->FsContext;
+    uint32_t Cluster = Context->FileCluster;
+    char *Current = FsContext->ClusterBuffer;
+    char *Output = Buffer;
+
+    if (Context->Directory || Offset + Size > Context->Size) {
+        return 0;
+    }
+
+    /* Seek through the file into the starting cluster (for the given byte index). */
+    while (Offset >= FsContext->BytesPerCluster) {
+        Offset -= FsContext->BytesPerCluster;
+        if (!FollowCluster(FsContext, NULL, &Cluster)) {
+            return 0;
+        }
+    }
+
+    while (Size) {
+        if (!FollowCluster(FsContext, (void **)&Current, &Cluster)) {
+            return 0;
+        }
+
+        uint64_t CopySize = FsContext->BytesPerCluster - Offset;
+        if (Size < CopySize) {
+            CopySize = Size;
+        }
+
+        memcpy(Output, Current + Offset, CopySize);
+        Current += FsContext->BytesPerCluster;
+        Output += CopySize;
+        Offset = 0;
+        Size -= CopySize;
+    }
+
+    return 1;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function does traversal on what should be a FAT32 directory (if its a file, we error
+ *     out), searching for a specific named node.
+ *
+ * PARAMETERS:
+ *     ContextPtr - Pointer to Fat32Context struct.
+ *     Name - Which entry we're looking for.
+ *
+ * RETURN VALUE:
+ *     File handle on success, NULL otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+static BmFile *ReadEntry(void *ContextPtr, const char *Name) {
+    Fat32Context *Context = ContextPtr;
+    Fat32FsContext *FsContext = Context->FsContext;
     Fat32DirectoryEntry *Current = FsContext->ClusterBuffer;
-    uint32_t Cluster = FsContext->FileCluster;
+    uint32_t Cluster = Context->FileCluster;
     char ShortName[11];
 
-    if (!FsContext->Directory) {
-        return 0;
+    if (!Context->Directory) {
+        return NULL;
     }
 
     /* We'll use this if the entry has no LFN prefix entry. */
@@ -274,15 +262,30 @@ int BiTraverseFat32Directory(FileContext *Context, const char *Name) {
 
     while (1) {
         if (!FollowCluster(FsContext, (void **)&Current, &Cluster) || !Current->DosName[0]) {
-            return 0;
+            return NULL;
         }
 
         if ((uint8_t)Current->DosName[0] != 0xE5 && !memcmp(Current->DosName, ShortName, 11)) {
-            FsContext->FileCluster =
+            BmFile *Handle = BmAllocateBlock(sizeof(BmFile) + sizeof(Fat32Context));
+            if (!Handle) {
+                return NULL;
+            }
+
+            Context = (Fat32Context *)(Handle + 1);
+            Context->FsContext = FsContext;
+            Context->FileCluster =
                 ((uint32_t)Current->FileClusterHigh << 16) | Current->FileClusterLow;
-            FsContext->Directory = Current->Attributes & 0x10;
-            Context->FileLength = Current->FileSize;
-            return 1;
+            Context->Size = Current->FileSize;
+            Context->Directory = Current->Attributes & 0x10;
+
+            Handle->Size = Current->FileSize;
+            Handle->Context = Context;
+            Handle->Close = NULL;
+            Handle->Read = Read;
+            Handle->ReadEntry = ReadEntry;
+            Handle->Iterate = Iterate;
+
+            return Handle;
         }
 
         Current++;
@@ -291,167 +294,158 @@ int BiTraverseFat32Directory(FileContext *Context, const char *Name) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function follows the FAT chain to cache all VCN->LCN conversions.
+ *     This function gets the name of the Nth entry on what should be a FAT32 directory (if its a
+ *     file, we error out).
  *
  * PARAMETERS:
- *     FsContext - FS-specific data.
- *     FileLength - Full size of the file; We use this to limit how many VCNs we're converting.
+ *     ContextPtr - Pointer to Fat32Context struct.
+ *     Index - Which entry we're looking for.
+ *
+ * RETURN VALUE:
+ *     File name on success, NULL otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+static char *Iterate(void *ContextPtr, int Index) {
+    Fat32Context *Context = ContextPtr;
+    Fat32FsContext *FsContext = Context->FsContext;
+    Fat32DirectoryEntry *Current = FsContext->ClusterBuffer;
+    uint32_t Cluster = Context->FileCluster;
+
+    if (!Context->Directory) {
+        return NULL;
+    }
+
+    for (int CurrentIndex = 0;; Current++) {
+        if (!FollowCluster(FsContext, (void **)&Current, &Cluster) || !Current->DosName[0]) {
+            return NULL;
+        } else if (CurrentIndex > Index) {
+            return NULL;
+        }
+
+        if ((uint8_t)Current->DosName[0] == 0xE5 || Current->Attributes == 0x08 ||
+            Current->Attributes == 0x0F || !memcmp(Current->DosName, ".          ", 11) ||
+            !memcmp(Current->DosName, "..         ", 11)) {
+            continue;
+        }
+
+        if (CurrentIndex != Index) {
+            CurrentIndex++;
+            continue;
+        }
+
+        char *Name = BmAllocateZeroBlock(13, 1);
+        if (!Name) {
+            return NULL;
+        }
+
+        memcpy(Name, Current->DosName, 11);
+
+        /* Names without an extension stay the same; 8.3 names get a dot added before the
+           extension. */
+        char *Start = strchr(Name, ' ');
+        char *Current = Start + 1;
+        char *End = Name + 12;
+        while (*Current && Current < End) {
+            if (*Current != ' ') {
+                *Start = '.';
+                memcpy(Start + 1, Current, End - Current);
+                break;
+            }
+
+            Current++;
+        }
+
+        return Name;
+    }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function creates a root directory file handle.
+ *
+ * PARAMETERS:
+ *     ContextPtr - FAT32-specific partition data.
+ *
+ * RETURN VALUE:
+ *     New handle on success, NULL otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+static BmFile *OpenRoot(void *ContextPtr) {
+    Fat32FsContext *FsContext = ContextPtr;
+    BmFile *Handle = BmAllocateBlock(sizeof(BmFile) + sizeof(Fat32Context));
+    if (!Handle) {
+        return NULL;
+    }
+
+    Fat32Context *Context = (Fat32Context *)(Handle + 1);
+    Context->FsContext = FsContext;
+    Context->FileCluster = FsContext->RootCluster;
+    Context->Size = 0;
+    Context->Directory = 1;
+
+    Handle->Size = 0;
+    Handle->Context = Context;
+    Handle->Close = NULL;
+    Handle->Read = Read;
+    Handle->ReadEntry = ReadEntry;
+    Handle->Iterate = Iterate;
+
+    return Handle;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function probes the given partition for the FAT32 filesystem.
+ *
+ * PARAMETERS:
+ *     Partition - Which partition we're checking.
+ *     ReadPartition - Function to read some bytes from the partition.
  *
  * RETURN VALUE:
  *     1 on success, 0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-static int FillDataRuns(Fat32Context *FsContext, uint64_t FileLength) {
-    /* We always get called on ReadFile, but this might be the trivial case of multiple operations
-       on the same file (VCNs already cached). */
-    if (FsContext->DataRuns && FsContext->DataRuns->Parent == FsContext) {
-        return 1;
+int BiProbeFat32(BmPartition *Partition, BmFileReadFn ReadPartition) {
+    const char ExpectedSystemIdentifier[8] = "FAT32   ";
+
+    char *Buffer = BmAllocateBlock(512);
+    Fat32BootSector *BootSector = (Fat32BootSector *)Buffer;
+    if (!Buffer) {
+        return 0;
     }
 
-    Fat32DataRun *LastRun = FsContext->DataRuns;
-    Fat32DataRun *CurrentRun = LastRun;
-
-    uint32_t Lcn = FsContext->FileCluster;
-    uint32_t Vcn = 0;
-
-    while (Vcn * FsContext->BytesPerCluster < FileLength) {
-        /* If possible, reuse our past allocated data run list, overwriting its entries. */
-        Fat32DataRun *Entry = CurrentRun;
-        if (!Entry) {
-            Entry = BmAllocateZeroBlock(1, sizeof(Fat32DataRun));
-            if (!Entry) {
-                return 0;
-            }
-        }
-
-        Entry->Parent = FsContext;
-        Entry->Used = 1;
-        Entry->Vcn = Vcn;
-        Entry->Lcn = Lcn;
-
-        if (!CurrentRun && !LastRun) {
-            FsContext->DataRuns = Entry;
-        } else if (!CurrentRun) {
-            LastRun->Next = Entry;
-        } else {
-            CurrentRun = CurrentRun->Next;
-        }
-
-        LastRun = Entry;
-        Vcn++;
-
-        if (!FollowCluster(FsContext, NULL, &Lcn)) {
-            if (CurrentRun) {
-                CurrentRun->Used = 0;
-            }
-
-            break;
-        }
+    /* We're using the process from http://jdebp.info/FGA/determining-filesystem-type.html to
+       determine if this is really FAT32 (or if it at least looks like it). */
+    if (!ReadPartition(Partition, 0, 512, Buffer) ||
+        memcmp(BootSector->SystemIdentifier, ExpectedSystemIdentifier, 8) ||
+        !(BootSector->BytesPerSector >= 256 && BootSector->BytesPerSector <= 4096) ||
+        !BootSector->SectorsPerCluster || BootSector->SectorsPerCluster > 128 ||
+        (BootSector->Signature != 0x28 && BootSector->Signature != 0x29)) {
+        return 0;
     }
 
+    Fat32FsContext *FsContext = BmAllocateBlock(sizeof(Fat32FsContext));
+    if (!FsContext) {
+        BmFreeBlock(Buffer);
+        return 0;
+    }
+
+    FsContext->Partition = Partition;
+    FsContext->ReadPartition = ReadPartition;
+    FsContext->BytesPerCluster = BootSector->BytesPerSector * BootSector->SectorsPerCluster;
+    FsContext->ClusterBuffer = BmAllocateBlock(FsContext->BytesPerCluster);
+    if (!FsContext->ClusterBuffer) {
+        BmFreeBlock(FsContext);
+        BmFreeBlock(Buffer);
+        return 0;
+    }
+
+    FsContext->FatOffset = BootSector->ReservedSectors * BootSector->BytesPerSector;
+    FsContext->ClusterOffset =
+        BootSector->NumberOfFats * BootSector->SectorsPerFat * BootSector->BytesPerSector +
+        FsContext->FatOffset;
+    FsContext->RootCluster = BootSector->RootDirectoryCluster;
+
+    Partition->FsContext = FsContext;
+    Partition->OpenRoot = OpenRoot;
+
+    BmFreeBlock(Buffer);
     return 1;
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function uses a data run list obtained from FillDataRuns to convert a Virtual Cluster
- *     Number (VCN) into a Logical Cluster Number (LCN, aka something we can just multiply by the
- *     size of a cluster and read it).
- *
- * PARAMETERS:
- *     FsContext - FS-specific data.
- *     Vcn - Virtual cluster to translate.
- *     Lcn - Output; Contains the Logical Cluster Number on success.
- *
- * RETURN VALUE:
- *     1 on match (if a translation was found), 0 otherwise.
- *-----------------------------------------------------------------------------------------------*/
-static int TranslateVcn(Fat32Context *FsContext, uint32_t Vcn, uint32_t *Lcn) {
-    for (Fat32DataRun *Entry = FsContext->DataRuns; Entry && Entry->Used; Entry = Entry->Next) {
-        if (Entry->Vcn == Vcn) {
-            *Lcn = Entry->Lcn;
-            return 1;
-        }
-    }
-
-    return 0;
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function tries to read what should be an FAT32 file. Calling it on a directory will
- *     fail.
- *
- * PARAMETERS:
- *     Context - Device/node private data.
- *     Buffer - Output buffer.
- *     Start - Starting byte index (in the file).
- *     Size - How many bytes to read into the buffer.
- *     Read - How many bytes we read with no error.
- *
- * RETURN VALUE:
- *     1 if something went wrong, 0 otherwise.
- *-----------------------------------------------------------------------------------------------*/
-int BiReadFat32File(FileContext *Context, void *Buffer, size_t Start, size_t Size, size_t *Read) {
-    Fat32Context *FsContext = Context->PrivateData;
-    char *Current = FsContext->ClusterBuffer;
-    char *Output = Buffer;
-    size_t Accum = 0;
-    int Flags = 0;
-
-    if (FsContext->Directory || Start > Context->FileLength) {
-        return 1;
-    }
-
-    if (Size > Context->FileLength - Start) {
-        Flags = 1;
-        Size = Context->FileLength - Start;
-    }
-
-    /* Seek through the file into the starting cluster (for the given byte index). */
-
-    if (!FillDataRuns(FsContext, Context->FileLength)) {
-        if (Read) {
-            *Read = 0;
-        }
-
-        return 1;
-    }
-
-    uint32_t Vcn = 0;
-    if (Start > FsContext->BytesPerCluster) {
-        size_t Clusters = Start / FsContext->BytesPerCluster;
-        Vcn += Clusters;
-        Start -= Clusters * FsContext->BytesPerCluster;
-    }
-
-    while (Size) {
-        uint32_t Lcn;
-        if (!TranslateVcn(FsContext, Vcn++, &Lcn) ||
-            BmReadFile(
-                &FsContext->Parent,
-                FsContext->ClusterBuffer,
-                FsContext->ClusterOffset + (Lcn - 2) * FsContext->BytesPerCluster,
-                FsContext->BytesPerCluster,
-                NULL)) {
-            Flags = 1;
-            break;
-        }
-
-        size_t CopySize = FsContext->BytesPerCluster - Start;
-        if (Size < CopySize) {
-            CopySize = Size;
-        }
-
-        memcpy(Output, Current + Start, CopySize);
-        Output += CopySize;
-        Start = 0;
-        Size -= CopySize;
-        Accum += CopySize;
-    }
-
-    if (Read) {
-        *Read = Accum;
-    }
-
-    return Flags;
 }

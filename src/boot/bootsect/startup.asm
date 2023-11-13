@@ -1,5 +1,77 @@
-; SPDX-FileCopyrightText: (C) 2023 ilmmatias
+; SPDX-FileCopyrightText: (C) 2022-2023 ilmmatias
 ; SPDX-License-Identifier: BSD-3-Clause
+
+.model tiny
+.x64p
+
+_TEXT16 segment use16
+org 0
+_TEXT16$Start:
+
+;--------------------------------------------------------------------------------------------------
+; PURPOSE:
+;     This function implements the necessary code to prepare the processor and environment to
+;     reload and jump into bootmgr.exe.
+;
+; PARAMETERS:
+;     BootDrive (dl) - Boot drive BIOS index.
+;
+; RETURN VALUE:
+;     This function does not return.
+;--------------------------------------------------------------------------------------------------
+Main proc
+    mov ax, cs
+    mov ds, ax
+    xor ax, ax
+    mov es, ax
+    mov byte ptr [BootDrive], dl
+
+    ; We prefer no text cursor (as we want to show the menu with no text cursor on bootmgr).
+    mov ah, 1
+    mov ch, 3Fh
+    int 10h
+
+    call CheckA20
+    jnc Main$A20Enabled
+    call TryA20Bios
+    jnc Main$A20Enabled
+    call TryA20Keyboard
+    jnc Main$A20Enabled
+
+    mov si, offset A20Error
+    call Error
+
+Main$A20Enabled:
+    ; startup.com has its size fixed at 2KiB, the PE file (bootmgr.exe) should have been copied
+    ; right after that.
+    mov esi, _TEXT16$End + (_TEXT32$PeStart - _TEXT32$Start)
+    add esi, dword ptr [esi + 3Ch]
+
+    ; Our code segment isn't 0, so we need to fix up the GDT, all of our other data structures, and
+    ; the far jump IP.
+    cli
+
+    mov eax, cs
+    shl eax, 4
+    add esi, eax
+
+    movzx ebx, byte ptr [BootDrive]
+    push ebx
+
+    mov ebx, eax
+    add ebx, offset _TEXT16$End
+    add [GdtBase], eax
+    lgdt fword ptr [GdtSize]
+
+    mov eax, cr0
+    or eax, 1
+    mov cr0, eax
+
+    pushd 8
+    push ebx
+    mov bp, sp
+    jmp far32 ptr [bp]
+Main endp
 
 ;--------------------------------------------------------------------------------------------------
 ; PURPOSE:
@@ -190,3 +262,82 @@ TryA20Keyboard$Wait2:
     jz TryA20Keyboard$Wait2
     ret
 TryA20Keyboard endp
+
+;--------------------------------------------------------------------------------------------------
+; PURPOSE:
+;     This function should be called when something in the load process goes wrong. It prints the
+;     contents of Message and halts the system.
+;
+; PARAMETERS:
+;     Message (si) - error message to print.
+;
+; RETURN VALUE:
+;     Does not return.
+;--------------------------------------------------------------------------------------------------
+Error proc
+    lodsb
+    or al, al
+    jz Error$Halt
+    mov ah, 0Eh
+    xor bh, bh
+    int 10h
+    jmp Error
+
+Error$Halt:
+    jmp $
+Error endp
+
+A20Error db "Couldn't enable the processor A20 line.", 0
+
+align 8
+GdtDescs dq 0000000000000000h, 00CF9A000000FFFFh, 00CF92000000FFFFh, 008F9A000000FFFFh, 008F92000000FFFFh
+GdtSize dw GdtSize - GdtDescs - 1
+GdtBase dd offset GdtDescs
+
+BootDrive db 0
+
+_TEXT16$End:
+_TEXT16 ends
+
+_TEXT32 segment byte use32
+_TEXT32$Start:
+
+;--------------------------------------------------------------------------------------------------
+; PURPOSE:
+;     This function implements the necessary code to relocate bootmgr.exe into himem and transfer
+;     execution to it.
+;
+; PARAMETERS:
+;     None
+;
+; RETURN VALUE:
+;     This function does not return.
+;--------------------------------------------------------------------------------------------------
+Relocate proc
+    ; We just loaded the new GDT, so we need to fix our segment registers.
+    mov ax, 10h
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+    mov ss, ax
+
+    add esp, 8
+    pop eax
+    mov esp, 7C00h
+    sub esp, 8
+    push eax
+
+    mov eax, dword ptr [esi + 40]
+    add eax, dword ptr [esi + 52]
+    call eax
+    jmp $
+Relocate endp
+
+_TEXT32$End:
+byte 2048 - (_TEXT16$End - _TEXT16$Start) - (_TEXT32$End - _TEXT32$Start) dup (90h)
+_TEXT32$PeStart:
+
+_TEXT32 ends
+
+end

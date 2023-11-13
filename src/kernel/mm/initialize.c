@@ -31,8 +31,7 @@ void MiInitializePageAllocator(LoaderBootData *BootData) {
 
         /* Available and `boot manager used` are considered the same for us (free for usage after
            we save required data from bootmgr), while anything else is considered reserved. */
-        if (Region->Type != BOOT_MEMORY_REGION_TYPE_AVAILABLE &&
-            Region->Type != BOOT_MEMORY_REGION_TYPE_USED) {
+        if (Region->Type != BOOT_MD_FREE && Region->Type != BOOT_MD_BOOTMGR) {
             continue;
         }
 

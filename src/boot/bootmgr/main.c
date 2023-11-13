@@ -2,10 +2,14 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <boot.h>
+#include <config.h>
 #include <display.h>
+#include <file.h>
+#include <ini.h>
 #include <keyboard.h>
+#include <loader.h>
 #include <memory.h>
-#include <registry.h>
+#include <menu.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -14,17 +18,27 @@
  *     transfer control to it.
  *
  * PARAMETERS:
- *     BootBlock - Information obtained while setting up the boot environment.
+ *     BootInfo - Information obtained while setting up the boot environment.
  *
  * RETURN VALUE:
  *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
-[[noreturn]] void BiMain(void *BootBlock) {
-    BiInitDisplay();
-    BiInitKeyboard();
-    BiInitMemory(BootBlock);
-    BiInitArch(BootBlock);
-    BiInitRegistry();
-    BiLoadMenuEntries();
-    BiEnterMenu();
+[[noreturn]] void BiMain(void *BootInfo) {
+    /* Get the display and memory manager up and running (everything else depends on them). */
+    BiZeroRequiredSections();
+    BiInitializeDisplay();
+    BiReserveLoaderSections();
+    BiInitializeMemory();
+    BiCalculateMemoryLimits();
+
+    /* Initialize any event related subsystems. */
+    BiInitializeKeyboard();
+
+    /* Initialize the filesystem manager, and load up the bootmgr config file. */
+    BiInitializeDisks(BootInfo);
+    BiLoadConfig();
+
+    /* Finish initializing the platform, and give control to the menu manager. */
+    BiInitializePlatform();
+    BiInitializeMenu();
 }

@@ -13,6 +13,10 @@
 #define LOADER_MAGIC "BMGR"
 #define LOADER_CURRENT_VERSION 0x0000
 
+#define ACPI_NONE 0
+#define ACPI_RSDT 1
+#define ACPI_XSDT 2
+
 typedef struct __attribute__((packed)) {
     uint64_t VirtualAddress;
     uint64_t PhysicalAddress;
@@ -26,7 +30,7 @@ typedef struct __attribute__((packed)) {
     uint16_t Version;
     struct {
         uint64_t BaseAdress;
-        int IsXsdt;
+        int TableType;
     } Acpi;
     struct {
         uint64_t MemorySize;
@@ -56,15 +60,8 @@ typedef struct __attribute__((packed)) {
 #error "Undefined ARCH for the bootmgr module!"
 #endif /* ARCH */
 
-void BiInitArch(void* BootBlock);
+void BiInitializePlatform(void);
 
-void BiLoadMenuEntries(void);
-[[noreturn]] void BiEnterMenu(void);
-[[noreturn]] void BiLoadPalladium(const char* SystemFolder);
-
-void BiCheckCompatibility(void);
-[[noreturn]] void BiTransferExecution(LoadedImage* Images, size_t ImageCount);
-
-[[noreturn]] void BmPanic(const char* Message);
+[[noreturn]] void BiStartPalladium(LoadedImage* Images, size_t ImageCount);
 
 #endif /* _BOOT_H_ */

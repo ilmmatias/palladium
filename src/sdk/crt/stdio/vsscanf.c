@@ -6,7 +6,7 @@
 #include <string.h>
 
 typedef struct {
-    char *buffer;
+    const char *buffer;
 } context_t;
 
 /*-------------------------------------------------------------------------------------------------
@@ -56,7 +56,7 @@ static void unread_ch(void *context, int ch) {
  * RETURN VALUE:
  *     How many arguments have been filled.
  *-----------------------------------------------------------------------------------------------*/
-int vsscanf(char *buffer, const char *format, va_list vlist) {
+int vsscanf(const char *buffer, const char *format, va_list vlist) {
     context_t context;
     context.buffer = buffer;
     return __vscanf(format, vlist, &context, read_ch, unread_ch);

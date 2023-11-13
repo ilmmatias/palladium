@@ -4,63 +4,57 @@
 #ifndef _FILE_H_
 #define _FILE_H_
 
-#include <stddef.h>
-#include <stdint.h>
+#include <rt.h>
 
-#define FILE_TYPE_NONE 0
-#define FILE_TYPE_CONSOLE 1
-#define FILE_TYPE_ARCH 2
-#define FILE_TYPE_EXFAT 3
-#define FILE_TYPE_FAT32 4
-#define FILE_TYPE_ISO9660 5
-#define FILE_TYPE_NTFS 6
+struct BmFile;
+typedef struct BmFile BmFile;
+
+typedef BmFile *(*BmFileOpenRootFn)(void *Context);
+typedef void (*BmFileCloseFn)(void *Context);
+typedef int (*BmFileReadFn)(void *Context, uint64_t Offset, uint64_t Size, void *Buffer);
+typedef BmFile *(*BmFileReadEntryFn)(void *Context, const char *Name);
+typedef char *(*BmFileIterateFn)(void *Context, int Index);
 
 typedef struct {
-    int Type;
-    size_t PrivateSize;
-    void *PrivateData;
-    uint64_t FileLength;
-} FileContext;
+    RtSList ListHeader;
+    int Index;
+    int Active;
+    uint64_t Offset;
+    void *DeviceContext;
+    BmFileReadFn ReadDisk;
+    void *FsContext;
+    BmFileOpenRootFn OpenRoot;
+} BmPartition;
 
-FileContext *BmOpenFile(const char *Path);
-void BmCloseFile(FileContext *Context);
-int BmReadFile(FileContext *Context, void *Buffer, size_t Start, size_t Size, size_t *Read);
+typedef struct BmFile {
+    uint64_t Size;
+    void *Context;
+    BmFileCloseFn Close;
+    BmFileReadFn Read;
+    BmFileReadEntryFn ReadEntry;
+    BmFileIterateFn Iterate;
+} BmFile;
 
-int BiCopyFileContext(FileContext *Context, FileContext *Copy);
-int BiReadDirectoryEntry(FileContext *Context, const char *Name);
+void BiInitializeDisks(void *BootInfo);
 
-int BiOpenConsoleDevice(const char *Segment, FileContext *Context);
-int BiReadConsoleDevice(
-    FileContext *Context,
-    void *Buffer,
-    size_t Start,
-    size_t Size,
-    size_t *Read);
-int BiWriteConsoleDevice(
-    FileContext *Context,
-    const void *Buffer,
-    size_t Start,
-    size_t Size,
-    size_t *Wrote);
+void BiProbeDisk(RtSList *ListHead, BmFileReadFn ReadDisk, void *Context, uint64_t SectorSize);
+void BiProbeMbrDisk(RtSList *ListHead, BmFileReadFn ReadDisk, void *Context, uint64_t SectorSize);
 
-int BiOpenArchDevice(const char *Segment, FileContext *Context);
-int BiReadArchDirectoryEntry(FileContext *Context, const char *Name);
-int BiReadArchDevice(FileContext *Context, void *Buffer, size_t Start, size_t Size, size_t *Read);
+int BiProbePartition(BmPartition *Partition, BmFileReadFn ReadPartition);
+int BiProbeExfat(BmPartition *Partition, BmFileReadFn ReadPartition);
+int BiProbeFat32(BmPartition *Partition, BmFileReadFn ReadPartition);
+int BiProbeIso9660(BmPartition *Partition, BmFileReadFn ReadPartition);
+int BiProbeNtfs(BmPartition *Partition, BmFileReadFn ReadPartition);
 
-int BiProbeExfat(FileContext *Context);
-int BiTraverseExfatDirectory(FileContext *Context, const char *Name);
-int BiReadExfatFile(FileContext *Context, void *Buffer, size_t Start, size_t Size, size_t *Read);
+BmFile *BiOpenDevice(char **Name, RtSList **ListHead);
+BmFile *BiOpenPartition(RtSList *ListHead, const char *Name);
+BmFile *BiOpenBootPartition(void);
+BmFile *BiOpenRoot(BmPartition *Partition);
 
-int BiProbeFat32(FileContext *Context);
-int BiTraverseFat32Directory(FileContext *Context, const char *Name);
-int BiReadFat32File(FileContext *Context, void *Buffer, size_t Start, size_t Size, size_t *Read);
-
-int BiProbeIso9660(FileContext *Context, uint16_t BytesPerSector);
-int BiTraverseIso9660Directory(FileContext *Context, const char *Name);
-int BiReadIso9660File(FileContext *Context, void *Buffer, size_t Start, size_t Size, size_t *Read);
-
-int BiProbeNtfs(FileContext *Context);
-int BiTraverseNtfsDirectory(FileContext *Context, const char *Name);
-int BiReadNtfsFile(FileContext *Context, void *Buffer, size_t Start, size_t Size, size_t *Read);
+BmFile *BmOpenFile(const char *Path);
+void BmCloseFile(BmFile *File);
+int BmReadFile(BmFile *File, uint64_t Offset, uint64_t Size, void *Buffer);
+BmFile *BmReadDirectoryEntry(BmFile *Directory, const char *Name);
+char *BmIterateDirectory(BmFile *Directory, int Index);
 
 #endif /* _FILE_H_ */

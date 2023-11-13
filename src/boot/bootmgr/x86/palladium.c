@@ -4,29 +4,25 @@
 #include <boot.h>
 #include <display.h>
 #include <memory.h>
-#include <stdint.h>
 #include <string.h>
 #include <x86/bios.h>
 #include <x86/cpuid.h>
 #include <x86/idt.h>
 
 extern uint64_t BiosRsdtLocation;
-extern int BiosIsXsdt;
+extern int BiosTableType;
 
-extern BiosMemoryRegion *BiosMemoryMap;
-extern uint32_t BiosMemoryMapEntries;
-extern uint64_t BiosMemorySize;
-extern uint64_t BiosMaxAddressableMemory;
+extern BiMemoryDescriptor BiMemoryDescriptors[BI_MAX_MEMORY_DESCRIPTORS];
+extern int BiMemoryDescriptorCount;
+extern uint64_t BiUsableMemorySize;
+extern uint64_t BiMaxAdressableMemory;
 
 extern uint32_t *BiVideoBuffer;
 extern uint16_t BiVideoWidth;
 extern uint16_t BiVideoHeight;
 
-[[noreturn]] void BiFinishTransferExecution(
-    uint64_t *Pml4,
-    uint64_t BootData,
-    uint64_t EntryPoint,
-    uint64_t ProcessorStruct);
+[[noreturn]] void
+BiJumpPalladium(uint64_t *Pml4, uint64_t BootData, uint64_t EntryPoint, uint64_t ProcessorStruct);
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -61,7 +57,7 @@ static void InstallIdtHandler(int Number, uint64_t Handler) {
  * RETURN VALUE:
  *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
-[[noreturn]] void BiTransferExecution(LoadedImage *Images, size_t ImageCount) {
+[[noreturn]] void BiStartPalladium(LoadedImage *Images, size_t ImageCount) {
     /* TODO: Add support for PML5 (under compatible processors). */
 
     /* Check for 1GiB page support; If we do support it, it reduces the amount of work to map all
@@ -73,36 +69,38 @@ static void InstallIdtHandler(int Number, uint64_t Handler) {
        the kernel doesn't need to worry about anything but filling the info.
        MmSize should always be `PagesOfMemory * sizeof(MiPageEntry)`, if MiPageEntry changes
        on the kernel, the size here needs to change too! */
-    uint64_t PagesOfMemory = (BiosMemorySize + PAGE_SIZE - 1) >> PAGE_SHIFT;
-    uint64_t MmSize = PagesOfMemory * 32;
-    void *MmBase = BmAllocatePages((MmSize + PAGE_SIZE - 1) >> PAGE_SHIFT, MEMORY_KERNEL);
+    uint64_t PagesOfMemory = (BiUsableMemorySize + BI_PAGE_SIZE - 1) >> BI_PAGE_SHIFT;
+    void *MmBase = BmAllocatePages(PagesOfMemory * 32, BM_MD_KERNEL);
     if (!MmBase) {
-        BmPanic("An error occoured while trying to load the selected operating system.\n"
-                "There is not enough RAM for the memory manager.");
+        BmPrint("Could not allocate enough memory for the memory manager.\n"
+                "Your system might not have enough usable memory.\n");
+        while (1)
+            ;
     }
 
     /* Pre-allocate the pool bitmap as well (so that the kernel can initialize everything
        without trashing the loader struct before driver initialization). */
     uint64_t PoolSize = 0x2000000000;
-    uint64_t PoolBitmapSize = (PoolSize >> PAGE_SHIFT) >> 3;
-    void *PoolBitmapBase =
-        BmAllocatePages((PoolBitmapSize + PAGE_SIZE - 1) >> PAGE_SHIFT, MEMORY_KERNEL);
+    void *PoolBitmapBase = BmAllocatePages((PoolSize >> BI_PAGE_SHIFT) >> 3, BM_MD_KERNEL);
     if (!PoolBitmapBase) {
-        BmPanic("An error occoured while trying to load the selected operating system.\n"
-                "There is not enough RAM for the memory manager.");
+        BmPrint("Could not allocate enough memory for the memory manager.\n"
+                "Your system might not have enough usable memory.\n");
+        while (1)
+            ;
     }
 
     /* A double buffer is required so that we can implement scrolling on the boot terminal
        without reading the (really slow) back buffer. */
-    void *ScreenFrontBase = BmAllocatePages(
-        (BiVideoWidth * BiVideoHeight * 4 + PAGE_SIZE - 1) >> PAGE_SHIFT, MEMORY_KERNEL);
+    void *ScreenFrontBase = BmAllocatePages(BiVideoWidth * BiVideoHeight * 4, BM_MD_KERNEL);
     if (!ScreenFrontBase) {
-        BmPanic("An error occoured while trying to load the selected operating system.\n"
-                "There is not enough RAM for the screen's front buffer.");
+        BmPrint("Could not allocate enough memory for the screen front buffer.\n"
+                "Your system might not have enough usable memory.\n");
+        while (1)
+            ;
     }
 
-    uint64_t Slices1GiB = (BiosMaxAddressableMemory + 0x3FFFFFFF) >> 30;
-    uint64_t Slices2MiB = (BiosMaxAddressableMemory + 0x1FFFFF) >> 21;
+    uint64_t Slices1GiB = (BiMaxAdressableMemory + 0x3FFFFFFF) >> 30;
+    uint64_t Slices2MiB = (BiMaxAdressableMemory + 0x1FFFFF) >> 21;
 
     /* We're mapping at most 512GiB over here, the kernel should map everything else. */
     if (Slices1GiB > 512) {
@@ -115,11 +113,11 @@ static void InstallIdtHandler(int Number, uint64_t Handler) {
 
     do {
         int Fail = 0;
-        uint64_t *Pml4 = BmAllocatePages(1, MEMORY_KERNEL);
-        uint64_t *EarlyIdentPdpt = BmAllocatePages(1, MEMORY_KERNEL);
-        uint64_t *LateIdentPdpt = BmAllocatePages(1, MEMORY_KERNEL);
-        uint64_t *KernelPdpt = BmAllocatePages(1, MEMORY_KERNEL);
-        uint64_t *EarlyIdentPdt = BmAllocatePages(1, MEMORY_KERNEL);
+        uint64_t *Pml4 = BmAllocatePages(BI_PAGE_SIZE, BM_MD_KERNEL);
+        uint64_t *EarlyIdentPdpt = BmAllocatePages(BI_PAGE_SIZE, BM_MD_KERNEL);
+        uint64_t *LateIdentPdpt = BmAllocatePages(BI_PAGE_SIZE, BM_MD_KERNEL);
+        uint64_t *KernelPdpt = BmAllocatePages(BI_PAGE_SIZE, BM_MD_KERNEL);
+        uint64_t *EarlyIdentPdt = BmAllocatePages(BI_PAGE_SIZE, BM_MD_KERNEL);
         LoaderBootData *BootData = BmAllocateBlock(sizeof(LoaderBootData));
 
         if (!Pml4 || !EarlyIdentPdpt || !LateIdentPdpt || !EarlyIdentPdt || !KernelPdpt ||
@@ -135,43 +133,43 @@ static void InstallIdtHandler(int Number, uint64_t Handler) {
            layer chose.
            The last entry of the address space contains a self-reference (so that the kernel can
            easily manipulate the page map). */
-        memset(Pml4, 0, PAGE_SIZE);
+        memset(Pml4, 0, BI_PAGE_SIZE);
         Pml4[0] = (uint64_t)EarlyIdentPdpt | 0x03;
         Pml4[256] = (uint64_t)LateIdentPdpt | 0x03;
-        Pml4[(ARENA_BASE >> 39) & 0x1FF] = (uint64_t)KernelPdpt | 0x03;
+        Pml4[(BI_ARENA_BASE >> 39) & 0x1FF] = (uint64_t)KernelPdpt | 0x03;
         Pml4[511] = (uint64_t)Pml4 | 0x03;
 
         if (Edx & bit_PDPE1GB) {
             BmPrint("mapping %llu 1GiB slices of adressable physical memory\n", Slices1GiB);
-            memset(LateIdentPdpt, 0, PAGE_SIZE);
+            memset(LateIdentPdpt, 0, BI_PAGE_SIZE);
             for (uint64_t i = 0; i < Slices1GiB; i++) {
                 LateIdentPdpt[i] = (i << 30) | 0x83;
             }
         } else {
-            uint64_t *LateIdentPdt = BmAllocatePages(Slices1GiB, MEMORY_KERNEL);
+            uint64_t *LateIdentPdt = BmAllocatePages(Slices1GiB << BI_PAGE_SHIFT, BM_MD_KERNEL);
             if (!LateIdentPdt) {
                 break;
             }
 
-            memset(LateIdentPdpt, 0, PAGE_SIZE);
+            memset(LateIdentPdpt, 0, BI_PAGE_SIZE);
             for (uint64_t i = 0; i < Slices1GiB; i++) {
                 LateIdentPdpt[i] = (uint64_t)(LateIdentPdt + (i << 9)) | 0x03;
             }
 
             BmPrint("mapping %llu 2MiB slices of adressable physical memory\n", Slices2MiB);
-            memset(LateIdentPdt, 0, Slices1GiB * PAGE_SIZE);
+            memset(LateIdentPdt, 0, Slices1GiB * BI_PAGE_SIZE);
             for (uint64_t i = 0; i < Slices2MiB; i++) {
                 LateIdentPdt[i] = (i << 21) | 0x83;
             }
         }
 
-        memset(EarlyIdentPdpt, 0, PAGE_SIZE);
+        memset(EarlyIdentPdpt, 0, BI_PAGE_SIZE);
         EarlyIdentPdpt[0] = (uint64_t)EarlyIdentPdt | 0x03;
 
-        memset(EarlyIdentPdt, 0, PAGE_SIZE);
+        memset(EarlyIdentPdt, 0, BI_PAGE_SIZE);
         EarlyIdentPdt[0] = 0x83;
 
-        memset(KernelPdpt, 0, PAGE_SIZE);
+        memset(KernelPdpt, 0, BI_PAGE_SIZE);
         for (size_t i = 0; i < ImageCount; i++) {
             /* 1GiB should be a sane limit for a single image/driver. */
             uint64_t ImageSlices2MiB = (Images[i].ImageSize + 0x1FFFFF) >> 21;
@@ -188,8 +186,8 @@ static void InstallIdtHandler(int Number, uint64_t Handler) {
                 ImageSlices2MiB++;
             }
 
-            uint64_t *ImagePdt = BmAllocatePages(1, MEMORY_KERNEL);
-            uint64_t *ImagePt = BmAllocatePages(ImageSlices2MiB, MEMORY_KERNEL);
+            uint64_t *ImagePdt = BmAllocatePages(BI_PAGE_SIZE, BM_MD_KERNEL);
+            uint64_t *ImagePt = BmAllocatePages(ImageSlices2MiB << BI_PAGE_SHIFT, BM_MD_KERNEL);
 
             if (!ImagePdt || !ImagePt) {
                 break;
@@ -197,13 +195,13 @@ static void InstallIdtHandler(int Number, uint64_t Handler) {
 
             KernelPdpt[ImagePdptBase] = (uint64_t)ImagePdt | 0x03;
 
-            memset(ImagePdt, 0, PAGE_SIZE);
+            memset(ImagePdt, 0, BI_PAGE_SIZE);
             for (uint64_t j = 0; j < ImageSlices2MiB; j++) {
                 ImagePdt[ImagePdtBase + j] = (uint64_t)(ImagePt + (j << 9)) | 0x03;
             }
 
             BmPrint("mapping %llu slices of 4KiB of image %zu\n", ImageSlices4KiB, i);
-            memset(ImagePt, 0, ImageSlices2MiB * PAGE_SIZE);
+            memset(ImagePt, 0, ImageSlices2MiB * BI_PAGE_SIZE);
             for (uint64_t j = 0; j < ImageSlices4KiB; j++) {
                 int Flags = Images[i].PageFlags[j];
                 ImagePt[ImagePtBase + j] = (uint64_t)(Images[i].PhysicalAddress + (j << 12)) |
@@ -233,12 +231,12 @@ static void InstallIdtHandler(int Number, uint64_t Handler) {
         memcpy(BootData->Magic, LOADER_MAGIC, 4);
         BootData->Version = LOADER_CURRENT_VERSION;
         BootData->Acpi.BaseAdress = BiosRsdtLocation;
-        BootData->Acpi.IsXsdt = BiosIsXsdt;
-        BootData->MemoryManager.MemorySize = BiosMemorySize;
+        BootData->Acpi.TableType = BiosTableType;
+        BootData->MemoryManager.MemorySize = BiUsableMemorySize;
         BootData->MemoryManager.PageAllocatorBase = (uint64_t)MmBase + 0xFFFF800000000000;
         BootData->MemoryManager.PoolBitmapBase = (uint64_t)PoolBitmapBase + 0xFFFF800000000000;
-        BootData->MemoryMap.BaseAddress = (uint64_t)BiosMemoryMap + 0xFFFF800000000000;
-        BootData->MemoryMap.Count = BiosMemoryMapEntries;
+        BootData->MemoryMap.BaseAddress = (uint64_t)BiMemoryDescriptors + 0xFFFF800000000000;
+        BootData->MemoryMap.Count = BiMemoryDescriptorCount;
         BootData->Display.BackBufferBase = (uint64_t)BiVideoBuffer + 0xFFFF800000000000;
         BootData->Display.FrontBufferBase = (uint64_t)ScreenFrontBase + 0xFFFF800000000000;
         BootData->Display.Width = BiVideoWidth;
@@ -247,13 +245,15 @@ static void InstallIdtHandler(int Number, uint64_t Handler) {
         BootData->Images.Count = ImageCount;
 
         /* The loader should have placed the stack directly above the kernel image. */
-        BiFinishTransferExecution(
+        BiJumpPalladium(
             Pml4,
             (uint64_t)BootData + 0xFFFF800000000000,
             Images[0].EntryPoint,
             Images[0].VirtualAddress + Images[0].ImageSize - SIZEOF_PROCESSOR);
     } while (0);
 
-    BmPanic("An error occoured while trying to load the selected operating system.\n"
-            "Please, reboot your device and try again.\n");
+    BmPrint("Something went wrong while loading the OS.\n"
+            "Your system might not have enough usable memory.\n");
+    while (1)
+        ;
 }
