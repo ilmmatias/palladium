@@ -9,8 +9,7 @@ extern PsThread *PspSystemThread;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function adds a thread to the current processor queue, calling a switch event
- *     if overdue.
+ *     This function adds a thread to a processor queue, calling a switch event if overdue.
  *
  * PARAMETERS:
  *     Thread - Which thread to add.
@@ -19,14 +18,35 @@ extern PsThread *PspSystemThread;
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void PsReadyThread(PsThread *Thread) {
-    HalProcessor *Processor = HalGetCurrentProcessor();
+    /* Always try and add the thread to the least full queue. */
+    RtSList *ListHeader = HalpProcessorListHead.Next;
+    uint64_t BestMatchSize = UINT64_MAX;
+    HalProcessor *BestMatch = NULL;
 
-    KeAcquireSpinLock(&Processor->ThreadQueueLock);
-    RtAppendDList(&Processor->ThreadQueue, &Thread->ListHeader);
-    KeReleaseSpinLock(&Processor->ThreadQueueLock);
+    while (ListHeader) {
+        HalProcessor *Processor = CONTAINING_RECORD(ListHeader, HalProcessor, ListHeader);
 
-    if (HalGetTimerTicks() >= Processor->CurrentThread->Expiration) {
-        HalpSetEvent(0);
+        /* Unless the processor list is somehow NULL, we should be TRUE in the if below at least
+           once. */
+        if (!BestMatch || Processor->ThreadQueueSize < BestMatchSize) {
+            BestMatchSize = Processor->ThreadQueueSize;
+            BestMatch = Processor;
+        }
+
+        ListHeader = ListHeader->Next;
+    }
+
+    /* Now we're forced to lock the processor queue (there was no need up until now, as we were
+       only reading). */
+    KeAcquireSpinLock(&BestMatch->ThreadQueueLock);
+    __atomic_add_fetch(&BestMatch->ThreadQueueSize, 1, __ATOMIC_ACQUIRE);
+    RtAppendDList(&BestMatch->ThreadQueue, &Thread->ListHeader);
+    KeReleaseSpinLock(&BestMatch->ThreadQueueLock);
+
+    /* PspHandleEvent uses Expiration=0 as a sign that we need to switch asap (we were out of
+       work). */
+    if (!BestMatch->CurrentThread->Expiration) {
+        HalpNotifyProcessor(BestMatch);
     }
 }
 
@@ -88,6 +108,7 @@ void PspHandleEvent(HalRegisterState *Context) {
        instead of the queue). */
     if (!Processor->CurrentThread) {
         Processor->CurrentThread = Processor->InitialThread;
+        Processor->CurrentThread->Expiration = 0;
         HalpRestoreContext(Context, &Processor->CurrentThread->Context);
         return;
     }
@@ -97,17 +118,23 @@ void PspHandleEvent(HalRegisterState *Context) {
     if (CurrentTicks >= CurrentThread->Expiration) {
         PsThread *NewThread = GetNextReadyThread(Processor);
         if (!NewThread) {
+            CurrentThread->Expiration = 0;
             return;
         }
 
-        NewThread->Expiration = HalGetTimerTicks() + PSP_THREAD_QUANTUM / HalGetTimerPeriod();
+        uint64_t ThreadQuantum = PSP_THREAD_QUANTUM / Processor->ThreadQueueSize;
+        if (ThreadQuantum < PSP_THREAD_MIN_QUANTUM) {
+            ThreadQuantum = PSP_THREAD_MIN_QUANTUM;
+        }
+
+        NewThread->Expiration = HalGetTimerTicks() + ThreadQuantum / HalGetTimerPeriod();
         Processor->CurrentThread = NewThread;
+        HalpSetEvent(ThreadQuantum);
 
         if (CurrentThread != Processor->IdleThread) {
             KeAcquireSpinLock(&Processor->ThreadQueueLock);
             RtAppendDList(&Processor->ThreadQueue, &CurrentThread->ListHeader);
             KeReleaseSpinLock(&Processor->ThreadQueueLock);
-            HalpSetEvent(PSP_THREAD_QUANTUM);
             HalpSaveContext(Context, &CurrentThread->Context);
         }
 

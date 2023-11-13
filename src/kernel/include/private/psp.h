@@ -7,6 +7,7 @@
 #include <ps.h>
 
 #define PSP_THREAD_QUANTUM (10 * HAL_MILLISECS)
+#define PSP_THREAD_MIN_QUANTUM (750 * HAL_MICROSECS)
 
 void PspCreateSystemThread(void);
 void PspCreateIdleThread(void);

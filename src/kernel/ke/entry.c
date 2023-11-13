@@ -53,24 +53,6 @@
         ;
 }
 
-static void TestThread(void *) {
-    HalProcessor *CurrentProcessor = HalGetCurrentProcessor();
-    VidPrint(
-        VID_MESSAGE_INFO, "Kernel", "test thread started up on processor %p\n", CurrentProcessor);
-
-    while (1) {
-        HalProcessor *Processor = HalGetCurrentProcessor();
-        if (Processor != CurrentProcessor) {
-            CurrentProcessor = Processor;
-            VidPrint(
-                VID_MESSAGE_INFO,
-                "Kernel",
-                "test thread switched to processor %p\n",
-                CurrentProcessor);
-        }
-    }
-}
-
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function is the post-scheduler entry point; We're responsible for finishing the boot
@@ -86,11 +68,6 @@ static void TestThread(void *) {
     /* Stage 4: Initialize all boot drivers; We can't load anything further than this without
        them. */
     KiRunBootStartDrivers();
-
-    /* Spin up some threads to see if the other processors will take them. */
-    for (uint32_t i = 0; i < HalpProcessorCount; i++) {
-        PsReadyThread(PsCreateThread(TestThread, NULL));
-    }
 
     while (1)
         ;

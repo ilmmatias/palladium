@@ -44,8 +44,10 @@ void HalpInitializeSmp(void) {
     HalGetCurrentProcessor()->Online = 1;
     ((HalpProcessor *)HalGetCurrentProcessor())->ApicId = ApicId;
 
+    HalGetCurrentProcessor()->ThreadQueueSize = 0;
     RtInitializeDList(&HalGetCurrentProcessor()->ThreadQueue);
     KeReleaseSpinLock(&HalGetCurrentProcessor()->ThreadQueueLock);
+
     RtPushSList(&HalpProcessorListHead, &HalGetCurrentProcessor()->ListHeader);
 
     while (ListHeader) {
@@ -68,6 +70,7 @@ void HalpInitializeSmp(void) {
 
         /* Initialize the scheduler queue before any other processor has any chances to access
            us. */
+        Processor->Base.ThreadQueueSize = 0;
         RtInitializeDList(&Processor->Base.ThreadQueue);
         KeReleaseSpinLock(&Processor->Base.ThreadQueueLock);
 
@@ -120,4 +123,19 @@ void HalpInitializeSmp(void) {
  *-----------------------------------------------------------------------------------------------*/
 HalProcessor *HalGetCurrentProcessor(void) {
     return (HalProcessor *)ReadMsr(0xC0000102);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function notifies another processor that some (probably significant) event has
+ *     happend.
+ *
+ * PARAMETERS:
+ *     Processor - Which processor to notify.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void HalpNotifyProcessor(HalProcessor *Processor) {
+    HalpSendIpi(((HalpProcessor *)Processor)->ApicId, 0xFE);
 }

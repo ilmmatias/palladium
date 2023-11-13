@@ -20,6 +20,7 @@ typedef struct {
     PsThread *IdleThread;
     PsThread *CurrentThread;
     RtDList ThreadQueue;
+    uint64_t ThreadQueueSize;
     KeSpinLock ThreadQueueLock;
 } HalProcessor;
 
