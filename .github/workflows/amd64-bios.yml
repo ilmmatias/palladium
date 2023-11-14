@@ -157,7 +157,7 @@ jobs:
         Path=bios(80)
         EOF
 
-        cp icons/* _root/Boot/
+        cp palladium/icons/* _root/Boot/
         cp palladium/build.boot/boot/bootsect/iso9660boot.com _root/iso9660boot.com
         cat palladium/build.boot/boot/startup/startup.com palladium/build.boot/boot/bootmgr/bootmgr.exe > _root/bootmgr
         cp palladium/build.target/kernel/kernel.exe _root/System/kernel.exe
