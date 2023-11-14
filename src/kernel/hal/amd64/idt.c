@@ -10,7 +10,7 @@ typedef struct {
     void (*Handler)(HalRegisterState *);
 } IdtHandler;
 
-extern void PspHandleEvent(HalRegisterState *);
+extern void EvpHandleEvents(HalRegisterState *);
 extern uint64_t HalpInterruptHandlerTable[256];
 
 /*-------------------------------------------------------------------------------------------------
@@ -83,7 +83,7 @@ void HalpInitializeIdt(HalpProcessor *Processor) {
     __asm__ volatile("lidt %0" :: "m"(Processor->IdtDescriptor));
 
     /* Register the DPC/event handler. */
-    HalInstallInterruptHandlerAt(0xDE, PspHandleEvent);
+    HalInstallInterruptHandlerAt(0xDE, EvpHandleEvents);
 }
 
 /*-------------------------------------------------------------------------------------------------

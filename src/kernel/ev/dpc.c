@@ -1,8 +1,8 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
+#include <ev.h>
 #include <halp.h>
-#include <ke.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -18,7 +18,7 @@
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void KeInitializeDpc(KeDpc *Dpc, void (*Routine)(void *Context), void *Context) {
+void EvInitializeDpc(EvDpc *Dpc, void (*Routine)(void *Context), void *Context) {
     Dpc->Routine = Routine;
     Dpc->Context = Context;
 }
@@ -33,7 +33,7 @@ void KeInitializeDpc(KeDpc *Dpc, void (*Routine)(void *Context), void *Context) 
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void KeEnqueueDpc(KeDpc *Dpc) {
+void EvDispatchDpc(EvDpc *Dpc) {
     void *Context = HalpEnterCriticalSection();
     RtAppendDList(&HalGetCurrentProcessor()->DpcQueue, &Dpc->ListHeader);
     HalpLeaveCriticalSection(Context);

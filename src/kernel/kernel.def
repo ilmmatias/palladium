@@ -1,5 +1,8 @@
 LIBRARY kernel.exe
 EXPORTS
+    EvDispatchDpc
+    EvInitializeDpc
+
     HalGetCurrentProcessor
     HalGetTimerPeriod
     HalGetTimerTicks
@@ -9,9 +12,7 @@ EXPORTS
     IoOpenDevice
 
     KeAcquireSpinLock
-    KeEnqueueDpc
     KeFatalError
-    KeInitializeDpc
     KeReleaseSpinLock
     KeTestSpinLock
     KeTryAcquireSpinLock

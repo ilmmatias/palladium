@@ -1,6 +1,7 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
+#include <ev.h>
 #include <halp.h>
 #include <ki.h>
 #include <psp.h>
@@ -43,7 +44,7 @@ void PsReadyThread(PsThread *Thread) {
     RtAppendDList(&BestMatch->ThreadQueue, &Thread->ListHeader);
     KeReleaseSpinLock(&BestMatch->ThreadQueueLock);
 
-    /* PspHandleEvent uses Expiration=0 as a sign that we need to switch asap (we were out of
+    /* PspScheduleNext uses Expiration=0 as a sign that we need to switch asap (we were out of
        work). */
     if (!BestMatch->CurrentThread->Expiration) {
         HalpNotifyProcessor(BestMatch);
@@ -64,7 +65,7 @@ void PsReadyThread(PsThread *Thread) {
 void PspInitializeScheduler(int IsBsp) {
     HalProcessor *Processor = HalGetCurrentProcessor();
 
-    /* PspHandleEvent should forcefully "switch" threads if we're not running anything. */
+    /* PspScheduleNext should forcefully "switch" threads if we're not running anything. */
     Processor->CurrentThread = NULL;
     Processor->InitialThread = IsBsp ? PspSystemThread : Processor->IdleThread;
 
@@ -92,7 +93,7 @@ static PsThread *GetNextReadyThread(HalProcessor *Processor) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function handles any pending kernel events.
+ *     This function tries scheduling and executing the next available thread.
  *
  * PARAMETERS:
  *     Context - Current processor state.
@@ -100,15 +101,9 @@ static PsThread *GetNextReadyThread(HalProcessor *Processor) {
  * RETURN VALUE:
  *     None..
  *-----------------------------------------------------------------------------------------------*/
-void PspHandleEvent(HalRegisterState *Context) {
+void PspScheduleNext(HalRegisterState *Context) {
     HalProcessor *Processor = HalGetCurrentProcessor();
     PsThread *CurrentThread = Processor->CurrentThread;
-
-    /* Process any pending DPCs. */
-    while (Processor->DpcQueue.Next != &Processor->DpcQueue) {
-        KeDpc *Dpc = CONTAINING_RECORD(RtPopDList(&Processor->DpcQueue), KeDpc, ListHeader);
-        Dpc->Routine(Dpc->Context);
-    }
 
     /* Scheduler initialization, there should be no contention yet (we're using InitialThread
        instead of the queue). */

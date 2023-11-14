@@ -4,7 +4,7 @@
 #include <amd64/halp.h>
 #include <vid.h>
 
-extern void PspHandleEvent(HalRegisterState *);
+extern void EvpHandleEvents(HalRegisterState *);
 
 static uint64_t Period = 0;
 static uint8_t Irq = 0;
@@ -36,7 +36,7 @@ void HalpInitializeApicTimer(void) {
     }
 
     /* Allocate a vector and enable interrupts (and we're done). */
-    Irq = HalInstallInterruptHandler(PspHandleEvent);
+    Irq = HalInstallInterruptHandler(EvpHandleEvents);
     if (Irq == (uint8_t)-1) {
         VidPrint(
             VID_MESSAGE_ERROR, "Kernel HAL", "could not allocate an IRQ for the event timer\n");

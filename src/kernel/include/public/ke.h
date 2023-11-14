@@ -4,7 +4,7 @@
 #ifndef _KE_H_
 #define _KE_H_
 
-#include <rt.h>
+#include <stdint.h>
 
 #define KE_FATAL_ERROR 0
 #define KE_BAD_ACPI_TABLES 1
@@ -17,21 +17,12 @@
 
 typedef int KeSpinLock;
 
-typedef struct {
-    RtDList ListHeader;
-    void (*Routine)(void *Context);
-    void *Context;
-} KeDpc;
-
 void *KiFindAcpiTable(const char Signature[4], int Index);
 
 int KeTryAcquireSpinLock(KeSpinLock *Lock);
 void KeAcquireSpinLock(KeSpinLock *Lock);
 void KeReleaseSpinLock(KeSpinLock *Lock);
 int KeTestSpinLock(KeSpinLock *Lock);
-
-void KeInitializeDpc(KeDpc *Dpc, void (*Routine)(void *Context), void *Context);
-void KeEnqueueDpc(KeDpc *Dpc);
 
 [[noreturn]] void KeFatalError(int Message);
 

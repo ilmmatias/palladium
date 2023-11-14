@@ -4,6 +4,7 @@
 #ifndef _PSP_H_
 #define _PSP_H_
 
+#include <hal.h>
 #include <ps.h>
 
 #define PSP_THREAD_QUANTUM (10 * HAL_MILLISECS)
@@ -12,5 +13,6 @@
 void PspCreateSystemThread(void);
 void PspCreateIdleThread(void);
 void PspInitializeScheduler(int IsBsp);
+void PspScheduleNext(HalRegisterState *Context);
 
 #endif /* _PSP_H_ */
