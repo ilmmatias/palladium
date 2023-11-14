@@ -99,7 +99,7 @@ void BiInitializeDisplay(void) {
     VbeInfoBlock InfoBlock;
     VbeModeInfo ModeInfo;
 
-    int PreferredWidth = 800, PreferredHeight = 600;
+    int PreferredWidth = 1024, PreferredHeight = 768;
     char Edid[128];
 
     /* The info block contains the list of all valid modes, so grab it first (assume we're in an
@@ -125,8 +125,8 @@ void BiInitializeDisplay(void) {
 
     BiosCall(0x10, &Registers);
     if (Registers.Eax == 0x4F) {
-        // PreferredWidth = Edid[0x38] | ((Edid[0x3A] & 0xF0) << 4);
-        // PreferredHeight = Edid[0x3B] | ((Edid[0x3D] & 0xF0) << 4);
+        PreferredWidth = Edid[0x38] | ((Edid[0x3A] & 0xF0) << 4);
+        PreferredHeight = Edid[0x3B] | ((Edid[0x3D] & 0xF0) << 4);
     }
 
     uint16_t *Modes = (uint16_t *)((InfoBlock.VideoModeSeg << 4) + InfoBlock.VideoModeOff);

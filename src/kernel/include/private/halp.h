@@ -23,6 +23,9 @@ int HalpMapPage(void *VirtualAddress, uint64_t PhysicalAddress, int Flags);
 void HalpSetEvent(uint64_t Time);
 void HalpNotifyProcessor(HalProcessor *Processor);
 
+void *HalpEnterCriticalSection(void);
+void HalpLeaveCriticalSection(void *Context);
+
 void HalpInitializeContext(
     HalRegisterState *Context,
     char *Stack,

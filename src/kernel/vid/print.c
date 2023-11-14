@@ -8,6 +8,10 @@
 
 extern const VidpFontData VidpFont;
 
+static int PendingFullFlush = 0;
+static uint16_t FlushY = 0;
+static uint16_t FlushLines = 0;
+
 char *VidpBackBuffer = NULL;
 char *VidpFrontBuffer = NULL;
 uint16_t VidpWidth = 0;
@@ -23,8 +27,9 @@ KeSpinLock VidpLock = {0};
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function copies the front buffer into the back buffer (flusing its contents into the
+ *     This function copies the front buffer into the back buffer (flushing its contents into the
  *     screen).
+ *     Set the contents of FlushY/Lines according to what region you want to flush.
  *
  * PARAMETERS:
  *     None.
@@ -33,7 +38,11 @@ KeSpinLock VidpLock = {0};
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 static void Flush(void) {
-    memcpy(VidpBackBuffer, VidpFrontBuffer, VidpPitch * VidpHeight);
+    memcpy(
+        VidpBackBuffer + FlushY * VidpPitch,
+        VidpFrontBuffer + FlushY * VidpPitch,
+        FlushLines * VidpPitch);
+    PendingFullFlush = 0;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -49,8 +58,13 @@ static void Flush(void) {
 static void ScrollUp(void) {
     const uint32_t ScreenSize = VidpPitch * VidpHeight;
     const uint32_t LineSize = VidpPitch * VidpFont.Height;
+
     memmove(VidpFrontBuffer, VidpFrontBuffer + LineSize, ScreenSize - LineSize);
     memset(VidpFrontBuffer + ScreenSize - LineSize, 0, LineSize);
+
+    PendingFullFlush = 1;
+    FlushY = 0;
+    FlushLines = VidpHeight;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -157,7 +171,10 @@ void VidResetDisplay(void) {
         }
     }
 
+    FlushY = 0;
+    FlushLines = VidpHeight;
     Flush();
+
     KeReleaseSpinLock(&VidpLock);
 }
 
@@ -245,7 +262,14 @@ static void PutBuffer(const void *buffer, int size, void *context) {
  *-----------------------------------------------------------------------------------------------*/
 void VidPutChar(char Character) {
     KeAcquireSpinLock(&VidpLock);
+
+    FlushY = VidpCursorY;
     PutChar(Character);
+
+    if (!PendingFullFlush) {
+        FlushLines = VidpCursorY - FlushY + 1;
+    }
+
     Flush();
     KeReleaseSpinLock(&VidpLock);
 }
@@ -262,7 +286,14 @@ void VidPutChar(char Character) {
  *-----------------------------------------------------------------------------------------------*/
 void VidPutString(const char *String) {
     KeAcquireSpinLock(&VidpLock);
+
+    FlushY = VidpCursorY;
     PutString(String);
+
+    if (!PendingFullFlush) {
+        FlushLines = VidpCursorY - FlushY + 1;
+    }
+
     Flush();
     KeReleaseSpinLock(&VidpLock);
 }
@@ -331,11 +362,16 @@ void VidPrintVariadic(int Type, const char *Prefix, const char *Message, va_list
             break;
     }
 
+    FlushY = VidpCursorY;
     PutString(Prefix);
     PutString(Suffix);
     VidpForeground = OriginalForeground;
-
     __vprintf(Message, Arguments, NULL, PutBuffer);
+
+    if (!PendingFullFlush) {
+        FlushLines = VidpCursorY - FlushY + 1;
+    }
+
     Flush();
     KeReleaseSpinLock(&VidpLock);
 }

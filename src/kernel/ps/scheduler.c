@@ -104,6 +104,12 @@ void PspHandleEvent(HalRegisterState *Context) {
     HalProcessor *Processor = HalGetCurrentProcessor();
     PsThread *CurrentThread = Processor->CurrentThread;
 
+    /* Process any pending DPCs. */
+    while (Processor->DpcQueue.Next != &Processor->DpcQueue) {
+        KeDpc *Dpc = CONTAINING_RECORD(RtPopDList(&Processor->DpcQueue), KeDpc, ListHeader);
+        Dpc->Routine(Dpc->Context);
+    }
+
     /* Scheduler initialization, there should be no contention yet (we're using InitialThread
        instead of the queue). */
     if (!Processor->CurrentThread) {

@@ -10,6 +10,7 @@
 #include <vid.h>
 
 RtSList HalpLapicListHead = {};
+uint32_t HalpProcessorCount = 0;
 
 static void *LapicAddress = NULL;
 static int X2ApicEnabled = 0;
@@ -114,7 +115,7 @@ void HalpInitializeApic(void) {
             case LAPIC_RECORD: {
                 /* Prevent a bunch of entries with the same APIC ID (but probably different ACPI
                    IDs) filling our processor list. */
-                if (GetLapic(Record->Lapic.ApicId)) {
+                if (GetLapic(Record->Lapic.ApicId) || !(Record->Lapic.Flags & 1)) {
                     break;
                 }
 
@@ -128,7 +129,6 @@ void HalpInitializeApic(void) {
                 Entry->ApicId = Record->Lapic.ApicId;
                 Entry->AcpiId = Record->Lapic.AcpiId;
                 Entry->IsX2Apic = 0;
-                Entry->Online = 0;
                 RtPushSList(&HalpLapicListHead, &Entry->ListHeader);
                 VidPrint(
                     VID_MESSAGE_INFO,
@@ -137,6 +137,7 @@ void HalpInitializeApic(void) {
                     Entry->ApicId,
                     Entry->AcpiId);
 
+                HalpProcessorCount++;
                 break;
             }
 
@@ -148,7 +149,7 @@ void HalpInitializeApic(void) {
             case X2APIC_RECORD: {
                 /* Prevent a bunch of entries with the same APIC ID (but probably different ACPI
                    IDs) filling our processor list. */
-                if (GetLapic(Record->X2Apic.X2ApicId)) {
+                if (GetLapic(Record->X2Apic.X2ApicId) || !(Record->X2Apic.Flags & 1)) {
                     break;
                 }
 
@@ -162,7 +163,6 @@ void HalpInitializeApic(void) {
                 Entry->ApicId = Record->X2Apic.X2ApicId;
                 Entry->AcpiId = Record->X2Apic.AcpiId;
                 Entry->IsX2Apic = 1;
-                Entry->Online = 0;
                 RtPushSList(&HalpLapicListHead, &Entry->ListHeader);
                 VidPrint(
                     VID_MESSAGE_INFO,
@@ -171,11 +171,16 @@ void HalpInitializeApic(void) {
                     Entry->ApicId,
                     Entry->AcpiId);
 
+                HalpProcessorCount++;
                 break;
             }
         }
 
         Position += Record->Length;
+    }
+
+    if (HalpProcessorCount < 1) {
+        HalpProcessorCount = 1;
     }
 }
 

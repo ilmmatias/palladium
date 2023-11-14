@@ -28,6 +28,7 @@ add_executable(kernel "kernel" YES
     io/device.c
 
     ke/acpi.c
+    ke/dpc.c
     ke/driver.c
     ke/entry.c
     ke/lock.c

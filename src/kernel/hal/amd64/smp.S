@@ -87,7 +87,7 @@ HalpApEntry:
        land. */
     mov HalpApStructure - HalpApEntry(%ebx), %rdx
     lea 0x4000(%rdx), %rsp
-    movb $1, (%rsp)
+    lock incb (%rsp)
     movabs $KiSystemStartup, %rax
     mov $0, %rcx
     jmp *%rax

@@ -22,6 +22,7 @@ typedef struct {
     RtDList ThreadQueue;
     uint64_t ThreadQueueSize;
     KeSpinLock ThreadQueueLock;
+    RtDList DpcQueue;
 } HalProcessor;
 
 HalProcessor *HalGetCurrentProcessor(void);

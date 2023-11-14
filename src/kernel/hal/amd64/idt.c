@@ -136,3 +136,36 @@ uint8_t HalInstallInterruptHandler(void (*Handler)(HalRegisterState *)) {
 
     return HalInstallInterruptHandlerAt(Index, Handler) ? Index : -1;
 }
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function enters a critical code path (no interrupts allowed).
+ *
+ * PARAMETERS:
+ *     None.
+ *
+ * RETURN VALUE:
+ *     Arch-specific context; Either a 0 (interrupts were disabled) or >0 (interrupts were enabled)
+ *     in our case.
+ *-----------------------------------------------------------------------------------------------*/
+void *HalpEnterCriticalSection(void) {
+    uint64_t Flags;
+    __asm__ volatile("pushfq; pop %0; cli" : "=r"(Flags));
+    return (void*)(Flags & 0x200);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function marks the end of a critical code path (interrupts allowed again).
+ *
+ * PARAMETERS:
+ *     Context - Previously returned value from HalpEnterCriticalSection.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void HalpLeaveCriticalSection(void *Context) {
+    if (Context) {
+        __asm__ volatile("sti");
+    }
+}

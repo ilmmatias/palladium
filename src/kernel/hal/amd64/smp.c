@@ -14,7 +14,6 @@ extern uint64_t HalpKernelPageMap;
 extern HalpProcessor *HalpApStructure;
 
 RtSList HalpProcessorListHead = {};
-uint32_t HalpProcessorCount = 1;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -41,26 +40,31 @@ void HalpInitializeSmp(void) {
                      : "=r"(*(uint64_t *)MI_PADDR_TO_VADDR(
                          (uint64_t)&HalpKernelPageMap - (uint64_t)HalpApEntry + 0x8000)));
 
-    HalGetCurrentProcessor()->Online = 1;
-    ((HalpProcessor *)HalGetCurrentProcessor())->ApicId = ApicId;
+    /* BSP processor is already initialized, just setup its processor struct before someone
+       tries acessing our scheduler. */
+    HalpProcessor *Processor = (HalpProcessor *)HalGetCurrentProcessor();
 
-    HalGetCurrentProcessor()->ThreadQueueSize = 0;
-    RtInitializeDList(&HalGetCurrentProcessor()->ThreadQueue);
-    KeReleaseSpinLock(&HalGetCurrentProcessor()->ThreadQueueLock);
+    Processor->Base.Online = 1;
+    Processor->ApicId = ApicId;
 
-    RtPushSList(&HalpProcessorListHead, &HalGetCurrentProcessor()->ListHeader);
+    Processor->Base.ThreadQueueSize = 0;
+    RtInitializeDList(&Processor->Base.ThreadQueue);
+    KeReleaseSpinLock(&Processor->Base.ThreadQueueLock);
+
+    RtInitializeDList(&Processor->Base.DpcQueue);
+
+    RtPushSList(&HalpProcessorListHead, &Processor->Base.ListHeader);
 
     while (ListHeader) {
         LapicEntry *Entry = CONTAINING_RECORD(ListHeader, LapicEntry, ListHeader);
 
         /* KiSystemStartup is already initializing the BSP. */
         if (Entry->ApicId == ApicId) {
-            Entry->Online = 1;
             ListHeader = ListHeader->Next;
             continue;
         }
 
-        HalpProcessor *Processor = MmAllocatePool(sizeof(HalpProcessor), "Halp");
+        Processor = MmAllocatePool(sizeof(HalpProcessor), "Halp");
         if (!Processor) {
             continue;
         }
@@ -74,6 +78,8 @@ void HalpInitializeSmp(void) {
         RtInitializeDList(&Processor->Base.ThreadQueue);
         KeReleaseSpinLock(&Processor->Base.ThreadQueueLock);
 
+        RtInitializeDList(&Processor->Base.DpcQueue);
+
         *(HalpProcessor **)MI_PADDR_TO_VADDR(
             (uint64_t)&HalpApStructure - (uint64_t)HalpApEntry + 0x8000) = Processor;
 
@@ -86,8 +92,7 @@ void HalpInitializeSmp(void) {
         HalpWaitIpiDelivery();
         HalWaitTimer(10 * HAL_MILLISECS);
 
-        /* Two attempts at sending a STARTUP IPI to the core; If it doesn't come alive, we're
-           ignoring it. */
+        /* Two attempts at sending a STARTUP IPI should be enough (according to spec). */
         for (int i = 0; i < 2; i++) {
             HalpClearApicErrors();
             HalpSendIpi(Entry->ApicId, 0x608);
@@ -95,17 +100,11 @@ void HalpInitializeSmp(void) {
             HalpWaitIpiDelivery();
         }
 
-        for (int i = 0; i < 1000; i++) {
-            if (Processor->Base.Online) {
-                Entry->Online = 1;
-                RtPushSList(&HalpProcessorListHead, &Processor->Base.ListHeader);
-                HalpProcessorCount++;
-                break;
-            }
-
-            HalWaitTimer(1 * HAL_MILLISECS);
+        while (!__atomic_load_n(&Processor->Base.Online, __ATOMIC_RELAXED)) {
+            HalWaitTimer(200 * HAL_MICROSECS);
         }
 
+        RtPushSList(&HalpProcessorListHead, &Processor->Base.ListHeader);
         ListHeader = ListHeader->Next;
     }
 }

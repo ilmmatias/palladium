@@ -9,7 +9,9 @@ EXPORTS
     IoOpenDevice
 
     KeAcquireSpinLock
+    KeEnqueueDpc
     KeFatalError
+    KeInitializeDpc
     KeReleaseSpinLock
     KeTestSpinLock
     KeTryAcquireSpinLock
