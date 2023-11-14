@@ -92,7 +92,7 @@ static void InstallIdtHandler(int Number, uint64_t Handler) {
 
     /* A double buffer is required so that we can implement scrolling on the boot terminal
        without reading the (really slow) back buffer. */
-    void *ScreenFrontBase = BmAllocatePages(BiVideoWidth * BiVideoHeight * 4, BM_MD_KERNEL);
+    void *ScreenFrontBase = BmAllocatePages(BiVideoPitch * BiVideoHeight * 4, BM_MD_KERNEL);
     if (!ScreenFrontBase) {
         BmPrint("Could not allocate enough memory for the screen front buffer.\n"
                 "Your system might not have enough usable memory.\n");
