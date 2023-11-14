@@ -67,7 +67,7 @@ void HalpInitializeHpet(void) {
         VID_MESSAGE_INFO,
         "Kernel HAL",
         "using HPET as timer tick source (period = %llu ns)\n",
-        Period);
+        PeriodInNs);
 
     WriteHpetRegister(HPET_VAL_REG, 0);
     WriteHpetRegister(HPET_CFG_REG, 0x01);

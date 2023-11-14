@@ -49,6 +49,7 @@ typedef struct __attribute__((packed)) {
         uint64_t FrontBufferBase;
         uint16_t Width;
         uint16_t Height;
+        uint16_t Pitch;
     } Display;
     struct {
         BootLoaderImage *Entries;

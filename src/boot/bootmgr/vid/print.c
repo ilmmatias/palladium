@@ -5,9 +5,10 @@
 #include <font.h>
 #include <string.h>
 
-extern uint32_t *BiVideoBuffer;
+extern char *BiVideoBuffer;
 extern uint16_t BiVideoWidth;
 extern uint16_t BiVideoHeight;
+extern uint16_t BiVideoPitch;
 extern uint32_t BiVideoBackground;
 extern uint32_t BiVideoForeground;
 
@@ -25,10 +26,10 @@ uint16_t BiCursorY = 0;
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 static void ScrollUp(void) {
-    const uint32_t ScreenSize = BiVideoWidth * BiVideoHeight;
-    const uint32_t LineSize = BiVideoWidth * BiFont.Height;
-    memmove(BiVideoBuffer, BiVideoBuffer + LineSize, (ScreenSize - LineSize) * 4);
-    memset(BiVideoBuffer + ScreenSize - LineSize, 0, LineSize * 4);
+    const uint32_t ScreenSize = BiVideoPitch * BiVideoHeight;
+    const uint32_t LineSize = BiVideoPitch * BiFont.Height;
+    memmove(BiVideoBuffer, BiVideoBuffer + LineSize, ScreenSize - LineSize);
+    memset(BiVideoBuffer + ScreenSize - LineSize, 0, LineSize);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -69,8 +70,8 @@ static void DrawCharacter(char Character) {
     const uint8_t *Data = &BiFont.GlyphData[Info->Offset];
     uint16_t GlyphLeft = Info->Left;
     uint16_t GlyphTop = BiFont.Ascender - Info->Top;
-    uint32_t *Buffer =
-        &BiVideoBuffer[(BiCursorY + GlyphTop) * BiVideoWidth + BiCursorX + GlyphLeft];
+    char *Buffer =
+        &BiVideoBuffer[(BiCursorY + GlyphTop) * BiVideoPitch + (BiCursorX + GlyphLeft) * 4];
 
     /* We use a schema where each byte inside the glyph represents one pixel, the value of said
        pixel is the brightness of the pixel (0 being background); We just use Blend() to combine
@@ -87,7 +88,7 @@ static void DrawCharacter(char Character) {
 
             uint8_t Alpha = Data[Top * Info->Width + Left];
             if (Alpha) {
-                Buffer[Top * BiVideoWidth + Left] =
+                *(uint32_t *)&Buffer[Top * BiVideoPitch + Left * 4] =
                     Blend(BiVideoBackground, BiVideoForeground, Alpha);
             }
         }
@@ -106,8 +107,10 @@ static void DrawCharacter(char Character) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void BmResetDisplay(void) {
-    for (int i = 0; i < BiVideoWidth * BiVideoHeight; i++) {
-        BiVideoBuffer[i] = BiVideoBackground;
+    for (int i = 0; i < BiVideoHeight; i++) {
+        for (int j = 0; j < BiVideoWidth; j++) {
+            *(uint32_t *)&BiVideoBuffer[i * BiVideoPitch + j * 4] = BiVideoBackground;
+        }
     }
 
     BiCursorX = 0;
@@ -129,12 +132,14 @@ void BmClearLine(int LeftOffset, int RightOffset) {
     int Size = BiVideoWidth - LeftOffset - RightOffset;
 
     for (int i = 0; i < BiFont.Height; i++) {
-        memset(BiVideoBuffer + (BiCursorY + i) * BiVideoWidth, 0, LeftOffset * 4);
+        memset(BiVideoBuffer + (BiCursorY + i) * BiVideoPitch, 0, LeftOffset * 4);
         memset(
-            BiVideoBuffer + (BiCursorY + i + 1) * BiVideoWidth - RightOffset, 0, RightOffset * 4);
+            BiVideoBuffer + (BiCursorY + i) * BiVideoPitch + (BiVideoWidth - RightOffset) * 4,
+            0,
+            RightOffset * 4);
 
         for (int j = 0; j < Size; j++) {
-            BiVideoBuffer[(BiCursorY + i) * BiVideoWidth + LeftOffset + j] = BiVideoBackground;
+            *(uint32_t *)&BiVideoBuffer[(BiCursorY + i) * BiVideoPitch + j * 4] = BiVideoBackground;
         }
     }
 }

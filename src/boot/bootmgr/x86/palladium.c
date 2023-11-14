@@ -17,9 +17,10 @@ extern int BiMemoryDescriptorCount;
 extern uint64_t BiUsableMemorySize;
 extern uint64_t BiMaxAdressableMemory;
 
-extern uint32_t *BiVideoBuffer;
+extern char *BiVideoBuffer;
 extern uint16_t BiVideoWidth;
 extern uint16_t BiVideoHeight;
+extern uint16_t BiVideoPitch;
 
 [[noreturn]] void
 BiJumpPalladium(uint64_t *Pml4, uint64_t BootData, uint64_t EntryPoint, uint64_t ProcessorStruct);
@@ -241,6 +242,7 @@ static void InstallIdtHandler(int Number, uint64_t Handler) {
         BootData->Display.FrontBufferBase = (uint64_t)ScreenFrontBase + 0xFFFF800000000000;
         BootData->Display.Width = BiVideoWidth;
         BootData->Display.Height = BiVideoHeight;
+        BootData->Display.Pitch = BiVideoPitch;
         BootData->Images.BaseAddress = (uint64_t)Images + 0xFFFF800000000000;
         BootData->Images.Count = ImageCount;
 

@@ -1,10 +1,9 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
-#include <string.h>
 #include <font.h>
+#include <string.h>
 
-extern uint32_t *BiVideoBuffer;
 extern uint16_t BiVideoWidth;
 extern uint16_t BiVideoHeight;
 extern uint32_t BiVideoBackground;

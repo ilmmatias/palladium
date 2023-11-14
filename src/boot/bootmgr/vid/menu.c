@@ -13,9 +13,10 @@
 #include <string.h>
 #include <timer.h>
 
-extern uint32_t *BiVideoBuffer;
+extern char *BiVideoBuffer;
 extern uint16_t BiVideoWidth;
 extern uint16_t BiVideoHeight;
+extern uint16_t BiVideoPitch;
 
 static char TimeoutString[256];
 
@@ -67,7 +68,9 @@ static void DisplayBmp(char *Icon, uint16_t X, uint16_t Y, uint32_t BackgroundCo
             for (uint32_t j = 0; j < Header->Width; j++) {
                 uint32_t Color =
                     *(uint32_t *)(Icon + Header->DataOffset + i * Header->Width * 4 + j * 4);
-                BiVideoBuffer[(Y + (Header->Height - i)) * BiVideoWidth + X + j] =
+
+                *(uint32_t
+                      *)&BiVideoBuffer[(Y + (Header->Height - i)) * BiVideoPitch + (X + j) * 4] =
                     Blend(BackgroundColor, Color, Color >> 24);
             }
         }
@@ -181,7 +184,8 @@ static void RedrawTimeout(int Timeout) {
     /* 0 means there's no countdown, kind of. We still wait 1 second, but we change the text
        message. */
     if (Timeout) {
-        sprintf(TimeoutString, "Automatic boot in %u %s", Timeout, Timeout != 1 ? "seconds" : "second");
+        sprintf(
+            TimeoutString, "Automatic boot in %u %s", Timeout, Timeout != 1 ? "seconds" : "second");
         BmSetCursor(
             (BiVideoWidth - BmGetStringWidth(TimeoutString)) / 2,
             BiVideoHeight - BiFont.Height - 16);
@@ -189,8 +193,7 @@ static void RedrawTimeout(int Timeout) {
     } else {
         String = "Automatic boot enabled, press any key to stop";
         BmSetCursor(
-            (BiVideoWidth - BmGetStringWidth(String)) / 2,
-            BiVideoHeight - BiFont.Height - 16);
+            (BiVideoWidth - BmGetStringWidth(String)) / 2, BiVideoHeight - BiFont.Height - 16);
         BmPutString(String);
     }
 
@@ -213,7 +216,7 @@ static void RedrawTimeout(int Timeout) {
                     RedrawSelection(Entries, Selection, Selection + 1);
                     Selection++;
                 }
-            } 
+            }
 
             Timeout = -1;
             RedrawTimeout(-1);

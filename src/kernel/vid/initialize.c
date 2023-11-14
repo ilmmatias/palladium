@@ -3,10 +3,11 @@
 
 #include <vidp.h>
 
-extern uint32_t *VidpBackBuffer;
-extern uint32_t *VidpFrontBuffer;
+extern char *VidpBackBuffer;
+extern char *VidpFrontBuffer;
 extern uint16_t VidpWidth;
 extern uint16_t VidpHeight;
+extern uint16_t VidpPitch;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -21,9 +22,10 @@ extern uint16_t VidpHeight;
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void VidpInitialize(LoaderBootData *BootData) {
-    VidpBackBuffer = (uint32_t *)BootData->Display.BackBufferBase;
-    VidpFrontBuffer = (uint32_t *)BootData->Display.FrontBufferBase;
+    VidpBackBuffer = (char *)BootData->Display.BackBufferBase;
+    VidpFrontBuffer = (char *)BootData->Display.FrontBufferBase;
     VidpWidth = BootData->Display.Width;
     VidpHeight = BootData->Display.Height;
+    VidpPitch = BootData->Display.Pitch;
     VidResetDisplay();
 }
