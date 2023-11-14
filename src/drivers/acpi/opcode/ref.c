@@ -22,6 +22,19 @@
  *-----------------------------------------------------------------------------------------------*/
 int AcpipExecuteRefOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value) {
     switch (Opcode) {
+        /* RefOf := RefOfOp SuperName */
+        case 0x71: {
+            AcpiValue *SuperName = &State->Opcode->FixedArguments[0].TermArg;
+
+            if (!AcpipStoreTarget(State, Value, SuperName)) {
+                AcpiRemoveReference(SuperName, 0);
+                return 0;
+            }
+
+            AcpiRemoveReference(SuperName, 0);
+            break;
+        }
+
         /* DerefOf := DerefOfOp ObjReference */
         case 0x83: {
             AcpiValue *Reference = &State->Opcode->FixedArguments[0].TermArg;
