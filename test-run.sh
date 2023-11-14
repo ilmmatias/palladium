@@ -91,7 +91,7 @@ then
     sudo losetup -d /dev/loop32
     dd if=build.boot/boot/bootsect/mbrboot.com of=build.target/fat32.img count=440 bs=1 conv=notrunc 2>/dev/null
     echo "[5/5] Running emulator"
-    qemu-system-x86_64 -enable-kvm -M smm=off -cpu host -smp 4 -drive file=build.target/fat32.img,index=0,media=disk,format=raw -no-reboot
+    qemu-system-x86_64 -enable-kvm -M smm=off -cpu host -smp 4 -drive file=build.target/fat32.img,index=0,media=disk,format=raw -no-reboot $2 1>/dev/null
 elif [ "$1" == "exfat" ]
 then
     sudo rm -rf /mnt/mount
@@ -110,7 +110,7 @@ then
     sudo losetup -d /dev/loop32
     dd if=build.boot/boot/bootsect/mbrboot.com of=build.target/exfat.img count=440 bs=1 conv=notrunc 2>/dev/null
     echo "[5/5] Running emulator"
-    qemu-system-x86_64 -enable-kvm -M smm=off -cpu host -smp 4 -drive file=build.target/exfat.img,index=0,media=disk,format=raw -no-reboot 1>/dev/null
+    qemu-system-x86_64 -enable-kvm -M smm=off -cpu host -smp 4 -drive file=build.target/exfat.img,index=0,media=disk,format=raw -no-reboot $2 1>/dev/null
 elif [ "$1" == "ntfs" ]
 then
     sudo rm -rf /mnt/mount
@@ -129,11 +129,11 @@ then
     sudo losetup -d /dev/loop32
     dd if=build.boot/boot/bootsect/mbrboot.com of=build.target/ntfs.img count=440 bs=1 conv=notrunc 2>/dev/null
     echo "[5/5] Running emulator"
-    qemu-system-x86_64 -enable-kvm -M smm=off -cpu host -smp 4 -drive file=build.target/ntfs.img,index=0,media=disk,format=raw -no-reboot 1>/dev/null
+    qemu-system-x86_64 -enable-kvm -M smm=off -cpu host -smp 4 -drive file=build.target/ntfs.img,index=0,media=disk,format=raw -no-reboot $2 1>/dev/null
 else
     mkisofs -iso-level 2 -R -b Boot/iso9660boot.com -no-emul-boot -o build.target/iso9660.iso _root 1>/dev/null 2>&1
     echo "[5/5] Running emulator"
-    qemu-system-x86_64 -enable-kvm -M smm=off -cpu host -smp 4 -m 4G -cdrom build.target/iso9660.iso -no-reboot 1>/dev/null
+    qemu-system-x86_64 -enable-kvm -M smm=off -cpu host -smp 4 -m 4G -cdrom build.target/iso9660.iso -no-reboot $2 1>/dev/null
 fi
 
 rm -rf _root
