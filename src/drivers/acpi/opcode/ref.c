@@ -26,7 +26,7 @@ int AcpipExecuteRefOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value) 
         case 0x71: {
             AcpiValue *SuperName = &State->Opcode->FixedArguments[0].TermArg;
 
-            if (!AcpipStoreTarget(State, Value, SuperName)) {
+            if (!AcpipStoreTarget(State, SuperName, Value)) {
                 AcpiRemoveReference(SuperName, 0);
                 return 0;
             }
@@ -166,7 +166,7 @@ int AcpipExecuteRefOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value) 
             Value->References = 1;
             Value->Integer = SuperName->Type == ACPI_EMPTY ? 0 : UINT64_MAX;
 
-            if (SuperName->Type != ACPI_EMPTY && !AcpipStoreTarget(State, Target, SuperName)) {
+            if (SuperName->Type != ACPI_EMPTY && !AcpipStoreTarget(State, SuperName, Target)) {
                 AcpiRemoveReference(Target, 0);
                 return 0;
             }
