@@ -24,7 +24,7 @@ void HalpInitializeApicTimer(void) {
 
     /* We'll be taking the average over 4 runs. */
     uint64_t Accum = 0;
-    uint64_t Ticks = (10 * HAL_MILLISECS) / HalGetTimerPeriod();
+    uint64_t Ticks = (10 * EV_MILLISECS) / HalGetTimerPeriod();
     for (int i = 0; i < 4; i++) {
         uint64_t End = HalGetTimerTicks() + Ticks;
         HalpWriteLapicRegister(0x380, UINT32_MAX);

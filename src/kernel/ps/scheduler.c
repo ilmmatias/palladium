@@ -39,15 +39,17 @@ void PsReadyThread(PsThread *Thread) {
 
     /* Now we're forced to lock the processor queue (there was no need up until now, as we were
        only reading). */
+    void *Context = HalpEnterCriticalSection();
     KeAcquireSpinLock(&BestMatch->ThreadQueueLock);
-    __atomic_add_fetch(&BestMatch->ThreadQueueSize, 1, __ATOMIC_ACQUIRE);
+    __atomic_add_fetch(&BestMatch->ThreadQueueSize, 1, __ATOMIC_SEQ_CST);
     RtAppendDList(&BestMatch->ThreadQueue, &Thread->ListHeader);
     KeReleaseSpinLock(&BestMatch->ThreadQueueLock);
+    HalpLeaveCriticalSection(Context);
 
     /* PspScheduleNext uses Expiration=0 as a sign that we need to switch asap (we were out of
        work). */
     if (!BestMatch->CurrentThread->Expiration) {
-        HalpNotifyProcessor(BestMatch);
+        HalpNotifyProcessor(BestMatch, 0);
     }
 }
 
@@ -86,9 +88,12 @@ static PsThread *GetNextReadyThread(HalProcessor *Processor) {
     KeAcquireSpinLock(&Processor->ThreadQueueLock);
     RtDList *ListHeader = RtPopDList(&Processor->ThreadQueue);
     KeReleaseSpinLock(&Processor->ThreadQueueLock);
-    return ListHeader == &Processor->ThreadQueue
-               ? NULL
-               : CONTAINING_RECORD(ListHeader, PsThread, ListHeader);
+
+    if (ListHeader != &Processor->ThreadQueue) {
+        return CONTAINING_RECORD(ListHeader, PsThread, ListHeader);
+    }
+
+    return Processor->ForceYield ? Processor->IdleThread : NULL;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -114,35 +119,74 @@ void PspScheduleNext(HalRegisterState *Context) {
         return;
     }
 
-    /* Quantum expiry, switch threads if possible. */
+    /* On quantum expiry, we switch threads if possible;
+       On force yield, we always switch threads (into the idle if nothing is left). */
     uint64_t CurrentTicks = HalGetTimerTicks();
-    if (CurrentTicks >= CurrentThread->Expiration) {
+    if (CurrentTicks >= CurrentThread->Expiration || Processor->ForceYield) {
         PsThread *NewThread = GetNextReadyThread(Processor);
         if (!NewThread) {
             CurrentThread->Expiration = 0;
+
+            /* Setup a next timer tick (for events) if possible. */
+            if (Processor->ClosestEvent) {
+                HalpSetEvent((Processor->ClosestEvent - CurrentTicks) * HalGetTimerPeriod());
+            }
+
             return;
         }
 
-        uint64_t ThreadQuantum = PSP_THREAD_QUANTUM / Processor->ThreadQueueSize;
-        if (ThreadQuantum < PSP_THREAD_MIN_QUANTUM) {
-            ThreadQuantum = PSP_THREAD_MIN_QUANTUM;
+        if (NewThread == Processor->IdleThread) {
+            NewThread->Expiration = 0;
+        } else {
+            uint64_t ThreadQuantum = PSP_THREAD_QUANTUM / Processor->ThreadQueueSize;
+            if (ThreadQuantum < PSP_THREAD_MIN_QUANTUM) {
+                ThreadQuantum = PSP_THREAD_MIN_QUANTUM;
+            }
+
+            NewThread->Expiration = HalGetTimerTicks() + ThreadQuantum / HalGetTimerPeriod();
         }
 
-        NewThread->Expiration = HalGetTimerTicks() + ThreadQuantum / HalGetTimerPeriod();
-        Processor->CurrentThread = NewThread;
-        HalpSetEvent(ThreadQuantum);
+        /* Try setting up a timer tick for the closest event; If we can't, we're on the idle
+           thread, and blocked by an event with no deadline (awaiting IO?) */
+        uint64_t ThreadDeadline = NewThread->Expiration ? NewThread->Expiration : UINT64_MAX;
+        uint64_t EventDeadline = Processor->ClosestEvent ? Processor->ClosestEvent : UINT64_MAX;
 
-        if (CurrentThread != Processor->IdleThread) {
+        if (NewThread->Expiration || Processor->ClosestEvent) {
+            if (ThreadDeadline < EventDeadline) {
+                HalpSetEvent((ThreadDeadline - CurrentTicks) * HalGetTimerPeriod());
+            } else {
+                HalpSetEvent((EventDeadline - CurrentTicks) * HalGetTimerPeriod());
+            }
+        }
+
+        Processor->CurrentThread = NewThread;
+
+        if (Processor->ForceYield == PSP_YIELD_EVENT) {
+            __atomic_sub_fetch(&Processor->ThreadQueueSize, 1, __ATOMIC_SEQ_CST);
+        } else if (CurrentThread != Processor->IdleThread) {
             KeAcquireSpinLock(&Processor->ThreadQueueLock);
             RtAppendDList(&Processor->ThreadQueue, &CurrentThread->ListHeader);
             KeReleaseSpinLock(&Processor->ThreadQueueLock);
+        }
+
+        if (CurrentThread != Processor->IdleThread) {
             HalpSaveContext(Context, &CurrentThread->Context);
         }
 
+        Processor->ForceYield = PSP_YIELD_NONE;
         HalpRestoreContext(Context, &NewThread->Context);
+
         return;
     }
 
     /* We're here too early, try again in a bit. */
-    HalpSetEvent((CurrentThread->Expiration - CurrentTicks) * HalGetTimerPeriod());
+    uint64_t ThreadDeadline = CurrentThread->Expiration ? CurrentThread->Expiration : UINT64_MAX;
+    uint64_t EventDeadline = Processor->ClosestEvent ? Processor->ClosestEvent : UINT64_MAX;
+    if (CurrentThread->Expiration || Processor->ClosestEvent) {
+        if (ThreadDeadline < EventDeadline) {
+            HalpSetEvent((ThreadDeadline - CurrentTicks) * HalGetTimerPeriod());
+        } else {
+            HalpSetEvent((EventDeadline - CurrentTicks) * HalGetTimerPeriod());
+        }
+    }
 }

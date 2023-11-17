@@ -4,25 +4,28 @@
 #ifndef _HAL_H_
 #define _HAL_H_
 
+#include <ev.h>
 #include <ke.h>
 #include <ps.h>
 #include <rt.h>
 
-#define HAL_MICROSECS 1000ull
-#define HAL_MILLISECS 1000000ull
-#define HAL_SECS 1000000000ull
-
 typedef struct {
     char Stack[0x4000];
+
     int Online;
     RtSList ListHeader;
+
     PsThread *InitialThread;
     PsThread *IdleThread;
     PsThread *CurrentThread;
     RtDList ThreadQueue;
     uint64_t ThreadQueueSize;
     KeSpinLock ThreadQueueLock;
+
+    int ForceYield;
+    uint64_t ClosestEvent;
     RtDList DpcQueue;
+    RtDList EventQueue;
 } HalProcessor;
 
 HalProcessor *HalGetCurrentProcessor(void);

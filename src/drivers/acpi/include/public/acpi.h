@@ -24,13 +24,13 @@
 #define ACPI_PROCESSOR 12
 #define ACPI_THERMAL 13
 #define ACPI_BUFFER_FIELD 14
+#define ACPI_DEBUG 16
 #define ACPI_ALIAS 17
 #define ACPI_SCOPE 18
 #define ACPI_REFERENCE 19
 #define ACPI_INDEX 20
 #define ACPI_LOCAL 21
 #define ACPI_ARG 22
-#define ACPI_DEBUG 23
 
 #define ACPI_FIELD 0
 #define ACPI_BANK_FIELD 1

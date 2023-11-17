@@ -47,11 +47,14 @@ void HalpInitializeSmp(void) {
     Processor->Base.Online = 1;
     Processor->ApicId = ApicId;
 
-    Processor->Base.ThreadQueueSize = 0;
+    Processor->Base.ThreadQueueSize = 1;
     RtInitializeDList(&Processor->Base.ThreadQueue);
     KeReleaseSpinLock(&Processor->Base.ThreadQueueLock);
 
+    Processor->Base.ForceYield = 0;
+    Processor->Base.ClosestEvent = 0;
     RtInitializeDList(&Processor->Base.DpcQueue);
+    RtInitializeDList(&Processor->Base.EventQueue);
 
     RtPushSList(&HalpProcessorListHead, &Processor->Base.ListHeader);
 
@@ -78,7 +81,10 @@ void HalpInitializeSmp(void) {
         RtInitializeDList(&Processor->Base.ThreadQueue);
         KeReleaseSpinLock(&Processor->Base.ThreadQueueLock);
 
+        Processor->Base.ForceYield = 0;
+        Processor->Base.ClosestEvent = 0;
         RtInitializeDList(&Processor->Base.DpcQueue);
+        RtInitializeDList(&Processor->Base.EventQueue);
 
         *(HalpProcessor **)MI_PADDR_TO_VADDR(
             (uint64_t)&HalpApStructure - (uint64_t)HalpApEntry + 0x8000) = Processor;
@@ -90,18 +96,18 @@ void HalpInitializeSmp(void) {
         HalpWaitIpiDelivery();
         HalpSendIpi(Entry->ApicId, 0x8500);
         HalpWaitIpiDelivery();
-        HalWaitTimer(10 * HAL_MILLISECS);
+        HalWaitTimer(10 * EV_MILLISECS);
 
         /* Two attempts at sending a STARTUP IPI should be enough (according to spec). */
         for (int i = 0; i < 2; i++) {
             HalpClearApicErrors();
             HalpSendIpi(Entry->ApicId, 0x608);
-            HalWaitTimer(200 * HAL_MICROSECS);
+            HalWaitTimer(200 * EV_MICROSECS);
             HalpWaitIpiDelivery();
         }
 
         while (!__atomic_load_n(&Processor->Base.Online, __ATOMIC_RELAXED)) {
-            HalWaitTimer(200 * HAL_MICROSECS);
+            HalWaitTimer(200 * EV_MICROSECS);
         }
 
         RtPushSList(&HalpProcessorListHead, &Processor->Base.ListHeader);
@@ -131,10 +137,15 @@ HalProcessor *HalGetCurrentProcessor(void) {
  *
  * PARAMETERS:
  *     Processor - Which processor to notify.
+ *     WaitDelivery - Set this to 1 if we should wait for delivery (important for events!)
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void HalpNotifyProcessor(HalProcessor *Processor) {
+void HalpNotifyProcessor(HalProcessor *Processor, int WaitDelivery) {
     HalpSendIpi(((HalpProcessor *)Processor)->ApicId, 0xFE);
+
+    if (WaitDelivery) {
+        HalpWaitIpiDelivery();
+    }
 }

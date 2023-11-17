@@ -267,7 +267,7 @@ void VidPutChar(char Character) {
     PutChar(Character);
 
     if (!PendingFullFlush) {
-        FlushLines = VidpCursorY - FlushY + 1;
+        FlushLines = VidpCursorY - FlushY + VidpFont.Height;
     }
 
     Flush();
@@ -291,7 +291,7 @@ void VidPutString(const char *String) {
     PutString(String);
 
     if (!PendingFullFlush) {
-        FlushLines = VidpCursorY - FlushY + 1;
+        FlushLines = VidpCursorY - FlushY + VidpFont.Height;
     }
 
     Flush();
@@ -369,7 +369,7 @@ void VidPrintVariadic(int Type, const char *Prefix, const char *Message, va_list
     __vprintf(Message, Arguments, NULL, PutBuffer);
 
     if (!PendingFullFlush) {
-        FlushLines = VidpCursorY - FlushY + 1;
+        FlushLines = VidpCursorY - FlushY + VidpFont.Height;
     }
 
     Flush();

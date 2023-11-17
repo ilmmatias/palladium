@@ -268,6 +268,16 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
                     break;
                 }
 
+                /* DefObjectType := ObjectTypeOp SuperName */
+                case 0x8E: {
+                    AcpiValue *SuperName = &State->Opcode->FixedArguments[0].TermArg;
+                    Value.Type = ACPI_INTEGER;
+                    Value.References = 1;
+                    Value.Integer = SuperName->Type;
+                    AcpiRemoveReference(SuperName, 0);
+                    break;
+                }
+
                 /* DefCopyObject := CopyObjectOp TermArg SimpleName */
                 case 0x9D: {
                     AcpiValue *Source = &State->Opcode->FixedArguments[0].TermArg;
