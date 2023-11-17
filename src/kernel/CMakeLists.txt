@@ -18,6 +18,7 @@ if(ARCH STREQUAL "amd64")
         hal/${ARCH}/smp.c
         hal/${ARCH}/smp.S
         hal/${ARCH}/timer.c)
+    set(ARCH_STR "amd64")
 endif()
 
 add_executable(kernel "kernel" YES
@@ -52,7 +53,16 @@ add_executable(kernel "kernel" YES
 
     kernel.def)
 
+# Get the latest abbreviated commit hash of the working branch
+execute_process(
+    COMMAND git log -1 --format=%h
+    WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
+    OUTPUT_VARIABLE GIT_HASH
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+
 target_include_directories(kernel PRIVATE include/private PUBLIC include/public)
 target_compile_options(kernel PRIVATE $<$<COMPILE_LANGUAGE:C,CXX>:-ffreestanding>)
+target_compile_definitions(kernel PRIVATE "-DKE_GIT_HASH=\"${GIT_HASH}\"" PRIVATE "-DKE_ARCH=\"${ARCH_STR}\"")
 target_link_options(kernel PRIVATE -Wl,--subsystem=native,--entry=KiSystemStartup)
 set_target_properties(kernel PROPERTIES ENABLE_EXPORTS TRUE)

@@ -24,6 +24,12 @@
     if (IsBsp) {
         /* Stage 0: Early output initialization; We need this, or we can't show error messages. */
         VidpInitialize(BootData);
+        VidPrint(
+            VID_MESSAGE_INFO,
+            "Kernel",
+            "palladium kernel for %s, git commit %s\n",
+            KE_ARCH,
+            KE_GIT_HASH);
 
         /* Stage 1: Memory manager initialization. */
         MiInitializePageAllocator(BootData);
