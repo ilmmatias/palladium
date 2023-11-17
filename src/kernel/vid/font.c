@@ -5646,4 +5646,4 @@ static const VidpFontGlyph FontGlyphs[] = {
     {0x930F, 11, 18, 0, 14, 11},
 };
 
-const VidpFontData VidpFont = {18, -5, 22, FontGlyphs, FontGlyphData};
+const VidpFontData VidpFont = {18, -5, 24, FontGlyphs, FontGlyphData};

@@ -5646,4 +5646,4 @@ static const BiFontGlyph FontGlyphs[] = {
     {0x930F, 11, 18, 0, 14, 11},
 };
 
-const BiFontData BiFont = {18, -5, 22, FontGlyphs, FontGlyphData};
+const BiFontData BiFont = {18, -5, 24, FontGlyphs, FontGlyphData};

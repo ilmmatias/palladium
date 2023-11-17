@@ -115,7 +115,7 @@ static void DrawCharacter(char Character) {
             break;
         }
 
-        for (uint16_t Left = 0; Left < VidpFont.Ascender + VidpFont.Descender; Left++) {
+        for (uint16_t Left = 0; Left < VidpFont.GlyphInfo[' '].Advance; Left++) {
             if (VidpCursorX + Left >= VidpWidth) {
                 break;
             }
