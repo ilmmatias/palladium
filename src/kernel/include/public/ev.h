@@ -35,5 +35,6 @@ void EvDispatchDpc(EvDpc *Dpc);
 void EvInitializeTimer(EvTimer *Timer, uint64_t Timeout, EvDpc *Dpc);
 
 void EvWaitObject(void *Object, uint64_t Timeout);
+void EvCancelObject(void *Object);
 
 #endif /* _EV_H_ */
