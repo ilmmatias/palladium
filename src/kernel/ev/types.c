@@ -1,8 +1,8 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
-#include <ev.h>
-#include <hal.h>
+#include <evp.h>
+#include <string.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -18,7 +18,17 @@
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void EvInitializeTimer(EvTimer *Timer, uint64_t Timeout, EvDpc *Dpc) {
+    memset(Timer, 0, sizeof(EvTimer));
     Timer->Type = EV_TYPE_TIMER;
     Timer->Dpc = Dpc;
-    Timer->Deadline = HalGetTimerTicks() + Timeout / HalGetTimerPeriod();
+
+    /* Dispatch the DPC if this is 0-timeout event, and don't bother with the event dispatcher
+       (just set us as finished). */
+    if (!Timeout) {
+        Timer->Finished = 1;
+        EvDispatchDpc(Dpc);
+        return;
+    }
+
+    EvpDispatchObject(Timer, Timeout, 0);
 }

@@ -22,6 +22,8 @@ typedef struct {
 typedef struct {
     RtDList ListHeader;
     int Type;
+    int Dispatched;
+    int Finished;
     PsThread *Source;
     EvDpc *Dpc;
     uint64_t Deadline;

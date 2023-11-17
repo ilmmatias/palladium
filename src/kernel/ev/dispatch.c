@@ -7,6 +7,72 @@
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
+ *     This function dispatches the given object into the event queue.
+ *     Do not use this function unless you're implementing a custom event, use EvWaitObject(s)
+ *     instead.
+ *
+ * PARAMETERS:
+ *     Object - Pointer to the event object.
+ *     Timeout - How many nanoseconds we should wait until we drop the event; Set this to 0 to
+ *               wait indefinitely.
+ *     Yield - Set this to 1 if we should yield the thread (and only reinsert it after the event
+ *             finishes).
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void EvpDispatchObject(void *Object, uint64_t Timeout, int Yield) {
+    HalProcessor *Processor = HalGetCurrentProcessor();
+    uint64_t CurrentTicks = HalGetTimerTicks();
+    EvHeader *Header = Object;
+
+    if (Header->Finished) {
+        return;
+    }
+
+    /* Ignore the target timeout for already dispatched objects (we probably just want to yield
+       this thread out). */
+    if (!Header->Dispatched) {
+        Header->Deadline = 0;
+        if (Timeout) {
+            Header->Deadline = CurrentTicks + Timeout / HalGetTimerPeriod();
+        }
+    }
+
+    /* Enter critical section (can't let any scheduling happen here), and update the event
+       queue (and the closest event deadline). */
+    void *Context = HalpEnterCriticalSection();
+
+    if (!Header->Dispatched) {
+        RtAppendDList(&HalGetCurrentProcessor()->EventQueue, &Header->ListHeader);
+        Header->Dispatched = 1;
+    }
+
+    if (Yield) {
+        Processor->ForceYield = PSP_YIELD_EVENT;
+        Header->Source = Processor->CurrentThread;
+    }
+
+    int NewClosestEvent = 0;
+    if (Header->Deadline &&
+        (!Processor->ClosestEvent || Header->Deadline < Processor->ClosestEvent)) {
+        Processor->ClosestEvent = Header->Deadline;
+        NewClosestEvent = 1;
+    }
+
+    HalpLeaveCriticalSection(Context);
+
+    /* Either we yield out, or we notify the current processor we have an event in X-time
+       (if we're stuck without any thread to switch into). */
+    if (Yield) {
+        HalpNotifyProcessor(Processor, 1);
+    } else if (!Processor->CurrentThread->Expiration && NewClosestEvent) {
+        HalpSetEvent((Header->Deadline - CurrentTicks) * HalGetTimerPeriod());
+    }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
  *     This function schedules out the current thread while it awaits an event to complete.
  *
  * PARAMETERS:
@@ -18,31 +84,7 @@
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void EvWaitObject(void *Object, uint64_t Timeout) {
-    HalProcessor *Processor = HalGetCurrentProcessor();
-    EvHeader *Header = Object;
-
-    /* For timers, always ignore the timeout parameter (we use their target deadline). */
-    if (!Header->Deadline) {
-        Header->Deadline = 0;
-        if (Timeout) {
-            Header->Deadline = HalGetTimerTicks() + Timeout / HalGetTimerPeriod();
-        }
-    }
-
-    /* Enter critical section (can't let any scheduling happen here), and update the event
-       queue (and the closest event deadline). */
-    void *Context = HalpEnterCriticalSection();
-
-    Header->Source = Processor->CurrentThread;
-    Processor->ForceYield = PSP_YIELD_EVENT;
-    RtAppendDList(&HalGetCurrentProcessor()->EventQueue, &Header->ListHeader);
-
-    if (!Processor->ClosestEvent || Header->Deadline < Processor->ClosestEvent) {
-        Processor->ClosestEvent = Header->Deadline;
-    }
-
-    HalpLeaveCriticalSection(Context);
-    HalpNotifyProcessor(Processor, 1);
+    EvpDispatchObject(Object, Timeout, 1);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -63,28 +105,41 @@ void EvpHandleEvents(HalRegisterState *Context) {
     RtDList *ListHeader = Processor->EventQueue.Next;
     while (ListHeader != &Processor->EventQueue) {
         EvHeader *Header = CONTAINING_RECORD(ListHeader, EvHeader, ListHeader);
-        int Finished = 0;
-
         ListHeader = ListHeader->Next;
 
         /* Out of the deadline, for anything but timers, this will make WaitObject return an
            error. */
         if (Header->Deadline && CurrentTicks >= Header->Deadline) {
-            RtUnlinkDList(&Header->ListHeader);
-            Processor->ClosestEvent = 0;
-
-            KeAcquireSpinLock(&Processor->ThreadQueueLock);
-            __atomic_add_fetch(&Processor->ThreadQueueSize, 1, __ATOMIC_SEQ_CST);
-
-            /* Boost the priority of any waiting task. */
-            RtPushDList(&Processor->ThreadQueue, &Header->Source->ListHeader);
-            KeReleaseSpinLock(&Processor->ThreadQueueLock);
-
-            Finished = 1;
+            Header->Finished = 1;
         }
 
-        if (Finished && Header->Dpc) {
-            RtAppendDList(&Processor->DpcQueue, &Header->Dpc->ListHeader);
+        if (Header->Finished) {
+            RtUnlinkDList(&Header->ListHeader);
+            if (Header->Source) {
+                /* Boost the priority of the waiting task, and insert it back. */
+                KeAcquireSpinLock(&Processor->ThreadQueueLock);
+                __atomic_add_fetch(&Processor->ThreadQueueSize, 1, __ATOMIC_SEQ_CST);
+                RtPushDList(&Processor->ThreadQueue, &Header->Source->ListHeader);
+                KeReleaseSpinLock(&Processor->ThreadQueueLock);
+            }
+
+            /* Grab the new closest event, or zero out that field if we have nothing else.
+               No need to SetEvent(), the scheduler should do that if required. */
+            Processor->ClosestEvent = 0;
+            RtDList *ListHeader = Processor->EventQueue.Next;
+            while (ListHeader != &Processor->EventQueue) {
+                EvHeader *Header = CONTAINING_RECORD(ListHeader, EvHeader, ListHeader);
+                
+                if (Header->Deadline && (!Processor->ClosestEvent || Header->Deadline < Processor->ClosestEvent)) {
+                    Processor->ClosestEvent = Header->Deadline;
+                }
+
+                ListHeader = ListHeader->Next;
+            }
+
+            if (Header->Dpc) {
+                RtAppendDList(&Processor->DpcQueue, &Header->Dpc->ListHeader);
+            }
         }
     }
 
