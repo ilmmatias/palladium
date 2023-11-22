@@ -33,7 +33,10 @@ function(add_executable target type has_lib)
         PRIVATE
         --target=${TARGET_${ARCH}}-w64-mingw32
         -DARCH_${ARCH}
-        -fno-stack-protector)
+        -fno-stack-protector
+        -fexceptions
+        -fseh-exceptions
+        -fms-extensions)
 
     target_link_options(
     	${target}
@@ -77,7 +80,10 @@ function(add_library target type)
         PRIVATE
         --target=${TARGET_${ARCH}}-w64-mingw32
         -DARCH_${ARCH}
-        -fno-stack-protector)
+        -fno-stack-protector
+        -fexceptions
+        -fseh-exceptions
+        -fms-extensions)
 
     target_link_options(
         	${target}

@@ -343,15 +343,20 @@ static uint64_t LoadFile(
         /* First pass, collect the driver count, as we'll be allocating the LoadedImage array all
         at once. */
         int DriverCount = 0;
+        size_t NameAccum = 11;
         for (RtSList *ListHeader = Entry->Palladium.DriverListHead; ListHeader;
              ListHeader = ListHeader->Next) {
+            NameAccum +=
+                strlen(CONTAINING_RECORD(Entry->Palladium.DriverListHead, BmIniArray, ListHeader)
+                           ->Value) +
+                1;
             DriverCount++;
         }
 
         /* We're forced to use BmAllocatePages, as we need to mark this page as KERNEL instead of
            BOOT. */
         LoadedImage *Images =
-            BmAllocatePages((DriverCount + 1) * sizeof(LoadedImage), BM_MD_KERNEL);
+            BmAllocatePages((DriverCount + 1) * sizeof(LoadedImage) + NameAccum, BM_MD_KERNEL);
         if (!Images) {
             break;
         }
@@ -361,6 +366,13 @@ static uint64_t LoadFile(
         if (!Exports) {
             break;
         }
+
+        /* After all loaded images, we store the driver (and kernel) names; Get a pointer into that
+         * ready. */
+        char *Name = (char *)(Images + DriverCount + 1);
+        strcpy(Name, "kernel.exe");
+        Images[0].Name = Name;
+        Name += 11;
 
         /* Delegate the loading job to the common PE loader. */
         Images[0].PhysicalAddress = LoadFile(
@@ -406,6 +418,10 @@ static uint64_t LoadFile(
                 "%s/%s",
                 Entry->Palladium.SystemFolder,
                 DriverEntry->Value);
+
+            strcpy(Name, DriverEntry->Value);
+            Images[Index + 1].Name = Name;
+            Name += strlen(DriverEntry->Value) + 1;
 
             Images[Index + 1].PhysicalAddress = LoadFile(
                 DriverPath,

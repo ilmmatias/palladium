@@ -26,6 +26,7 @@ typedef struct __attribute__((packed)) {
     uint64_t ImageSize;
     uint64_t EntryPoint;
     uint32_t PageFlags;
+    uint32_t Name;
 } BootLoaderImage;
 
 typedef struct __attribute__((packed)) {

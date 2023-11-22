@@ -16,5 +16,6 @@ void KiSaveAcpiData(LoaderBootData *BootData);
 
 void KiSaveBootStartDrivers(LoaderBootData *BootData);
 void KiRunBootStartDrivers(void);
+void KiDumpSymbol(void *Address);
 
 #endif /* _KI_H_ */

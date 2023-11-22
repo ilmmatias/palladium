@@ -23,6 +23,7 @@ typedef struct __attribute__((packed)) {
     uint64_t ImageSize;
     uint64_t EntryPoint;
     int* PageFlags;
+    char *Name;
 } LoadedImage;
 
 typedef struct __attribute__((packed)) {

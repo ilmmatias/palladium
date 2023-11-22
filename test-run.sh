@@ -133,7 +133,7 @@ then
 else
     mkisofs -iso-level 2 -R -b Boot/iso9660boot.com -no-emul-boot -o build.target/iso9660.iso _root 1>/dev/null 2>&1
     echo "[5/5] Running emulator"
-    qemu-system-x86_64 -enable-kvm -M smm=off -cpu host -smp 4 -m 4G -cdrom build.target/iso9660.iso -no-reboot $2 1>/dev/null
+    qemu-system-x86_64 -enable-kvm -M smm=off -cpu host -smp 4 -cdrom build.target/iso9660.iso -no-reboot $2 1>/dev/null
 fi
 
 rm -rf _root
