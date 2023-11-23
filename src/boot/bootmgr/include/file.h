@@ -4,7 +4,7 @@
 #ifndef _FILE_H_
 #define _FILE_H_
 
-#include <rt.h>
+#include <rt/list.h>
 
 struct BmFile;
 typedef struct BmFile BmFile;

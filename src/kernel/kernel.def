@@ -9,6 +9,8 @@ EXPORTS
     HalGetCurrentProcessor
     HalGetTimerPeriod
     HalGetTimerTicks
+    HalRestoreContext
+    HalSaveContext
     HalWaitTimer
 
     IoCreateDevice
@@ -51,6 +53,8 @@ EXPORTS
     RtGetHash
     RtInitializeBitmap
     RtInitializeDList
+    RtLookupFunctionEntry
+    RtLookupImageBase
     RtPopDList
     RtPopSList
     RtPushDList
@@ -60,6 +64,7 @@ EXPORTS
     RtSetBits
     RtTruncateDList
     RtUnlinkDList
+    RtUnwindFrame
 
     __rand64
     __vprintf

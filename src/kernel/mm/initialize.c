@@ -3,7 +3,7 @@
 
 #include <boot.h>
 #include <mi.h>
-#include <rt.h>
+#include <rt/bitmap.h>
 
 extern MiPageEntry *MiPageList;
 extern MiPageEntry *MiFreePageListHead;

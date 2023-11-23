@@ -18,7 +18,7 @@
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void HalpInitializeContext(
+void HalpInitializeThreadContext(
     HalRegisterState *Context,
     char *Stack,
     uint64_t StackSize,
@@ -43,7 +43,7 @@ void HalpInitializeContext(
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void HalpSaveContext(HalRegisterState *Source, HalRegisterState *Target) {
+void HalpSaveThreadContext(HalRegisterState *Source, HalRegisterState *Target) {
     memcpy(Target, Source, sizeof(HalRegisterState));
 }
 
@@ -59,6 +59,6 @@ void HalpSaveContext(HalRegisterState *Source, HalRegisterState *Target) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void HalpRestoreContext(HalRegisterState *Target, HalRegisterState *Source) {
+void HalpRestoreThreadContext(HalRegisterState *Target, HalRegisterState *Source) {
     memcpy(Target, Source, sizeof(HalRegisterState));
 }

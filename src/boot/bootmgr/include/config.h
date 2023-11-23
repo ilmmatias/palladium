@@ -4,7 +4,7 @@
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
 
-#include <rt.h>
+#include <rt/list.h>
 
 #define BM_ENTRY_PALLADIUM 0
 #define BM_ENTRY_CHAINLOAD 1

@@ -2,13 +2,14 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <boot.h>
+#include <ke.h>
 #include <mm.h>
 #include <pe.h>
 #include <stdio.h>
+#include <string.h>
 #include <vid.h>
 
-static BootLoaderImage *LoadedImages;
-static uint32_t LoadedImageCount;
+RtDList KeModuleListHead;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -22,8 +23,26 @@ static uint32_t LoadedImageCount;
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void KiSaveBootStartDrivers(LoaderBootData *BootData) {
-    LoadedImages = BootData->Images.Entries;
-    LoadedImageCount = BootData->Images.Count;
+    BootLoaderImage *LoadedImages = BootData->Images.Entries;
+    uint32_t LoadedImageCount = BootData->Images.Count;
+
+    RtInitializeDList(&KeModuleListHead);
+
+    while (LoadedImageCount--) {
+        KeModule *Module = MmAllocatePool(sizeof(KeModule), "KeLd");
+        if (!Module) {
+            VidPrint(VID_MESSAGE_ERROR, "Kernel", "couldn't allocate space for a kernel module\n");
+            KeFatalError(KE_OUT_OF_MEMORY);
+        }
+
+        Module->Name = MI_PADDR_TO_VADDR(LoadedImages->Name);
+        Module->ImageBase = LoadedImages->VirtualAddress;
+        Module->ImageSize = LoadedImages->ImageSize;
+        Module->EntryPoint = LoadedImages->EntryPoint;
+
+        RtAppendDList(&KeModuleListHead, &Module->ListHeader);
+        LoadedImages++;
+    }
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -38,9 +57,17 @@ void KiSaveBootStartDrivers(LoaderBootData *BootData) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void KiRunBootStartDrivers(void) {
-    /* Skipping the first image, as it is certain to be the kernel itself. */
-    for (uint32_t i = 1; i < LoadedImageCount; i++) {
-        ((void (*)(void))LoadedImages[i].EntryPoint)();
+    /* The kernel should be the first image, and the drivers start from there onwards. */
+    RtDList *ListHeader = KeModuleListHead.Next;
+    if (!ListHeader) {
+        return;
+    }
+
+    ListHeader = ListHeader->Next;
+    while (ListHeader != &KeModuleListHead) {
+        KeModule *Module = CONTAINING_RECORD(ListHeader, KeModule, ListHeader);
+        ((void (*)(void))Module->EntryPoint)();
+        ListHeader = ListHeader->Next;
     }
 }
 
@@ -59,29 +86,33 @@ void KiRunBootStartDrivers(void) {
 void KiDumpSymbol(void *Address) {
     uint64_t Offset = (uint64_t)Address;
 
-    BootLoaderImage *Image = LoadedImages;
-    while (Image < LoadedImages + LoadedImageCount) {
-        if (Offset < Image->VirtualAddress || Offset >= Image->VirtualAddress + Image->ImageSize) {
-            Image++;
+    RtDList *ListHeader = KeModuleListHead.Next;
+    KeModule *Image = NULL;
+
+    while (ListHeader != &KeModuleListHead) {
+        Image = CONTAINING_RECORD(ListHeader, KeModule, ListHeader);
+
+        if (Offset < Image->ImageBase || Offset >= Image->ImageBase + Image->ImageSize) {
+            ListHeader = ListHeader->Next;
             continue;
         }
 
         break;
     }
 
-    if (Image >= LoadedImages + LoadedImageCount) {
+    if (ListHeader == &KeModuleListHead) {
         char OffsetString[25];
-        sprintf(OffsetString, "%#llx - ??\n", Offset);
+        sprintf(OffsetString, "0x%016llx - ??\n", Offset);
         VidPutString(OffsetString);
         return;
     }
 
-    uint64_t Start = Image->VirtualAddress + *(uint16_t *)(Image->VirtualAddress + 0x3C);
+    uint64_t Start = Image->ImageBase + *(uint16_t *)(Image->ImageBase + 0x3C);
     PeHeader *Header = (PeHeader *)Start;
     PeSectionHeader *Sections = (PeSectionHeader *)(Start + Header->SizeOfOptionalHeader + 24);
 
     /* Clang seems to not strip the coff symbol table out, so we can use it. */
-    CoffSymbol *SymbolTable = (CoffSymbol *)(Image->VirtualAddress + Header->PointerToSymbolTable);
+    CoffSymbol *SymbolTable = (CoffSymbol *)(Image->ImageBase + Header->PointerToSymbolTable);
     char *Strings = (char *)(SymbolTable + Header->NumberOfSymbols);
     CoffSymbol *Symbol = SymbolTable;
     CoffSymbol *Closest = NULL;
@@ -93,8 +124,8 @@ void KiDumpSymbol(void *Address) {
             continue;
         }
 
-        uint64_t Address = Image->VirtualAddress +
-                           Sections[Symbol->SectionNumber - 1].VirtualAddress + Symbol->Value;
+        uint64_t Address =
+            Image->ImageBase + Sections[Symbol->SectionNumber - 1].VirtualAddress + Symbol->Value;
 
         if (Address <= Offset && (!Closest || Offset - Address < Offset - ClosestAddress)) {
             Closest = Symbol;
@@ -108,11 +139,11 @@ void KiDumpSymbol(void *Address) {
         Symbol += Symbol->NumberOfAuxSymbols + 1;
     }
 
-    char OffsetString[22];
-    sprintf(OffsetString, "%#llx - ", Offset);
+    char OffsetString[23];
+    sprintf(OffsetString, "0x%016llx - ", Offset);
     VidPutString(OffsetString);
 
-    VidPutString(MI_PADDR_TO_VADDR(Image->Name));
+    VidPutString(Image->Name);
     VidPutString("!");
 
     if (!Closest->Name[0] && !Closest->Name[1] && !Closest->Name[2] && !Closest->Name[3]) {
@@ -123,6 +154,6 @@ void KiDumpSymbol(void *Address) {
         }
     }
 
-    sprintf(OffsetString, "+%#llx", Offset - ClosestAddress);
+    sprintf(OffsetString, "+%#llx\n", Offset - ClosestAddress);
     VidPutString(OffsetString);
 }

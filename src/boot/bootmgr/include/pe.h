@@ -10,9 +10,6 @@
 
 #if defined(ARCH_x86) || defined(ARCH_amd64)
 #define PE_MACHINE 0x8664
-
-struct PeHeader32;
-typedef struct PeHeader32 PeHeaderLoader;
 #else
 #error "Undefined ARCH for the bootmgr module!"
 #endif
@@ -28,7 +25,7 @@ typedef struct __attribute__((packed)) {
     uint32_t Size;
 } PeDataDirectory;
 
-typedef struct __attribute__((packed)) PeHeader32 {
+typedef struct __attribute__((packed)) {
     char Signature[4];
     uint16_t Machine;
     uint16_t NumberOfSections;
@@ -87,7 +84,7 @@ typedef struct __attribute__((packed)) PeHeader32 {
     } DataDirectories;
 } PeHeader32;
 
-typedef struct __attribute__((packed)) PeHeader64 {
+typedef struct __attribute__((packed)) {
     char Signature[4];
     uint16_t Machine;
     uint16_t NumberOfSections;
@@ -184,5 +181,11 @@ typedef struct __attribute__((packed)) {
     uint32_t PageRva;
     uint32_t BlockSize;
 } PeBaseRelocationBlock;
+
+#if UINTPTR_MAX == UINT64_MAX
+typedef PeHeader64 PeHeaderLoader;
+#else
+typedef PeHeader32 PeHeaderLoader;
+#endif
 
 #endif /* _PE_H_ */

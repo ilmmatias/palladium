@@ -1,6 +1,7 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
+#include <hal.h>
 #include <ke.h>
 #include <vid.h>
 
@@ -32,6 +33,7 @@ static char *Messages[] = {
     VidSetColor(VID_COLOR_PANIC);
     VidPutString("CANNOT SAFELY RECOVER OPERATION: ");
     VidPutString(Messages[Message]);
+    VidPutChar('\n');
 
     while (1)
         ;

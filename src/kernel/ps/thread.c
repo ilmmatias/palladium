@@ -36,7 +36,7 @@ PsThread *PsCreateThread(void (*EntryPoint)(void *), void *Parameter) {
         return NULL;
     }
 
-    HalpInitializeContext(&Thread->Context, Thread->Stack, KE_STACK_SIZE, EntryPoint, Parameter);
+    HalpInitializeThreadContext(&Thread->Context, Thread->Stack, KE_STACK_SIZE, EntryPoint, Parameter);
     return Thread;
 }
 

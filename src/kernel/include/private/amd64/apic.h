@@ -4,7 +4,7 @@
 #ifndef _AMD64_APIC_H_
 #define _AMD64_APIC_H_
 
-#include <rt.h>
+#include <rt/list.h>
 
 #define IOAPIC_INDEX 0x00
 #define IOAPIC_DATA 0x10

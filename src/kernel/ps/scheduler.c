@@ -21,7 +21,7 @@ extern PsThread *PspSystemThread;
 void PsReadyThread(PsThread *Thread) {
     /* Always try and add the thread to the least full queue. */
     RtSList *ListHeader = HalpProcessorListHead.Next;
-    uint64_t BestMatchSize = UINT64_MAX;
+    size_t BestMatchSize = SIZE_MAX;
     HalProcessor *BestMatch = NULL;
 
     while (ListHeader) {
@@ -115,7 +115,7 @@ void PspScheduleNext(HalRegisterState *Context) {
     if (!Processor->CurrentThread) {
         Processor->CurrentThread = Processor->InitialThread;
         Processor->CurrentThread->Expiration = 0;
-        HalpRestoreContext(Context, &Processor->CurrentThread->Context);
+        HalpRestoreThreadContext(Context, &Processor->CurrentThread->Context);
         return;
     }
 
@@ -170,11 +170,11 @@ void PspScheduleNext(HalRegisterState *Context) {
         }
 
         if (CurrentThread != Processor->IdleThread) {
-            HalpSaveContext(Context, &CurrentThread->Context);
+            HalpSaveThreadContext(Context, &CurrentThread->Context);
         }
 
         Processor->ForceYield = PSP_YIELD_NONE;
-        HalpRestoreContext(Context, &NewThread->Context);
+        HalpRestoreThreadContext(Context, &NewThread->Context);
 
         return;
     }

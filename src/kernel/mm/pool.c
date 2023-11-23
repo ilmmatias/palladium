@@ -3,6 +3,7 @@
 
 #include <halp.h>
 #include <mi.h>
+#include <rt/bitmap.h>
 #include <string.h>
 
 #define SMALL_BLOCK_COUNT ((uint32_t)((MM_PAGE_SIZE - 16) >> 4))

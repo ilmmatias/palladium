@@ -26,13 +26,13 @@ void HalpNotifyProcessor(HalProcessor *Processor, int WaitDelivery);
 void *HalpEnterCriticalSection(void);
 void HalpLeaveCriticalSection(void *Context);
 
-void HalpInitializeContext(
+void HalpInitializeThreadContext(
     HalRegisterState *Context,
     char *Stack,
     uint64_t StackSize,
     void (*EntryPoint)(void *),
     void *Parameter);
-void HalpSaveContext(HalRegisterState *Source, HalRegisterState *Thread);
-void HalpRestoreContext(HalRegisterState *Target, HalRegisterState *Thread);
+void HalpSaveThreadContext(HalRegisterState *Source, HalRegisterState *Thread);
+void HalpRestoreThreadContext(HalRegisterState *Target, HalRegisterState *Thread);
 
 #endif /* _HALP_H_ */

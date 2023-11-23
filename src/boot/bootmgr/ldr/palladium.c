@@ -85,7 +85,15 @@ static uint64_t LoadFile(
         return 0;
     }
 
-    uint64_t FirstStackPage = (Header->SizeOfImage + BI_PAGE_SIZE - 1) >> BI_PAGE_SHIFT;
+    /* Calculate the size (and were to put) the symbol table; Loading up all sections to the proper
+       places will probably trash it (and the strings table) as we currently stand. */
+    char *SourceSymbols = Buffer + Header->PointerToSymbolTable;
+    uint32_t TargetSymbols = Header->SizeOfImage;
+    uint32_t Strings = *(uint32_t *)(SourceSymbols + Header->NumberOfSymbols * 18);
+    uint32_t SymbolTableSize = Strings + Header->NumberOfSymbols * 18;
+
+    uint64_t FirstStackPage =
+        (Header->SizeOfImage + SymbolTableSize + BI_PAGE_SIZE - 1) >> BI_PAGE_SHIFT;
     uint64_t StackPageCount = IsKernel ? (SIZEOF_PROCESSOR + BI_PAGE_SIZE - 1) >> BI_PAGE_SHIFT : 0;
 
     uint64_t Pages = FirstStackPage + StackPageCount;
@@ -118,11 +126,13 @@ static uint64_t LoadFile(
        should have given us the code/data size + all headers, so we're assuming that and loading
        it all up to the base address. */
     memcpy(PhysicalAddress, Buffer, Header->SizeOfHeaders);
+    memcpy((char *)PhysicalAddress + TargetSymbols, SourceSymbols, SymbolTableSize);
 
     uint64_t ExpectedBase = Header->ImageBase;
     uint64_t BaseDiff = *VirtualAddress - ExpectedBase;
     Header = (PeHeader64 *)((char *)PhysicalAddress + Offset);
     Header->ImageBase = *VirtualAddress;
+    Header->PointerToSymbolTable = TargetSymbols;
 
     if (EntryAddress) {
         *EntryAddress = *VirtualAddress + Header->AddressOfEntryPoint;

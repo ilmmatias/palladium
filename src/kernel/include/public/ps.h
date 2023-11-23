@@ -4,13 +4,13 @@
 #ifndef _PS_H_
 #define _PS_H_
 
-#ifdef ARCH_amd64
+#if defined(ARCH_x86) || defined(ARCH_amd64)
 #include <amd64/regs.h>
 #else
 #error "Undefined ARCH for the kernel module!"
 #endif /* ARCH */
 
-#include <rt.h>
+#include <rt/list.h>
 
 typedef struct {
     RtDList ListHeader;

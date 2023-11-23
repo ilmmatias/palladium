@@ -7,7 +7,6 @@
 #include <ev.h>
 #include <ke.h>
 #include <ps.h>
-#include <rt.h>
 
 typedef struct {
     char Stack[0x4000];
@@ -19,7 +18,7 @@ typedef struct {
     PsThread *IdleThread;
     PsThread *CurrentThread;
     RtDList ThreadQueue;
-    uint64_t ThreadQueueSize;
+    size_t ThreadQueueSize;
     KeSpinLock ThreadQueueLock;
 
     int ForceYield;
@@ -29,6 +28,9 @@ typedef struct {
 } HalProcessor;
 
 HalProcessor *HalGetCurrentProcessor(void);
+
+void HalSaveContext(HalRegisterState *Context);
+void HalRestoreContext(HalRegisterState *Context);
 
 uint64_t HalGetTimerPeriod(void);
 uint64_t HalGetTimerTicks(void);

@@ -4,7 +4,7 @@
 #ifndef _INI_H_
 #define _INI_H_
 
-#include <rt.h>
+#include <rt/list.h>
 
 #define BM_INI_STRING 0
 #define BM_INI_ARRAY 1

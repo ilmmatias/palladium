@@ -5,7 +5,7 @@
 #define _PCIP_H_
 
 #include <acpi.h>
-#include <rt.h>
+#include <rt/list.h>
 
 typedef struct {
     RtSList ListHeader;

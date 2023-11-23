@@ -4,7 +4,7 @@
 #ifndef _KE_H_
 #define _KE_H_
 
-#include <stdint.h>
+#include <rt/list.h>
 
 #define KE_FATAL_ERROR 0
 #define KE_BAD_ACPI_TABLES 1
@@ -16,6 +16,16 @@
 #define KE_STACK_SIZE 0x4000
 
 typedef int KeSpinLock;
+
+typedef struct {
+    RtDList ListHeader;
+    const char *Name;
+    uint64_t ImageBase;
+    uint64_t ImageSize;
+    uint64_t EntryPoint;
+} KeModule;
+
+extern RtDList KeModuleListHead;
 
 void *KiFindAcpiTable(const char Signature[4], int Index);
 
