@@ -430,7 +430,8 @@ RtUnwind(void *TargetFrame, void *TargetIp, RtExceptionRecord *ExceptionRecord, 
         ExceptionRecord->ExceptionFlags |= RT_EXC_FLAG_EXIT_UNWIND;
     }
 
-    while (1) {
+    uint64_t EstablisherFrame;
+    while (ActiveContext.Rsp >= StackBase && ActiveContext.Rsp < StackLimit) {
         uint64_t ControlPc = ActiveContext.Rip;
         uint64_t ImageBase = RtLookupImageBase(ControlPc);
         if (!ImageBase) {
@@ -452,7 +453,6 @@ RtUnwind(void *TargetFrame, void *TargetIp, RtExceptionRecord *ExceptionRecord, 
         memcpy(&UnwindContext, &ActiveContext, sizeof(RtContext));
 
         /* As long as we pass EstablisherFrame to VirtualUnwind, it should always be filled up. */
-        uint64_t EstablisherFrame;
         void *HandlerData;
         RtExceptionRoutine LanguageHandler = RtVirtualUnwind(
             RT_UNW_FLAG_UHANDLER,
@@ -478,7 +478,6 @@ RtUnwind(void *TargetFrame, void *TargetIp, RtExceptionRecord *ExceptionRecord, 
             DispatcherContext.FunctionEntry = FunctionEntry;
             DispatcherContext.EstablisherFrame = EstablisherFrame;
             DispatcherContext.TargetIp = (uint64_t)TargetIp;
-            DispatcherContext.ContextRecord = &ActiveContext;
             DispatcherContext.ScopeIndex = 0;
 
             do {
@@ -487,13 +486,14 @@ RtUnwind(void *TargetFrame, void *TargetIp, RtExceptionRecord *ExceptionRecord, 
                 }
 
                 ActiveContext.Rax = (uint64_t)ReturnValue;
+                DispatcherContext.ContextRecord = &ActiveContext;
                 DispatcherContext.LanguageHandler = LanguageHandler;
                 DispatcherContext.HandlerData = HandlerData;
 
                 int Disposition = LanguageHandler(
                     ExceptionRecord, EstablisherFrame, &ActiveContext, &DispatcherContext);
 
-                /* Don't propagae those to the next iterations (unless requested/necessary). */
+                /* Don't propagate those to the next iterations (unless requested/necessary). */
                 ExceptionRecord->ExceptionFlags &=
                     ~(RT_EXC_FLAG_TARGET_UNWIND | RT_EXC_COLLIDED_UNWIND);
 
@@ -538,15 +538,21 @@ RtUnwind(void *TargetFrame, void *TargetIp, RtExceptionRecord *ExceptionRecord, 
                 while (1)
                     ;
             }
-
-            if (EstablisherFrame == (uint64_t)TargetFrame) {
-                break;
-            }
-
-            /* Descriptions online tell us to swap this with the unwind context, but the start
-               of the loop trashes the unwind context?????? */
-            memcpy(&ActiveContext, &UnwindContext, sizeof(RtContext));
         }
+
+        if (EstablisherFrame == (uint64_t)TargetFrame) {
+            break;
+        }
+
+        /* Descriptions online tell us to swap this with the unwind context, but the start
+           of the loop trashes the unwind context?????? */
+        memcpy(&ActiveContext, &UnwindContext, sizeof(RtContext));
+    }
+
+    if (EstablisherFrame != (uint64_t)TargetFrame) {
+        /* TODO: Raise an exception here. */
+        while (1)
+            ;
     }
 
     ActiveContext.Rax = (uint64_t)ReturnValue;

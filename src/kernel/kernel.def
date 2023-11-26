@@ -40,10 +40,12 @@ EXPORTS
     VidSetColor
     VidSetCursor
 
+    __C_specific_handler
     RtAppendDList
     RtClearAllBits
     RtClearBit
     RtClearBits
+    RtDispatchException
     RtFindClearBits
     RtFindClearBitsAndSet
     RtFindSetBits

@@ -3,6 +3,7 @@
 
 if(ARCH STREQUAL "amd64")
     set(KERNEL_SOURCES
+        ${ARCH}/except.c
         ${ARCH}/unwind.c)
 endif()
 

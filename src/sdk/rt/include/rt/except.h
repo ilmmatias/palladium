@@ -32,11 +32,10 @@
 #define RT_EXC_UNWIND 20
 
 #define RT_EXC_FLAG_NONCONTINUABLE 0x01
-#define RT_EXC_FLAG_EXCEPTION 0x02
-#define RT_EXC_FLAG_UNWIND 0x04
-#define RT_EXC_FLAG_EXIT_UNWIND 0x08
-#define RT_EXC_FLAG_TARGET_UNWIND 0x10
-#define RT_EXC_FLAG_COLLIDED_UNWIND 0x20
+#define RT_EXC_FLAG_UNWIND 0x02
+#define RT_EXC_FLAG_EXIT_UNWIND 0x04
+#define RT_EXC_FLAG_TARGET_UNWIND 0x08
+#define RT_EXC_FLAG_COLLIDED_UNWIND 0x10
 
 #define RT_EXC_EXECUTE_HANDLER -1
 #define RT_EXC_CONTINUE_EXECUTION 0
@@ -90,6 +89,6 @@ RtExceptionRoutine RtVirtualUnwind(
 [[noreturn]] void
 RtUnwind(void *TargetFrame, void *TargetIp, RtExceptionRecord *ExceptionRecord, void *ReturnValue);
 
-void RtRaiseException(RtExceptionRecord *ExceptionRecord);
+int RtDispatchException(RtExceptionRecord *ExceptionRecord, RtContext *ContextRecord);
 
 #endif /* _RT_EXCEPT_H_ */
