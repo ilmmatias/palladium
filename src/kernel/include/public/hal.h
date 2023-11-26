@@ -29,9 +29,6 @@ typedef struct {
 
 HalProcessor *HalGetCurrentProcessor(void);
 
-void HalSaveContext(HalRegisterState *Context);
-void HalRestoreContext(HalRegisterState *Context);
-
 uint64_t HalGetTimerPeriod(void);
 uint64_t HalGetTimerTicks(void);
 void HalWaitTimer(uint64_t Time);

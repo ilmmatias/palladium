@@ -3,6 +3,11 @@
 
 project(os/sdk/rt)
 
+if(ARCH STREQUAL "amd64")
+    set(SOURCES
+        ${ARCH}/context.S)
+endif()
+
 set(SOURCES
     ${SOURCES}
     bitmap.c

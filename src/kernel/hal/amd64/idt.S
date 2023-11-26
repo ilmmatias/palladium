@@ -5,20 +5,28 @@
 .text
 
 .macro NO_ERRCODE num
-Handler\num:
+.seh_proc HalpInterruptHandler\num
+HalpInterruptHandler\num:
     push $0
     push $\num
-    jmp CommonStub
+    .seh_pushframe
+    .seh_endprologue
+    jmp HalpCommonInterruptStub
+.seh_endproc
 .endm
 
 .macro ERRCODE num
-Handler\num:
+.seh_proc HalpInterruptHandler\num
+HalpInterruptHandler\num:
     push $\num
-    jmp CommonStub
+    .seh_pushframe @code
+    .seh_endprologue
+    jmp HalpCommonInterruptStub
+.seh_endproc
 .endm
 
 .macro ENTRY num
-    .quad Handler\num
+    .quad HalpInterruptHandler\num
 .endm
 
 /* Some of the exceptions (in interrupts 0-31) have error codes (which we use ERRCODE instead
@@ -64,25 +72,42 @@ NO_ERRCODE 31
 .endr
 
 .extern HalpInterruptHandler
-CommonStub:
+.seh_proc HalpCommonInterruptStub
+HalpCommonInterruptStub:
     /* AMD64 has no PUSHA/POPA, so we're forced to save state manually.
        No XMM state is saved, as you shouldn't be using it in kernel mode; Only the thread
        scheduler saves it (on thread switch). */ 
 	push %rax
+    .seh_pushreg %rax
     push %rcx
+    .seh_pushreg %rcx
     push %rdx
+    .seh_pushreg %rdx
     push %rbx
+    .seh_pushreg %rbx
     push %rbp
+    .seh_pushreg %rbp
     push %rsi
+    .seh_pushreg %rsi
     push %rdi
+    .seh_pushreg %rdi
     push %r8
+    .seh_pushreg %r8
     push %r9
+    .seh_pushreg %r9
     push %r10
+    .seh_pushreg %r10
     push %r11
+    .seh_pushreg %r11
     push %r12
+    .seh_pushreg %r12
     push %r13
+    .seh_pushreg %r13
     push %r14
+    .seh_pushreg %r14
     push %r15
+    .seh_pushreg %r15
+    .seh_endprologue
 
     mov %rsp, %rcx
     call HalpInterruptHandler
@@ -105,6 +130,7 @@ CommonStub:
 
     add $16, %rsp
     iretq
+.seh_endproc
 
 .section .rodata
 

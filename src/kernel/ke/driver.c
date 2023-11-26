@@ -154,6 +154,8 @@ void KiDumpSymbol(void *Address) {
         }
     }
 
-    sprintf(OffsetString, "+%#llx\n", Offset - ClosestAddress);
-    VidPutString(OffsetString);
+    if (Offset - ClosestAddress) {
+        sprintf(OffsetString, "+%#llx\n", Offset - ClosestAddress);
+        VidPutString(OffsetString);
+    }
 }

@@ -4,86 +4,92 @@
 #ifndef _RT_EXCEPT_H_
 #define _RT_EXCEPT_H_
 
+#include <rt/context.h>
 #include <stddef.h>
-#include <stdint.h>
 
-#define RT_MAX_EXCEPT_ARGS 15
+#define RT_EXC_NUMBER_OF_PARAMETERS 16
+
+#define RT_EXC_ACCESS_VIOLATION 0
+#define RT_EXC_ARRAY_BOUNDS_EXCEEDED 1
+#define RT_EXC_BREAKPOINT 2
+#define RT_EXC_DATATYPE_MISALIGNMENT 3
+#define RT_EXC_FLT_DENORMAL_OPERAND 4
+#define RT_EXC_FLT_DIVIDE_BY_ZERO 5
+#define RT_EXC_FLT_INEXACT_RESULT 6
+#define RT_EXC_FLT_INVALID_OPERATION 7
+#define RT_EXC_FLT_OVERFLOW 8
+#define RT_EXC_FLT_STACK_CHECK 9
+#define RT_EXC_FLT_UNDERFLOW 10
+#define RT_EXC_ILLEGAL_INSTRUCTION 11
+#define RT_EXC_IN_PAGE_ERROR 12
+#define RT_EXC_INT_DIVIDE_BY_ZERO 13
+#define RT_EXC_INT_OVERFLOW 14
+#define RT_EXC_INVALID_DISPOSITION 15
+#define RT_EXC_NONCONTINUABLE_EXCEPTION 16
+#define RT_EXC_PRIV_INSTRUCTION 17
+#define RT_EXC_SINGLE_STEP 18
+#define RT_EXC_STACK_OVERFLOW 19
+#define RT_EXC_UNWIND 20
+
+#define RT_EXC_FLAG_NONCONTINUABLE 0x01
+#define RT_EXC_FLAG_EXCEPTION 0x02
+#define RT_EXC_FLAG_UNWIND 0x04
+#define RT_EXC_FLAG_EXIT_UNWIND 0x08
+#define RT_EXC_FLAG_TARGET_UNWIND 0x10
+#define RT_EXC_FLAG_COLLIDED_UNWIND 0x20
+
+#define RT_EXC_EXECUTE_HANDLER -1
+#define RT_EXC_CONTINUE_EXECUTION 0
+#define RT_EXC_CONTINUE_SEARCH 1
+#define RT_EXC_NESTED_EXCEPTION 2
+#define RT_EXC_COLLIDED_UNWIND 3
 
 typedef struct RtExceptionRecord {
     uint32_t ExceptionCode;
     uint32_t ExceptionFlags;
     struct RtExceptionRecord *ExceptionRecord;
     void *ExceptionAddress;
-    uint32_t NumberParameters;
-    uintptr_t ExceptionInformation[RT_MAX_EXCEPT_ARGS];
+    uint32_t NumberOfParameters;
+    void *ExceptionInformation[RT_EXC_NUMBER_OF_PARAMETERS];
 } RtExceptionRecord;
 
-#if defined(ARCH_x86) || defined(ARCH_amd64)
-#define RT_UNW_FLAG_NHANDLER 0x00
-#define RT_UNW_FLAG_EHANDLER 0x01
-#define RT_UNW_FLAG_UHANDLER 0x02
-#define RT_UNW_FLAG_CHAININFO 0x04
-
-#define RT_UWOP_PUSH_NONVOL 0
-#define RT_UWOP_ALLOC_LARGE 1
-#define RT_UWOP_ALLOC_SMALL 2
-#define RT_UWOP_SET_FPREG 3
-#define RT_UWOP_SAVE_NONVOL 4
-#define RT_UWOP_SAVE_NONVOL_FAR 5
-#define RT_UWOP_EPILOG 6
-#define RT_UWOP_SPARE_CODE 7
-#define RT_UWOP_SAVE_XMM128 8
-#define RT_UWOP_SAVE_XMM128_FAR 9
-#define RT_UWOP_PUSH_MACHFRAME 10
-
-#define RtGetUnwindCodeEntry(info, index) ((info)->UnwindCode[index])
-#define RtGetLanguageSpecificData(info) \
-    ((uint64_t *)&RtGetUnwindCodeEntry((info), ((info)->CountOfCodes + 1) & ~1))
-#define RtGetExceptionHandler(base, info) \
-    ((RtExceptionRoutine *)((base) + *(uintptr_t *)RtGetLanguageSpecificData(info)))
-#define RtGetChainedFunctionEntry(base, info) \
-    ((RtRuntimeFunction *)((base) + *(uintptr_t *)RtGetLanguageSpecificData(info)))
-#define RtGetExceptionDataPtr(info) ((void *)((uintptr_t *)RtGetLanguageSpecificData(info) + 1))
-
-typedef union {
-    struct {
-        uint8_t CodeOffset;
-        uint8_t UnwindOp : 4;
-        uint8_t OpInfo : 4;
-    };
-    uint16_t FrameOffset;
-} RtUnwindCode;
-
 typedef struct {
-    uint8_t Version : 3;
-    uint8_t Flags : 5;
-    uint8_t SizeOfProlog;
-    uint8_t CountOfCodes;
-    uint8_t FrameRegister : 4;
-    uint8_t FrameOffset : 4;
-    RtUnwindCode UnwindCode[];
-} RtUnwindInfo;
+    RtExceptionRecord *ExceptionRecord;
+    RtContext *ContextRecord;
+} RtExceptionPointers;
 
-typedef struct {
-    uint32_t BeginAddress;
-    uint32_t EndAddress;
-    uint32_t UnwindData;
-} RtRuntimeFunction;
+struct RtDispatcherContext;
 
 typedef int (*RtExceptionRoutine)(
     RtExceptionRecord *ExceptionRecord,
     uint64_t EstablisherFrame,
-    void *ContextRecord,
-    void *DispatcherContext);
+    RtContext *ContextRecord,
+    struct RtDispatcherContext *DispatcherContext);
+
+typedef int (*RtExceptionFilter)(RtExceptionPointers *ExceptionPointers, uint64_t EstablisherFrame);
+typedef void (*RtTerminationHandler)(int AbnormalTermination, uint64_t EstablisherFrame);
+
+#if defined(ARCH_x86) || defined(ARCH_amd64)
+#include <rt/amd64/unwind.h>
 #else
 #error "Undefined ARCH for the rt module!"
 #endif
 
 uint64_t RtLookupImageBase(uint64_t Address);
-RtRuntimeFunction *RtLookupFunctionEntry(uint64_t Address);
-int RtUnwindFrame(
-    HalRegisterState *Context,
-    RtExceptionRoutine *LanguageHandler,
-    void **LanguageData);
+RtRuntimeFunction *RtLookupFunctionEntry(uint64_t ImageBase, uint64_t Address);
+
+RtExceptionRoutine RtVirtualUnwind(
+    int HandlerType,
+    uint64_t ImageBase,
+    uint64_t ControlPc,
+    RtRuntimeFunction *FunctionEntry,
+    RtContext *ContextRecord,
+    void **HandlerData,
+    uint64_t *EstablisherFrame);
+
+[[noreturn]] void
+RtUnwind(void *TargetFrame, void *TargetIp, RtExceptionRecord *ExceptionRecord, void *ReturnValue);
+
+void RtRaiseException(RtExceptionRecord *ExceptionRecord);
 
 #endif /* _RT_EXCEPT_H_ */
