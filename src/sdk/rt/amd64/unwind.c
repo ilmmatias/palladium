@@ -545,7 +545,7 @@ RtUnwind(void *TargetFrame, void *TargetIp, RtExceptionRecord *ExceptionRecord, 
 
             /* Descriptions online tell us to swap this with the unwind context, but the start
                of the loop trashes the unwind context?????? */
-            memcpy(&UnwindContext, &ActiveContext, sizeof(RtContext));
+            memcpy(&ActiveContext, &UnwindContext, sizeof(RtContext));
         }
     }
 
