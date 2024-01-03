@@ -195,8 +195,7 @@ RtRuntimeFunction *RtLookupFunctionEntry(uint64_t ImageBase, uint64_t Address) {
  *     ControlPc - Value of the instruction pointer.
  *     FunctionEntry - Exception/unwind data about the function.
  *     ContextRecord - Register state the function was being executed in.
- *     LanguageHandler - Output; Language-specific handler.
- *     LanguageData - Output; Language-specific handler data.
+ *     HandlerData - Output; Language-specific handler data.
  *     EstablisherFrame - Output; Base of the fixed stack allocation for this function.
  *
  * RETURN VALUE:
@@ -257,103 +256,9 @@ RtExceptionRoutine RtVirtualUnwind(
         }
     } while (0);
 
-    /* Microsoft's docs says that for epilogs and prologs, there will never be any handler;
-       Prologs get handled like usual (ProcessUnwindOps), epilogs get handled by manually
-       executing all their instructions. */
-    do {
-        if (Offset < UnwindInfo->SizeOfProlog) {
-            break;
-        }
-
-        RtContext LocalContext;
-        memcpy(&LocalContext, ContextRecord, sizeof(RtContext));
-
-        /* Epilogs are allowed an ADD RSP, CONSTANT or a LEA RSP, CONSTANT[FPREG] at the
-           start. */
-        uint32_t Instr = *(uint32_t *)ControlPc;
-        if ((Instr & 0xFFFFFF) == 0xC48348) {
-            /* ADD RSP, IMM8 */
-            LocalContext.Rsp += Instr >> 24;
-            ControlPc += 4;
-        } else if ((Instr & 0xFFFFFF) == 0xC48148) {
-            /* ADD RSP, IMM32 */
-            LocalContext.Rsp += *(uint32_t *)(ControlPc + 3);
-            ControlPc += 7;
-        } else if ((Instr & 0x38FFFE) == 0x208D48) {
-            /* LEA RSP, M */
-            LocalContext.Rsp = LocalContext.Gpr[((Instr >> 16) & 0x07) + (Instr & 0x01) * 8];
-            switch ((Instr >> 22) & 0x03) {
-                /* [R] */
-                case 0:
-                    ControlPc += 3;
-                    break;
-                /* [R + imm8] */
-                case 1:
-                    LocalContext.Rsp += (int8_t)(Instr >> 24);
-                    ControlPc += 4;
-                    break;
-                /* [R + imm32] */
-                case 2:
-                    LocalContext.Rsp += *(int32_t *)(ControlPc + 3);
-                    ControlPc += 7;
-                    break;
-            }
-        }
-
-        /* Now, we should have N register pops, anything other than a pop (or a return/jump),
-           means this isn't an epilog. */
-        while (1) {
-            Instr = *(uint32_t *)ControlPc;
-            if ((Instr & 0xF8) == 0x58) {
-                /* POP REG */
-                LocalContext.Gpr[Instr & 0x07] = *(uint64_t *)LocalContext.Rsp;
-                LocalContext.Rsp += sizeof(uint64_t);
-                ControlPc += 1;
-            } else if ((Instr & 0xF8FB) == 0x5841) {
-                /* REX.B POP REG */
-                LocalContext.Gpr[((Instr >> 8) & 0x07) + 8] = *(uint64_t *)LocalContext.Rsp;
-                LocalContext.Rsp += sizeof(uint64_t);
-                ControlPc += 2;
-            } else {
-                break;
-            }
-        }
-
-        Instr = *(uint32_t *)ControlPc;
-        if ((Instr & 0xFF) == 0xEB || (Instr & 0xFF) == 0xE9) {
-            /* JMP IMM
-               Both branches into another function and into tail recursion means this is an
-               epilog. */
-
-            uint64_t Target = ControlPc - ImageBase;
-            if ((Instr & 0xFF) == 0xEB) {
-                /* JMP IMM8 */
-                Target += (int8_t)(Instr >> 8) + 2;
-            } else {
-                /* JMP IMM32 */
-                Target += *(int32_t *)(ControlPc + 1) + 5;
-            }
-
-            if ((Target > FunctionEntry->BeginAddress && Target < FunctionEntry->EndAddress) ||
-                (Target == FunctionEntry->BeginAddress &&
-                 (UnwindInfo->Flags & RT_UNW_FLAG_CHAININFO))) {
-                break;
-            }
-        } else if (
-            Instr != 0xC2 && Instr != 0xC3 && Instr != 0xCF && Instr != 0xC3F3 &&
-            (Instr & 0xFF48) != 0xCF48 && (Instr & 0x20FF) != 0x20FF &&
-            (Instr & 0x38FF48) != 0x28FF48) {
-            break;
-        }
-
-        /* We're RETing anyways, even on jumps (remember that we're trying to backtrack, not go
-           forward). */
-        LocalContext.Rip = *(uint64_t *)LocalContext.Rsp;
-        LocalContext.Rsp += sizeof(uint64_t);
-
-        memcpy(ContextRecord, &LocalContext, sizeof(RtContext));
-        return NULL;
-    } while (0);
+    /* Any compilers following the current SEH standard really shouldn't be depending on us
+     * manually detecting and executing the epilog instructions, so it should be safe to just
+     * fallback everything to the common path. */
 
     /* Skip any ops smaller than the current offset (they don't need to be executed/unwinded). */
     int OpIndex = 0;

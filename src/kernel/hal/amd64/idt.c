@@ -2,7 +2,10 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #include <amd64/halp.h>
+#include <ki.h>
 #include <mm.h>
+#include <rt/except.h>
+#include <stdio.h>
 #include <vid.h>
 
 typedef struct {
@@ -28,12 +31,37 @@ void HalpInterruptHandler(HalRegisterState *State) {
     HalpProcessor *Processor = (HalpProcessor *)HalGetCurrentProcessor();
 
     if (State->InterruptNumber < 32) {
-        VidPrint(
-            VID_MESSAGE_ERROR,
-            "Kernel HAL",
-            "processor %u received exception %llu\n",
-            Processor->ApicId,
-            State->InterruptNumber);
+        if (Processor->ApicId == 0) {
+            char ErrorMessage[256];
+            snprintf(
+                ErrorMessage,
+                256,
+                "Processor %u received exception %llu\n",
+                Processor->ApicId,
+                State->InterruptNumber);
+
+            VidSetColor(VID_COLOR_PANIC);
+            VidPutString("CANNOT SAFELY RECOVER OPERATION\n");
+            VidPutString(ErrorMessage);
+
+            RtContext Context;
+            RtSaveContext(&Context);
+            VidPutString("\nSTACK TRACE:\n");
+
+            do {
+                KiDumpSymbol((void *)Context.Rip);
+                uint64_t ImageBase = RtLookupImageBase(Context.Rip);
+                RtVirtualUnwind(
+                    RT_UNW_FLAG_NHANDLER,
+                    ImageBase,
+                    Context.Rip,
+                    RtLookupFunctionEntry(ImageBase, Context.Rip),
+                    &Context,
+                    NULL,
+                    NULL);
+            } while (Context.Rip >= MM_PAGE_SIZE);
+        }
+
         while (1)
             ;
     }
@@ -151,7 +179,7 @@ uint8_t HalInstallInterruptHandler(void (*Handler)(HalRegisterState *)) {
 void *HalpEnterCriticalSection(void) {
     uint64_t Flags;
     __asm__ volatile("pushfq; pop %0; cli" : "=r"(Flags));
-    return (void*)(Flags & 0x200);
+    return (void *)(Flags & 0x200);
 }
 
 /*-------------------------------------------------------------------------------------------------

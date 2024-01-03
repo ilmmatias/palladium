@@ -129,7 +129,11 @@ void PspScheduleNext(HalRegisterState *Context) {
 
             /* Setup a next timer tick (for events) if possible. */
             if (Processor->ClosestEvent) {
-                HalpSetEvent((Processor->ClosestEvent - CurrentTicks) * HalGetTimerPeriod());
+                if (Processor->ClosestEvent <= CurrentTicks) {
+                    HalpSetEvent(0);
+                } else {
+                    HalpSetEvent((Processor->ClosestEvent - CurrentTicks) * HalGetTimerPeriod());
+                }
             }
 
             return;
@@ -143,7 +147,7 @@ void PspScheduleNext(HalRegisterState *Context) {
                 ThreadQuantum = PSP_THREAD_MIN_QUANTUM;
             }
 
-            NewThread->Expiration = HalGetTimerTicks() + ThreadQuantum / HalGetTimerPeriod();
+            NewThread->Expiration = CurrentTicks + ThreadQuantum / HalGetTimerPeriod();
         }
 
         /* Try setting up a timer tick for the closest event; If we can't, we're on the idle
@@ -152,7 +156,9 @@ void PspScheduleNext(HalRegisterState *Context) {
         uint64_t EventDeadline = Processor->ClosestEvent ? Processor->ClosestEvent : UINT64_MAX;
 
         if (NewThread->Expiration || Processor->ClosestEvent) {
-            if (ThreadDeadline < EventDeadline) {
+            if (!NewThread->Expiration && EventDeadline <= CurrentTicks) {
+                HalpSetEvent(0);
+            } else if (ThreadDeadline < EventDeadline || EventDeadline <= CurrentTicks) {
                 HalpSetEvent((ThreadDeadline - CurrentTicks) * HalGetTimerPeriod());
             } else {
                 HalpSetEvent((EventDeadline - CurrentTicks) * HalGetTimerPeriod());
@@ -185,8 +191,10 @@ void PspScheduleNext(HalRegisterState *Context) {
     if (CurrentThread->Expiration || Processor->ClosestEvent) {
         if (ThreadDeadline < EventDeadline) {
             HalpSetEvent((ThreadDeadline - CurrentTicks) * HalGetTimerPeriod());
-        } else {
+        } else if (CurrentTicks < EventDeadline) {
             HalpSetEvent((EventDeadline - CurrentTicks) * HalGetTimerPeriod());
+        } else {
+            HalpSetEvent(0);
         }
     }
 }
