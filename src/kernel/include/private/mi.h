@@ -1,5 +1,5 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
- * SPDX-License-Identifier: BSD-3-Clause */
+ * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #ifndef _MI_H_
 #define _MI_H_
@@ -17,16 +17,10 @@
 #define MI_MAP_WRITE 0x01
 #define MI_MAP_EXEC 0x02
 
-typedef struct MiPageEntry {
+typedef struct __attribute__((packed)) MiPageEntry {
+    uint8_t References;
     uint64_t GroupBase;
     uint32_t GroupPages;
-
-    struct {
-        uint8_t References : 8;
-        uint8_t StartOfAllocation : 1;
-        uint8_t EndOfAllocation : 1;
-    };
-
     struct MiPageEntry *NextGroup;
     struct MiPageEntry *PreviousGroup;
 } MiPageEntry;

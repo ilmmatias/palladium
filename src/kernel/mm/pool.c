@@ -1,5 +1,5 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
- * SPDX-License-Identifier: BSD-3-Clause */
+ * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <halp.h>
 #include <mi.h>
@@ -50,14 +50,8 @@ static void *AllocatePoolPages(uint32_t Pages) {
             return NULL;
         }
 
-        /* FreePoolPages uses these two markers to count how many pages the allocation has. */
-
         if (!i) {
-            MiPageList[PhysicalAddress >> MM_PAGE_SHIFT].StartOfAllocation = 1;
-        }
-
-        if (i == Pages - 1) {
-            MiPageList[PhysicalAddress >> MM_PAGE_SHIFT].EndOfAllocation = 1;
+            MiPageList[PhysicalAddress >> MM_PAGE_SHIFT].GroupPages = Pages;
         }
     }
 
@@ -76,23 +70,13 @@ static void *AllocatePoolPages(uint32_t Pages) {
  *-----------------------------------------------------------------------------------------------*/
 static void FreePoolPages(void *Base) {
     uint64_t FirstPhysicalAddress = HalpGetPhysicalAddress(Base);
-    if (!MiPageList[FirstPhysicalAddress >> MM_PAGE_SHIFT].StartOfAllocation) {
-        KeFatalError(KE_BAD_POOL_HEADER);
+    uint32_t Pages = MiPageList[FirstPhysicalAddress >> MM_PAGE_SHIFT].GroupPages;
+
+    for (uint32_t i = 0; i < Pages; i++) {
+        MmDereferencePage(HalpGetPhysicalAddress((char *)Base + (i << MM_PAGE_SHIFT)));
     }
 
-    uint64_t Pages = 1;
-    uint64_t LastPhysicalAddress = FirstPhysicalAddress;
-    for (uint64_t i = 1; !MiPageList[LastPhysicalAddress >> MM_PAGE_SHIFT].EndOfAllocation; i++) {
-        MmDereferencePage(LastPhysicalAddress);
-        LastPhysicalAddress = HalpGetPhysicalAddress((char *)Base + (i << MM_PAGE_SHIFT));
-        Pages++;
-    }
-
-    MmDereferencePage(LastPhysicalAddress);
-    RtClearBits(&MiPoolBitmap, FirstPhysicalAddress >> MM_PAGE_SHIFT, Pages);
-
-    MiPageList[FirstPhysicalAddress >> MM_PAGE_SHIFT].StartOfAllocation = 0;
-    MiPageList[LastPhysicalAddress >> MM_PAGE_SHIFT].EndOfAllocation = 0;
+    RtClearBits(&MiPoolBitmap, ((uint64_t)Base - MiPoolStart) >> MM_PAGE_SHIFT, Pages);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -108,7 +92,7 @@ static void FreePoolPages(void *Base) {
  *     a new page failed.
  *-----------------------------------------------------------------------------------------------*/
 void *MmAllocatePool(size_t Size, const char Tag[4]) {
-    KeAcquireSpinLock(&Lock);
+    KeIrql Irql = KeAcquireSpinLock(&Lock);
 
     if (!Size) {
         Size = 1;
@@ -118,10 +102,10 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
        pointer size isn't 64-bits. */
     uint32_t Head = (Size + 0x0F) >> 4;
     if (Head > SMALL_BLOCK_COUNT) {
-        uint64_t Pages = (Size + MM_PAGE_SIZE - 1) >> MM_PAGE_SHIFT;
+        uint32_t Pages = (Size + MM_PAGE_SIZE - 1) >> MM_PAGE_SHIFT;
         void *Base = AllocatePoolPages(Pages);
 
-        KeReleaseSpinLock(&Lock);
+        KeReleaseSpinLock(&Lock, Irql);
 
         if (Base) {
             memset(Base, 0, Pages << MM_PAGE_SHIFT);
@@ -152,7 +136,7 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
             RtPushSList(&SmallBlocks[i - Head - 2], &RemainingSpace->ListHeader);
         }
 
-        KeReleaseSpinLock(&Lock);
+        KeReleaseSpinLock(&Lock, Irql);
         memset(Header + 1, 0, Head << 4);
 
         return Header + 1;
@@ -160,7 +144,7 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
 
     PoolHeader *Header = (PoolHeader *)AllocatePoolPages(1);
     if (!Header) {
-        KeReleaseSpinLock(&Lock);
+        KeReleaseSpinLock(&Lock, Irql);
         return NULL;
     }
 
@@ -176,7 +160,7 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
         RtPushSList(&SmallBlocks[SMALL_BLOCK_COUNT - Head - 2], &RemainingSpace->ListHeader);
     }
 
-    KeReleaseSpinLock(&Lock);
+    KeReleaseSpinLock(&Lock, Irql);
     memset(Header + 1, 0, Head << 4);
 
     return Header + 1;
@@ -193,13 +177,13 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void MmFreePool(void *Base, const char Tag[4]) {
-    KeAcquireSpinLock(&Lock);
+    KeIrql Irql = KeAcquireSpinLock(&Lock);
 
     /* MmAllocatePool guarantees anything that is inside the small pool buckets is never going to
        be page aligned. */
     if (!((uint64_t)Base & (MM_PAGE_SIZE - 1))) {
         FreePoolPages(Base);
-        KeReleaseSpinLock(&Lock);
+        KeReleaseSpinLock(&Lock, Irql);
         return;
     }
 
@@ -214,5 +198,5 @@ void MmFreePool(void *Base, const char Tag[4]) {
     }
 
     RtPushSList(&SmallBlocks[Header->Head - 1], &Header->ListHeader);
-    KeReleaseSpinLock(&Lock);
+    KeReleaseSpinLock(&Lock, Irql);
 }

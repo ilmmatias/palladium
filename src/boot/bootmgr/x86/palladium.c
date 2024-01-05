@@ -1,5 +1,5 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
- * SPDX-License-Identifier: BSD-3-Clause */
+ * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <boot.h>
 #include <display.h>
@@ -71,7 +71,7 @@ static void InstallIdtHandler(int Number, uint64_t Handler) {
        MmSize should always be `PagesOfMemory * sizeof(MiPageEntry)`, if MiPageEntry changes
        on the kernel, the size here needs to change too! */
     uint64_t PagesOfMemory = (BiUsableMemorySize + BI_PAGE_SIZE - 1) >> BI_PAGE_SHIFT;
-    void *MmBase = BmAllocatePages(PagesOfMemory * 32, BM_MD_KERNEL);
+    void *MmBase = BmAllocatePages(PagesOfMemory * 29, BM_MD_KERNEL);
     if (!MmBase) {
         BmPrint("Could not allocate enough memory for the memory manager.\n"
                 "Your system might not have enough usable memory.\n");

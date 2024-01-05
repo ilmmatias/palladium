@@ -1,5 +1,5 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
- * SPDX-License-Identifier: BSD-3-Clause */
+ * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <amd64/apic.h>
 #include <amd64/halp.h>
@@ -48,8 +48,8 @@ void HalpInitializeSmp(void) {
     Processor->ApicId = ApicId;
 
     Processor->Base.ThreadQueueSize = 1;
+    Processor->Base.ThreadQueueLock = 0;
     RtInitializeDList(&Processor->Base.ThreadQueue);
-    KeReleaseSpinLock(&Processor->Base.ThreadQueueLock);
 
     Processor->Base.ForceYield = 0;
     Processor->Base.ClosestEvent = 0;
@@ -78,8 +78,8 @@ void HalpInitializeSmp(void) {
         /* Initialize the scheduler queue before any other processor has any chances to access
            us. */
         Processor->Base.ThreadQueueSize = 0;
+        Processor->Base.ThreadQueueLock = 0;
         RtInitializeDList(&Processor->Base.ThreadQueue);
-        KeReleaseSpinLock(&Processor->Base.ThreadQueueLock);
 
         Processor->Base.ForceYield = 0;
         Processor->Base.ClosestEvent = 0;
@@ -143,7 +143,7 @@ HalProcessor *HalGetCurrentProcessor(void) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void HalpNotifyProcessor(HalProcessor *Processor, int WaitDelivery) {
-    HalpSendIpi(((HalpProcessor *)Processor)->ApicId, 0xFE);
+    HalpSendIpi(((HalpProcessor *)Processor)->ApicId, 0x40);
 
     if (WaitDelivery) {
         HalpWaitIpiDelivery();

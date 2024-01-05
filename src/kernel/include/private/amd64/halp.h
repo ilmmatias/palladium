@@ -1,5 +1,5 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
- * SPDX-License-Identifier: BSD-3-Clause */
+ * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #ifndef _AMD64_HALP_H_
 #define _AMD64_HALP_H_
@@ -11,6 +11,7 @@ typedef struct {
     HalProcessor Base;
     uint32_t ApicId;
     uint64_t GdtEntries[5];
+    KeIrql IdtIrqlSlots[256];
     struct __attribute__((packed)) {
         uint16_t BaseLow;
         uint16_t Cs;

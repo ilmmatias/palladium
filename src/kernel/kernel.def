@@ -16,6 +16,9 @@ EXPORTS
 
     KeAcquireSpinLock
     KeFatalError
+    KeGetIrql
+    KeLowerIrql
+    KeRaiseIrql
     KeReleaseSpinLock
     KeTestSpinLock
     KeTryAcquireSpinLock

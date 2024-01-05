@@ -1,5 +1,5 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
- * SPDX-License-Identifier: BSD-3-Clause */
+ * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <amd64/halp.h>
 #include <ki.h>
@@ -29,41 +29,59 @@ extern uint64_t HalpInterruptHandlerTable[256];
  *-----------------------------------------------------------------------------------------------*/
 void HalpInterruptHandler(HalRegisterState *State) {
     HalpProcessor *Processor = (HalpProcessor *)HalGetCurrentProcessor();
+    KeIrql Irql = KeRaiseIrql(Processor->IdtIrqlSlots[State->InterruptNumber]);
 
     if (State->InterruptNumber < 32) {
-        if (Processor->ApicId == 0) {
-            char ErrorMessage[256];
-            snprintf(
-                ErrorMessage,
-                256,
-                "Processor %u received exception %llu\n",
-                Processor->ApicId,
-                State->InterruptNumber);
+        /* We don't care about the current IRQL, reset it to DISPATCH, or most functions we want
+         * to use won't work. */
+        HalpSetIrql(KE_IRQL_DISPATCH);
 
-            VidSetColor(VID_COLOR_PANIC);
-            VidPutString("CANNOT SAFELY RECOVER OPERATION\n");
-            VidPutString(ErrorMessage);
-
-            RtContext Context;
-            RtSaveContext(&Context);
-            VidPutString("\nSTACK TRACE:\n");
-
-            do {
-                KiDumpSymbol((void *)Context.Rip);
-                uint64_t ImageBase = RtLookupImageBase(Context.Rip);
-                RtVirtualUnwind(
-                    RT_UNW_FLAG_NHANDLER,
-                    ImageBase,
-                    Context.Rip,
-                    RtLookupFunctionEntry(ImageBase, Context.Rip),
-                    &Context,
-                    NULL,
-                    NULL);
-            } while (Context.Rip >= MM_PAGE_SIZE);
+        /* Panics always halt everyone (the system isn't in a safe state anymore). */
+        for (RtSList *ListHeader = HalpProcessorListHead.Next; ListHeader;
+             ListHeader = ListHeader->Next) {
+            HalProcessor *Processor = CONTAINING_RECORD(ListHeader, HalProcessor, ListHeader);
+            Processor->EventStatus = HAL_PANIC_EVENT;
+            HalpNotifyProcessor(Processor, 0);
         }
 
-        while (1)
-            ;
+        char ErrorMessage[256];
+        snprintf(
+            ErrorMessage,
+            256,
+            "Processor %u received exception %llu\n",
+            Processor->ApicId,
+            State->InterruptNumber);
+
+        VidSetColor(VID_COLOR_PANIC);
+        VidPutString("CANNOT SAFELY RECOVER OPERATION\n");
+        VidPutString(ErrorMessage);
+
+        RtContext Context;
+        Context.Rsp = State->Rsp;
+        Context.Rip = State->Rip;
+        VidPutString("\nSTACK TRACE:\n");
+
+        while (1) {
+            KiDumpSymbol((void *)Context.Rip);
+
+            if (Context.Rip < MM_PAGE_SIZE) {
+                break;
+            }
+
+            uint64_t ImageBase = RtLookupImageBase(Context.Rip);
+            RtVirtualUnwind(
+                RT_UNW_FLAG_NHANDLER,
+                ImageBase,
+                Context.Rip,
+                RtLookupFunctionEntry(ImageBase, Context.Rip),
+                &Context,
+                NULL,
+                NULL);
+        }
+
+        while (1) {
+            HalpStopProcessor();
+        }
     }
 
     RtSList *ListHeader = Processor->IdtSlots[State->InterruptNumber - 32].ListHead.Next;
@@ -73,6 +91,7 @@ void HalpInterruptHandler(HalRegisterState *State) {
     }
 
     HalpSendEoi();
+    KeLowerIrql(Irql);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -90,6 +109,10 @@ void HalpInitializeIdt(HalpProcessor *Processor) {
     /* Interrupts remain disabled up until the Local APIC is configured (our interrupt handler
        is setup to send EOI to the APIC, not the PIC). */
     __asm__ volatile("cli");
+
+    for (int i = 0; i < 256; i++) {
+        Processor->IdtIrqlSlots[i] = KE_IRQL_MASK;
+    }
 
     for (int i = 0; i < 256; i++) {
         Processor->IdtEntries[i].BaseLow = HalpInterruptHandlerTable[i];
@@ -111,7 +134,7 @@ void HalpInitializeIdt(HalpProcessor *Processor) {
     __asm__ volatile("lidt %0" :: "m"(Processor->IdtDescriptor));
 
     /* Register the DPC/event handler. */
-    HalInstallInterruptHandlerAt(0xDE, EvpHandleEvents);
+    HalInstallInterruptHandlerAt(0x40, EvpHandleEvents, KE_IRQL_DISPATCH);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -125,16 +148,20 @@ void HalpInitializeIdt(HalpProcessor *Processor) {
  * RETURN VALUE:
  *     1 on success, 0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int HalInstallInterruptHandlerAt(uint8_t Vector, void (*Handler)(HalRegisterState *)) {
+int HalInstallInterruptHandlerAt(
+    uint8_t Vector,
+    void (*Handler)(HalRegisterState *),
+    KeIrql TargetIrql) {
     IdtHandler *Entry = MmAllocatePool(sizeof(IdtHandler), "Apic");
     if (!Entry) {
         return 0;
     }
 
     HalpProcessor *Processor = (HalpProcessor *)HalGetCurrentProcessor();
-    Processor->IdtSlots[Vector].Usage++;
+    Processor->IdtSlots[Vector - 32].Usage++;
+    Processor->IdtIrqlSlots[Vector] = TargetIrql;
     Entry->Handler = Handler;
-    RtPushSList(&Processor->IdtSlots[Vector].ListHead, &Entry->ListHeader);
+    RtPushSList(&Processor->IdtSlots[Vector - 32].ListHead, &Entry->ListHeader);
 
     return 1;
 }
@@ -150,7 +177,7 @@ int HalInstallInterruptHandlerAt(uint8_t Vector, void (*Handler)(HalRegisterStat
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-uint8_t HalInstallInterruptHandler(void (*Handler)(HalRegisterState *)) {
+uint8_t HalInstallInterruptHandler(void (*Handler)(HalRegisterState *), KeIrql TargetIrql) {
     HalpProcessor *Processor = (HalpProcessor *)HalGetCurrentProcessor();
     uint32_t SmallestUsage = UINT32_MAX;
     uint8_t Index = 0;
@@ -162,7 +189,7 @@ uint8_t HalInstallInterruptHandler(void (*Handler)(HalRegisterState *)) {
         }
     }
 
-    return HalInstallInterruptHandlerAt(Index, Handler) ? Index : -1;
+    return HalInstallInterruptHandlerAt(Index + 32, Handler, TargetIrql) ? Index + 32 : -1;
 }
 
 /*-------------------------------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
- * SPDX-License-Identifier: BSD-3-Clause */
+ * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <amd64/halp.h>
 #include <vid.h>
@@ -7,7 +7,6 @@
 extern void EvpHandleEvents(HalRegisterState *);
 
 static uint64_t Period = 0;
-static uint8_t Irq = 0;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -35,15 +34,14 @@ void HalpInitializeApicTimer(void) {
         Accum += UINT32_MAX - HalpReadLapicRegister(0x390);
     }
 
-    /* Allocate a vector and enable interrupts (and we're done). */
-    Irq = HalInstallInterruptHandler(EvpHandleEvents);
-    if (Irq == (uint8_t)-1) {
-        VidPrint(
-            VID_MESSAGE_ERROR, "Kernel HAL", "could not allocate an IRQ for the event timer\n");
+    /* Install the vector (into the shared event handler) and enable interrupts (we should be
+     * done). */
+    if (!HalInstallInterruptHandlerAt(0x40, EvpHandleEvents, KE_IRQL_DISPATCH)) {
+        VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "could not install the handler for the timer\n");
         KeFatalError(KE_FATAL_ERROR);
     }
 
-    HalpWriteLapicRegister(0x320, Irq + 32);
+    HalpWriteLapicRegister(0x320, 0x40);
 
     /* Round to closest, or we might be very off. */
     Period = (40000000 + Accum / 2) / Accum;

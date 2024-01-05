@@ -1,5 +1,5 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
- * SPDX-License-Identifier: BSD-3-Clause */
+ * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <io.h>
 #include <ke.h>
@@ -41,9 +41,9 @@ int IoCreateDevice(const char *Name, IoReadFn Read, IoWriteFn Write) {
     Entry->Read = Read;
     Entry->Write = Write;
 
-    KeAcquireSpinLock(&Lock);
+    KeIrql Irql = KeAcquireSpinLock(&Lock);
     RtPushSList(&DeviceListHead, &Entry->ListHeader);
-    KeReleaseSpinLock(&Lock);
+    KeReleaseSpinLock(&Lock, Irql);
 
     return 1;
 }
@@ -59,17 +59,17 @@ int IoCreateDevice(const char *Name, IoReadFn Read, IoWriteFn Write) {
  *     Pointer to the device on success, NULL otherwise.
  *-----------------------------------------------------------------------------------------------*/
 IoDevice *IoOpenDevice(const char *Name) {
-    KeAcquireSpinLock(&Lock);
+    KeIrql Irql = KeAcquireSpinLock(&Lock);
 
     RtSList *ListHeader = DeviceListHead.Next;
     while (ListHeader) {
         IoDevice *Entry = CONTAINING_RECORD(ListHeader, IoDevice, ListHeader);
         if (!strcmp(Entry->Name, Name)) {
-            KeReleaseSpinLock(&Lock);
+            KeReleaseSpinLock(&Lock, Irql);
             return Entry;
         }
     }
 
-    KeReleaseSpinLock(&Lock);
+    KeReleaseSpinLock(&Lock, Irql);
     return NULL;
 }

@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: (C) 2023 ilmmatias
-# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-License-Identifier: GPL-3.0-or-later
 
 function(add_executable target type has_lib)
     _add_executable(${target} ${ARGN})

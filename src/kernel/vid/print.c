@@ -1,5 +1,5 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
- * SPDX-License-Identifier: BSD-3-Clause */
+ * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <crt_impl.h>
 #include <ke.h>
@@ -159,7 +159,7 @@ static void DrawCharacter(char Character) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void VidResetDisplay(void) {
-    KeAcquireSpinLock(&VidpLock);
+    KeIrql Irql = KeAcquireSpinLock(&VidpLock);
 
     /* While the color/attribute is left untouched, the cursor is always reset to 0;0. */
     VidpCursorX = 0;
@@ -175,7 +175,7 @@ void VidResetDisplay(void) {
     FlushLines = VidpHeight;
     Flush();
 
-    KeReleaseSpinLock(&VidpLock);
+    KeReleaseSpinLock(&VidpLock, Irql);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -261,7 +261,7 @@ static void PutBuffer(const void *buffer, int size, void *context) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void VidPutChar(char Character) {
-    KeAcquireSpinLock(&VidpLock);
+    KeIrql Irql = KeAcquireSpinLock(&VidpLock);
 
     FlushY = VidpCursorY;
     PutChar(Character);
@@ -271,7 +271,7 @@ void VidPutChar(char Character) {
     }
 
     Flush();
-    KeReleaseSpinLock(&VidpLock);
+    KeReleaseSpinLock(&VidpLock, Irql);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -285,7 +285,7 @@ void VidPutChar(char Character) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void VidPutString(const char *String) {
-    KeAcquireSpinLock(&VidpLock);
+    KeIrql Irql = KeAcquireSpinLock(&VidpLock);
 
     FlushY = VidpCursorY;
     PutString(String);
@@ -295,7 +295,7 @@ void VidPutString(const char *String) {
     }
 
     Flush();
-    KeReleaseSpinLock(&VidpLock);
+    KeReleaseSpinLock(&VidpLock, Irql);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -313,27 +313,27 @@ void VidPutString(const char *String) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void VidPrintVariadic(int Type, const char *Prefix, const char *Message, va_list Arguments) {
-    KeAcquireSpinLock(&VidpLock);
+    KeIrql Irql = KeAcquireSpinLock(&VidpLock);
 
     /* Make sure this specific type of message wasn't disabled at compile time. */
     switch (Type) {
         case VID_MESSAGE_TRACE:
             if (!VID_ENABLE_MESSAGE_TRACE) {
-                KeReleaseSpinLock(&VidpLock);
+                KeReleaseSpinLock(&VidpLock, Irql);
                 return;
             }
 
             break;
         case VID_MESSAGE_DEBUG:
             if (!VID_ENABLE_MESSAGE_DEBUG) {
-                KeReleaseSpinLock(&VidpLock);
+                KeReleaseSpinLock(&VidpLock, Irql);
                 return;
             }
 
             break;
         case VID_MESSAGE_INFO:
             if (!VID_ENABLE_MESSAGE_INFO) {
-                KeReleaseSpinLock(&VidpLock);
+                KeReleaseSpinLock(&VidpLock, Irql);
                 return;
             }
 
@@ -373,7 +373,7 @@ void VidPrintVariadic(int Type, const char *Prefix, const char *Message, va_list
     }
 
     Flush();
-    KeReleaseSpinLock(&VidpLock);
+    KeReleaseSpinLock(&VidpLock, Irql);
 }
 
 /*-------------------------------------------------------------------------------------------------

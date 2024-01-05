@@ -1,5 +1,5 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
- * SPDX-License-Identifier: BSD-3-Clause */
+ * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <ke.h>
 #include <mi.h>
@@ -111,13 +111,15 @@ uint64_t MmAllocatePages(uint32_t Pages) {
         Pages = 1;
     }
 
-    KeAcquireSpinLock(&PageListLock);
+    KeIrql Irql = KeAcquireSpinLock(&PageListLock);
 
     /* Deferred free pages are always size 1, we can/should use them if possible. */
     if (DeferredFreePageListHead && Pages == 1) {
         MiPageEntry *Page = DeferredFreePageListHead;
         DeferredFreePageListHead = Page->NextGroup;
-        KeReleaseSpinLock(&PageListLock);
+        DeferredFreePageListSize--;
+        Page->References = 1;
+        KeReleaseSpinLock(&PageListLock, Irql);
         return Page->GroupBase;
     }
 
@@ -132,6 +134,10 @@ uint64_t MmAllocatePages(uint32_t Pages) {
             Group = Group->NextGroup;
         }
 
+        if (Group) {
+            break;
+        }
+
         Retry--;
         if (Retry) {
             DeferredFreePages();
@@ -139,28 +145,38 @@ uint64_t MmAllocatePages(uint32_t Pages) {
     } while (Retry);
 
     if (!Group) {
-        KeReleaseSpinLock(&PageListLock);
+        KeReleaseSpinLock(&PageListLock, Irql);
         return 0;
     }
 
-    /* On non perfectly sized matches, we can just update the group base and size. */
+    /* On non perfectly sized matches, we can just update which entry is the group base. */
+
     if (Pages < Group->GroupPages) {
-        uint64_t Base = Group->GroupBase;
+        MiPageEntry *Entry = Group + Pages;
+        Entry->GroupBase = Group->GroupBase + (Pages << MM_PAGE_SHIFT);
+        Entry->GroupPages = Group->GroupPages - Pages;
+        Entry->PreviousGroup = Group->PreviousGroup;
+        Entry->NextGroup = Group->NextGroup;
 
-        Group->GroupBase += (uint64_t)Pages << MM_PAGE_SHIFT;
-        Group->GroupPages -= Pages;
-
-        for (uint32_t i = 0; i < Pages; i++) {
-            MiPageList[(Base >> MM_PAGE_SHIFT) + i].References = 1;
+        if (Entry->PreviousGroup) {
+            Entry->PreviousGroup->NextGroup = Entry;
+        } else {
+            MiFreePageListHead = Entry;
         }
 
-        KeReleaseSpinLock(&PageListLock);
-        return Base;
+        if (Entry->NextGroup) {
+            Entry->NextGroup->PreviousGroup = Entry;
+        }
+
+        for (uint32_t i = 0; i < Pages; i++) {
+            (Group + i)->References = 1;
+        }
+
+        KeReleaseSpinLock(&PageListLock, Irql);
+        return Group->GroupBase;
     }
 
-    /* On perfect match, we have two options:
-           - Set the size to zero, and leave it in place, waiting for clean up later.
-           - Remove the group from the linked list; This is what we're doing below. */
+    /* Otherwise, we can just remove the current entry. */
 
     if (Group->PreviousGroup) {
         Group->PreviousGroup->NextGroup = Group->NextGroup;
@@ -173,10 +189,10 @@ uint64_t MmAllocatePages(uint32_t Pages) {
     }
 
     for (uint32_t i = 0; i < Pages; i++) {
-        MiPageList[(Group->GroupBase >> MM_PAGE_SHIFT) + i].References = 1;
+        (Group + i)->References = 1;
     }
 
-    KeReleaseSpinLock(&PageListLock);
+    KeReleaseSpinLock(&PageListLock, Irql);
     return Group->GroupBase;
 }
 
@@ -191,13 +207,13 @@ uint64_t MmAllocatePages(uint32_t Pages) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void MmReferencePage(uint64_t PhysicalAddress) {
-    KeAcquireSpinLock(&PageListLock);
+    KeIrql Irql = KeAcquireSpinLock(&PageListLock);
 
     if (MiPageList[PhysicalAddress >> MM_PAGE_SHIFT].References != UINT8_MAX) {
         MiPageList[PhysicalAddress >> MM_PAGE_SHIFT].References++;
     }
 
-    KeReleaseSpinLock(&PageListLock);
+    KeReleaseSpinLock(&PageListLock, Irql);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -212,22 +228,22 @@ void MmReferencePage(uint64_t PhysicalAddress) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void MmDereferencePage(uint64_t PhysicalAddress) {
-    KeAcquireSpinLock(&PageListLock);
+    KeIrql Irql = KeAcquireSpinLock(&PageListLock);
 
     if (!MiPageList[PhysicalAddress >> MM_PAGE_SHIFT].References--) {
         KeFatalError(KE_DOUBLE_PAGE_FREE);
     }
 
     if (MiPageList[PhysicalAddress >> MM_PAGE_SHIFT].References) {
-        KeReleaseSpinLock(&PageListLock);
+        KeReleaseSpinLock(&PageListLock, Irql);
         return;
     }
 
-    MiPageEntry *Entry = &MiPageList[PhysicalAddress >> 12];
+    MiPageEntry *Entry = &MiPageList[PhysicalAddress >> MM_PAGE_SHIFT];
     Entry->GroupBase = PhysicalAddress;
     Entry->GroupPages = 1;
     Entry->PreviousGroup = NULL;
-    Entry->NextGroup = MiFreePageListHead;
+    Entry->NextGroup = DeferredFreePageListHead;
 
     DeferredFreePageListHead = Entry;
     DeferredFreePageListSize++;
@@ -236,5 +252,5 @@ void MmDereferencePage(uint64_t PhysicalAddress) {
         DeferredFreePages();
     }
 
-    KeReleaseSpinLock(&PageListLock);
+    KeReleaseSpinLock(&PageListLock, Irql);
 }

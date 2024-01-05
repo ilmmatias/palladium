@@ -1,9 +1,10 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
- * SPDX-License-Identifier: BSD-3-Clause */
+ * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <boot.h>
 #include <mi.h>
 #include <rt/bitmap.h>
+#include <string.h>
 
 extern MiPageEntry *MiPageList;
 extern MiPageEntry *MiFreePageListHead;
@@ -23,7 +24,6 @@ extern RtBitmap MiPoolBitmap;
  *-----------------------------------------------------------------------------------------------*/
 void MiInitializePageAllocator(LoaderBootData *BootData) {
     MiPageEntry *Tail = NULL;
-
     MiPageList = (MiPageEntry *)BootData->MemoryManager.PageAllocatorBase;
 
     for (uint32_t i = 0; i < BootData->MemoryMap.Count; i++) {
@@ -58,7 +58,6 @@ void MiInitializePageAllocator(LoaderBootData *BootData) {
 
         MiPageEntry *Group = &MiPageList[Region->BaseAddress >> MM_PAGE_SHIFT];
 
-        Group->References = 0;
         Group->GroupBase = Region->BaseAddress;
         Group->GroupPages = Region->Length >> MM_PAGE_SHIFT;
         Group->NextGroup = NULL;

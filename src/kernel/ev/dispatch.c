@@ -1,7 +1,6 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
- * SPDX-License-Identifier: BSD-3-Clause */
+ * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#include <ev.h>
 #include <halp.h>
 #include <psp.h>
 
@@ -160,6 +159,14 @@ void EvpHandleEvents(HalRegisterState *Context) {
     HalProcessor *Processor = HalGetCurrentProcessor();
     uint64_t CurrentTicks = HalGetTimerTicks();
 
+    /* Someone else crashed? Halt this CPU, the crashing core should handle printing the error
+     * message to the screen. */
+    if (Processor->EventStatus == HAL_PANIC_EVENT) {
+        while (1) {
+            HalpStopProcessor();
+        }
+    }
+
     /* Process any pending events (they might enqueue DPCs, so we need to process them first). */
     RtDList *ListHeader = Processor->EventQueue.Next;
     while (ListHeader != &Processor->EventQueue) {
@@ -178,10 +185,10 @@ void EvpHandleEvents(HalRegisterState *Context) {
 
             if (Header->Source) {
                 /* Boost the priority of the waiting task, and insert it back. */
-                KeAcquireSpinLock(&Processor->ThreadQueueLock);
+                KeIrql Irql = KeAcquireSpinLock(&Processor->ThreadQueueLock);
                 __atomic_add_fetch(&Processor->ThreadQueueSize, 1, __ATOMIC_SEQ_CST);
                 RtPushDList(&Processor->ThreadQueue, &Header->Source->ListHeader);
-                KeReleaseSpinLock(&Processor->ThreadQueueLock);
+                KeReleaseSpinLock(&Processor->ThreadQueueLock, Irql);
             }
 
             if (Header->Dpc) {

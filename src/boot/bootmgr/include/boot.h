@@ -1,5 +1,5 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
- * SPDX-License-Identifier: BSD-3-Clause */
+ * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #ifndef _BOOT_H_
 #define _BOOT_H_
@@ -22,7 +22,7 @@ typedef struct __attribute__((packed)) {
     uint64_t PhysicalAddress;
     uint64_t ImageSize;
     uint64_t EntryPoint;
-    int* PageFlags;
+    int *PageFlags;
     char *Name;
 } LoadedImage;
 
@@ -57,13 +57,13 @@ typedef struct __attribute__((packed)) {
 
 /* The following parameter should always be bigger or equal to sizeof(HalpProcessor). */
 #if defined(ARCH_x86) || defined(ARCH_amd64)
-#define SIZEOF_PROCESSOR 0x6000
+#define SIZEOF_PROCESSOR 0x7000
 #else
 #error "Undefined ARCH for the bootmgr module!"
 #endif /* ARCH */
 
 void BiInitializePlatform(void);
 
-[[noreturn]] void BiStartPalladium(LoadedImage* Images, size_t ImageCount);
+[[noreturn]] void BiStartPalladium(LoadedImage *Images, size_t ImageCount);
 
 #endif /* _BOOT_H_ */

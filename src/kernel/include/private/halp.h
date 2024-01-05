@@ -1,5 +1,5 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
- * SPDX-License-Identifier: BSD-3-Clause */
+ * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #ifndef _HALP_H_
 #define _HALP_H_
@@ -16,6 +16,8 @@ extern uint32_t HalpProcessorCount;
 extern RtSList HalpProcessorListHead;
 
 void HalpInitializePlatform(int IsBsp, void *Processor);
+void HalpStopProcessor(void);
+void HalpPauseProcessor(void);
 
 uint64_t HalpGetPhysicalAddress(void *VirtualAddress);
 int HalpMapPage(void *VirtualAddress, uint64_t PhysicalAddress, int Flags);
@@ -25,6 +27,9 @@ void HalpNotifyProcessor(HalProcessor *Processor, int WaitDelivery);
 
 void *HalpEnterCriticalSection(void);
 void HalpLeaveCriticalSection(void *Context);
+
+KeIrql HalpGetIrql(void);
+void HalpSetIrql(KeIrql NewIrql);
 
 void HalpInitializeThreadContext(
     HalRegisterState *Context,

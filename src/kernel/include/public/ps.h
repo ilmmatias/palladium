@@ -1,5 +1,5 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
- * SPDX-License-Identifier: BSD-3-Clause */
+ * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #ifndef _PS_H_
 #define _PS_H_
@@ -10,16 +10,19 @@
 #error "Undefined ARCH for the kernel module!"
 #endif /* ARCH */
 
-#include <rt/list.h>
+#include <ev.h>
 
-typedef struct {
+typedef struct PsThread {
     RtDList ListHeader;
-    char *Stack;
     uint64_t Expiration;
+    int Terminated;
+    EvDpc TerminationDpc;
     HalRegisterState Context;
+    char *Stack;
 } PsThread;
 
 PsThread *PsCreateThread(void (*EntryPoint)(void *), void *Parameter);
 void PsReadyThread(PsThread *Thread);
+[[noreturn]] void PsTerminateThread(void);
 
 #endif /* _PS_H_ */

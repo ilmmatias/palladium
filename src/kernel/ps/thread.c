@@ -1,5 +1,5 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
- * SPDX-License-Identifier: BSD-3-Clause */
+ * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <halp.h>
 #include <ke.h>
@@ -36,8 +36,29 @@ PsThread *PsCreateThread(void (*EntryPoint)(void *), void *Parameter) {
         return NULL;
     }
 
-    HalpInitializeThreadContext(&Thread->Context, Thread->Stack, KE_STACK_SIZE, EntryPoint, Parameter);
+    HalpInitializeThreadContext(
+        &Thread->Context, Thread->Stack, KE_STACK_SIZE, EntryPoint, Parameter);
+
     return Thread;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function marks the current thread for deletion, and yields out into the next thread.
+ *
+ * PARAMETERS:
+ *     None.
+ *
+ * RETURN VALUE:
+ *     Does not return.
+ *-----------------------------------------------------------------------------------------------*/
+[[noreturn]] void PsTerminateThread(void) {
+    PsThread *Thread = HalGetCurrentProcessor()->CurrentThread;
+    Thread->Terminated = 1;
+    HalpSetEvent(0);
+    while (1) {
+        HalpStopProcessor();
+    }
 }
 
 /*-------------------------------------------------------------------------------------------------
