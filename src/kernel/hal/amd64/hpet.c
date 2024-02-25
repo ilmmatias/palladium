@@ -2,8 +2,9 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <amd64/hpet.h>
+#include <halp.h>
 #include <ke.h>
-#include <mm.h>
+#include <mi.h>
 #include <vid.h>
 
 static void *HpetAddress = NULL;
@@ -58,6 +59,10 @@ void HalpInitializeHpet(void) {
     }
 
     HpetAddress = MI_PADDR_TO_VADDR(Hpet->Address);
+    if (!HalpMapPage(HpetAddress, Hpet->Address, MI_MAP_WRITE)) {
+        VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "couldn't map the HPET table\n");
+        KeFatalError(KE_BAD_ACPI_TABLES);
+    }
 
     uint64_t Caps = ReadHpetRegister(HPET_CAP_REG);
     Period = Caps >> 32;

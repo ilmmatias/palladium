@@ -7,32 +7,12 @@
 #include <amd64/hal.h>
 #include <halp.h>
 
-typedef struct {
-    HalProcessor Base;
-    uint32_t ApicId;
-    uint64_t GdtEntries[5];
-    KeIrql IdtIrqlSlots[256];
-    struct __attribute__((packed)) {
-        uint16_t BaseLow;
-        uint16_t Cs;
-        uint8_t Ist;
-        uint8_t Attributes;
-        uint16_t BaseMid;
-        uint32_t BaseHigh;
-        uint32_t Reserved;
-    } IdtEntries[256];
-    struct {
-        RtSList ListHead;
-        uint32_t Usage;
-    } IdtSlots[224];
-    struct __attribute__((packed)) {
-        uint16_t Limit;
-        uint64_t Base;
-    } GdtDescriptor, IdtDescriptor;
-} HalpProcessor;
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
 
-void HalpInitializeIdt(HalpProcessor *Processor);
-void HalpInitializeGdt(HalpProcessor *Processor);
+void HalpInitializeIdt(KeProcessor *Processor);
+void HalpInitializeGdt(KeProcessor *Processor);
 void HalpFlushGdt(void);
 
 void HalpInitializeApic(void);
@@ -52,5 +32,9 @@ void HalpInitializeHpet(void);
 void HalpInitializeApicTimer(void);
 
 void HalpInitializeSmp(void);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif /* _AMD64_HALP_H_ */

@@ -68,11 +68,15 @@ typedef int (*RtExceptionRoutine)(
 typedef int (*RtExceptionFilter)(RtExceptionPointers *ExceptionPointers, uint64_t EstablisherFrame);
 typedef void (*RtTerminationHandler)(int AbnormalTermination, uint64_t EstablisherFrame);
 
-#if defined(ARCH_x86) || defined(ARCH_amd64)
+#if defined(ARCH_amd64)
 #include <rt/amd64/unwind.h>
 #else
 #error "Undefined ARCH for the rt module!"
 #endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
 
 uint64_t RtLookupImageBase(uint64_t Address);
 RtRuntimeFunction *RtLookupFunctionEntry(uint64_t ImageBase, uint64_t Address);
@@ -90,5 +94,9 @@ RtExceptionRoutine RtVirtualUnwind(
 RtUnwind(void *TargetFrame, void *TargetIp, RtExceptionRecord *ExceptionRecord, void *ReturnValue);
 
 int RtDispatchException(RtExceptionRecord *ExceptionRecord, RtContext *ContextRecord);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif /* _RT_EXCEPT_H_ */

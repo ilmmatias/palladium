@@ -26,6 +26,6 @@ int toupper(int ch);
 
 #ifdef __cplusplus
 }
-#endif
+#endif /* __cplusplus */
 
 #endif /* CTYPE_H */

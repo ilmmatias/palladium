@@ -4,7 +4,7 @@
 #ifndef _VIDP_H_
 #define _VIDP_H_
 
-#include <boot.h>
+#include <ki.h>
 #include <vid.h>
 
 typedef struct {
@@ -24,6 +24,14 @@ typedef struct {
     const uint8_t *GlyphData;
 } VidpFontData;
 
-void VidpInitialize(LoaderBootData *BootData);
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
+void VidpInitialize(KiLoaderBlock *LoaderBlock);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif /* _VIDP_H_ */

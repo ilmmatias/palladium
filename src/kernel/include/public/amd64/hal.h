@@ -7,11 +7,19 @@
 #include <amd64/regs.h>
 #include <hal.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 int HalInstallInterruptHandlerAt(
     uint8_t Vector,
     void (*Handler)(HalRegisterState *),
     KeIrql TargetIrql);
 
 uint8_t HalInstallInterruptHandler(void (*Handler)(HalRegisterState *), KeIrql TargetIrql);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif /* _AMD64_HAL_H_ */

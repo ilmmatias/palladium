@@ -3,7 +3,7 @@
 
 #include <amd64/apic.h>
 #include <amd64/halp.h>
-#include <mm.h>
+#include <mi.h>
 #include <vid.h>
 
 static RtSList IoapicListHead = {};
@@ -113,6 +113,11 @@ void HalpInitializeIoapic(void) {
                 Entry->Id = Record->Ioapic.IoapicId;
                 Entry->GsiBase = Record->Ioapic.GsiBase;
                 Entry->VirtualAddress = MI_PADDR_TO_VADDR(Record->Ioapic.Address);
+                if (!HalpMapPage(Entry->VirtualAddress, Record->Ioapic.Address, MI_MAP_WRITE)) {
+                    VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "couldn't allocate map an IOAPIC\n");
+                    KeFatalError(KE_OUT_OF_MEMORY);
+                }
+
                 Entry->Size = (ReadIoapicRegister(Entry, IOAPIC_VER_REG) >> 16) + 1;
 
                 /* Set some sane defaults for all IOAPICs we find. */
@@ -200,7 +205,7 @@ void HalpEnableIrq(uint8_t Irq, uint8_t Vector) {
         Vector + 32,
         PinPolarity,
         TriggerMode,
-        ((HalpProcessor *)HalGetCurrentProcessor())->ApicId);
+        ((KeProcessor *)HalGetCurrentProcessor())->ApicId);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -215,5 +220,5 @@ void HalpEnableIrq(uint8_t Irq, uint8_t Vector) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void HalpEnableGsi(uint8_t Gsi, uint8_t Vector) {
-    UnmaskIoapicVector(Gsi, Vector + 32, 0, 1, ((HalpProcessor *)HalGetCurrentProcessor())->ApicId);
+    UnmaskIoapicVector(Gsi, Vector + 32, 0, 1, ((KeProcessor *)HalGetCurrentProcessor())->ApicId);
 }

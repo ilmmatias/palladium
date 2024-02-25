@@ -14,9 +14,17 @@
 #define PSP_YIELD_REQUEST 1
 #define PSP_YIELD_EVENT 2
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 void PspCreateSystemThread(void);
 void PspCreateIdleThread(void);
 void PspInitializeScheduler(int IsBsp);
 void PspScheduleNext(HalRegisterState *Context);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif /* _PSP_H_ */

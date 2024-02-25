@@ -16,7 +16,7 @@ extern void HalpFlushGdt(void);
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void HalpInitializeGdt(HalpProcessor *Processor) {
+void HalpInitializeGdt(KeProcessor *Processor) {
     Processor->GdtEntries[0] = 0x0000000000000000;
     Processor->GdtEntries[1] = 0x00AF9A000000FFFF;
     Processor->GdtEntries[2] = 0x00AF92000000FFFF;

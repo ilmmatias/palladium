@@ -28,8 +28,9 @@ extern uint64_t HalpInterruptHandlerTable[256];
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void HalpInterruptHandler(HalRegisterState *State) {
-    HalpProcessor *Processor = (HalpProcessor *)HalGetCurrentProcessor();
+    KeProcessor *Processor = (KeProcessor *)HalGetCurrentProcessor();
     KeIrql Irql = KeRaiseIrql(Processor->IdtIrqlSlots[State->InterruptNumber]);
+    __asm__ volatile("sti");
 
     if (State->InterruptNumber < 32) {
         /* We don't care about the current IRQL, reset it to DISPATCH, or most functions we want
@@ -39,8 +40,8 @@ void HalpInterruptHandler(HalRegisterState *State) {
         /* Panics always halt everyone (the system isn't in a safe state anymore). */
         for (RtSList *ListHeader = HalpProcessorListHead.Next; ListHeader;
              ListHeader = ListHeader->Next) {
-            HalProcessor *Processor = CONTAINING_RECORD(ListHeader, HalProcessor, ListHeader);
-            Processor->EventStatus = HAL_PANIC_EVENT;
+            KeProcessor *Processor = CONTAINING_RECORD(ListHeader, KeProcessor, ListHeader);
+            Processor->EventStatus = KE_PANIC_EVENT;
             HalpNotifyProcessor(Processor, 0);
         }
 
@@ -91,6 +92,7 @@ void HalpInterruptHandler(HalRegisterState *State) {
     }
 
     HalpSendEoi();
+    __asm__ volatile("cli");
     KeLowerIrql(Irql);
 }
 
@@ -105,7 +107,7 @@ void HalpInterruptHandler(HalRegisterState *State) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void HalpInitializeIdt(HalpProcessor *Processor) {
+void HalpInitializeIdt(KeProcessor *Processor) {
     /* Interrupts remain disabled up until the Local APIC is configured (our interrupt handler
        is setup to send EOI to the APIC, not the PIC). */
     __asm__ volatile("cli");
@@ -157,7 +159,7 @@ int HalInstallInterruptHandlerAt(
         return 0;
     }
 
-    HalpProcessor *Processor = (HalpProcessor *)HalGetCurrentProcessor();
+    KeProcessor *Processor = (KeProcessor *)HalGetCurrentProcessor();
     Processor->IdtSlots[Vector - 32].Usage++;
     Processor->IdtIrqlSlots[Vector] = TargetIrql;
     Entry->Handler = Handler;
@@ -178,7 +180,7 @@ int HalInstallInterruptHandlerAt(
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 uint8_t HalInstallInterruptHandler(void (*Handler)(HalRegisterState *), KeIrql TargetIrql) {
-    HalpProcessor *Processor = (HalpProcessor *)HalGetCurrentProcessor();
+    KeProcessor *Processor = (KeProcessor *)HalGetCurrentProcessor();
     uint32_t SmallestUsage = UINT32_MAX;
     uint8_t Index = 0;
 

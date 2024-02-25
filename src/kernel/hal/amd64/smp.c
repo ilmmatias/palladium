@@ -11,7 +11,7 @@ extern RtSList HalpLapicListHead;
 
 extern void HalpApEntry(void);
 extern uint64_t HalpKernelPageMap;
-extern HalpProcessor *HalpApStructure;
+extern KeProcessor *HalpApStructure;
 
 RtSList HalpProcessorListHead = {};
 
@@ -42,21 +42,22 @@ void HalpInitializeSmp(void) {
 
     /* BSP processor is already initialized, just setup its processor struct before someone
        tries acessing our scheduler. */
-    HalpProcessor *Processor = (HalpProcessor *)HalGetCurrentProcessor();
+    KeProcessor *Processor = (KeProcessor *)HalGetCurrentProcessor();
 
-    Processor->Base.Online = 1;
+    Processor->Online = 1;
     Processor->ApicId = ApicId;
 
-    Processor->Base.ThreadQueueSize = 1;
-    Processor->Base.ThreadQueueLock = 0;
-    RtInitializeDList(&Processor->Base.ThreadQueue);
+    Processor->ThreadQueueSize = 1;
+    Processor->ThreadQueueLock = 0;
+    RtInitializeDList(&Processor->ThreadQueue);
 
-    Processor->Base.ForceYield = 0;
-    Processor->Base.ClosestEvent = 0;
-    RtInitializeDList(&Processor->Base.DpcQueue);
-    RtInitializeDList(&Processor->Base.EventQueue);
+    Processor->ForceYield = 0;
+    Processor->ClosestEvent = 0;
+    RtInitializeDList(&Processor->DpcQueue);
+    RtInitializeDList(&Processor->EventQueue);
 
-    RtPushSList(&HalpProcessorListHead, &Processor->Base.ListHeader);
+    RtPushSList(&HalpProcessorListHead, &Processor->ListHeader);
+    return;
 
     while (ListHeader) {
         LapicEntry *Entry = CONTAINING_RECORD(ListHeader, LapicEntry, ListHeader);
@@ -67,26 +68,26 @@ void HalpInitializeSmp(void) {
             continue;
         }
 
-        Processor = MmAllocatePool(sizeof(HalpProcessor), "Halp");
+        Processor = MmAllocatePool(sizeof(KeProcessor), "Halp");
         if (!Processor) {
             continue;
         }
 
-        Processor->Base.Online = 0;
+        Processor->Online = 0;
         Processor->ApicId = Entry->ApicId;
 
         /* Initialize the scheduler queue before any other processor has any chances to access
            us. */
-        Processor->Base.ThreadQueueSize = 0;
-        Processor->Base.ThreadQueueLock = 0;
-        RtInitializeDList(&Processor->Base.ThreadQueue);
+        Processor->ThreadQueueSize = 0;
+        Processor->ThreadQueueLock = 0;
+        RtInitializeDList(&Processor->ThreadQueue);
 
-        Processor->Base.ForceYield = 0;
-        Processor->Base.ClosestEvent = 0;
-        RtInitializeDList(&Processor->Base.DpcQueue);
-        RtInitializeDList(&Processor->Base.EventQueue);
+        Processor->ForceYield = 0;
+        Processor->ClosestEvent = 0;
+        RtInitializeDList(&Processor->DpcQueue);
+        RtInitializeDList(&Processor->EventQueue);
 
-        *(HalpProcessor **)MI_PADDR_TO_VADDR(
+        *(KeProcessor **)MI_PADDR_TO_VADDR(
             (uint64_t)&HalpApStructure - (uint64_t)HalpApEntry + 0x8000) = Processor;
 
         /* Recommended/safe initialization process;
@@ -106,11 +107,11 @@ void HalpInitializeSmp(void) {
             HalpWaitIpiDelivery();
         }
 
-        while (!__atomic_load_n(&Processor->Base.Online, __ATOMIC_RELAXED)) {
+        while (!__atomic_load_n(&Processor->Online, __ATOMIC_RELAXED)) {
             HalWaitTimer(200 * EV_MICROSECS);
         }
 
-        RtPushSList(&HalpProcessorListHead, &Processor->Base.ListHeader);
+        RtPushSList(&HalpProcessorListHead, &Processor->ListHeader);
         ListHeader = ListHeader->Next;
     }
 }
@@ -126,8 +127,8 @@ void HalpInitializeSmp(void) {
  * RETURN VALUE:
  *     Pointer to the processor struct.
  *-----------------------------------------------------------------------------------------------*/
-HalProcessor *HalGetCurrentProcessor(void) {
-    return (HalProcessor *)ReadMsr(0xC0000102);
+KeProcessor *HalGetCurrentProcessor(void) {
+    return (KeProcessor *)ReadMsr(0xC0000102);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -142,8 +143,8 @@ HalProcessor *HalGetCurrentProcessor(void) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void HalpNotifyProcessor(HalProcessor *Processor, int WaitDelivery) {
-    HalpSendIpi(((HalpProcessor *)Processor)->ApicId, 0x40);
+void HalpNotifyProcessor(KeProcessor *Processor, int WaitDelivery) {
+    HalpSendIpi(Processor->ApicId, 0x40);
 
     if (WaitDelivery) {
         HalpWaitIpiDelivery();

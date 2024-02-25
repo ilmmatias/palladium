@@ -12,10 +12,14 @@
 
 #include <hal.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 extern uint32_t HalpProcessorCount;
 extern RtSList HalpProcessorListHead;
 
-void HalpInitializePlatform(int IsBsp, void *Processor);
+void HalpInitializePlatform(KeProcessor *Processor, int IsBsp);
 void HalpStopProcessor(void);
 void HalpPauseProcessor(void);
 
@@ -23,7 +27,7 @@ uint64_t HalpGetPhysicalAddress(void *VirtualAddress);
 int HalpMapPage(void *VirtualAddress, uint64_t PhysicalAddress, int Flags);
 
 void HalpSetEvent(uint64_t Time);
-void HalpNotifyProcessor(HalProcessor *Processor, int WaitDelivery);
+void HalpNotifyProcessor(KeProcessor *Processor, int WaitDelivery);
 
 void *HalpEnterCriticalSection(void);
 void HalpLeaveCriticalSection(void *Context);
@@ -39,5 +43,9 @@ void HalpInitializeThreadContext(
     void *Parameter);
 void HalpSaveThreadContext(HalRegisterState *Source, HalRegisterState *Thread);
 void HalpRestoreThreadContext(HalRegisterState *Target, HalRegisterState *Thread);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif /* _HALP_H_ */

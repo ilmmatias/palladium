@@ -6,6 +6,14 @@
 
 #include <ev.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 void EvpDispatchObject(void *Object, uint64_t Timeout, int Yield);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif /* _EVP_H_ */

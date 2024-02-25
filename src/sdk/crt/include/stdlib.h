@@ -36,6 +36,6 @@ void abort(void);
 
 #ifdef __cplusplus
 }
-#endif
+#endif /* __cplusplus */
 
 #endif /* STDLIB_H */

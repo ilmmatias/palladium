@@ -4,7 +4,7 @@
 #ifndef _MI_H_
 #define _MI_H_
 
-#include <boot.h>
+#include <ki.h>
 #include <mm.h>
 
 #ifdef ARCH_amd64
@@ -17,15 +17,40 @@
 #define MI_MAP_WRITE 0x01
 #define MI_MAP_EXEC 0x02
 
+#define MI_PAGE_FREE 0x00
+#define MI_PAGE_LOADED_PROGRAM 0x01
+#define MI_PAGE_OSLOADER 0x02
+#define MI_PAGE_BOOT_PROCESSOR 0x03
+#define MI_PAGE_BOOT_TABLES 0x04
+#define MI_PAGE_FIRMWARE_TEMPORARY 0x05
+#define MI_PAGE_FIRMWARE_PERMANENT 0x06
+#define MI_PAGE_SYSTEM_RESERVED 0x07
+
+#define MI_PAGE_BASE(Entry) ((uint64_t)((Entry) - MiPageList) << MM_PAGE_SHIFT)
+
+typedef struct {
+    RtDList ListHeader;
+    uint8_t Type;
+    uint32_t BasePage;
+    uint32_t PageCount;
+} MiMemoryDescriptor;
+
 typedef struct __attribute__((packed)) MiPageEntry {
-    uint8_t References;
-    uint64_t GroupBase;
-    uint32_t GroupPages;
-    struct MiPageEntry *NextGroup;
-    struct MiPageEntry *PreviousGroup;
+    struct MiPageEntry *NextPage;
+    uint32_t References;
+    uint32_t Pages;
 } MiPageEntry;
 
-void MiInitializePageAllocator(LoaderBootData *BootData);
-void MiInitializePool(LoaderBootData *BootData);
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
+void MiInitializePageAllocator(KiLoaderBlock *LoaderBlock);
+void MiReleaseOsloaderMemory(KiLoaderBlock *LoaderBlock);
+void MiInitializePool(KiLoaderBlock *LoaderBlock);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif /* _MI_H_ */

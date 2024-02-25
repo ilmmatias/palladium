@@ -1,9 +1,8 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#include <boot.h>
-#include <ke.h>
-#include <mm.h>
+#include <ki.h>
+#include <mi.h>
 #include <pe.h>
 #include <stdio.h>
 #include <string.h>
@@ -17,31 +16,37 @@ RtDList KeModuleListHead;
  *     We need to do this before allocating any memory.
  *
  * PARAMETERS:
- *     BootData - Data prepared by the boot loader for us.
+ *     LoaderBlock - Data prepared by the boot loader for us.
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void KiSaveBootStartDrivers(LoaderBootData *BootData) {
-    BootLoaderImage *LoadedImages = BootData->Images.Entries;
-    uint32_t LoadedImageCount = BootData->Images.Count;
+void KiSaveBootStartDrivers(KiLoaderBlock *LoaderBlock) {
+    RtDList *LoaderModuleListHead = MI_PADDR_TO_VADDR((uint64_t)LoaderBlock->BootDriverListHead);
 
     RtInitializeDList(&KeModuleListHead);
 
-    while (LoadedImageCount--) {
-        KeModule *Module = MmAllocatePool(sizeof(KeModule), "KeLd");
-        if (!Module) {
+    for (RtDList *ListHeader = MI_PADDR_TO_VADDR((uint64_t)LoaderModuleListHead->Next);
+         ListHeader != LoaderModuleListHead;
+         ListHeader = MI_PADDR_TO_VADDR((uint64_t)ListHeader->Next)) {
+        KeModule *SourceModule = CONTAINING_RECORD(ListHeader, KeModule, ListHeader);
+        KeModule *TargetModule = MmAllocatePool(sizeof(KeModule), "KeLd");
+        if (!TargetModule) {
             VidPrint(VID_MESSAGE_ERROR, "Kernel", "couldn't allocate space for a kernel module\n");
             KeFatalError(KE_OUT_OF_MEMORY);
         }
 
-        Module->Name = MI_PADDR_TO_VADDR(LoadedImages->Name);
-        Module->ImageBase = LoadedImages->VirtualAddress;
-        Module->ImageSize = LoadedImages->ImageSize;
-        Module->EntryPoint = LoadedImages->EntryPoint;
+        const char *SourceImageName = MI_PADDR_TO_VADDR((uint64_t)SourceModule->ImageName);
+        char *TargetImageName = MmAllocatePool(strlen(SourceImageName) + 1, "KeLd");
+        if (!TargetImageName) {
+            VidPrint(VID_MESSAGE_ERROR, "Kernel", "couldn't allocate space for a kernel module\n");
+            KeFatalError(KE_OUT_OF_MEMORY);
+        }
 
-        RtAppendDList(&KeModuleListHead, &Module->ListHeader);
-        LoadedImages++;
+        memcpy(TargetModule, SourceModule, sizeof(KeModule));
+        strcpy(TargetImageName, SourceImageName);
+        TargetModule->ImageName = TargetImageName;
+        RtAppendDList(&KeModuleListHead, &TargetModule->ListHeader);
     }
 }
 
@@ -92,7 +97,8 @@ void KiDumpSymbol(void *Address) {
     while (ListHeader != &KeModuleListHead) {
         Image = CONTAINING_RECORD(ListHeader, KeModule, ListHeader);
 
-        if (Offset < Image->ImageBase || Offset >= Image->ImageBase + Image->ImageSize) {
+        if (Offset < (uint64_t)Image->ImageBase ||
+            Offset >= (uint64_t)Image->ImageBase + Image->SizeOfImage) {
             ListHeader = ListHeader->Next;
             continue;
         }
@@ -107,7 +113,7 @@ void KiDumpSymbol(void *Address) {
         return;
     }
 
-    uint64_t Start = Image->ImageBase + *(uint16_t *)(Image->ImageBase + 0x3C);
+    uint64_t Start = (uint64_t)Image->ImageBase + *(uint16_t *)(Image->ImageBase + 0x3C);
     PeHeader *Header = (PeHeader *)Start;
     PeSectionHeader *Sections = (PeSectionHeader *)(Start + Header->SizeOfOptionalHeader + 24);
 
@@ -124,8 +130,8 @@ void KiDumpSymbol(void *Address) {
             continue;
         }
 
-        uint64_t Address =
-            Image->ImageBase + Sections[Symbol->SectionNumber - 1].VirtualAddress + Symbol->Value;
+        uint64_t Address = (uint64_t)Image->ImageBase +
+                           Sections[Symbol->SectionNumber - 1].VirtualAddress + Symbol->Value;
 
         if (Address <= Offset && (!Closest || Offset - Address < Offset - ClosestAddress)) {
             Closest = Symbol;
@@ -143,7 +149,7 @@ void KiDumpSymbol(void *Address) {
     sprintf(OffsetString, "0x%016llx - ", Offset);
     VidPutString(OffsetString);
 
-    VidPutString(Image->Name);
+    VidPutString(Image->ImageName);
     VidPutString("!");
 
     if (!Closest->Name[0] && !Closest->Name[1] && !Closest->Name[2] && !Closest->Name[3]) {

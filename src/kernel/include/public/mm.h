@@ -16,11 +16,19 @@
 
 #define MM_PAGE_SIZE (1ull << (MM_PAGE_SHIFT))
 
-uint64_t MmAllocatePages(uint32_t Pages);
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
+uint64_t MmAllocatePage(void);
 void MmReferencePage(uint64_t PhysicalAddress);
 void MmDereferencePage(uint64_t PhysicalAddress);
 
 void *MmAllocatePool(size_t Size, const char Tag[4]);
 void MmFreePool(void *Base, const char Tag[4]);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif /* _MM_H_ */

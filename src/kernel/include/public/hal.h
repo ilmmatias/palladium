@@ -10,30 +10,18 @@
 #define HAL_NO_EVENT 0
 #define HAL_PANIC_EVENT 1
 
-typedef struct {
-    char Stack[0x4000];
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
 
-    int Online;
-    RtSList ListHeader;
-
-    PsThread *InitialThread;
-    PsThread *IdleThread;
-    PsThread *CurrentThread;
-    RtDList ThreadQueue;
-    size_t ThreadQueueSize;
-    KeSpinLock ThreadQueueLock;
-
-    int EventStatus;
-    int ForceYield;
-    uint64_t ClosestEvent;
-    RtDList DpcQueue;
-    RtDList EventQueue;
-} HalProcessor;
-
-HalProcessor *HalGetCurrentProcessor(void);
+KeProcessor *HalGetCurrentProcessor(void);
 
 uint64_t HalGetTimerPeriod(void);
 uint64_t HalGetTimerTicks(void);
 void HalWaitTimer(uint64_t Time);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif /* _HAL_H_ */

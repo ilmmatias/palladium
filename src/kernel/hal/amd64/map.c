@@ -61,34 +61,36 @@ int HalpMapPage(void *VirtualAddress, uint64_t PhysicalAddress, int Flags) {
 
     /* We need to move into the PTE (4KiB), allocating any pages along the way. */
     for (int i = 0; i < 3; i++) {
+        if (Addresses[i][Indexes[i]] & 0x80) {
+            return 1;
+        }
+
         if (!(Addresses[i][Indexes[i]] & 0x01)) {
-            uint64_t Page = MmAllocatePages(1);
+            uint64_t Page = MmAllocatePage();
             if (!Page) {
                 return 0;
             }
 
             memset(MI_PADDR_TO_VADDR(Page), 0, MM_PAGE_SIZE);
             Addresses[i][Indexes[i]] = Page | 0x03;
-
-            void *NextLevel = (char *)Addresses[i + 1] + (Indexes[i] << MM_PAGE_SHIFT);
-            __asm__ volatile("invlpg %0" :: "m"(NextLevel) : "memory");
         }
     }
 
-    /* W^X is enforced higher up (random drivers shouldn't be acessing us!), we just
-       convert the flags 1:1. */
-    int PageFlags = 0x01;
+    if (!(Addresses[3][Indexes[3]] & 0x01)) {
+        /* W^X is enforced higher up (random drivers shouldn't be acessing us!), we just
+        convert the flags 1:1. */
+        int PageFlags = 0x01;
 
-    if (Flags & MI_MAP_WRITE) {
-        PageFlags |= 0x02;
+        if (Flags & MI_MAP_WRITE) {
+            PageFlags |= 0x02;
+        }
+
+        if (!(Flags & MI_MAP_EXEC)) {
+            PageFlags |= 0x8000000000000000;
+        }
+
+        Addresses[3][Indexes[3]] = PhysicalAddress | PageFlags;
     }
-
-    if (!(Flags & MI_MAP_EXEC)) {
-        PageFlags |= 0x8000000000000000;
-    }
-
-    Addresses[3][Indexes[3]] = PhysicalAddress | PageFlags;
-    __asm__ volatile("invlpg %0" :: "m"(VirtualAddress) : "memory");
 
     return 1;
 }

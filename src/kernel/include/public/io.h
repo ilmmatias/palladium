@@ -19,7 +19,15 @@ struct IoDevice {
     IoWriteFn Write;
 };
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 int IoCreateDevice(const char *Name, IoReadFn Read, IoWriteFn Write);
 IoDevice *IoOpenDevice(const char *Name);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif /* _IO_H_ */

@@ -38,8 +38,8 @@ static char *Messages[] = {
     /* Panics always halt everyone (the system isn't in a safe state anymore). */
     for (RtSList *ListHeader = HalpProcessorListHead.Next; ListHeader;
          ListHeader = ListHeader->Next) {
-        HalProcessor *Processor = CONTAINING_RECORD(ListHeader, HalProcessor, ListHeader);
-        Processor->EventStatus = HAL_PANIC_EVENT;
+        KeProcessor *Processor = CONTAINING_RECORD(ListHeader, KeProcessor, ListHeader);
+        Processor->EventStatus = KE_PANIC_EVENT;
         HalpNotifyProcessor(Processor, 0);
     }
 

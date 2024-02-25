@@ -21,6 +21,10 @@
 #define VID_ENABLE_MESSAGE_DEBUG 1
 #define VID_ENABLE_MESSAGE_INFO 1
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 void VidResetDisplay(void);
 
 void VidSetColor(uint32_t BackgroundColor, uint32_t ForegroundColor);
@@ -32,5 +36,9 @@ void VidPutChar(char Character);
 void VidPutString(const char *String);
 void VidPrintVariadic(int Type, const char *Prefix, const char *Message, va_list Arguments);
 void VidPrint(int Type, const char *Prefix, const char *Message, ...);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif /* _VID_H_ */

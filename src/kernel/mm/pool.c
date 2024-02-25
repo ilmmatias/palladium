@@ -44,14 +44,14 @@ static void *AllocatePoolPages(uint32_t Pages) {
 
     char *VirtualAddress = (char *)MiPoolStart + (Offset << MM_PAGE_SHIFT);
     for (uint32_t i = 0; i < Pages; i++) {
-        uint64_t PhysicalAddress = MmAllocatePages(1);
+        uint64_t PhysicalAddress = MmAllocatePage();
         if (!PhysicalAddress ||
             !HalpMapPage(VirtualAddress + (i << MM_PAGE_SHIFT), PhysicalAddress, MI_MAP_WRITE)) {
             return NULL;
         }
 
         if (!i) {
-            MiPageList[PhysicalAddress >> MM_PAGE_SHIFT].GroupPages = Pages;
+            MiPageList[PhysicalAddress >> MM_PAGE_SHIFT].Pages = Pages;
         }
     }
 
@@ -70,7 +70,7 @@ static void *AllocatePoolPages(uint32_t Pages) {
  *-----------------------------------------------------------------------------------------------*/
 static void FreePoolPages(void *Base) {
     uint64_t FirstPhysicalAddress = HalpGetPhysicalAddress(Base);
-    uint32_t Pages = MiPageList[FirstPhysicalAddress >> MM_PAGE_SHIFT].GroupPages;
+    uint32_t Pages = MiPageList[FirstPhysicalAddress >> MM_PAGE_SHIFT].Pages;
 
     for (uint32_t i = 0; i < Pages; i++) {
         MmDereferencePage(HalpGetPhysicalAddress((char *)Base + (i << MM_PAGE_SHIFT)));
@@ -92,8 +92,6 @@ static void FreePoolPages(void *Base) {
  *     a new page failed.
  *-----------------------------------------------------------------------------------------------*/
 void *MmAllocatePool(size_t Size, const char Tag[4]) {
-    KeIrql Irql = KeAcquireSpinLock(&Lock);
-
     if (!Size) {
         Size = 1;
     }
@@ -105,14 +103,14 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
         uint32_t Pages = (Size + MM_PAGE_SIZE - 1) >> MM_PAGE_SHIFT;
         void *Base = AllocatePoolPages(Pages);
 
-        KeReleaseSpinLock(&Lock, Irql);
-
         if (Base) {
             memset(Base, 0, Pages << MM_PAGE_SHIFT);
         }
 
         return Base;
     }
+
+    KeIrql Irql = KeAcquireSpinLock(&Lock);
 
     /* Start at an exact match, and try everything onwards too (if there was nothing free). */
     for (uint32_t i = Head; i <= SMALL_BLOCK_COUNT; i++) {
@@ -127,6 +125,8 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
             KeFatalError(KE_BAD_POOL_HEADER);
         }
 
+        KeReleaseSpinLock(&Lock, Irql);
+
         Header->Head = Head;
         memcpy(Header->Tag, Tag, 4);
 
@@ -136,9 +136,7 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
             RtPushSList(&SmallBlocks[i - Head - 2], &RemainingSpace->ListHeader);
         }
 
-        KeReleaseSpinLock(&Lock, Irql);
         memset(Header + 1, 0, Head << 4);
-
         return Header + 1;
     }
 
@@ -162,7 +160,6 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
 
     KeReleaseSpinLock(&Lock, Irql);
     memset(Header + 1, 0, Head << 4);
-
     return Header + 1;
 }
 
@@ -177,13 +174,10 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void MmFreePool(void *Base, const char Tag[4]) {
-    KeIrql Irql = KeAcquireSpinLock(&Lock);
-
     /* MmAllocatePool guarantees anything that is inside the small pool buckets is never going to
        be page aligned. */
     if (!((uint64_t)Base & (MM_PAGE_SIZE - 1))) {
         FreePoolPages(Base);
-        KeReleaseSpinLock(&Lock, Irql);
         return;
     }
 
@@ -197,6 +191,7 @@ void MmFreePool(void *Base, const char Tag[4]) {
         KeFatalError(KE_DOUBLE_POOL_FREE);
     }
 
+    KeIrql Irql = KeAcquireSpinLock(&Lock);
     RtPushSList(&SmallBlocks[Header->Head - 1], &Header->ListHeader);
     KeReleaseSpinLock(&Lock, Irql);
 }

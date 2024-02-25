@@ -3,8 +3,4 @@
 
 project(os/boot)
 
-if(ARCH STREQUAL "x86")
-    add_subdirectory(bootsect)
-endif()
-
-add_subdirectory(bootmgr)
+add_subdirectory(osloader)

@@ -68,7 +68,4 @@ set(SOURCES
     string/strtok.c)
 
 include(kernel.cmake)
-
-if(NOT ARCH STREQUAL "x86")
-    include(user.cmake)
-endif()
+include(user.cmake)

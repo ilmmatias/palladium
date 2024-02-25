@@ -15,7 +15,7 @@
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-static void UpdateClosestDeadline(HalProcessor *Processor) {
+static void UpdateClosestDeadline(KeProcessor *Processor) {
     RtDList *ListHeader = Processor->EventQueue.Next;
 
     Processor->ClosestEvent = 0;
@@ -48,7 +48,7 @@ static void UpdateClosestDeadline(HalProcessor *Processor) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void EvpDispatchObject(void *Object, uint64_t Timeout, int Yield) {
-    HalProcessor *Processor = HalGetCurrentProcessor();
+    KeProcessor *Processor = HalGetCurrentProcessor();
     uint64_t CurrentTicks = HalGetTimerTicks();
     EvHeader *Header = Object;
 
@@ -125,7 +125,7 @@ void EvWaitObject(void *Object, uint64_t Timeout) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void EvCancelObject(void *Object) {
-    HalProcessor *Processor = HalGetCurrentProcessor();
+    KeProcessor *Processor = HalGetCurrentProcessor();
     void *Context = HalpEnterCriticalSection();
     EvHeader *Header = Object;
 
@@ -156,12 +156,12 @@ void EvCancelObject(void *Object) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void EvpHandleEvents(HalRegisterState *Context) {
-    HalProcessor *Processor = HalGetCurrentProcessor();
+    KeProcessor *Processor = HalGetCurrentProcessor();
     uint64_t CurrentTicks = HalGetTimerTicks();
 
     /* Someone else crashed? Halt this CPU, the crashing core should handle printing the error
      * message to the screen. */
-    if (Processor->EventStatus == HAL_PANIC_EVENT) {
+    if (Processor->EventStatus == KE_PANIC_EVENT) {
         while (1) {
             HalpStopProcessor();
         }

@@ -53,14 +53,14 @@ static int Checksum(const char *Table, uint32_t Length) {
  *     can access through the KiAcpi* functions.
  *
  * PARAMETERS:
- *     BootData - Data prepared by the boot loader for us.
+ *     LoaderBlock - Data prepared by the boot loader for us.
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void KiSaveAcpiData(LoaderBootData *BootData) {
-    BaseAddress = BootData->Acpi.BaseAdress;
-    TableType = BootData->Acpi.TableType;
+void KiSaveAcpiData(KiLoaderBlock *LoaderBlock) {
+    BaseAddress = (uint64_t)LoaderBlock->AcpiTable;
+    TableType = LoaderBlock->AcpiTableVersion;
 }
 
 /*-------------------------------------------------------------------------------------------------

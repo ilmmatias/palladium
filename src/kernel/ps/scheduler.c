@@ -22,10 +22,10 @@ void PsReadyThread(PsThread *Thread) {
     /* Always try and add the thread to the least full queue. */
     RtSList *ListHeader = HalpProcessorListHead.Next;
     size_t BestMatchSize = SIZE_MAX;
-    HalProcessor *BestMatch = NULL;
+    KeProcessor *BestMatch = NULL;
 
     while (ListHeader) {
-        HalProcessor *Processor = CONTAINING_RECORD(ListHeader, HalProcessor, ListHeader);
+        KeProcessor *Processor = CONTAINING_RECORD(ListHeader, KeProcessor, ListHeader);
 
         /* Unless the processor list is somehow NULL, we should be TRUE in the if below at least
            once. */
@@ -63,7 +63,7 @@ void PsReadyThread(PsThread *Thread) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void PspInitializeScheduler(int IsBsp) {
-    HalProcessor *Processor = HalGetCurrentProcessor();
+    KeProcessor *Processor = HalGetCurrentProcessor();
 
     /* PspScheduleNext should forcefully "switch" threads if we're not running anything. */
     Processor->CurrentThread = NULL;
@@ -82,7 +82,7 @@ void PspInitializeScheduler(int IsBsp) {
  * RETURN VALUE:
  *     Which thread to execute next.
  *-----------------------------------------------------------------------------------------------*/
-static PsThread *GetNextReadyThread(HalProcessor *Processor) {
+static PsThread *GetNextReadyThread(KeProcessor *Processor) {
     KeIrql Irql = KeAcquireSpinLock(&Processor->ThreadQueueLock);
     RtDList *ListHeader = RtPopDList(&Processor->ThreadQueue);
     KeReleaseSpinLock(&Processor->ThreadQueueLock, Irql);
@@ -106,8 +106,7 @@ static PsThread *GetNextReadyThread(HalProcessor *Processor) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 static void TerminationDpc(PsThread *Thread) {
-    /* Memory corruptions happens if you uncomment below; I need to seriously investigate this!
-     * MmFreePool(Thread->Stack, "Ps  "); */
+    MmFreePool(Thread->Stack, "Ps  ");
     MmFreePool(Thread, "Ps  ");
 }
 
@@ -122,7 +121,7 @@ static void TerminationDpc(PsThread *Thread) {
  *     None..
  *-----------------------------------------------------------------------------------------------*/
 void PspScheduleNext(HalRegisterState *Context) {
-    HalProcessor *Processor = HalGetCurrentProcessor();
+    KeProcessor *Processor = HalGetCurrentProcessor();
     PsThread *CurrentThread = Processor->CurrentThread;
 
     /* Scheduler initialization, there should be no contention yet (we're using InitialThread

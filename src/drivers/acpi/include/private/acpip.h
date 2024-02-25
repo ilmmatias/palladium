@@ -74,6 +74,10 @@ typedef struct AcpipState {
     AcpipOpcode *Opcode;
 } AcpipState;
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 SdtHeader *AcpipFindTable(char Signature[4], int Index);
 void AcpipReadTables(void);
 
@@ -140,5 +144,9 @@ int AcpipCastToBuffer(AcpiValue *Value);
 int AcpipExecuteTermList(AcpipState *State);
 int AcpipReadTarget(AcpipState *State, AcpiValue *Target, AcpiValue *Value);
 int AcpipStoreTarget(AcpipState *State, AcpiValue *Target, AcpiValue *Value);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif /* _ACPIP_H_ */

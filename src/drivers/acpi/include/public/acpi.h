@@ -161,6 +161,10 @@ typedef struct AcpiObject {
     struct AcpiObject *Parent;
 } AcpiObject;
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 AcpiObject *AcpiSearchObject(AcpiObject *Parent, const char *Name);
 char *AcpiGetObjectPath(AcpiObject *Object);
 int AcpiEvaluateObject(AcpiObject *Object, AcpiValue *Result, int ExpectedType);
@@ -170,5 +174,9 @@ void AcpiCreateReference(AcpiValue *Source, AcpiValue *Target);
 void AcpiRemoveReference(AcpiValue *Value, int CleanupPointer);
 
 int AcpiCopyValue(AcpiValue *Source, AcpiValue *Target);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif /* _ACPI_H_ */

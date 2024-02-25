@@ -254,6 +254,7 @@ AcpiObject *AcpipResolveObject(AcpiName *Name) {
 
     /* Second pass, validate that all required path segments in the way exist. */
     AcpiObject *Base = Parent->Value.Children->Objects;
+
     while (Name->SegmentCount > 1) {
         while (1) {
             if (!Base) {

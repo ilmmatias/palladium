@@ -24,7 +24,7 @@ EXPORTS
     KeTryAcquireSpinLock
     KiFindAcpiTable
 
-    MmAllocatePages
+    MmAllocatePage
     MmAllocatePool
     MmDereferencePage
     MmFreePool

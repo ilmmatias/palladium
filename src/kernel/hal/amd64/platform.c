@@ -10,17 +10,17 @@
  *     This function runs any early arch-specific initialization routines.
  *
  * PARAMETERS:
- *     IsBsp - Set this to 1 if we're the bootstrap processor, or 0 otherwise.
  *     Processor - Pointer to the processor-specific structure.
+ *     IsBsp - Set this to 1 if we're the bootstrap processor, or 0 otherwise.
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void HalpInitializePlatform(int IsBsp, void *Processor) {
+void HalpInitializePlatform(KeProcessor *Processor, int IsBsp) {
     WriteMsr(0xC0000102, (uint64_t)Processor);
     HalpSetIrql(KE_IRQL_PASSIVE);
-    HalpInitializeGdt((HalpProcessor *)Processor);
-    HalpInitializeIdt((HalpProcessor *)Processor);
+    HalpInitializeGdt(Processor);
+    HalpInitializeIdt(Processor);
 
     if (IsBsp) {
         HalpInitializeIoapic();

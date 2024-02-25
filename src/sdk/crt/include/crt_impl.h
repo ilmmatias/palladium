@@ -30,7 +30,7 @@ struct fpos_t {
 
 #ifndef __CRT_STDIO_H
 
-#if defined(ARCH_x86) || defined(ARCH_amd64)
+#if defined(ARCH_amd64)
 #define __PAGE_SHIFT 12
 #else
 #error "Undefined ARCH for the CRT module!"
@@ -60,8 +60,21 @@ int __vprintf(
     void *context,
     void (*put_buf)(const void *buffer, int size, void *context));
 
+int __vwprintf(
+    const wchar_t *format,
+    va_list vlist,
+    void *context,
+    void (*put_buf)(const void *buffer, int size, void *context));
+
 int __vscanf(
     const char *format,
+    va_list vlist,
+    void *context,
+    int (*read_ch)(void *context),
+    void (*unread_ch)(void *context, int ch));
+
+int __vwscanf(
+    const wchar_t *format,
     va_list vlist,
     void *context,
     int (*read_ch)(void *context),

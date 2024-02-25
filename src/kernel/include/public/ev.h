@@ -31,6 +31,10 @@ typedef struct {
     uint64_t Deadline;
 } EvHeader, EvTimer;
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 void EvInitializeDpc(EvDpc *Dpc, void (*Routine)(void *Context), void *Context);
 void EvDispatchDpc(EvDpc *Dpc);
 
@@ -38,5 +42,9 @@ void EvInitializeTimer(EvTimer *Timer, uint64_t Timeout, EvDpc *Dpc);
 
 void EvWaitObject(void *Object, uint64_t Timeout);
 void EvCancelObject(void *Object);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif /* _EV_H_ */

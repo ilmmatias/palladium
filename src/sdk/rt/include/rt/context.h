@@ -6,13 +6,21 @@
 
 #include <stdint.h>
 
-#if defined(ARCH_x86) || defined(ARCH_amd64)
+#if defined(ARCH_amd64)
 #include <rt/amd64/context.h>
 #else
 #error "Undefined ARCH for the rt module!"
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 void RtSaveContext(RtContext *Context);
 [[noreturn]] void RtRestoreContext(RtContext *Context);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif /* _RT_EXCEPT_H_ */

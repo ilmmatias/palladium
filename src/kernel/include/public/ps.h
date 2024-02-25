@@ -4,7 +4,7 @@
 #ifndef _PS_H_
 #define _PS_H_
 
-#if defined(ARCH_x86) || defined(ARCH_amd64)
+#if defined(ARCH_amd64)
 #include <amd64/regs.h>
 #else
 #error "Undefined ARCH for the kernel module!"
@@ -21,8 +21,16 @@ typedef struct PsThread {
     char *Stack;
 } PsThread;
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 PsThread *PsCreateThread(void (*EntryPoint)(void *), void *Parameter);
 void PsReadyThread(PsThread *Thread);
 [[noreturn]] void PsTerminateThread(void);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif /* _PS_H_ */

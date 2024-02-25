@@ -34,6 +34,7 @@ function(add_executable target type has_lib)
         --target=${TARGET_${ARCH}}-w64-mingw32
         -DARCH_${ARCH}
         -fno-stack-protector
+        -mno-stack-arg-probe
         -fexceptions
         -fseh-exceptions
         -fms-extensions)
@@ -81,6 +82,7 @@ function(add_library target type)
         --target=${TARGET_${ARCH}}-w64-mingw32
         -DARCH_${ARCH}
         -fno-stack-protector
+        -mno-stack-arg-probe
         -fexceptions
         -fseh-exceptions
         -fms-extensions)

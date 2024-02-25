@@ -19,6 +19,6 @@ void __assert(const char *condition, const char *file, int line, const char *fun
 
 #ifdef __cplusplus
 }
-#endif
+#endif /* __cplusplus */
 
 #endif /* ASSERT_H */

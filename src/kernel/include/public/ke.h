@@ -6,6 +6,15 @@
 
 #include <rt/list.h>
 
+#ifdef ARCH_amd64
+#include <amd64/processor.h>
+#else
+#error "Undefined ARCH for the kernel module!"
+#endif /* ARCH */
+
+#define KE_NO_EVENT 0
+#define KE_PANIC_EVENT 1
+
 #define KE_FATAL_ERROR 0
 #define KE_BAD_ACPI_TABLES 1
 #define KE_BAD_POOL_HEADER 2
@@ -15,14 +24,14 @@
 #define KE_WRONG_IRQL 6
 #define KE_PANIC_COUNT 7
 
-#if defined(ARCH_amd64) || defined(ARCH_x86)
+#if defined(ARCH_amd64)
 #define KE_IRQL_PASSIVE 0
 #define KE_IRQL_DISPATCH 4
 #define KE_IRQL_DEVICE 5
 #define KE_IRQL_CLOCK 14
 #define KE_IRQL_MASK 15
 
-#define KE_STACK_SIZE 0x4000
+#define KE_STACK_SIZE 0x2000
 #else
 #error "Undefined ARCH for the kernel module!"
 #endif /* ARCH */
@@ -32,11 +41,15 @@ typedef uintptr_t KeIrql;
 
 typedef struct {
     RtDList ListHeader;
-    const char *Name;
-    uint64_t ImageBase;
-    uint64_t ImageSize;
-    uint64_t EntryPoint;
+    void *ImageBase;
+    void *EntryPoint;
+    uint32_t SizeOfImage;
+    const char *ImageName;
 } KeModule;
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
 
 extern RtDList KeModuleListHead;
 
@@ -52,5 +65,9 @@ void KeReleaseSpinLock(KeSpinLock *Lock, KeIrql NewIrql);
 int KeTestSpinLock(KeSpinLock *Lock);
 
 [[noreturn]] void KeFatalError(int Message);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif /* _KE_H_ */

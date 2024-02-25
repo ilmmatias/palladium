@@ -14,9 +14,17 @@ typedef struct {
     uint64_t Bbn;
 } PcipBus;
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 void PcipShowInfoMessage(const char *Format, ...);
 [[noreturn]] void PcipShowErrorMessage(int Code, const char *Format, ...);
 
 void PcipInitializeBus(PcipBus *Bus);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif /* _PCIP_H_ */
