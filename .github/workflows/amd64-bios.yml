@@ -19,7 +19,7 @@ jobs:
       run: |
         wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
         sudo add-apt-repository -y "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy main"
-        sudo apt install -y build-essential cmake ninja-build clang lld llvm libclang-dev mkisofs dosfstools
+        sudo apt install -y build-essential cmake ninja-build clang lld llvm libclang-dev mkisofs mtools
 
     - name: Checkout llvm-project
       uses: actions/checkout@v3
@@ -81,21 +81,26 @@ jobs:
 
     - name: Build EFI image
       run: |
-        dd if=/dev/zero of=palladium/build.target/fat.img bs=1k count=1440
-        mkfs.vfat palladium/build.target/fat.img
-        mount -t vfat palladium/build.target/fat.img /mnt/mount
-        mkdir -p /mnt/mount/EFI/BOOT
-        cp palladium/build.target/boot/osloader/osloader.exe /mnt/mount/EFI/BOOT/BOOTX64.EFI
-        mkdir -p /mnt/mount/EFI/PALLADIUM
-        cp palladium/build.target/kernel/kernel.exe /mnt/mount/EFI/PALLADIUM/KERNEL.EXE
-        cp palladium/build.target/drivers/acpi/acpi.sys /mnt/mount/EFI/PALLADIUM/ACPI.SYS
-        cp palladium/build.target/drivers/pci/pci.sys /mnt/mount/EFI/PALLADIUM/PCI.SYS
-        umount /mnt/mount
-        mkdir -p _root
-        cp palladium/build.target/fat.img _root/fat.img
+        dd if=/dev/zero of=palladium/build.target/fat.img bs=1k count=184320
+        mformat -F -i palladium/build.target/fat.img
+        mmd -i palladium/build.target/fat.img ::/EFI
+        mmd -i palladium/build.target/fat.img ::/EFI/BOOT
+        mmd -i palladium/build.target/fat.img ::/EFI/PALLADIUM
+        mcopy -i palladium/build.target/fat.img palladium/build.target/boot/osloader/osloader.exe ::/EFI/BOOT/BOOTX64.EFI
+        mcopy -i palladium/build.target/fat.img palladium/build.target/kernel/kernel.exe ::/EFI/PALLADIUM/KERNEL.EXE
+        mcopy -i palladium/build.target/fat.img palladium/build.target/drivers/acpi/acpi.sys ::/EFI/PALLADIUM/ACPI.SYS
+        mcopy -i palladium/build.target/fat.img palladium/build.target/drivers/pci/pci.sys ::/EFI/PALLADIUM/PCI.SYS
 
     - name: Build ISO image
-      run: mkisofs -R -f -eltorito-boot fat.img -no-emul-boot -o palladium/build.target/iso9660.iso _root
+      run: |
+        mkdir -p _root
+        cp palladium/build.target/fat.img _root/fat.img
+        mkisofs -R -f -eltorito-boot fat.img -no-emul-boot -o palladium/build.target/iso9660.iso _root
+
+    - uses: actions/upload-artifact@v3
+      with:
+        name: fat.img
+        path: palladium/build.target/fat.img
 
     - uses: actions/upload-artifact@v3
       with:

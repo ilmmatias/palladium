@@ -29,16 +29,15 @@ cmake --build .
 cd ..
 
 echo "[3/4] Creating bootable image"
-dd if=/dev/zero of=build.target/fat.img bs=1k count=1440 1>/dev/null 2>&1
-sudo mkfs.vfat build.target/fat.img 1>/dev/null
-sudo mount -t vfat build.target/fat.img /mnt/mount
-sudo mkdir -p /mnt/mount/EFI/BOOT
-sudo cp build.target/boot/osloader/osloader.exe /mnt/mount/EFI/BOOT/BOOTX64.EFI
-sudo mkdir -p /mnt/mount/EFI/PALLADIUM
-sudo cp build.target/kernel/kernel.exe /mnt/mount/EFI/PALLADIUM/KERNEL.EXE
-sudo cp build.target/drivers/acpi/acpi.sys /mnt/mount/EFI/PALLADIUM/ACPI.SYS
-sudo cp build.target/drivers/pci/pci.sys /mnt/mount/EFI/PALLADIUM/PCI.SYS
-sudo umount /mnt/mount
+dd if=/dev/zero of=build.target/fat.img bs=1k count=184320 1>/dev/null 2>&1
+mformat -F -i build.target/fat.img
+mmd -i build.target/fat.img ::/EFI
+mmd -i build.target/fat.img ::/EFI/BOOT
+mmd -i build.target/fat.img ::/EFI/PALLADIUM
+mcopy -i build.target/fat.img build.target/boot/osloader/osloader.exe ::/EFI/BOOT/BOOTX64.EFI
+mcopy -i build.target/fat.img build.target/kernel/kernel.exe ::/EFI/PALLADIUM/KERNEL.EXE
+mcopy -i build.target/fat.img build.target/drivers/acpi/acpi.sys ::/EFI/PALLADIUM/ACPI.SYS
+mcopy -i build.target/fat.img build.target/drivers/pci/pci.sys ::/EFI/PALLADIUM/PCI.SYS
 mkdir -p _root
 cp build.target/fat.img _root/fat.img
 mkisofs -R -f -eltorito-boot fat.img -no-emul-boot -o build.target/iso9660.iso _root 1>/dev/null 2>&1
