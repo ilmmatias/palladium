@@ -30,6 +30,10 @@
 typedef struct FILE FILE;
 typedef struct fpos_t fpos_t;
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 extern FILE *stdin;
 extern FILE *stdout;
 extern FILE *stderr;
@@ -85,5 +89,9 @@ int rewind(FILE *stream);
 void clearerr(FILE *stream);
 int feof(FILE *stream);
 int ferror(FILE *stream);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif /* STDIO_H */

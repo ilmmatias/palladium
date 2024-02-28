@@ -25,33 +25,33 @@ endif()
 add_executable(kernel "kernel" YES
     ${SOURCES}
 
-    ev/dispatch.c
+    ev/dispatch.cxx
     ev/dpc.c
     ev/types.c
 
     hal/timer.c
 
-    io/device.c
+    io/device.cxx
 
     ke/acpi.c
     ke/driver.c
-    ke/entry.c
+    ke/entry.cxx
     ke/irql.c
     ke/lock.c
     ke/panic.c
 
     mm/initialize.c
-    mm/page.c
-    mm/pool.c
+    mm/page.cxx
+    mm/pool.cxx
 
     ps/idle.c
-    ps/scheduler.c
+    ps/scheduler.cxx
     ps/thread.c
 
-    vid/attributes.c
+    vid/attributes.cxx
     vid/font.c
     vid/initialize.c
-    vid/print.c
+    vid/print.cxx
 
     kernel.def)
 

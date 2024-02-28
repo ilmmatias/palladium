@@ -6,6 +6,8 @@
 #include <rt/bitmap.h>
 #include <string.h>
 
+#include <ke.hxx>
+
 #define SMALL_BLOCK_COUNT ((uint32_t)((MM_PAGE_SIZE - 16) >> 4))
 
 typedef struct {
@@ -14,6 +16,7 @@ typedef struct {
     uint32_t Head;
 } PoolHeader;
 
+extern "C" {
 extern MiPageEntry *MiPageList;
 
 RtSList SmallBlocks[SMALL_BLOCK_COUNT] = {};
@@ -21,6 +24,7 @@ RtSList SmallBlocks[SMALL_BLOCK_COUNT] = {};
 uint64_t MiPoolStart = 0;
 uint64_t MiPoolBitmapHint = 0;
 RtBitmap MiPoolBitmap;
+}
 
 static KeSpinLock Lock = {0};
 
@@ -91,7 +95,7 @@ static void FreePoolPages(void *Base) {
  *     A pointer to the allocated block, or NULL if there is was no free entry and requesting
  *     a new page failed.
  *-----------------------------------------------------------------------------------------------*/
-void *MmAllocatePool(size_t Size, const char Tag[4]) {
+extern "C" void *MmAllocatePool(size_t Size, const char Tag[4]) {
     if (!Size) {
         Size = 1;
     }
@@ -110,7 +114,7 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
         return Base;
     }
 
-    KeIrql Irql = KeAcquireSpinLock(&Lock);
+    SpinLockGuard Guard(&Lock);
 
     /* Start at an exact match, and try everything onwards too (if there was nothing free). */
     for (uint32_t i = Head; i <= SMALL_BLOCK_COUNT; i++) {
@@ -125,7 +129,8 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
             KeFatalError(KE_BAD_POOL_HEADER);
         }
 
-        KeReleaseSpinLock(&Lock, Irql);
+        /* We don't need locking from here on out (we'd just be wasting time). */
+        Guard.Release();
 
         Header->Head = Head;
         memcpy(Header->Tag, Tag, 4);
@@ -142,7 +147,6 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
 
     PoolHeader *Header = (PoolHeader *)AllocatePoolPages(1);
     if (!Header) {
-        KeReleaseSpinLock(&Lock, Irql);
         return NULL;
     }
 
@@ -158,7 +162,7 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
         RtPushSList(&SmallBlocks[SMALL_BLOCK_COUNT - Head - 2], &RemainingSpace->ListHeader);
     }
 
-    KeReleaseSpinLock(&Lock, Irql);
+    Guard.Release();
     memset(Header + 1, 0, Head << 4);
     return Header + 1;
 }
@@ -173,7 +177,7 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void MmFreePool(void *Base, const char Tag[4]) {
+extern "C" void MmFreePool(void *Base, const char Tag[4]) {
     /* MmAllocatePool guarantees anything that is inside the small pool buckets is never going to
        be page aligned. */
     if (!((uint64_t)Base & (MM_PAGE_SIZE - 1))) {
@@ -191,7 +195,6 @@ void MmFreePool(void *Base, const char Tag[4]) {
         KeFatalError(KE_DOUBLE_POOL_FREE);
     }
 
-    KeIrql Irql = KeAcquireSpinLock(&Lock);
+    SpinLockGuard Guard(&Lock);
     RtPushSList(&SmallBlocks[Header->Head - 1], &Header->ListHeader);
-    KeReleaseSpinLock(&Lock, Irql);
 }

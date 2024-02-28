@@ -48,6 +48,10 @@ struct fpos_t {
 #define __STDIO_FLAGS_READING 0x80
 #define __STDIO_FLAGS_WRITING 0x100
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 int __parse_fopen_mode(const char *mode);
 void *__fopen(const char *filename, int mode, size_t *length);
 void __fclose(void *handle);
@@ -87,6 +91,10 @@ double __strtod_dec(const char *str, double sign);
 
 uint64_t __rand64(void);
 void __srand64(uint64_t seed);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif /* __CRT_STDIO_H */
 

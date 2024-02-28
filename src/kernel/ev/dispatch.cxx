@@ -4,6 +4,8 @@
 #include <halp.h>
 #include <psp.h>
 
+#include <ke.hxx>
+
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function searches for the next closest event deadline, and updates the Processor
@@ -47,10 +49,10 @@ static void UpdateClosestDeadline(KeProcessor *Processor) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void EvpDispatchObject(void *Object, uint64_t Timeout, int Yield) {
+extern "C" void EvpDispatchObject(void *Object, uint64_t Timeout, int Yield) {
     KeProcessor *Processor = HalGetCurrentProcessor();
     uint64_t CurrentTicks = HalGetTimerTicks();
-    EvHeader *Header = Object;
+    EvHeader *Header = (EvHeader *)Object;
 
     /* Enter critical section (can't let any scheduling happen here), and update the event
        queue (and the closest event deadline). */
@@ -109,7 +111,7 @@ void EvpDispatchObject(void *Object, uint64_t Timeout, int Yield) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void EvWaitObject(void *Object, uint64_t Timeout) {
+extern "C" void EvWaitObject(void *Object, uint64_t Timeout) {
     EvpDispatchObject(Object, Timeout, 1);
 }
 
@@ -124,10 +126,10 @@ void EvWaitObject(void *Object, uint64_t Timeout) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void EvCancelObject(void *Object) {
+extern "C" void EvCancelObject(void *Object) {
     KeProcessor *Processor = HalGetCurrentProcessor();
     void *Context = HalpEnterCriticalSection();
-    EvHeader *Header = Object;
+    EvHeader *Header = (EvHeader *)Object;
 
     if (!Header->Dispatched) {
         HalpLeaveCriticalSection(Context);
@@ -155,7 +157,7 @@ void EvCancelObject(void *Object) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void EvpHandleEvents(HalRegisterState *Context) {
+extern "C" void EvpHandleEvents(HalRegisterState *Context) {
     KeProcessor *Processor = HalGetCurrentProcessor();
     uint64_t CurrentTicks = HalGetTimerTicks();
 
@@ -185,10 +187,9 @@ void EvpHandleEvents(HalRegisterState *Context) {
 
             if (Header->Source) {
                 /* Boost the priority of the waiting task, and insert it back. */
-                KeIrql Irql = KeAcquireSpinLock(&Processor->ThreadQueueLock);
+                SpinLockGuard Guard(&Processor->ThreadQueueLock);
                 __atomic_add_fetch(&Processor->ThreadQueueSize, 1, __ATOMIC_SEQ_CST);
                 RtPushDList(&Processor->ThreadQueue, &Header->Source->ListHeader);
-                KeReleaseSpinLock(&Processor->ThreadQueueLock, Irql);
             }
 
             if (Header->Dpc) {

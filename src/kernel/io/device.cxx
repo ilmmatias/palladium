@@ -2,9 +2,10 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <io.h>
-#include <ke.h>
 #include <mm.h>
 #include <string.h>
+
+#include <ke.hxx>
 
 static RtSList DeviceListHead = {.Next = NULL};
 static KeSpinLock Lock = {0};
@@ -26,12 +27,12 @@ int IoCreateDevice(const char *Name, IoReadFn Read, IoWriteFn Write) {
         return 0;
     }
 
-    IoDevice *Entry = MmAllocatePool(sizeof(IoDevice), "Io  ");
+    IoDevice *Entry = (IoDevice *)MmAllocatePool(sizeof(IoDevice), "Io  ");
     if (!Entry) {
         return 0;
     }
 
-    Entry->Name = MmAllocatePool(strlen(Name) + 1, "Io  ");
+    Entry->Name = (char *)MmAllocatePool(strlen(Name) + 1, "Io  ");
     if (!Entry->Name) {
         MmFreePool(Entry, "Io  ");
         return 0;
@@ -41,9 +42,8 @@ int IoCreateDevice(const char *Name, IoReadFn Read, IoWriteFn Write) {
     Entry->Read = Read;
     Entry->Write = Write;
 
-    KeIrql Irql = KeAcquireSpinLock(&Lock);
+    SpinLockGuard Guard(&Lock);
     RtPushSList(&DeviceListHead, &Entry->ListHeader);
-    KeReleaseSpinLock(&Lock, Irql);
 
     return 1;
 }
@@ -59,17 +59,15 @@ int IoCreateDevice(const char *Name, IoReadFn Read, IoWriteFn Write) {
  *     Pointer to the device on success, NULL otherwise.
  *-----------------------------------------------------------------------------------------------*/
 IoDevice *IoOpenDevice(const char *Name) {
-    KeIrql Irql = KeAcquireSpinLock(&Lock);
-
+    SpinLockGuard Guard(&Lock);
     RtSList *ListHeader = DeviceListHead.Next;
+
     while (ListHeader) {
         IoDevice *Entry = CONTAINING_RECORD(ListHeader, IoDevice, ListHeader);
         if (!strcmp(Entry->Name, Name)) {
-            KeReleaseSpinLock(&Lock, Irql);
             return Entry;
         }
     }
 
-    KeReleaseSpinLock(&Lock, Irql);
     return NULL;
 }

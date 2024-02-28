@@ -37,7 +37,9 @@ function(add_executable target type has_lib)
         -mno-stack-arg-probe
         -fexceptions
         -fseh-exceptions
-        -fms-extensions)
+        -fms-extensions
+        $<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions>
+        $<$<COMPILE_LANGUAGE:CXX>:-fno-rtti>)
 
     target_link_options(
     	${target}
@@ -85,7 +87,9 @@ function(add_library target type)
         -mno-stack-arg-probe
         -fexceptions
         -fseh-exceptions
-        -fms-extensions)
+        -fms-extensions
+        $<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions>
+        $<$<COMPILE_LANGUAGE:CXX>:-fno-rtti>)
 
     target_link_options(
         	${target}

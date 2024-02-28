@@ -1,8 +1,9 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#include <ke.h>
+#include <ke.hxx>
 
+extern "C" {
 extern uint16_t VidpWidth;
 extern uint16_t VidpHeight;
 extern uint32_t VidpBackground;
@@ -10,6 +11,7 @@ extern uint32_t VidpForeground;
 extern uint16_t VidpCursorX;
 extern uint16_t VidpCursorY;
 extern KeSpinLock VidpLock;
+}
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -22,11 +24,10 @@ extern KeSpinLock VidpLock;
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void VidSetColor(uint32_t BackgroundColor, uint32_t ForegroundColor) {
-    KeIrql Irql = KeAcquireSpinLock(&VidpLock);
+extern "C" void VidSetColor(uint32_t BackgroundColor, uint32_t ForegroundColor) {
+    SpinLockGuard Guard(&VidpLock);
     VidpBackground = BackgroundColor;
     VidpForeground = ForegroundColor;
-    KeReleaseSpinLock(&VidpLock, Irql);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -40,8 +41,8 @@ void VidSetColor(uint32_t BackgroundColor, uint32_t ForegroundColor) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void VidGetColor(uint32_t *BackgroundColor, uint32_t *ForegroundColor) {
-    KeIrql Irql = KeAcquireSpinLock(&VidpLock);
+extern "C" void VidGetColor(uint32_t *BackgroundColor, uint32_t *ForegroundColor) {
+    SpinLockGuard Guard(&VidpLock);
 
     if (BackgroundColor) {
         *BackgroundColor = VidpBackground;
@@ -50,8 +51,6 @@ void VidGetColor(uint32_t *BackgroundColor, uint32_t *ForegroundColor) {
     if (ForegroundColor) {
         *ForegroundColor = VidpForeground;
     }
-
-    KeReleaseSpinLock(&VidpLock, Irql);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -65,11 +64,10 @@ void VidGetColor(uint32_t *BackgroundColor, uint32_t *ForegroundColor) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void VidSetCursor(uint16_t X, uint16_t Y) {
-    KeIrql Irql = KeAcquireSpinLock(&VidpLock);
+extern "C" void VidSetCursor(uint16_t X, uint16_t Y) {
+    SpinLockGuard Guard(&VidpLock);
     VidpCursorX = X >= VidpWidth ? VidpWidth - 1 : X;
     VidpCursorY = Y >= VidpHeight ? VidpHeight - 1 : Y;
-    KeReleaseSpinLock(&VidpLock, Irql);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -83,8 +81,8 @@ void VidSetCursor(uint16_t X, uint16_t Y) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void VidGetCursor(uint16_t *X, uint16_t *Y) {
-    KeIrql Irql = KeAcquireSpinLock(&VidpLock);
+extern "C" void VidGetCursor(uint16_t *X, uint16_t *Y) {
+    SpinLockGuard Guard(&VidpLock);
 
     if (X) {
         *X = VidpCursorX;
@@ -93,6 +91,4 @@ void VidGetCursor(uint16_t *X, uint16_t *Y) {
     if (Y) {
         *Y = VidpCursorY;
     }
-
-    KeReleaseSpinLock(&VidpLock, Irql);
 }

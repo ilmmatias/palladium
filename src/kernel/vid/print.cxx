@@ -2,15 +2,17 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <crt_impl.h>
-#include <ke.h>
 #include <string.h>
 #include <vidp.h>
 
-extern const VidpFontData VidpFont;
+#include <ke.hxx>
 
 static int PendingFullFlush = 0;
 static uint16_t FlushY = 0;
 static uint16_t FlushLines = 0;
+
+extern "C" {
+extern const VidpFontData VidpFont;
 
 char *VidpBackBuffer = NULL;
 char *VidpFrontBuffer = NULL;
@@ -24,6 +26,7 @@ uint16_t VidpCursorX = 0;
 uint16_t VidpCursorY = 0;
 
 KeSpinLock VidpLock = {0};
+}
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -115,7 +118,7 @@ static void DrawCharacter(char Character) {
             break;
         }
 
-        for (uint16_t Left = 0; Left < VidpFont.GlyphInfo[' '].Advance; Left++) {
+        for (uint16_t Left = 0; Left < VidpFont.GlyphInfo[0x20].Advance; Left++) {
             if (VidpCursorX + Left >= VidpWidth) {
                 break;
             }
@@ -158,8 +161,8 @@ static void DrawCharacter(char Character) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void VidResetDisplay(void) {
-    KeIrql Irql = KeAcquireSpinLock(&VidpLock);
+extern "C" void VidResetDisplay(void) {
+    SpinLockGuard Guard(&VidpLock);
 
     /* While the color/attribute is left untouched, the cursor is always reset to 0;0. */
     VidpCursorX = 0;
@@ -174,8 +177,6 @@ void VidResetDisplay(void) {
     FlushY = 0;
     FlushLines = VidpHeight;
     Flush();
-
-    KeReleaseSpinLock(&VidpLock, Irql);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -188,7 +189,7 @@ void VidResetDisplay(void) {
  *
  * RETURN VALUE:
  *     None.
- *-----------------------------------------------------------------------------------------------*/
+ *------------------------------------------------------------------------------------------------*/
 static void PutChar(char Character) {
     /* It's probably safe to use the size of 4 spaces? */
     const int TabSize = VidpFont.GlyphInfo[0x20].Width * 4;
@@ -260,8 +261,8 @@ static void PutBuffer(const void *buffer, int size, void *context) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void VidPutChar(char Character) {
-    KeIrql Irql = KeAcquireSpinLock(&VidpLock);
+extern "C" void VidPutChar(char Character) {
+    SpinLockGuard Guard(&VidpLock);
 
     FlushY = VidpCursorY;
     PutChar(Character);
@@ -271,7 +272,6 @@ void VidPutChar(char Character) {
     }
 
     Flush();
-    KeReleaseSpinLock(&VidpLock, Irql);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -284,8 +284,8 @@ void VidPutChar(char Character) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void VidPutString(const char *String) {
-    KeIrql Irql = KeAcquireSpinLock(&VidpLock);
+extern "C" void VidPutString(const char *String) {
+    SpinLockGuard Guard(&VidpLock);
 
     FlushY = VidpCursorY;
     PutString(String);
@@ -295,7 +295,6 @@ void VidPutString(const char *String) {
     }
 
     Flush();
-    KeReleaseSpinLock(&VidpLock, Irql);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -312,28 +311,26 @@ void VidPutString(const char *String) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void VidPrintVariadic(int Type, const char *Prefix, const char *Message, va_list Arguments) {
-    KeIrql Irql = KeAcquireSpinLock(&VidpLock);
+extern "C" void
+VidPrintVariadic(int Type, const char *Prefix, const char *Message, va_list Arguments) {
+    SpinLockGuard Guard(&VidpLock);
 
     /* Make sure this specific type of message wasn't disabled at compile time. */
     switch (Type) {
         case VID_MESSAGE_TRACE:
             if (!VID_ENABLE_MESSAGE_TRACE) {
-                KeReleaseSpinLock(&VidpLock, Irql);
                 return;
             }
 
             break;
         case VID_MESSAGE_DEBUG:
             if (!VID_ENABLE_MESSAGE_DEBUG) {
-                KeReleaseSpinLock(&VidpLock, Irql);
                 return;
             }
 
             break;
         case VID_MESSAGE_INFO:
             if (!VID_ENABLE_MESSAGE_INFO) {
-                KeReleaseSpinLock(&VidpLock, Irql);
                 return;
             }
 
@@ -373,7 +370,6 @@ void VidPrintVariadic(int Type, const char *Prefix, const char *Message, va_list
     }
 
     Flush();
-    KeReleaseSpinLock(&VidpLock, Irql);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -389,9 +385,9 @@ void VidPrintVariadic(int Type, const char *Prefix, const char *Message, va_list
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void VidPrint(int Type, const char *Prefix, const char *Message, ...) {
+extern "C" void VidPrint(int Type, const char *Prefix, const char *Message, ...) {
     va_list Arguments;
-    va_start(Arguments, Format);
+    va_start(Arguments, Message);
     VidPrintVariadic(Type, Prefix, Message, Arguments);
     va_end(Arguments);
 }

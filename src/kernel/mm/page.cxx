@@ -1,12 +1,15 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#include <ke.h>
 #include <mi.h>
 #include <vid.h>
 
+#include <ke.hxx>
+
+extern "C" {
 MiPageEntry *MiPageList = NULL;
 MiPageEntry *MiFreePageListHead = NULL;
+}
 
 static KeSpinLock PageListLock = {0};
 
@@ -21,8 +24,8 @@ static KeSpinLock PageListLock = {0};
  * RETURN VALUE:
  *     Physical address of the allocated page, or 0 on failure.
  *-----------------------------------------------------------------------------------------------*/
-uint64_t MmAllocatePage(void) {
-    KeIrql Irql = KeAcquireSpinLock(&PageListLock);
+extern "C" uint64_t MmAllocatePage(void) {
+    SpinLockGuard Guard(&PageListLock);
 
     if (MiFreePageListHead) {
         MiPageEntry *Page = MiFreePageListHead;
@@ -33,7 +36,6 @@ uint64_t MmAllocatePage(void) {
         }
 
         Page->References = 1;
-        KeReleaseSpinLock(&PageListLock, Irql);
         return MI_PAGE_BASE(Page);
     }
 
@@ -50,14 +52,11 @@ uint64_t MmAllocatePage(void) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void MmReferencePage(uint64_t PhysicalAddress) {
-    KeIrql Irql = KeAcquireSpinLock(&PageListLock);
-
+extern "C" void MmReferencePage(uint64_t PhysicalAddress) {
+    SpinLockGuard Guard(&PageListLock);
     if (MiPageList[PhysicalAddress >> MM_PAGE_SHIFT].References != UINT32_MAX) {
         MiPageList[PhysicalAddress >> MM_PAGE_SHIFT].References++;
     }
-
-    KeReleaseSpinLock(&PageListLock, Irql);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -71,8 +70,8 @@ void MmReferencePage(uint64_t PhysicalAddress) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void MmDereferencePage(uint64_t PhysicalAddress) {
-    KeIrql Irql = KeAcquireSpinLock(&PageListLock);
+extern "C" void MmDereferencePage(uint64_t PhysicalAddress) {
+    SpinLockGuard Guard(&PageListLock);
     MiPageEntry *Entry = &MiPageList[PhysicalAddress >> MM_PAGE_SHIFT];
 
     if (!Entry->References--) {
@@ -80,12 +79,9 @@ void MmDereferencePage(uint64_t PhysicalAddress) {
     }
 
     if (Entry->References) {
-        KeReleaseSpinLock(&PageListLock, Irql);
         return;
     }
 
     Entry->NextPage = MiFreePageListHead;
     MiFreePageListHead = Entry;
-
-    KeReleaseSpinLock(&PageListLock, Irql);
 }

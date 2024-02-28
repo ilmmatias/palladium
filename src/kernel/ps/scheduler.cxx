@@ -6,7 +6,11 @@
 #include <mm.h>
 #include <psp.h>
 
+#include <ke.hxx>
+
+extern "C" {
 extern PsThread *PspSystemThread;
+}
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -39,10 +43,11 @@ void PsReadyThread(PsThread *Thread) {
 
     /* Now we're forced to lock the processor queue (there was no need up until now, as we were
        only reading). */
-    KeIrql Irql = KeAcquireSpinLock(&BestMatch->ThreadQueueLock);
-    __atomic_add_fetch(&BestMatch->ThreadQueueSize, 1, __ATOMIC_SEQ_CST);
-    RtAppendDList(&BestMatch->ThreadQueue, &Thread->ListHeader);
-    KeReleaseSpinLock(&BestMatch->ThreadQueueLock, Irql);
+    {
+        SpinLockGuard Guard(&BestMatch->ThreadQueueLock);
+        __atomic_add_fetch(&BestMatch->ThreadQueueSize, 1, __ATOMIC_SEQ_CST);
+        RtAppendDList(&BestMatch->ThreadQueue, &Thread->ListHeader);
+    }
 
     /* PspScheduleNext uses Expiration=0 as a sign that we need to switch asap (we were out of
        work). */
@@ -83,9 +88,12 @@ void PspInitializeScheduler(int IsBsp) {
  *     Which thread to execute next.
  *-----------------------------------------------------------------------------------------------*/
 static PsThread *GetNextReadyThread(KeProcessor *Processor) {
-    KeIrql Irql = KeAcquireSpinLock(&Processor->ThreadQueueLock);
-    RtDList *ListHeader = RtPopDList(&Processor->ThreadQueue);
-    KeReleaseSpinLock(&Processor->ThreadQueueLock, Irql);
+    RtDList *ListHeader;
+
+    {
+        SpinLockGuard Guard(&Processor->ThreadQueueLock);
+        ListHeader = RtPopDList(&Processor->ThreadQueue);
+    }
 
     if (ListHeader != &Processor->ThreadQueue) {
         return CONTAINING_RECORD(ListHeader, PsThread, ListHeader);
@@ -206,9 +214,8 @@ void PspScheduleNext(HalRegisterState *Context) {
         if (Processor->ForceYield == PSP_YIELD_EVENT) {
             __atomic_sub_fetch(&Processor->ThreadQueueSize, 1, __ATOMIC_SEQ_CST);
         } else if (CurrentThread != Processor->IdleThread) {
-            KeIrql Irql = KeAcquireSpinLock(&Processor->ThreadQueueLock);
+            SpinLockGuard Guard(&Processor->ThreadQueueLock);
             RtAppendDList(&Processor->ThreadQueue, &CurrentThread->ListHeader);
-            KeReleaseSpinLock(&Processor->ThreadQueueLock, Irql);
         }
 
         if (CurrentThread != Processor->IdleThread) {

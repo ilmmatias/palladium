@@ -9,6 +9,8 @@
 #include <string.h>
 #include <vidp.h>
 
+#include <mm.hxx>
+
 // ####### GRAPHICS BACKEND #######
 
 #define BACKGROUND_COLOR 0x09090F
@@ -89,7 +91,7 @@ static void SpawnParticle(FireworkData *Data);
 #define DELTA_SEC Delay / 1000
 
 [[noreturn]] static void T_Particle(void *Parameter) {
-    FireworkData *ParentData = Parameter;
+    FireworkData *ParentData = (FireworkData *)Parameter;
     FireworkData Data;
     memset(&Data, 0, sizeof(Data));
 
@@ -185,7 +187,7 @@ static void SpawnParticle(FireworkData *Data);
     int PartCount = Rand() % 50 + 50;
 
     for (int i = 0; i < PartCount; i++) {
-        FireworkData *DataClone = MmAllocatePool(sizeof(FireworkData), "FWKS");
+        FireworkData *DataClone = (FireworkData *)MmAllocatePool(sizeof(FireworkData), "FWKS");
         if (!DataClone) {
             break;
         }
@@ -220,7 +222,7 @@ static void SpawnExplodable(void) {
     // The main thread occupies itself with spawning explodeables
     // from time to time, to keep things interesting.
     while (1) {
-        int SpawnCount = Rand() % 2 + 1;
+        int SpawnCount = Rand() % 2 + 2;
 
         for (int i = 0; i < SpawnCount; i++) {
             SpawnExplodable();
@@ -241,9 +243,9 @@ static void SpawnExplodable(void) {
  * RETURN VALUE:
  *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
-[[noreturn]] void KiSystemStartup(uint64_t LoaderBlockPage) {
-    KiLoaderBlock *LoaderBlock = MI_PADDR_TO_VADDR(LoaderBlockPage);
-    KeProcessor *Processor = MI_PADDR_TO_VADDR((uint64_t)LoaderBlock->BootProcessor);
+extern "C" [[noreturn]] void KiSystemStartup(uint64_t LoaderBlockPage) {
+    KiLoaderBlock *LoaderBlock = (KiLoaderBlock *)MI_PADDR_TO_VADDR(LoaderBlockPage);
+    KeProcessor *Processor = (KeProcessor *)MI_PADDR_TO_VADDR((uint64_t)LoaderBlock->BootProcessor);
 
     /* Stage 1: Memory manager initialization; This won't mark the OSLOADER pages as free
      * just yet. */
@@ -290,9 +292,9 @@ static void SpawnExplodable(void) {
  * RETURN VALUE:
  *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
-[[noreturn]] void KiContinueSystemStartup(void *) {
+extern "C" [[noreturn]] void KiContinueSystemStartup(void *) {
     /* Stage 5: Initialize all boot drivers; We can't load anything further than this without
        them. */
-    //KiRunBootStartDrivers();
+    // KiRunBootStartDrivers();
     PerformFireworkTest();
 }
