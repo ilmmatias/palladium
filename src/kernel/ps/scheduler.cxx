@@ -5,6 +5,7 @@
 #include <ki.h>
 #include <mm.h>
 #include <psp.h>
+#include <vid.h>
 
 #include <ke.hxx>
 
@@ -43,11 +44,10 @@ void PsReadyThread(PsThread *Thread) {
 
     /* Now we're forced to lock the processor queue (there was no need up until now, as we were
        only reading). */
-    {
-        SpinLockGuard Guard(&BestMatch->ThreadQueueLock);
-        __atomic_add_fetch(&BestMatch->ThreadQueueSize, 1, __ATOMIC_SEQ_CST);
-        RtAppendDList(&BestMatch->ThreadQueue, &Thread->ListHeader);
-    }
+    SpinLockGuard Guard(&BestMatch->ThreadQueueLock);
+    __atomic_add_fetch(&BestMatch->ThreadQueueSize, 1, __ATOMIC_SEQ_CST);
+    RtAppendDList(&BestMatch->ThreadQueue, &Thread->ListHeader);
+    Guard.Release();
 
     /* PspScheduleNext uses Expiration=0 as a sign that we need to switch asap (we were out of
        work). */
@@ -88,34 +88,15 @@ void PspInitializeScheduler(int IsBsp) {
  *     Which thread to execute next.
  *-----------------------------------------------------------------------------------------------*/
 static PsThread *GetNextReadyThread(KeProcessor *Processor) {
-    RtDList *ListHeader;
-
-    {
-        SpinLockGuard Guard(&Processor->ThreadQueueLock);
-        ListHeader = RtPopDList(&Processor->ThreadQueue);
-    }
+    SpinLockGuard Guard(&Processor->ThreadQueueLock);
+    RtDList *ListHeader = RtPopDList(&Processor->ThreadQueue);
+    Guard.Release();
 
     if (ListHeader != &Processor->ThreadQueue) {
         return CONTAINING_RECORD(ListHeader, PsThread, ListHeader);
     }
 
     return Processor->ForceYield ? Processor->IdleThread : NULL;
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     Cleanup routine for killed/terminated threads; We're forced to use a DPC (+this method), as
- *     PspScheduleNext runs in the context of the terminated thread.
- *
- * PARAMETERS:
- *     Thread - Which thread was killed.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-static void TerminationDpc(PsThread *Thread) {
-    MmFreePool(Thread->Stack, "Ps  ");
-    MmFreePool(Thread, "Ps  ");
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -139,10 +120,6 @@ void PspScheduleNext(HalRegisterState *Context) {
         Processor->CurrentThread->Expiration = 0;
         HalpRestoreThreadContext(Context, &Processor->CurrentThread->Context);
         return;
-    }
-
-    if (Processor->CurrentThread->Terminated) {
-        Processor->ForceYield = PSP_YIELD_EVENT;
     }
 
     /* On quantum expiry, we switch threads if possible;
@@ -191,24 +168,6 @@ void PspScheduleNext(HalRegisterState *Context) {
             }
         }
 
-        /* Thread cleanup cannot be done at the moment (we're still on the thread context!),
-         * we need to enqueue a DPC if we yielded out because of PsTerminateThread. */
-        if (Processor->CurrentThread->Terminated) {
-            EvInitializeDpc(
-                &Processor->CurrentThread->TerminationDpc,
-                (void (*)(void *))TerminationDpc,
-                Processor->CurrentThread);
-
-            RtAppendDList(
-                &Processor->DpcQueue, &Processor->CurrentThread->TerminationDpc.ListHeader);
-
-            /* No events on sight? Retrigger the event handler as soon as we enter the idle
-             * thread. */
-            if (!NewThread->Expiration && !Processor->ClosestEvent) {
-                HalpSetEvent(0);
-            }
-        }
-
         Processor->CurrentThread = NewThread;
 
         if (Processor->ForceYield == PSP_YIELD_EVENT) {
@@ -218,11 +177,12 @@ void PspScheduleNext(HalRegisterState *Context) {
             RtAppendDList(&Processor->ThreadQueue, &CurrentThread->ListHeader);
         }
 
+        Processor->ForceYield = PSP_YIELD_NONE;
+
         if (CurrentThread != Processor->IdleThread) {
             HalpSaveThreadContext(Context, &CurrentThread->Context);
         }
 
-        Processor->ForceYield = PSP_YIELD_NONE;
         HalpRestoreThreadContext(Context, &NewThread->Context);
 
         return;

@@ -54,10 +54,18 @@ HalpApEntry:
     or $0x900, %eax
     wrmsr
 
-    /* Enable PAE (physical address extension); Required for long mode. */
+    /* Enable PAE (physical address extension) + PSE (support for larger pages);
+     * Required for long mode + the processor not crashing with our page tables. */
     mov %cr4, %eax
-    or $0x20, %eax
+    or $0x668, %eax
     mov %eax, %cr4
+
+    /* Setup our WC PAT entry. */
+    mov $0x277, %ecx
+    rdmsr
+    and $0xFFFFFF00, %edx
+    or $0x01, %edx
+    wrmsr
 
     /* Install the kernel page map, and enable paging. */
     mov HalpKernelPageMap - HalpApEntry(%bx), %eax
@@ -86,12 +94,11 @@ HalpApEntry:
     /* Setup the stack, indicate we're only, and finally get out of assembly (and low address)
        land. */
     mov HalpApStructure - HalpApEntry(%ebx), %rdx
-    lea 0x4000(%rdx), %rsp
-    lock incb (%rsp)
+    lea 0x3000(%rdx), %rsp
+    lock incb 0x10(%rdx)
     movabs $KiSystemStartup, %rax
-    mov $0, %rcx
+    xor %rcx, %rcx
     jmp *%rax
-
 
 .fill 128, 1, 0
 HalpTemporaryApStack:

@@ -2,15 +2,21 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <halp.h>
-#include <ke.h>
 #include <mm.h>
-#include <ps.h>
+#include <psp.h>
 #include <vid.h>
 
+#include <ke.hxx>
+
+extern "C" {
 extern void KiContinueSystemStartup(void *);
 extern void PspIdleThread(void *);
 
+extern KeSpinLock PspReaperLock;
+extern RtDList PspReaperList;
+
 PsThread *PspSystemThread = NULL;
+}
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -24,13 +30,13 @@ PsThread *PspSystemThread = NULL;
  * RETURN VALUE:
  *     Pointer to the thread structure, or NULL on failure.
  *-----------------------------------------------------------------------------------------------*/
-PsThread *PsCreateThread(void (*EntryPoint)(void *), void *Parameter) {
-    PsThread *Thread = MmAllocatePool(sizeof(PsThread), "Ps  ");
+extern "C" PsThread *PsCreateThread(void (*EntryPoint)(void *), void *Parameter) {
+    PsThread *Thread = (PsThread *)MmAllocatePool(sizeof(PsThread), "Ps  ");
     if (!Thread) {
         return NULL;
     }
 
-    Thread->Stack = MmAllocatePool(KE_STACK_SIZE, "Ps  ");
+    Thread->Stack = (char *)MmAllocatePool(KE_STACK_SIZE, "Ps  ");
     if (!Thread->Stack) {
         MmFreePool(Thread, "Ps  ");
         return NULL;
@@ -52,9 +58,16 @@ PsThread *PsCreateThread(void (*EntryPoint)(void *), void *Parameter) {
  * RETURN VALUE:
  *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
-[[noreturn]] void PsTerminateThread(void) {
-    PsThread *Thread = HalGetCurrentProcessor()->CurrentThread;
-    Thread->Terminated = 1;
+extern "C" [[noreturn]] void PsTerminateThread(void) {
+    KeProcessor *Processor = HalGetCurrentProcessor();
+    PsThread *Thread = Processor->CurrentThread;
+
+    /* Hold the reaper lock while changing the reaper structs, just to be safe. */
+    SpinLockGuard Guard(&PspReaperLock);
+    RtPushDList(&PspReaperList, &Thread->ListHeader);
+    Guard.Release();
+
+    Processor->ForceYield = PSP_YIELD_EVENT;
     HalpSetEvent(0);
     while (1) {
         HalpStopProcessor();
@@ -71,7 +84,7 @@ PsThread *PsCreateThread(void (*EntryPoint)(void *), void *Parameter) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void PspCreateSystemThread(void) {
+extern "C" void PspCreateSystemThread(void) {
     PspSystemThread = PsCreateThread(KiContinueSystemStartup, NULL);
     if (!PspSystemThread) {
         VidPrint(VID_MESSAGE_ERROR, "Kernel", "failed to create the system thread\n");
@@ -89,7 +102,7 @@ void PspCreateSystemThread(void) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void PspCreateIdleThread(void) {
+extern "C" void PspCreateIdleThread(void) {
     HalGetCurrentProcessor()->IdleThread = PsCreateThread(PspIdleThread, NULL);
     if (!HalGetCurrentProcessor()->IdleThread) {
         VidPrint(VID_MESSAGE_ERROR, "Kernel", "failed to create the idle thread\n");

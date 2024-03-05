@@ -59,7 +59,7 @@ void HalpInitializeHpet(void) {
     }
 
     HpetAddress = MI_PADDR_TO_VADDR(Hpet->Address);
-    if (!HalpMapPage(HpetAddress, Hpet->Address, MI_MAP_WRITE)) {
+    if (!HalpMapPage(HpetAddress, Hpet->Address, MI_MAP_WRITE | MI_MAP_DEVICE)) {
         VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "couldn't map the HPET table\n");
         KeFatalError(KE_BAD_ACPI_TABLES);
     }

@@ -113,7 +113,10 @@ void HalpInitializeIoapic(void) {
                 Entry->Id = Record->Ioapic.IoapicId;
                 Entry->GsiBase = Record->Ioapic.GsiBase;
                 Entry->VirtualAddress = MI_PADDR_TO_VADDR(Record->Ioapic.Address);
-                if (!HalpMapPage(Entry->VirtualAddress, Record->Ioapic.Address, MI_MAP_WRITE)) {
+                if (!HalpMapPage(
+                        Entry->VirtualAddress,
+                        Record->Ioapic.Address,
+                        MI_MAP_WRITE | MI_MAP_DEVICE)) {
                     VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "couldn't allocate map an IOAPIC\n");
                     KeFatalError(KE_OUT_OF_MEMORY);
                 }

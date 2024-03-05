@@ -14,6 +14,7 @@
 
 #define KE_NO_EVENT 0
 #define KE_PANIC_EVENT 1
+#define KE_INVALIDATE_PAGE_EVENT 2
 
 #define KE_FATAL_ERROR 0
 #define KE_BAD_ACPI_TABLES 1
@@ -22,7 +23,8 @@
 #define KE_DOUBLE_PAGE_FREE 4
 #define KE_OUT_OF_MEMORY 5
 #define KE_WRONG_IRQL 6
-#define KE_PANIC_COUNT 7
+#define KE_DOUBLE_THREAD_REAP 7
+#define KE_PANIC_COUNT 8
 
 #if defined(ARCH_amd64)
 #define KE_IRQL_PASSIVE 0

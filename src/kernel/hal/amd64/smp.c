@@ -4,7 +4,7 @@
 #include <amd64/apic.h>
 #include <amd64/halp.h>
 #include <amd64/msr.h>
-#include <mm.h>
+#include <mi.h>
 #include <string.h>
 
 extern RtSList HalpLapicListHead;
@@ -30,15 +30,15 @@ void HalpInitializeSmp(void) {
     uint32_t ApicId = HalpReadLapicRegister(0x20);
     RtSList *ListHeader = HalpLapicListHead.Next;
 
-    /* Copy the AP startup code into 0x8000 (as the STARTUP IPI makes the API start at
-       0800:0000). */
-    memcpy(MI_PADDR_TO_VADDR(0x8000), HalpApEntry, MM_PAGE_SIZE);
+    /* Map the AP startup code (0x8000), and copy all the trampoline data to it. */
+    HalpMapPage((void *)0x8000, 0x8000, MI_MAP_WRITE | MI_MAP_EXEC);
+    memcpy((void *)0x8000, HalpApEntry, MM_PAGE_SIZE);
 
     /* Save the kernel page map (shared between all processors).
        The address is guaranteed to be on the low 4GiBs (because of bootmgr). */
-    __asm__ volatile("mov %%cr3, %0"
-                     : "=r"(*(uint64_t *)MI_PADDR_TO_VADDR(
-                         (uint64_t)&HalpKernelPageMap - (uint64_t)HalpApEntry + 0x8000)));
+    __asm__ volatile(
+        "mov %%cr3, %0"
+        : "=r"(*(uint64_t *)((uint64_t)&HalpKernelPageMap - (uint64_t)HalpApEntry + 0x8000)));
 
     /* BSP processor is already initialized, just setup its processor struct before someone
        tries acessing our scheduler. */
@@ -57,7 +57,6 @@ void HalpInitializeSmp(void) {
     RtInitializeDList(&Processor->EventQueue);
 
     RtPushSList(&HalpProcessorListHead, &Processor->ListHeader);
-    return;
 
     while (ListHeader) {
         LapicEntry *Entry = CONTAINING_RECORD(ListHeader, LapicEntry, ListHeader);
@@ -87,8 +86,7 @@ void HalpInitializeSmp(void) {
         RtInitializeDList(&Processor->DpcQueue);
         RtInitializeDList(&Processor->EventQueue);
 
-        *(KeProcessor **)MI_PADDR_TO_VADDR(
-            (uint64_t)&HalpApStructure - (uint64_t)HalpApEntry + 0x8000) = Processor;
+        *(KeProcessor **)((uint64_t)&HalpApStructure - (uint64_t)HalpApEntry + 0x8000) = Processor;
 
         /* Recommended/safe initialization process;
            Send an INIT IPI, followed by deasserting it. */

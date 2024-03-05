@@ -85,6 +85,10 @@ int HalpMapPage(void *VirtualAddress, uint64_t PhysicalAddress, int Flags) {
             PageFlags |= 0x02;
         }
 
+        if (Flags & MI_MAP_DEVICE) {
+            PageFlags |= 0x80;
+        }
+
         if (!(Flags & MI_MAP_EXEC)) {
             PageFlags |= 0x8000000000000000;
         }

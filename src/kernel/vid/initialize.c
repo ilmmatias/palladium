@@ -33,7 +33,9 @@ void VidpInitialize(KiLoaderBlock *LoaderBlock) {
     VidpFrontBuffer = MmAllocatePool(VidpHeight * VidpPitch * 4, "Vidp");
     for (uint64_t i = 0; i < VidpHeight * VidpPitch * 4; i += MM_PAGE_SIZE) {
         HalpMapPage(
-            (char *)VidpBackBuffer + i, (uint64_t)LoaderBlock->Framebuffer + i, MI_MAP_WRITE);
+            (char *)VidpBackBuffer + i,
+            (uint64_t)LoaderBlock->Framebuffer + i,
+            MI_MAP_WRITE | MI_MAP_DEVICE);
     }
 
     VidResetDisplay();

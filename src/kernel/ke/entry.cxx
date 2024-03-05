@@ -15,10 +15,12 @@
 
 #define BACKGROUND_COLOR 0x09090F
 
+extern "C" {
 extern char *VidpBackBuffer;
 extern uint16_t VidpWidth;
 extern uint16_t VidpHeight;
 extern uint16_t VidpPitch;
+}
 
 static void PlotPixel(uint32_t Color, int X, int Y) {
     if (X < 0 || Y < 0 || X >= VidpWidth || Y >= VidpHeight) {
@@ -232,6 +234,11 @@ static void SpawnExplodable(void) {
     }
 }
 
+extern "C" {
+extern RtDList PspReaperList;
+extern void PspReaperThread(void *);
+}
+
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function is the kernel's architecture-independent entry point.
@@ -239,42 +246,55 @@ static void SpawnExplodable(void) {
  *
  * PARAMETERS:
  *     LoaderBlockPage - Physical address of the OSLOADER's boot block.
+ *     ProcessorPage - Either the physical address (for the boot processor) or the virtual
+ *                     address (for the APs) of this processor's block.
  *
  * RETURN VALUE:
  *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
-extern "C" [[noreturn]] void KiSystemStartup(uint64_t LoaderBlockPage) {
-    KiLoaderBlock *LoaderBlock = (KiLoaderBlock *)MI_PADDR_TO_VADDR(LoaderBlockPage);
-    KeProcessor *Processor = (KeProcessor *)MI_PADDR_TO_VADDR((uint64_t)LoaderBlock->BootProcessor);
+extern "C" [[noreturn]] void KiSystemStartup(uint64_t LoaderBlockPage, uint64_t ProcessorPage) {
+    KiLoaderBlock *LoaderBlock;
+    KeProcessor *Processor;
 
-    /* Stage 1: Memory manager initialization; This won't mark the OSLOADER pages as free
-     * just yet. */
-    MiInitializePool(LoaderBlock);
-    MiInitializePageAllocator(LoaderBlock);
+    if (LoaderBlockPage) {
+        LoaderBlock = (KiLoaderBlock *)MI_PADDR_TO_VADDR(LoaderBlockPage);
+        Processor = (KeProcessor *)MI_PADDR_TO_VADDR(ProcessorPage);
+    } else {
+        Processor = (KeProcessor *)ProcessorPage;
+    }
 
-    /* Stage 2: Display initialization (for early debugging). */
-    VidpInitialize(LoaderBlock);
-    VidPrint(
-        VID_MESSAGE_INFO,
-        "Kernel",
-        "palladium kernel for %s, git commit %s\n",
-        KE_ARCH,
-        KE_GIT_HASH);
+    if (LoaderBlockPage) {
+        /* Stage 1: Memory manager initialization; This won't mark the OSLOADER pages as free
+         * just yet. */
+        MiInitializePool(LoaderBlock);
+        MiInitializePageAllocator(LoaderBlock);
 
-    /* Stage 3.1: Save all remaining info from the boot loader, and release the OSLOADER memory for
-     * usage. */
-    KiSaveAcpiData(LoaderBlock);
-    KiSaveBootStartDrivers(LoaderBlock);
-    MiReleaseOsloaderMemory(LoaderBlock);
+        /* Stage 2: Display initialization (for early debugging). */
+        VidpInitialize(LoaderBlock);
+        VidPrint(
+            VID_MESSAGE_INFO,
+            "Kernel",
+            "palladium kernel for %s, git commit %s\n",
+            KE_ARCH,
+            KE_GIT_HASH);
+
+        /* Stage 3.1: Save all remaining info from the boot loader. */
+        KiSaveAcpiData(LoaderBlock);
+        KiSaveBootStartDrivers(LoaderBlock);
+    }
 
     /* Stage 3.2: Early platform/arch initialization. */
-    HalpInitializePlatform(Processor, 1);
-    VidPrint(VID_MESSAGE_INFO, "Kernel", "%u processors online\n", HalpProcessorCount);
+    if (LoaderBlockPage) {
+        HalpInitializePlatform(Processor, 1);
+        VidPrint(VID_MESSAGE_INFO, "Kernel", "%u processors online\n", HalpProcessorCount);
+    } else {
+        HalpInitializePlatform(Processor, 0);
+    }
 
     /* Stage 4: Create the initial system thread, idle thread, and spin up the scheduler. */
     PspCreateSystemThread();
     PspCreateIdleThread();
-    PspInitializeScheduler(1);
+    PspInitializeScheduler(LoaderBlockPage != 0);
 
     while (1) {
         HalpStopProcessor();
@@ -293,6 +313,15 @@ extern "C" [[noreturn]] void KiSystemStartup(uint64_t LoaderBlockPage) {
  *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
 extern "C" [[noreturn]] void KiContinueSystemStartup(void *) {
+    /* Stage 4.1: Initialize the thread reaper, and enqueue it to some processor. */
+    PsThread *Reaper = PsCreateThread(PspReaperThread, NULL);
+    if (!Reaper) {
+        KeFatalError(KE_OUT_OF_MEMORY);
+    }
+
+    RtInitializeDList(&PspReaperList);
+    PsReadyThread(Reaper);
+
     /* Stage 5: Initialize all boot drivers; We can't load anything further than this without
        them. */
     // KiRunBootStartDrivers();

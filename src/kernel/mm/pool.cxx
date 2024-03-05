@@ -162,7 +162,9 @@ extern "C" void *MmAllocatePool(size_t Size, const char Tag[4]) {
         RtPushSList(&SmallBlocks[SMALL_BLOCK_COUNT - Head - 2], &RemainingSpace->ListHeader);
     }
 
+    /* memset() inside the spin lock would be wasting time. */
     Guard.Release();
+
     memset(Header + 1, 0, Head << 4);
     return Header + 1;
 }

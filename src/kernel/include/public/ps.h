@@ -15,8 +15,6 @@
 typedef struct PsThread {
     RtDList ListHeader;
     uint64_t Expiration;
-    int Terminated;
-    EvDpc TerminationDpc;
     HalRegisterState Context;
     char *Stack;
 } PsThread;

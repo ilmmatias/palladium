@@ -1,10 +1,10 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
+#include <console.h>
 #include <efi/spec.h>
 #include <loader.h>
 #include <platform.h>
-#include <console.h>
 
 extern uint64_t *OslpPageMap;
 extern void *OslpGetBootStack(void *BspPtr);
@@ -38,7 +38,7 @@ extern void *OslpGetBootStack(void *BspPtr);
 
     /* We almost certainly want PSE (Page Size Extension) enabled. */
     __asm__ volatile("mov %%cr4, %%rax\n"
-                     "or $0x40, %%rax\n"
+                     "or $0x08, %%rax\n"
                      "mov %%rax, %%cr4\n"
                      :
                      :
@@ -54,6 +54,17 @@ extern void *OslpGetBootStack(void *BspPtr);
                      :
                      : "%rax", "%rcx");
 
+    /* Set the 4th PAT entry to WC (we use that for devices+physical memory at
+     * 0xFFFF800000000000). */
+    __asm__ volatile("mov $0x277, %%rcx\n"
+                     "rdmsr\n"
+                     "and $0xFFFFFF00, %%edx\n"
+                     "or $0x01, %%edx\n"
+                     "wrmsr\n"
+                     :
+                     :
+                     : "%rax", "%rcx");
+
     /* We can load up the new page table now. */
     __asm__ volatile("mov %0, %%cr3" : : "r"(OslpPageMap));
 
@@ -64,13 +75,15 @@ extern void *OslpGetBootStack(void *BspPtr);
     void *EntryPoint =
         CONTAINING_RECORD(BootBlock->BootDriverListHead->Next, OslpModuleEntry, ListHeader)
             ->EntryPoint;
-    __asm__ volatile("mov %0, %%rax\n"
-                     "mov %1, %%rcx\n"
-                     "mov %2, %%rsp\n"
-                     "jmp *%%rax\n"
-                     :
-                     : "r"(EntryPoint), "r"(BootBlock), "r"(BootStack)
-                     : "%rax", "%rcx");
+    __asm__ volatile(
+        "mov %0, %%rax\n"
+        "mov %1, %%rcx\n"
+        "mov %2, %%rdx\n"
+        "mov %3, %%rsp\n"
+        "jmp *%%rax\n"
+        :
+        : "r"(EntryPoint), "r"(BootBlock), "r"(BootBlock->BootProcessor), "r"(BootStack)
+        : "%rax", "%rcx", "%rdx");
 
     while (1)
         ;

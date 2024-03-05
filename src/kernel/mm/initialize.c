@@ -1,9 +1,11 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
+#include <halp.h>
 #include <mi.h>
 #include <rt/bitmap.h>
 #include <string.h>
+#include <vid.h>
 
 extern MiPageEntry *MiPageList;
 extern MiPageEntry *MiFreePageListHead;
@@ -50,7 +52,6 @@ static void *EarlyAllocatePages(KiLoaderBlock *LoaderBlock, uint32_t Pages) {
         void *Result = MI_PADDR_TO_VADDR((uint64_t)Entry->BasePage << MM_PAGE_SHIFT);
         Entry->BasePage += Pages;
         Entry->PageCount -= Pages;
-
         return Result;
     }
 
@@ -99,50 +100,6 @@ void MiInitializePageAllocator(KiLoaderBlock *LoaderBlock) {
         MiMemoryDescriptor *Entry = CONTAINING_RECORD(ListHeader, MiMemoryDescriptor, ListHeader);
 
         if (Entry->Type != MI_PAGE_FREE && Entry->Type != MI_PAGE_FIRMWARE_TEMPORARY) {
-            continue;
-        }
-
-        if (Entry->BasePage < 0x10) {
-            if (Entry->BasePage + Entry->PageCount < 0x10) {
-                continue;
-            }
-
-            Entry->PageCount -= 0x10 - Entry->BasePage;
-            Entry->BasePage += 0x10 - Entry->BasePage;
-        }
-
-        MiPageEntry *Group = &MiPageList[Entry->BasePage];
-        for (uint32_t i = 0; i < Entry->PageCount; i++) {
-            MiPageEntry *Page = Group + i;
-            Page->NextPage = MiFreePageListHead;
-            Page->References = 0;
-            MiFreePageListHead = Page;
-        }
-    }
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function releases all regions of memory marked as OSLOADER back into the free list, and
- *     unmaps the 1-to-1 mappings OSLOADER left; After this, the kernel cannot reliably touch
- *     OSLOADER memory again, so make sure to save it all beforehand!
- *
- * PARAMETERS:
- *     LoaderBlock - Data prepared by the boot loader for us.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-void MiReleaseOsloaderMemory(KiLoaderBlock *LoaderBlock) {
-    RtDList *MemoryDescriptorListHead =
-        MI_PADDR_TO_VADDR((uint64_t)LoaderBlock->MemoryDescriptorListHead);
-
-    for (RtDList *ListHeader = MI_PADDR_TO_VADDR((uint64_t)MemoryDescriptorListHead->Next);
-         ListHeader != MemoryDescriptorListHead;
-         ListHeader = MI_PADDR_TO_VADDR((uint64_t)ListHeader->Next)) {
-        MiMemoryDescriptor *Entry = CONTAINING_RECORD(ListHeader, MiMemoryDescriptor, ListHeader);
-
-        if (Entry->Type != MI_PAGE_OSLOADER) {
             continue;
         }
 

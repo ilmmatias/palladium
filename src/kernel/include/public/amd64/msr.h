@@ -37,7 +37,7 @@ static inline uint64_t ReadMsr(uint32_t Number) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 static inline void WriteMsr(uint32_t Number, uint64_t Value) {
-    __asm__ volatile("wrmsr" :: "a"((uint32_t)Value), "c"(Number), "d"(Value >> 32));
+    __asm__ volatile("wrmsr" : : "a"((uint32_t)Value), "c"(Number), "d"(Value >> 32));
 }
 
 #endif /* _AMD64_MSR_H_ */

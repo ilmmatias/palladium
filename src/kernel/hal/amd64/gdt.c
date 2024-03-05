@@ -26,6 +26,6 @@ void HalpInitializeGdt(KeProcessor *Processor) {
     Processor->GdtDescriptor.Limit = sizeof(Processor->GdtEntries) - 1;
     Processor->GdtDescriptor.Base = (uint64_t)Processor->GdtEntries;
 
-    __asm__ volatile("lgdt %0" :: "m"(Processor->GdtDescriptor));
+    __asm__ volatile("lgdt %0" : : "m"(Processor->GdtDescriptor));
     HalpFlushGdt();
 }

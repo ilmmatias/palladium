@@ -16,6 +16,7 @@
 
 #define MI_MAP_WRITE 0x01
 #define MI_MAP_EXEC 0x02
+#define MI_MAP_DEVICE 0x04
 
 #define MI_PAGE_FREE 0x00
 #define MI_PAGE_LOADED_PROGRAM 0x01
@@ -26,7 +27,7 @@
 #define MI_PAGE_FIRMWARE_PERMANENT 0x06
 #define MI_PAGE_SYSTEM_RESERVED 0x07
 
-#define MI_PAGE_BASE(Entry) ((uint64_t)((Entry) - MiPageList) << MM_PAGE_SHIFT)
+#define MI_PAGE_BASE(Entry) ((uint64_t)((Entry)-MiPageList) << MM_PAGE_SHIFT)
 
 typedef struct {
     RtDList ListHeader;
@@ -46,7 +47,6 @@ extern "C" {
 #endif /* __cplusplus */
 
 void MiInitializePageAllocator(KiLoaderBlock *LoaderBlock);
-void MiReleaseOsloaderMemory(KiLoaderBlock *LoaderBlock);
 void MiInitializePool(KiLoaderBlock *LoaderBlock);
 
 #ifdef __cplusplus

@@ -206,12 +206,10 @@ int OslpPrepareExecution(RtDList *LoadedPrograms, RtDList *MemoryDescriptors) {
     __cpuid(0x80000001, Eax, Ebx, Ecx, Edx);
     OslpHasHugePages = Edx & 0x4000000;
 
-    /* The last entry of the address space contains a self-reference(so that the
+    /* The last entry of the address space contains a self-reference (so that the
      * kernel can easily manipulate the page map). */
     memset(OslpPageMap, 0, 4096);
     OslpPageMap[511] = (uint64_t)OslpPageMap | 0x03;
-
-    OslPrint("OslpInitializeBsp is at %p\r\n", OslpInitializeBsp);
 
     /* Map all of the memory descriptors. */
     for (RtDList *ListHeader = MemoryDescriptors->Next; ListHeader != MemoryDescriptors;) {
