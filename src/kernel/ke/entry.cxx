@@ -186,7 +186,7 @@ static void SpawnParticle(FireworkData *Data);
 
     // Explode it!
     // This spawns many, many threads! Cause why not, right?!
-    int PartCount = Rand() % 50 + 50;
+    int PartCount = Rand() % 100 + 100;
 
     for (int i = 0; i < PartCount; i++) {
         FireworkData *DataClone = (FireworkData *)MmAllocatePool(sizeof(FireworkData), "FWKS");
@@ -224,7 +224,7 @@ static void SpawnExplodable(void) {
     // The main thread occupies itself with spawning explodeables
     // from time to time, to keep things interesting.
     while (1) {
-        int SpawnCount = Rand() % 2 + 2;
+        int SpawnCount = Rand() % 2 + 1;
 
         for (int i = 0; i < SpawnCount; i++) {
             SpawnExplodable();
@@ -232,11 +232,6 @@ static void SpawnExplodable(void) {
 
         PerformDelay(2000 + Rand() % 2000);
     }
-}
-
-extern "C" {
-extern RtDList PspReaperList;
-extern void PspReaperThread(void *);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -313,15 +308,6 @@ extern "C" [[noreturn]] void KiSystemStartup(uint64_t LoaderBlockPage, uint64_t 
  *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
 extern "C" [[noreturn]] void KiContinueSystemStartup(void *) {
-    /* Stage 4.1: Initialize the thread reaper, and enqueue it to some processor. */
-    PsThread *Reaper = PsCreateThread(PspReaperThread, NULL);
-    if (!Reaper) {
-        KeFatalError(KE_OUT_OF_MEMORY);
-    }
-
-    RtInitializeDList(&PspReaperList);
-    PsReadyThread(Reaper);
-
     /* Stage 5: Initialize all boot drivers; We can't load anything further than this without
        them. */
     // KiRunBootStartDrivers();

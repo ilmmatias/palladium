@@ -52,7 +52,6 @@ void HalpInitializeSmp(void) {
     RtInitializeDList(&Processor->ThreadQueue);
 
     Processor->ForceYield = 0;
-    Processor->ClosestEvent = 0;
     RtInitializeDList(&Processor->DpcQueue);
     RtInitializeDList(&Processor->EventQueue);
 
@@ -82,7 +81,6 @@ void HalpInitializeSmp(void) {
         RtInitializeDList(&Processor->ThreadQueue);
 
         Processor->ForceYield = 0;
-        Processor->ClosestEvent = 0;
         RtInitializeDList(&Processor->DpcQueue);
         RtInitializeDList(&Processor->EventQueue);
 

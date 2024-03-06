@@ -25,7 +25,8 @@ function(add_executable target type has_lib)
             PRIVATE
             $<$<COMPILE_LANGUAGE:C,CXX>:-mno-mmx>
             $<$<COMPILE_LANGUAGE:C,CXX>:-mno-sse>
-            $<$<COMPILE_LANGUAGE:C,CXX>:-mno-sse2>)
+            $<$<COMPILE_LANGUAGE:C,CXX>:-mno-sse2>
+            $<$<COMPILE_LANGUAGE:C,CXX>:-mno-red-zone>)
     endif()
 
     target_compile_options(
@@ -75,7 +76,8 @@ function(add_library target type)
             PRIVATE
             $<$<COMPILE_LANGUAGE:C,CXX>:-mno-mmx>
             $<$<COMPILE_LANGUAGE:C,CXX>:-mno-sse>
-            $<$<COMPILE_LANGUAGE:C,CXX>:-mno-sse2>)
+            $<$<COMPILE_LANGUAGE:C,CXX>:-mno-sse2>
+            $<$<COMPILE_LANGUAGE:C,CXX>:-mno-red-zone>)
     endif()
 
     target_compile_options(

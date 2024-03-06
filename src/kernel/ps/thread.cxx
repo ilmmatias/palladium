@@ -12,9 +12,6 @@ extern "C" {
 extern void KiContinueSystemStartup(void *);
 extern void PspIdleThread(void *);
 
-extern KeSpinLock PspReaperLock;
-extern RtDList PspReaperList;
-
 PsThread *PspSystemThread = NULL;
 }
 
@@ -61,14 +58,8 @@ extern "C" PsThread *PsCreateThread(void (*EntryPoint)(void *), void *Parameter)
 extern "C" [[noreturn]] void PsTerminateThread(void) {
     KeProcessor *Processor = HalGetCurrentProcessor();
     PsThread *Thread = Processor->CurrentThread;
-
-    /* Hold the reaper lock while changing the reaper structs, just to be safe. */
-    SpinLockGuard Guard(&PspReaperLock);
-    RtPushDList(&PspReaperList, &Thread->ListHeader);
-    Guard.Release();
-
-    Processor->ForceYield = PSP_YIELD_EVENT;
-    HalpSetEvent(0);
+    Thread->Terminated = 1;
+    HalpNotifyProcessor(Processor, 1);
     while (1) {
         HalpStopProcessor();
     }

@@ -4,10 +4,6 @@
 #include <amd64/halp.h>
 #include <vid.h>
 
-extern void EvpHandleEvents(HalRegisterState *);
-
-static uint64_t Period = 0;
-
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function initializes the per-CPU event timer (Local APIC Timer).
@@ -19,11 +15,12 @@ static uint64_t Period = 0;
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void HalpInitializeApicTimer(void) {
+    /* Max out the divider. */
     HalpWriteLapicRegister(0x3E0, 0);
 
     /* We'll be taking the average over 4 runs. */
     uint64_t Accum = 0;
-    uint64_t Ticks = (10 * EV_MILLISECS) / HalGetTimerPeriod();
+    uint64_t Ticks = (1 * EV_MILLISECS) / HalGetTimerPeriod();
     for (int i = 0; i < 4; i++) {
         uint64_t End = HalGetTimerTicks() + Ticks;
         HalpWriteLapicRegister(0x380, UINT32_MAX);
@@ -34,34 +31,8 @@ void HalpInitializeApicTimer(void) {
         Accum += UINT32_MAX - HalpReadLapicRegister(0x390);
     }
 
-    /* Install the vector (into the shared event handler) and enable interrupts (we should be
-     * done). */
-    if (!HalInstallInterruptHandlerAt(0x40, EvpHandleEvents, KE_IRQL_DISPATCH)) {
-        VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "could not install the handler for the timer\n");
-        KeFatalError(KE_FATAL_ERROR);
-    }
-
-    HalpWriteLapicRegister(0x320, 0x40);
-
-    /* Round to closest, or we might be very off. */
-    Period = (40000000 + Accum / 2) / Accum;
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function sets up an event to execute in the specified amount of time.
- *
- * PARAMETERS:
- *     Time - How many microseconds to wait.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-void HalpSetEvent(uint64_t Time) {
-    if (Time < Period) {
-        Time = Period;
-    }
-
+    /* Periodic timer, trigerring IRQ 32 (our event handler). */
+    HalpWriteLapicRegister(0x320, 0x20040);
     HalpWriteLapicRegister(0x3E0, 0);
-    HalpWriteLapicRegister(0x380, Time / Period);
+    HalpWriteLapicRegister(0x380, Accum / 4);
 }

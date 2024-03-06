@@ -37,9 +37,4 @@ void EvDispatchDpc(EvDpc *Dpc) {
     void *Context = HalpEnterCriticalSection();
     RtAppendDList(&HalGetCurrentProcessor()->DpcQueue, &Dpc->ListHeader);
     HalpLeaveCriticalSection(Context);
-
-    /* We need to trigger an event if we have nothing in sight. */
-    if (!HalGetCurrentProcessor()->CurrentThread->Expiration) {
-        HalpSetEvent(0);
-    }
 }

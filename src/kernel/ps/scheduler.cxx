@@ -5,7 +5,6 @@
 #include <ki.h>
 #include <mm.h>
 #include <psp.h>
-#include <vid.h>
 
 #include <ke.hxx>
 
@@ -69,12 +68,10 @@ void PsReadyThread(PsThread *Thread) {
  *-----------------------------------------------------------------------------------------------*/
 void PspInitializeScheduler(int IsBsp) {
     KeProcessor *Processor = HalGetCurrentProcessor();
-
     /* PspScheduleNext should forcefully "switch" threads if we're not running anything. */
     Processor->CurrentThread = NULL;
     Processor->InitialThread = IsBsp ? PspSystemThread : Processor->IdleThread;
-
-    HalpSetEvent(0);
+    HalpNotifyProcessor(Processor, 1);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -101,6 +98,22 @@ static PsThread *GetNextReadyThread(KeProcessor *Processor) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
+ *     Cleanup routine for killed/terminated threads; We're forced to use a DPC (+this method), as
+ *     PspScheduleNext runs in the context of the terminated thread.
+ *
+ * PARAMETERS:
+ *     Thread - Which thread was killed.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+static void TerminationDpc(PsThread *Thread) {
+    MmFreePool(Thread->Stack, "Ps  ");
+    MmFreePool(Thread, "Ps  ");
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
  *     This function tries scheduling and executing the next available thread.
  *
  * PARAMETERS:
@@ -122,82 +135,57 @@ void PspScheduleNext(HalRegisterState *Context) {
         return;
     }
 
+    if (Processor->CurrentThread->Terminated) {
+        Processor->ForceYield = PSP_YIELD_EVENT;
+    }
+
     /* On quantum expiry, we switch threads if possible;
        On force yield, we always switch threads (into the idle if nothing is left). */
     uint64_t CurrentTicks = HalGetTimerTicks();
-    if (CurrentTicks >= CurrentThread->Expiration || Processor->ForceYield) {
-        PsThread *NewThread = GetNextReadyThread(Processor);
-        if (!NewThread) {
-            CurrentThread->Expiration = 0;
-
-            /* Setup a next timer tick (for events) if possible. */
-            if (Processor->ClosestEvent) {
-                if (Processor->ClosestEvent <= CurrentTicks) {
-                    HalpSetEvent(0);
-                } else {
-                    HalpSetEvent((Processor->ClosestEvent - CurrentTicks) * HalGetTimerPeriod());
-                }
-            }
-
-            return;
-        }
-
-        if (NewThread == Processor->IdleThread) {
-            NewThread->Expiration = 0;
-        } else {
-            uint64_t ThreadQuantum = PSP_THREAD_QUANTUM / Processor->ThreadQueueSize;
-            if (ThreadQuantum < PSP_THREAD_MIN_QUANTUM) {
-                ThreadQuantum = PSP_THREAD_MIN_QUANTUM;
-            }
-
-            NewThread->Expiration = CurrentTicks + ThreadQuantum / HalGetTimerPeriod();
-        }
-
-        /* Try setting up a timer tick for the closest event; If we can't, we're on the idle
-           thread, and blocked by an event with no deadline (awaiting IO?) */
-        uint64_t ThreadDeadline = NewThread->Expiration ? NewThread->Expiration : UINT64_MAX;
-        uint64_t EventDeadline = Processor->ClosestEvent ? Processor->ClosestEvent : UINT64_MAX;
-
-        if (NewThread->Expiration || Processor->ClosestEvent) {
-            if (!NewThread->Expiration && EventDeadline <= CurrentTicks) {
-                HalpSetEvent(0);
-            } else if (ThreadDeadline < EventDeadline || EventDeadline <= CurrentTicks) {
-                HalpSetEvent((ThreadDeadline - CurrentTicks) * HalGetTimerPeriod());
-            } else {
-                HalpSetEvent((EventDeadline - CurrentTicks) * HalGetTimerPeriod());
-            }
-        }
-
-        Processor->CurrentThread = NewThread;
-
-        if (Processor->ForceYield == PSP_YIELD_EVENT) {
-            __atomic_sub_fetch(&Processor->ThreadQueueSize, 1, __ATOMIC_SEQ_CST);
-        } else if (CurrentThread != Processor->IdleThread) {
-            SpinLockGuard Guard(&Processor->ThreadQueueLock);
-            RtAppendDList(&Processor->ThreadQueue, &CurrentThread->ListHeader);
-        }
-
-        Processor->ForceYield = PSP_YIELD_NONE;
-
-        if (CurrentThread != Processor->IdleThread) {
-            HalpSaveThreadContext(Context, &CurrentThread->Context);
-        }
-
-        HalpRestoreThreadContext(Context, &NewThread->Context);
-
+    if (CurrentTicks < CurrentThread->Expiration && !Processor->ForceYield) {
         return;
     }
 
-    /* We're here too early, try again in a bit. */
-    uint64_t ThreadDeadline = CurrentThread->Expiration ? CurrentThread->Expiration : UINT64_MAX;
-    uint64_t EventDeadline = Processor->ClosestEvent ? Processor->ClosestEvent : UINT64_MAX;
-    if (CurrentThread->Expiration || Processor->ClosestEvent) {
-        if (ThreadDeadline < EventDeadline) {
-            HalpSetEvent((ThreadDeadline - CurrentTicks) * HalGetTimerPeriod());
-        } else if (CurrentTicks < EventDeadline) {
-            HalpSetEvent((EventDeadline - CurrentTicks) * HalGetTimerPeriod());
-        } else {
-            HalpSetEvent(0);
-        }
+    PsThread *NewThread = GetNextReadyThread(Processor);
+    if (!NewThread) {
+        return;
     }
+
+    if (NewThread == Processor->IdleThread) {
+        NewThread->Expiration = 0;
+    } else {
+        uint64_t ThreadQuantum = PSP_THREAD_QUANTUM / Processor->ThreadQueueSize;
+        if (ThreadQuantum < PSP_THREAD_MIN_QUANTUM) {
+            ThreadQuantum = PSP_THREAD_MIN_QUANTUM;
+        }
+
+        NewThread->Expiration = CurrentTicks + ThreadQuantum / HalGetTimerPeriod();
+    }
+
+    /* Thread cleanup cannot be done at the moment (we're still on the thread context!),
+     * we need to enqueue a DPC if we yielded out because of PsTerminateThread. */
+    if (Processor->CurrentThread->Terminated) {
+        EvInitializeDpc(
+            &Processor->CurrentThread->TerminationDpc,
+            (void (*)(void *))TerminationDpc,
+            Processor->CurrentThread);
+        RtAppendDList(&Processor->DpcQueue, &Processor->CurrentThread->TerminationDpc.ListHeader);
+    }
+
+    Processor->CurrentThread = NewThread;
+
+    if (Processor->ForceYield == PSP_YIELD_EVENT) {
+        __atomic_sub_fetch(&Processor->ThreadQueueSize, 1, __ATOMIC_SEQ_CST);
+    } else if (CurrentThread != Processor->IdleThread) {
+        SpinLockGuard Guard(&Processor->ThreadQueueLock);
+        RtAppendDList(&Processor->ThreadQueue, &CurrentThread->ListHeader);
+    }
+
+    Processor->ForceYield = PSP_YIELD_NONE;
+
+    if (CurrentThread != Processor->IdleThread) {
+        HalpSaveThreadContext(Context, &CurrentThread->Context);
+    }
+
+    HalpRestoreThreadContext(Context, &NewThread->Context);
 }

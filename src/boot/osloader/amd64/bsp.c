@@ -18,7 +18,6 @@ typedef struct {
     void *IdleThread;
     int ForceYield;
     int EventStatus;
-    uint64_t ClosestEvent;
     RtDList DpcQueue;
     RtDList EventQueue;
     char SystemStack[8192] __attribute__((aligned(4096)));

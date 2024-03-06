@@ -110,6 +110,7 @@ HalpCommonInterruptStub:
     .seh_endprologue
 
     mov %rsp, %rcx
+    cld
     call HalpInterruptHandler
 
     pop %r15

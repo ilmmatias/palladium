@@ -45,7 +45,6 @@ add_executable(kernel "kernel" YES
     mm/pool.cxx
 
     ps/idle.c
-    ps/reaper.cxx
     ps/scheduler.cxx
     ps/thread.cxx
 

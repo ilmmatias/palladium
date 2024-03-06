@@ -26,7 +26,6 @@ void HalpPauseProcessor(void);
 uint64_t HalpGetPhysicalAddress(void *VirtualAddress);
 int HalpMapPage(void *VirtualAddress, uint64_t PhysicalAddress, int Flags);
 
-void HalpSetEvent(uint64_t Time);
 void HalpNotifyProcessor(KeProcessor *Processor, int WaitDelivery);
 
 void *HalpEnterCriticalSection(void);

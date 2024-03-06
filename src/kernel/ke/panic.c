@@ -16,7 +16,6 @@ static char *Messages[] = {
     "The kernel or a driver tried freeing the same page twice.\n",
     "No memory left for an unpagable kernel allocation.\n",
     "The kernel or a driver tried using a function in the wrong context.\n",
-    "The thread reaper tried freeing the same thread twice.\n",
 };
 
 /*-------------------------------------------------------------------------------------------------

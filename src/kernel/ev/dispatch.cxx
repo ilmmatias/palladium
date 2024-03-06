@@ -8,33 +8,6 @@
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function searches for the next closest event deadline, and updates the Processor
- *     structure.
- *
- * PARAMETERS:
- *     Processor - Which processor we're currently running in.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-static void UpdateClosestDeadline(KeProcessor *Processor) {
-    RtDList *ListHeader = Processor->EventQueue.Next;
-
-    Processor->ClosestEvent = 0;
-    while (ListHeader != &Processor->EventQueue) {
-        EvHeader *Header = CONTAINING_RECORD(ListHeader, EvHeader, ListHeader);
-
-        if (Header->Deadline &&
-            (!Processor->ClosestEvent || Header->Deadline < Processor->ClosestEvent)) {
-            Processor->ClosestEvent = Header->Deadline;
-        }
-
-        ListHeader = ListHeader->Next;
-    }
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
  *     This function dispatches the given object into the event queue.
  *     Do not use this function unless you're implementing a custom event, use EvWaitObject(s)
  *     instead.
@@ -55,7 +28,7 @@ extern "C" void EvpDispatchObject(void *Object, uint64_t Timeout, int Yield) {
     EvHeader *Header = (EvHeader *)Object;
 
     /* Enter critical section (can't let any scheduling happen here), and update the event
-       queue (and the closest event deadline). */
+       queue. */
     void *Context = HalpEnterCriticalSection();
     if (Header->Finished) {
         HalpLeaveCriticalSection(Context);
@@ -81,21 +54,10 @@ extern "C" void EvpDispatchObject(void *Object, uint64_t Timeout, int Yield) {
         Header->Source = Processor->CurrentThread;
     }
 
-    int NewClosestEvent = 0;
-    if (Header->Deadline &&
-        (!Processor->ClosestEvent || Header->Deadline < Processor->ClosestEvent)) {
-        Processor->ClosestEvent = Header->Deadline;
-        NewClosestEvent = 1;
-    }
-
     HalpLeaveCriticalSection(Context);
 
-    /* Either we yield out, or we notify the current processor we have an event in X-time
-       (if we're stuck without any thread to switch into). */
     if (Yield) {
         HalpNotifyProcessor(Processor, 1);
-    } else if (!Processor->CurrentThread->Expiration && NewClosestEvent) {
-        HalpSetEvent((Header->Deadline - CurrentTicks) * HalGetTimerPeriod());
     }
 }
 
@@ -127,7 +89,6 @@ extern "C" void EvWaitObject(void *Object, uint64_t Timeout) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 extern "C" void EvCancelObject(void *Object) {
-    KeProcessor *Processor = HalGetCurrentProcessor();
     void *Context = HalpEnterCriticalSection();
     EvHeader *Header = (EvHeader *)Object;
 
@@ -138,7 +99,6 @@ extern "C" void EvCancelObject(void *Object) {
 
     /* No DPC dispatch happens on cancel. */
     RtUnlinkDList(&Header->ListHeader);
-    UpdateClosestDeadline(Processor);
 
     if (Header->Source) {
         PsReadyThread(Header->Source);
@@ -195,8 +155,6 @@ extern "C" void EvpHandleEvents(HalRegisterState *Context) {
             if (Header->Dpc) {
                 RtAppendDList(&Processor->DpcQueue, &Header->Dpc->ListHeader);
             }
-
-            UpdateClosestDeadline(Processor);
         }
     }
 

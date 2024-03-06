@@ -23,8 +23,7 @@
 #define KE_DOUBLE_PAGE_FREE 4
 #define KE_OUT_OF_MEMORY 5
 #define KE_WRONG_IRQL 6
-#define KE_DOUBLE_THREAD_REAP 7
-#define KE_PANIC_COUNT 8
+#define KE_PANIC_COUNT 7
 
 #if defined(ARCH_amd64)
 #define KE_IRQL_PASSIVE 0
