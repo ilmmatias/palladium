@@ -127,7 +127,7 @@ void PspScheduleNext(HalRegisterState *Context) {
     PsThread *CurrentThread = Processor->CurrentThread;
 
     /* Scheduler initialization, there should be no contention yet (we're using InitialThread
-       instead of the queue). */
+     * instead of the queue). */
     if (!Processor->CurrentThread) {
         Processor->CurrentThread = Processor->InitialThread;
         Processor->CurrentThread->Expiration = 0;
@@ -140,7 +140,7 @@ void PspScheduleNext(HalRegisterState *Context) {
     }
 
     /* On quantum expiry, we switch threads if possible;
-       On force yield, we always switch threads (into the idle if nothing is left). */
+     * On force yield, we always switch threads (into the idle if nothing is left). */
     uint64_t CurrentTicks = HalGetTimerTicks();
     if (CurrentTicks < CurrentThread->Expiration && !Processor->ForceYield) {
         return;

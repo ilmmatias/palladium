@@ -4,14 +4,73 @@
 .altmacro
 .text
 
+.extern HalpInterruptHandler
+
+.macro SAVE_REGS
+    push %rax
+    .seh_pushreg %rax
+    push %rcx
+    .seh_pushreg %rcx
+    push %rdx
+    .seh_pushreg %rdx
+    push %rbx
+    .seh_pushreg %rbx
+    push %rbp
+    .seh_pushreg %rbp
+    push %rsi
+    .seh_pushreg %rsi
+    push %rdi
+    .seh_pushreg %rdi
+    push %r8
+    .seh_pushreg %r8
+    push %r9
+    .seh_pushreg %r9
+    push %r10
+    .seh_pushreg %r10
+    push %r11
+    .seh_pushreg %r11
+    push %r12
+    .seh_pushreg %r12
+    push %r13
+    .seh_pushreg %r13
+    push %r14
+    .seh_pushreg %r14
+    push %r15
+    .seh_pushreg %r15
+.endm
+
+.macro RESTORE_REGS
+    pop %r15
+    pop %r14
+    pop %r13
+    pop %r12
+    pop %r11
+    pop %r10
+    pop %r9
+    pop %r8
+    pop %rdi
+    pop %rsi
+    pop %rbp
+    pop %rbx
+    pop %rdx
+    pop %rcx
+    pop %rax
+.endm
+
 .macro NO_ERRCODE num
 .seh_proc HalpInterruptHandler\num
 HalpInterruptHandler\num:
     push $0
     push $\num
     .seh_pushframe
+    SAVE_REGS
     .seh_endprologue
-    jmp HalpCommonInterruptStub
+    mov %rsp, %rcx
+    cld
+    call HalpInterruptHandler
+    RESTORE_REGS
+    add $16, %rsp
+    iretq
 .seh_endproc
 .endm
 
@@ -20,8 +79,14 @@ HalpInterruptHandler\num:
 HalpInterruptHandler\num:
     push $\num
     .seh_pushframe @code
+    SAVE_REGS
     .seh_endprologue
-    jmp HalpCommonInterruptStub
+    mov %rsp, %rcx
+    cld
+    call HalpInterruptHandler
+    RESTORE_REGS
+    add $16, %rsp
+    iretq
 .seh_endproc
 .endm
 
@@ -70,68 +135,6 @@ NO_ERRCODE 31
     NO_ERRCODE %i
     .set i, i + 1
 .endr
-
-.extern HalpInterruptHandler
-.seh_proc HalpCommonInterruptStub
-HalpCommonInterruptStub:
-    /* AMD64 has no PUSHA/POPA, so we're forced to save state manually.
-       No XMM state is saved, as you shouldn't be using it in kernel mode; Only the thread
-       scheduler saves it (on thread switch). */ 
-	push %rax
-    .seh_pushreg %rax
-    push %rcx
-    .seh_pushreg %rcx
-    push %rdx
-    .seh_pushreg %rdx
-    push %rbx
-    .seh_pushreg %rbx
-    push %rbp
-    .seh_pushreg %rbp
-    push %rsi
-    .seh_pushreg %rsi
-    push %rdi
-    .seh_pushreg %rdi
-    push %r8
-    .seh_pushreg %r8
-    push %r9
-    .seh_pushreg %r9
-    push %r10
-    .seh_pushreg %r10
-    push %r11
-    .seh_pushreg %r11
-    push %r12
-    .seh_pushreg %r12
-    push %r13
-    .seh_pushreg %r13
-    push %r14
-    .seh_pushreg %r14
-    push %r15
-    .seh_pushreg %r15
-    .seh_endprologue
-
-    mov %rsp, %rcx
-    cld
-    call HalpInterruptHandler
-
-    pop %r15
-    pop %r14
-    pop %r13
-    pop %r12
-    pop %r11
-    pop %r10
-    pop %r9
-    pop %r8
-    pop %rdi
-    pop %rsi
-    pop %rbp
-    pop %rbx
-    pop %rdx
-    pop %rcx
-    pop %rax
-
-    add $16, %rsp
-    iretq
-.seh_endproc
 
 .section .rodata
 

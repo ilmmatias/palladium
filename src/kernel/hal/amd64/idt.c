@@ -16,6 +16,8 @@ typedef struct {
 extern void EvpHandleEvents(HalRegisterState *);
 extern uint64_t HalpInterruptHandlerTable[256];
 
+extern KeSpinLock KiPanicLock;
+
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     Interrupt handler for the APIC; We redirect the interrupt to the correct place (or crash
@@ -36,6 +38,10 @@ void HalpInterruptHandler(HalRegisterState *State) {
         /* We don't care about the current IRQL, reset it to DISPATCH, or most functions we want
          * to use won't work. */
         HalpSetIrql(KE_IRQL_DISPATCH);
+
+        /* This should just halt if someone else already panicked; No need for LockGuard, we're
+         * not releasing this. */
+        KeAcquireSpinLock(&KiPanicLock);
 
         /* Panics always halt everyone (the system isn't in a safe state anymore). */
         for (RtSList *ListHeader = HalpProcessorListHead.Next; ListHeader;
@@ -58,8 +64,7 @@ void HalpInterruptHandler(HalRegisterState *State) {
         VidPutString(ErrorMessage);
 
         RtContext Context;
-        Context.Rsp = State->Rsp;
-        Context.Rip = State->Rip;
+        RtSaveContext(&Context);
         VidPutString("\nSTACK TRACE:\n");
 
         while (1) {

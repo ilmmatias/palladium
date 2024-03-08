@@ -18,6 +18,8 @@ static char *Messages[] = {
     "The kernel or a driver tried using a function in the wrong context.\n",
 };
 
+KeSpinLock KiPanicLock = {0};
+
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function takes over the display, and writes a fatal error message (panic), followed by
@@ -34,6 +36,10 @@ static char *Messages[] = {
      * won't work. */
     HalpEnterCriticalSection();
     HalpSetIrql(KE_IRQL_DISPATCH);
+
+    /* This should just halt if someone else already panicked; No need for LockGuard, we're
+     * not releasing this. */
+    KeAcquireSpinLock(&KiPanicLock);
 
     /* Panics always halt everyone (the system isn't in a safe state anymore). */
     for (RtSList *ListHeader = HalpProcessorListHead.Next; ListHeader;
