@@ -96,6 +96,8 @@ static void FreePoolPages(void *Base) {
  *     a new page failed.
  *-----------------------------------------------------------------------------------------------*/
 extern "C" void *MmAllocatePool(size_t Size, const char Tag[4]) {
+    SpinLockGuard Guard(&Lock);
+
     if (!Size) {
         Size = 1;
     }
@@ -107,14 +109,15 @@ extern "C" void *MmAllocatePool(size_t Size, const char Tag[4]) {
         uint32_t Pages = (Size + MM_PAGE_SIZE - 1) >> MM_PAGE_SHIFT;
         void *Base = AllocatePoolPages(Pages);
 
+        /* We don't need locking from here on out (we'd just be wasting time). */
+        Guard.Release();
+
         if (Base) {
             memset(Base, 0, Pages << MM_PAGE_SHIFT);
         }
 
         return Base;
     }
-
-    SpinLockGuard Guard(&Lock);
 
     /* Start at an exact match, and try everything onwards too (if there was nothing free). */
     for (uint32_t i = Head; i <= SMALL_BLOCK_COUNT; i++) {
@@ -129,9 +132,6 @@ extern "C" void *MmAllocatePool(size_t Size, const char Tag[4]) {
             KeFatalError(KE_BAD_POOL_HEADER);
         }
 
-        /* We don't need locking from here on out (we'd just be wasting time). */
-        Guard.Release();
-
         Header->Head = Head;
         memcpy(Header->Tag, Tag, 4);
 
@@ -140,6 +140,9 @@ extern "C" void *MmAllocatePool(size_t Size, const char Tag[4]) {
             RemainingSpace->Head = i - Head - 1;
             RtPushSList(&SmallBlocks[i - Head - 2], &RemainingSpace->ListHeader);
         }
+
+        /* We don't need locking from here on out (we'd just be wasting time). */
+        Guard.Release();
 
         memset(Header + 1, 0, Head << 4);
         return Header + 1;
@@ -180,6 +183,8 @@ extern "C" void *MmAllocatePool(size_t Size, const char Tag[4]) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 extern "C" void MmFreePool(void *Base, const char Tag[4]) {
+    SpinLockGuard Guard(&Lock);
+
     /* MmAllocatePool guarantees anything that is inside the small pool buckets is never going to
        be page aligned. */
     if (!((uint64_t)Base & (MM_PAGE_SIZE - 1))) {
@@ -197,6 +202,5 @@ extern "C" void MmFreePool(void *Base, const char Tag[4]) {
         KeFatalError(KE_DOUBLE_POOL_FREE);
     }
 
-    SpinLockGuard Guard(&Lock);
     RtPushSList(&SmallBlocks[Header->Head - 1], &Header->ListHeader);
 }
