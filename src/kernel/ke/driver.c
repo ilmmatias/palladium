@@ -63,12 +63,7 @@ void KiSaveBootStartDrivers(KiLoaderBlock *LoaderBlock) {
  *-----------------------------------------------------------------------------------------------*/
 void KiRunBootStartDrivers(void) {
     /* The kernel should be the first image, and the drivers start from there onwards. */
-    RtDList *ListHeader = KeModuleListHead.Next;
-    if (!ListHeader) {
-        return;
-    }
-
-    ListHeader = ListHeader->Next;
+    RtDList *ListHeader = KeModuleListHead.Next->Next;
     while (ListHeader != &KeModuleListHead) {
         KeModule *Module = CONTAINING_RECORD(ListHeader, KeModule, ListHeader);
         ((void (*)(void))Module->EntryPoint)();

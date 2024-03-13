@@ -203,6 +203,44 @@ EFI_STATUS OslpInitializeMemoryMap(void) {
                 break;
         }
 
+        /* We really shouldn't be messing with the low 64KiB (mark it as PAGE_LOW_MEMORY). */
+        if (Type == PAGE_FREE && BasePage < 16) {
+            uint32_t LowPages = 16 - BasePage;
+
+            if (LowPages > PageCount) {
+                LowPages = PageCount;
+            }
+
+            do {
+                if (TryMergeDescriptors(PAGE_LOW_MEMORY, BasePage, LowPages)) {
+                    break;
+                }
+
+                RtDList *ListHeader = RtPopDList(&OslpFreeMemoryDescriptorListHead);
+                if (ListHeader == &OslpFreeMemoryDescriptorListHead) {
+                    OslPrint("Failed to append all memory map entries into the kernel list.\r\n");
+                    OslPrint("There are over 256 entries, some will be missing.\r\n");
+                    OslPrint(
+                        "The kernel might not boot properly, or some memory might be missing.\r\n");
+                    return Status;
+                }
+
+                OslpMemoryDescriptor *TargetDescriptor =
+                    CONTAINING_RECORD(ListHeader, OslpMemoryDescriptor, ListHeader);
+                TargetDescriptor->Type = PAGE_LOW_MEMORY;
+                TargetDescriptor->BasePage = BasePage;
+                TargetDescriptor->PageCount = LowPages;
+                InsertDescriptor(TargetDescriptor);
+            } while (false);
+
+            if (LowPages < PageCount) {
+                BasePage += LowPages;
+                PageCount -= LowPages;
+            } else {
+                continue;
+            }
+        }
+
         /* Make sure we can't extend an already existing descriptor (and if we can, merge it with
          * its neighbours). */
         if (TryMergeDescriptors(Type, BasePage, PageCount)) {
