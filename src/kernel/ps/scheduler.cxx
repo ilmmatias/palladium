@@ -88,6 +88,22 @@ static PsThread *GetNextReadyThread(KeProcessor *Processor) {
         return CONTAINING_RECORD(ListHeader, PsThread, ListHeader);
     }
 
+    /* Failed to obtain the thread, let's try stealing something from another processor (so that
+     * we don't stay empty). */
+    for (uint32_t i = 0; i < HalpProcessorCount; i++) {
+        if (HalpProcessorList[i] == Processor) {
+            continue;
+        }
+
+        SpinLockGuard Guard(&HalpProcessorList[i]->ThreadQueueLock);
+        RtDList *ListHeader = RtPopDList(&Processor->ThreadQueue);
+        Guard.Release();
+
+        if (ListHeader != &Processor->ThreadQueue) {
+            return CONTAINING_RECORD(ListHeader, PsThread, ListHeader);
+        }
+    }
+
     return Processor->ForceYield ? Processor->IdleThread : NULL;
 }
 
