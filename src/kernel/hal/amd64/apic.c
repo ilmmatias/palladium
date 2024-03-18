@@ -1,4 +1,4 @@
-/* SPDX-FileCopyrightText: (C) 2023 ilmmatias
+/* SPDX-FileCopyrightText: (C) 2023-2024 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <amd64/apic.h>
@@ -131,7 +131,7 @@ void HalpInitializeApic(void) {
                 Entry->IsX2Apic = 0;
                 RtPushSList(&HalpLapicListHead, &Entry->ListHeader);
                 VidPrint(
-                    VID_MESSAGE_INFO,
+                    VID_MESSAGE_DEBUG,
                     "Kernel HAL",
                     "found LAPIC %u (ACPI ID %u)\n",
                     Entry->ApicId,
@@ -165,7 +165,7 @@ void HalpInitializeApic(void) {
                 Entry->IsX2Apic = 1;
                 RtPushSList(&HalpLapicListHead, &Entry->ListHeader);
                 VidPrint(
-                    VID_MESSAGE_INFO,
+                    VID_MESSAGE_DEBUG,
                     "Kernel HAL",
                     "found x2APIC %u (ACPI ID %u)\n",
                     Entry->ApicId,
@@ -214,20 +214,6 @@ void HalpEnableApic(void) {
     HalpWriteLapicRegister(0xF0, 0x1FF);
 
     __asm__ volatile("sti");
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function clears all errors on the Local APIC.
- *
- * PARAMETERS:
- *     None.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-void HalpClearApicErrors(void) {
-    HalpWriteLapicRegister(0x280, 0);
 }
 
 /*-------------------------------------------------------------------------------------------------

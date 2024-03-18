@@ -1,5 +1,5 @@
-/* SPDX-FileCopyrightText: (C) 2023 ilmmatias
- * SPDX-License-Identifier: GPL-3.0-or-later */
+/* SPDX-FileCopyrightText: (C) 2023-2024 ilmmatias
+ * SPDX-License-Identifier: BSD-3-Clause */
 
 #ifndef _SDT_H_
 #define _SDT_H_

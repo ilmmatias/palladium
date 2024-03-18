@@ -1,4 +1,4 @@
-/* SPDX-FileCopyrightText: (C) 2023 ilmmatias
+/* SPDX-FileCopyrightText: (C) 2023-2024 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #ifndef _HALP_H_
@@ -17,7 +17,7 @@ extern "C" {
 #endif /* __cplusplus */
 
 extern uint32_t HalpProcessorCount;
-extern RtSList HalpProcessorListHead;
+extern KeProcessor **HalpProcessorList;
 
 void HalpInitializePlatform(KeProcessor *Processor, int IsBsp);
 void HalpStopProcessor(void);

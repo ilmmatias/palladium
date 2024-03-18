@@ -131,7 +131,7 @@ void HalpInitializeIoapic(void) {
 
                 RtPushSList(&IoapicListHead, &Entry->ListHeader);
                 VidPrint(
-                    VID_MESSAGE_INFO,
+                    VID_MESSAGE_DEBUG,
                     "Kernel HAL",
                     "found IOAPIC %hhu (GSI base %u, size %u)\n",
                     Entry->Id,

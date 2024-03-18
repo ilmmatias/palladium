@@ -1,19 +1,20 @@
-/* SPDX-FileCopyrightText: (C) 2023 ilmmatias
+/* SPDX-FileCopyrightText: (C) 2023-2024 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <amd64/apic.h>
 #include <amd64/halp.h>
 #include <amd64/msr.h>
+#include <ke.h>
 #include <mi.h>
 #include <string.h>
-
-extern RtSList HalpLapicListHead;
+#include <vid.h>
 
 extern void HalpApEntry(void);
 extern uint64_t HalpKernelPageMap;
-extern KeProcessor *HalpApStructure;
+extern RtSList HalpLapicListHead;
 
-RtSList HalpProcessorListHead = {};
+KeProcessor **HalpProcessorList = NULL;
+uint32_t HalpOnlineProcessorCount = 1;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -27,8 +28,7 @@ RtSList HalpProcessorListHead = {};
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void HalpInitializeSmp(void) {
-    uint32_t ApicId = HalpReadLapicRegister(0x20);
-    RtSList *ListHeader = HalpLapicListHead.Next;
+    uint32_t ApicId = HalGetCurrentProcessor()->ApicId;
 
     /* Map the AP startup code (0x8000), and copy all the trampoline data to it. */
     HalpMapPage((void *)0x8000, 0x8000, MI_MAP_WRITE | MI_MAP_EXEC);
@@ -40,75 +40,66 @@ void HalpInitializeSmp(void) {
         "mov %%cr3, %0"
         : "=r"(*(uint64_t *)((uint64_t)&HalpKernelPageMap - (uint64_t)HalpApEntry + 0x8000)));
 
-    /* BSP processor is already initialized, just setup its processor struct before someone
-       tries acessing our scheduler. */
-    KeProcessor *Processor = (KeProcessor *)HalGetCurrentProcessor();
+    /* Allocate space for all the processors (this is just the pointer list, we'll be allocating
+     * each processor after that). */
+    HalpProcessorList = MmAllocatePool(HalpProcessorCount * sizeof(KeProcessor *), "Halp");
+    if (!HalpProcessorList) {
+        VidPrint(
+            VID_MESSAGE_ERROR, "Kernel HAL", "couldn't allocate space for the processor list\n");
+        KeFatalError(KE_OUT_OF_MEMORY);
+    }
 
-    Processor->Online = 1;
-    Processor->ApicId = ApicId;
+    for (uint32_t i = 0; i < HalpProcessorCount; i++) {
+        if (!i) {
+            HalpProcessorList[i] = (KeProcessor *)HalGetCurrentProcessor();
+        } else {
+            HalpProcessorList[i] = MmAllocatePool(sizeof(KeProcessor), "Halp");
+        }
 
-    Processor->ThreadQueueSize = 1;
-    Processor->ThreadQueueLock = 0;
-    RtInitializeDList(&Processor->ThreadQueue);
+        if (!HalpProcessorList[i]) {
+            VidPrint(
+                VID_MESSAGE_ERROR, "Kernel HAL", "couldn't allocate space for the a processor\n");
+            KeFatalError(KE_OUT_OF_MEMORY);
+        }
 
-    Processor->ForceYield = 0;
-    RtInitializeDList(&Processor->DpcQueue);
-    RtInitializeDList(&Processor->EventQueue);
+        HalpProcessorList[i]->ThreadQueueSize = 1;
+        HalpProcessorList[i]->ThreadQueueLock = 0;
+        RtInitializeDList(&HalpProcessorList[i]->ThreadQueue);
 
-    RtPushSList(&HalpProcessorListHead, &Processor->ListHeader);
+        HalpProcessorList[i]->ForceYield = 0;
+        RtInitializeDList(&HalpProcessorList[i]->DpcQueue);
+        RtInitializeDList(&HalpProcessorList[i]->EventQueue);
+    }
 
+    RtSList *ListHeader = HalpLapicListHead.Next;
     while (ListHeader) {
         LapicEntry *Entry = CONTAINING_RECORD(ListHeader, LapicEntry, ListHeader);
-
-        /* KiSystemStartup is already initializing the BSP. */
         if (Entry->ApicId == ApicId) {
             ListHeader = ListHeader->Next;
             continue;
         }
 
-        Processor = MmAllocatePool(sizeof(KeProcessor), "Halp");
-        if (!Processor) {
-            continue;
-        }
-
-        Processor->Online = 0;
-        Processor->ApicId = Entry->ApicId;
-
-        /* Initialize the scheduler queue before any other processor has any chances to access
-           us. */
-        Processor->ThreadQueueSize = 0;
-        Processor->ThreadQueueLock = 0;
-        RtInitializeDList(&Processor->ThreadQueue);
-
-        Processor->ForceYield = 0;
-        RtInitializeDList(&Processor->DpcQueue);
-        RtInitializeDList(&Processor->EventQueue);
-
-        *(KeProcessor **)((uint64_t)&HalpApStructure - (uint64_t)HalpApEntry + 0x8000) = Processor;
-
         /* Recommended/safe initialization process;
-           Send an INIT IPI, followed by deasserting it. */
-        HalpClearApicErrors();
+         * Send an INIT IPI, followed by deasserting it. */
         HalpSendIpi(Entry->ApicId, 0xC500);
         HalpWaitIpiDelivery();
+        HalWaitTimer(10 * EV_MICROSECS);
         HalpSendIpi(Entry->ApicId, 0x8500);
         HalpWaitIpiDelivery();
-        HalWaitTimer(10 * EV_MILLISECS);
+        HalWaitTimer(200 * EV_MICROSECS);
 
         /* Two attempts at sending a STARTUP IPI should be enough (according to spec). */
         for (int i = 0; i < 2; i++) {
-            HalpClearApicErrors();
             HalpSendIpi(Entry->ApicId, 0x608);
             HalWaitTimer(200 * EV_MICROSECS);
             HalpWaitIpiDelivery();
         }
 
-        while (!__atomic_load_n(&Processor->Online, __ATOMIC_RELAXED)) {
-            HalWaitTimer(200 * EV_MICROSECS);
-        }
-
-        RtPushSList(&HalpProcessorListHead, &Processor->ListHeader);
         ListHeader = ListHeader->Next;
+    }
+
+    while (__atomic_load_n(&HalpOnlineProcessorCount, __ATOMIC_RELAXED) != HalpProcessorCount) {
+        HalWaitTimer(100 * EV_MICROSECS);
     }
 }
 

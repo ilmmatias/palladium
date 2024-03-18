@@ -1,4 +1,4 @@
-/* SPDX-FileCopyrightText: (C) 2023 ilmmatias
+/* SPDX-FileCopyrightText: (C) 2023-2024 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #ifndef _AMD64_HALP_H_
@@ -19,7 +19,6 @@ void HalpInitializeApic(void);
 void HalpEnableApic(void);
 uint64_t HalpReadLapicRegister(uint32_t Number);
 void HalpWriteLapicRegister(uint32_t Number, uint64_t Data);
-void HalpClearApicErrors(void);
 void HalpSendIpi(uint32_t Target, uint32_t Vector);
 void HalpWaitIpiDelivery(void);
 void HalpSendEoi(void);

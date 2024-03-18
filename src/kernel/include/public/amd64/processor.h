@@ -1,4 +1,4 @@
-/* SPDX-FileCopyrightText: (C) 2023 ilmmatias
+/* SPDX-FileCopyrightText: (C) 2023-2024 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #ifndef _AMD64_PROCESSOR_H_
@@ -8,10 +8,7 @@
 #include <rt/list.h>
 
 typedef struct {
-    RtSList ListHeader;
-    uint16_t Number;
     uint32_t ApicId;
-    int Online;
     int ThreadQueueLock;
     RtDList ThreadQueue;
     uint32_t ThreadQueueSize;

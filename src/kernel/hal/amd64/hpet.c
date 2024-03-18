@@ -1,4 +1,4 @@
-/* SPDX-FileCopyrightText: (C) 2023 ilmmatias
+/* SPDX-FileCopyrightText: (C) 2023-2024 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <amd64/hpet.h>
@@ -69,7 +69,7 @@ void HalpInitializeHpet(void) {
     PeriodInNs = Period / 1000000;
     MinimumTicks = Hpet->MinimumTicks;
     VidPrint(
-        VID_MESSAGE_INFO,
+        VID_MESSAGE_DEBUG,
         "Kernel HAL",
         "using HPET as timer tick source (period = %llu ns)\n",
         PeriodInNs);

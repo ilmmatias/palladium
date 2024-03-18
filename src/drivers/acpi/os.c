@@ -1,9 +1,8 @@
-/* SPDX-FileCopyrightText: (C) 2023 ilmmatias
+/* SPDX-FileCopyrightText: (C) 2023-2024 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#include <acpip.h>
 #include <ke.h>
-#include <mm.h>
+#include <sdt.h>
 #include <vid.h>
 
 /*-------------------------------------------------------------------------------------------------
@@ -16,52 +15,8 @@
  * RETURN VALUE:
  *     Pointer to the header of the entry, or NULL on failure.
  *-----------------------------------------------------------------------------------------------*/
-SdtHeader *AcpipFindTable(char Signature[4], int Index) {
+SdtHeader *AcpipFindTable(const char Signature[4], int Index) {
     return KiFindAcpiTable(Signature, Index);
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     Wrapper around the OS' malloc (or malloc-like) routine.
- *
- * PARAMETERS:
- *     Size - Size in bytes of the block.
- *
- * RETURN VALUE:
- *     Start of the allocated block, or NULL on failure.
- *-----------------------------------------------------------------------------------------------*/
-void *AcpipAllocateBlock(size_t Size) {
-    return MmAllocatePool(Size, "Acpi");
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     Wrapper around the OS' calloc (or calloc-like) routine.
- *
- * PARAMETERS:
- *     Elements - How many elements we have.
- *     ElementSize - Size in bytes of each element.
- *
- * RETURN VALUE:
- *     Start of the allocated block, or NULL on failure.
- *-----------------------------------------------------------------------------------------------*/
-void *AcpipAllocateZeroBlock(size_t Elements, size_t ElementSize) {
-    return MmAllocatePool(Elements * ElementSize, "Acpi");
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     Wrapper around the OS' free() routine. Should be able to transparently free anything
- *     allocated by AcpipAllocateBlock/ZeroBlock.
- *
- * PARAMETERS:
- *     Block - Start of the block we're trying to free.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-void AcpipFreeBlock(void *Block) {
-    MmFreePool(Block, "Acpi");
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -134,10 +89,8 @@ void AcpipShowTraceMessage(const char *Message, ...) {
  *-----------------------------------------------------------------------------------------------*/
 [[noreturn]] void AcpipShowErrorMessage(int Reason, const char *Message, ...) {
     va_list Arguments;
-
     va_start(Arguments, Format);
     VidPrintVariadic(VID_MESSAGE_ERROR, "ACPI Driver", Message, Arguments);
     va_end(Arguments);
-
-    KeFatalError(Reason == ACPI_REASON_OUT_OF_MEMORY ? KE_OUT_OF_MEMORY : KE_BAD_ACPI_TABLES);
+    KeFatalError(Reason);
 }

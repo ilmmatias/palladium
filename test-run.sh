@@ -37,7 +37,6 @@ mmd -i build.target/fat.img ::/EFI/PALLADIUM
 mcopy -i build.target/fat.img build.target/boot/osloader/osloader.exe ::/EFI/BOOT/BOOTX64.EFI
 mcopy -i build.target/fat.img build.target/kernel/kernel.exe ::/EFI/PALLADIUM/KERNEL.EXE
 mcopy -i build.target/fat.img build.target/drivers/acpi/acpi.sys ::/EFI/PALLADIUM/ACPI.SYS
-mcopy -i build.target/fat.img build.target/drivers/pci/pci.sys ::/EFI/PALLADIUM/PCI.SYS
 mkdir -p _root
 cp build.target/fat.img _root/fat.img
 mkisofs -R -f -eltorito-boot fat.img -no-emul-boot -o build.target/iso9660.iso _root 1>/dev/null 2>&1

@@ -1,4 +1,4 @@
-/* SPDX-FileCopyrightText: (C) 2023 ilmmatias
+/* SPDX-FileCopyrightText: (C) 2023-2024 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <amd64/halp.h>
@@ -44,11 +44,11 @@ void HalpInterruptHandler(HalRegisterState *State) {
         KeAcquireSpinLock(&KiPanicLock);
 
         /* Panics always halt everyone (the system isn't in a safe state anymore). */
-        for (RtSList *ListHeader = HalpProcessorListHead.Next; ListHeader;
-             ListHeader = ListHeader->Next) {
-            KeProcessor *Processor = CONTAINING_RECORD(ListHeader, KeProcessor, ListHeader);
-            Processor->EventStatus = KE_PANIC_EVENT;
-            HalpNotifyProcessor(Processor, 0);
+        for (uint32_t i = 0; i < HalpProcessorCount; i++) {
+            if (HalpProcessorList[i] != Processor) {
+                HalpProcessorList[i]->EventStatus = KE_PANIC_EVENT;
+                HalpNotifyProcessor(HalpProcessorList[i], 0);
+            }
         }
 
         char ErrorMessage[256];

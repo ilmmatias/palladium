@@ -89,7 +89,6 @@ jobs:
         mcopy -i palladium/build.target/fat.img palladium/build.target/boot/osloader/osloader.exe ::/EFI/BOOT/BOOTX64.EFI
         mcopy -i palladium/build.target/fat.img palladium/build.target/kernel/kernel.exe ::/EFI/PALLADIUM/KERNEL.EXE
         mcopy -i palladium/build.target/fat.img palladium/build.target/drivers/acpi/acpi.sys ::/EFI/PALLADIUM/ACPI.SYS
-        mcopy -i palladium/build.target/fat.img palladium/build.target/drivers/pci/pci.sys ::/EFI/PALLADIUM/PCI.SYS
 
     - name: Build ISO image
       run: |

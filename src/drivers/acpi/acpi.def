@@ -1,9 +1,2 @@
 LIBRARY acpi.sys
 EXPORTS
-    AcpiCopyValue
-    AcpiCreateReference
-    AcpiEvaluateObject
-    AcpiExecuteMethod
-    AcpiGetObjectPath
-    AcpiRemoveReference
-    AcpiSearchObject

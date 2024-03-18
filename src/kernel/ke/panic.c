@@ -1,4 +1,4 @@
-/* SPDX-FileCopyrightText: (C) 2023 ilmmatias
+/* SPDX-FileCopyrightText: (C) 2023-2024 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <halp.h>
@@ -32,6 +32,8 @@ KeSpinLock KiPanicLock = {0};
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 [[noreturn]] void KeFatalError(int Message) {
+    KeProcessor *Processor = (KeProcessor *)HalGetCurrentProcessor();
+
     /* We don't care about the current IRQL, reset it to DISPATCH, or most functions we want to use
      * won't work. */
     HalpEnterCriticalSection();
@@ -42,11 +44,11 @@ KeSpinLock KiPanicLock = {0};
     KeAcquireSpinLock(&KiPanicLock);
 
     /* Panics always halt everyone (the system isn't in a safe state anymore). */
-    for (RtSList *ListHeader = HalpProcessorListHead.Next; ListHeader;
-         ListHeader = ListHeader->Next) {
-        KeProcessor *Processor = CONTAINING_RECORD(ListHeader, KeProcessor, ListHeader);
-        Processor->EventStatus = KE_PANIC_EVENT;
-        HalpNotifyProcessor(Processor, 0);
+    for (uint32_t i = 0; i < HalpProcessorCount; i++) {
+        if (HalpProcessorList[i] != Processor) {
+            HalpProcessorList[i]->EventStatus = KE_PANIC_EVENT;
+            HalpNotifyProcessor(HalpProcessorList[i], 0);
+        }
     }
 
     if (Message < KE_FATAL_ERROR || Message >= KE_PANIC_COUNT) {

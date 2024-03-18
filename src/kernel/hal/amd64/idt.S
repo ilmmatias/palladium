@@ -1,4 +1,4 @@
-/* SPDX-FileCopyrightText: (C) 2023 ilmmatias
+/* SPDX-FileCopyrightText: (C) 2023-2024 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 .altmacro
@@ -60,9 +60,10 @@
 .macro NO_ERRCODE num
 .seh_proc HalpInterruptHandler\num
 HalpInterruptHandler\num:
+    .seh_pushframe
     push $0
     push $\num
-    .seh_pushframe
+    .seh_stackalloc 16
     SAVE_REGS
     .seh_endprologue
     mov %rsp, %rcx
@@ -77,8 +78,9 @@ HalpInterruptHandler\num:
 .macro ERRCODE num
 .seh_proc HalpInterruptHandler\num
 HalpInterruptHandler\num:
-    push $\num
     .seh_pushframe @code
+    push $\num
+    .seh_stackalloc 8
     SAVE_REGS
     .seh_endprologue
     mov %rsp, %rcx

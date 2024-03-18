@@ -1,11 +1,11 @@
-/* SPDX-FileCopyrightText: (C) 2023 ilmmatias
+/* SPDX-FileCopyrightText: (C) 2023-2024 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <crt_impl.h>
 #include <string.h>
 #include <vidp.h>
 
-#include <ke.hxx>
+#include <cxx/lock.hxx>
 
 static int PendingFullFlush = 0;
 static uint16_t FlushY = 0;

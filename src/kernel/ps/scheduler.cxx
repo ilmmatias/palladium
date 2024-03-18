@@ -1,4 +1,4 @@
-/* SPDX-FileCopyrightText: (C) 2023 ilmmatias
+/* SPDX-FileCopyrightText: (C) 2023-2024 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <halp.h>
@@ -6,7 +6,7 @@
 #include <mm.h>
 #include <psp.h>
 
-#include <ke.hxx>
+#include <cxx/lock.hxx>
 
 extern "C" {
 extern PsThread *PspSystemThread;
@@ -24,21 +24,16 @@ extern PsThread *PspSystemThread;
  *-----------------------------------------------------------------------------------------------*/
 void PsReadyThread(PsThread *Thread) {
     /* Always try and add the thread to the least full queue. */
-    RtSList *ListHeader = HalpProcessorListHead.Next;
     size_t BestMatchSize = SIZE_MAX;
     KeProcessor *BestMatch = NULL;
 
-    while (ListHeader) {
-        KeProcessor *Processor = CONTAINING_RECORD(ListHeader, KeProcessor, ListHeader);
-
+    for (uint32_t i = 0; i < HalpProcessorCount; i++) {
         /* Unless the processor list is somehow NULL, we should be TRUE in the if below at least
            once. */
-        if (!BestMatch || Processor->ThreadQueueSize < BestMatchSize) {
-            BestMatchSize = Processor->ThreadQueueSize;
-            BestMatch = Processor;
+        if (!BestMatch || HalpProcessorList[i]->ThreadQueueSize < BestMatchSize) {
+            BestMatchSize = HalpProcessorList[i]->ThreadQueueSize;
+            BestMatch = HalpProcessorList[i];
         }
-
-        ListHeader = ListHeader->Next;
     }
 
     /* Now we're forced to lock the processor queue (there was no need up until now, as we were

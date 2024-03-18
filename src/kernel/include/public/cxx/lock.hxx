@@ -1,8 +1,8 @@
-/* SPDX-FileCopyrightText: (C) 2023 ilmmatias
+/* SPDX-FileCopyrightText: (C) 2023-2024 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#ifndef _KE_HXX_
-#define _KE_HXX_
+#ifndef _CXX_LOCK_HXX_
+#define _CXX_LOCK_HXX_
 
 #include <ke.h>
 
@@ -52,4 +52,4 @@ class SpinLockGuard {
     KeIrql m_irql;
 };
 
-#endif /* _KE_HXX_ */
+#endif /* _CXX_LOCK_HXX_ */

@@ -1,11 +1,11 @@
-/* SPDX-FileCopyrightText: (C) 2023 ilmmatias
+/* SPDX-FileCopyrightText: (C) 2023-2024 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <io.h>
 #include <mm.h>
 #include <string.h>
 
-#include <ke.hxx>
+#include <cxx/lock.hxx>
 
 static RtSList DeviceListHead = {.Next = NULL};
 static KeSpinLock Lock = {0};

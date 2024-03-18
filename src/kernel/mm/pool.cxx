@@ -1,4 +1,4 @@
-/* SPDX-FileCopyrightText: (C) 2023 ilmmatias
+/* SPDX-FileCopyrightText: (C) 2023-2024 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <halp.h>
@@ -6,7 +6,7 @@
 #include <rt/bitmap.h>
 #include <string.h>
 
-#include <ke.hxx>
+#include <cxx/lock.hxx>
 
 #define SMALL_BLOCK_COUNT ((uint32_t)((MM_PAGE_SIZE - 16) >> 4))
 

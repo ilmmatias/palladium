@@ -1,4 +1,4 @@
-/* SPDX-FileCopyrightText: (C) 2023 ilmmatias
+/* SPDX-FileCopyrightText: (C) 2023-2024 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <amd64/halp.h>
@@ -26,10 +26,12 @@ void HalpInitializePlatform(KeProcessor *Processor, int IsBsp) {
         HalpInitializeIoapic();
         HalpInitializeApic();
         HalpEnableApic();
+        Processor->ApicId = HalpReadLapicRegister(0x20);
         HalpInitializeHpet();
         HalpInitializeSmp();
     } else {
         HalpEnableApic();
+        Processor->ApicId = HalpReadLapicRegister(0x20);
     }
 
     HalpInitializeApicTimer();
