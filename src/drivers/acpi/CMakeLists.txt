@@ -7,7 +7,8 @@ add_executable(acpi "knostdlib" YES
 
     acpi.def
     main.cxx
-    os.c)
+    object.cxx
+    os.cxx)
 
 target_link_libraries(acpi kernel)
 target_include_directories(acpi PRIVATE include/private PUBLIC include/public)

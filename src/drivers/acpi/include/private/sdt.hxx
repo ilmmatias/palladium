@@ -1,20 +1,20 @@
 /* SPDX-FileCopyrightText: (C) 2023-2024 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
-#ifndef _SDT_H_
-#define _SDT_H_
+#ifndef _SDT_HXX_
+#define _SDT_HXX_
 
 #include <stdint.h>
 
-typedef struct __attribute__((packed)) {
+struct __attribute__((packed)) GenericAddressStructure {
     uint8_t AddressSpace;
     uint8_t BitWidth;
     uint8_t BitOffset;
     uint8_t AccessSize;
     uint64_t Address;
-} GenericAddressStructure;
+};
 
-typedef struct __attribute__((packed)) {
+struct __attribute__((packed)) SdtHeader {
     char Signature[4];
     uint32_t Length;
     uint8_t Revision;
@@ -24,9 +24,9 @@ typedef struct __attribute__((packed)) {
     uint32_t OemRevision;
     uint32_t CreatorId;
     uint32_t CreatorRevision;
-} SdtHeader;
+};
 
-typedef struct __attribute__((packed)) {
+struct __attribute__((packed)) FadtHeader {
     SdtHeader Header;
     uint32_t FirmwareCtrl;
     uint32_t Dsdt;
@@ -79,6 +79,6 @@ typedef struct __attribute__((packed)) {
     GenericAddressStructure XPmTimerBlock;
     GenericAddressStructure XGpe0Block;
     GenericAddressStructure XGpe1Block;
-} FadtHeader;
+};
 
 #endif /* _SDT_H_ */

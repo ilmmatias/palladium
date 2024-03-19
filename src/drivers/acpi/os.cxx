@@ -2,8 +2,9 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <ke.h>
-#include <sdt.h>
 #include <vid.h>
+
+#include <sdt.hxx>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -16,7 +17,7 @@
  *     Pointer to the header of the entry, or NULL on failure.
  *-----------------------------------------------------------------------------------------------*/
 SdtHeader *AcpipFindTable(const char Signature[4], int Index) {
-    return KiFindAcpiTable(Signature, Index);
+    return (SdtHeader *)KiFindAcpiTable(Signature, Index);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -32,7 +33,7 @@ SdtHeader *AcpipFindTable(const char Signature[4], int Index) {
  *-----------------------------------------------------------------------------------------------*/
 void AcpipShowInfoMessage(const char *Message, ...) {
     va_list Arguments;
-    va_start(Arguments, Format);
+    va_start(Arguments, Message);
     VidPrintVariadic(VID_MESSAGE_INFO, "ACPI Driver", Message, Arguments);
     va_end(Arguments);
 }
@@ -50,7 +51,7 @@ void AcpipShowInfoMessage(const char *Message, ...) {
  *-----------------------------------------------------------------------------------------------*/
 void AcpipShowDebugMessage(const char *Message, ...) {
     va_list Arguments;
-    va_start(Arguments, Format);
+    va_start(Arguments, Message);
     VidPrintVariadic(VID_MESSAGE_DEBUG, "ACPI Driver", Message, Arguments);
     va_end(Arguments);
 }
@@ -69,7 +70,7 @@ void AcpipShowDebugMessage(const char *Message, ...) {
  *-----------------------------------------------------------------------------------------------*/
 void AcpipShowTraceMessage(const char *Message, ...) {
     va_list Arguments;
-    va_start(Arguments, Format);
+    va_start(Arguments, Message);
     VidPrintVariadic(VID_MESSAGE_TRACE, "ACPI Driver", Message, Arguments);
     va_end(Arguments);
 }
@@ -89,7 +90,7 @@ void AcpipShowTraceMessage(const char *Message, ...) {
  *-----------------------------------------------------------------------------------------------*/
 [[noreturn]] void AcpipShowErrorMessage(int Reason, const char *Message, ...) {
     va_list Arguments;
-    va_start(Arguments, Format);
+    va_start(Arguments, Message);
     VidPrintVariadic(VID_MESSAGE_ERROR, "ACPI Driver", Message, Arguments);
     va_end(Arguments);
     KeFatalError(Reason);

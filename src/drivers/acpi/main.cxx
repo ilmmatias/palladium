@@ -1,8 +1,8 @@
 /* SPDX-FileCopyrightText: (C) 2023-2024 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#include <ke.h>
-#include <os.h>
+#include <acpip.hxx>
+#include <os.hxx>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -21,4 +21,7 @@ extern "C" void DriverEntry(void) {
     if (!Header) {
         AcpipShowErrorMessage(KE_BAD_ACPI_TABLES, "couldn't find the DSDT table\n");
     }
+
+    AcpipInitializeBuiltin();
+    AcpipShowInfoMessage("enabled ACPI\n");
 }

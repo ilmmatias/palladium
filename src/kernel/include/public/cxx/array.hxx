@@ -1,8 +1,8 @@
 /* SPDX-FileCopyrightText: (C) 2024 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#ifndef _CXX_PTR_HXX_
-#define _CXX_PTR_HXX_
+#ifndef _CXX_ARRAY_HXX_
+#define _CXX_ARRAY_HXX_
 
 #include <mm.h>
 #include <string.h>
@@ -10,30 +10,29 @@
 #include <cxx/new.hxx>
 
 template <typename Type>
-class AutoPtr {
+class AutoArray {
    public:
-    AutoPtr() {
+    AutoArray() {
     }
 
     /*-------------------------------------------------------------------------------------------------
      * PURPOSE:
-     *     This function initializes a new pointer with automatic reference counting.
+     *     This function initializes a new heap-allocated array with automatic reference counting.
      *     This should prevent leaks (as long as you don't create any circular references), so it is
      *     the recommended way to do things in C++!
      *     For pointers that need no sharing (no reference counting, should always be dropped at
-     *     the end of the scope), use ScopePtr<Type> instead!
+     *     the end of the scope), use ScopeArray<Type> instead!
      *
      * PARAMETERS:
      *     Tag - Which tag should be associated with this allocation.
-     *     ArgList - Arguments to be forwarded into the type constructor.
+     *     Elements - How many elements the array has.
      *
      * RETURN VALUE:
      *     Reference counted pointer; Make sure to check if the allocation didn't fail (either with
      *     operator!, or with .Data()), as we don't throw.
      *-----------------------------------------------------------------------------------------------*/
-    template <typename... Args>
-    AutoPtr(const char Tag[4], Args &&...ArgList) {
-        void *Data = MmAllocatePool(sizeof(Type), Tag);
+    AutoArray(const char Tag[4], size_t Elements) {
+        void *Data = MmAllocatePool(Elements * sizeof(Type), Tag);
         if (!Data) {
             return;
         }
@@ -44,40 +43,48 @@ class AutoPtr {
             return;
         }
 
-        m_data = new (Data) Type(ArgList...);
+        m_data = new (Data) Type[Elements];
+        m_elements = Elements;
         *m_references = 1;
         memcpy(m_tag, Tag, 4);
     }
 
-    AutoPtr(AutoPtr &&Other) {
+    AutoArray(AutoArray &&Other) {
         m_data = Other.m_data;
+        m_elements = Other.m_elements;
         m_references = Other.m_references;
         Other.m_data = NULL;
+        Other.m_elements = 0;
         Other.m_references = NULL;
         memcpy(m_tag, Other.m_tag, 4);
     }
 
-    AutoPtr(const AutoPtr &Other) {
+    AutoArray(const AutoArray &Other) {
         m_data = Other.m_data;
+        m_elements = Other.m_elements;
         m_references = Other.m_references;
         __atomic_add_fetch(m_references, 1, __ATOMIC_SEQ_CST);
         memcpy(m_tag, Other.m_tag, 4);
     }
 
-    ~AutoPtr(void) {
+    ~AutoArray(void) {
         /* Checking for exact zero should prevent multiple threads accidentally freeing the
          * data at the same time. */
         if (m_references && __atomic_sub_fetch(m_references, 1, __ATOMIC_SEQ_CST) == 0) {
-            m_data->~Type();
+            for (size_t i = 0; i < m_elements; i++) {
+                m_data[i].~Type();
+            }
+
             MmFreePool(m_references, "Arc ");
             MmFreePool(m_data, m_tag);
         }
     }
 
-    AutoPtr &operator=(const AutoPtr &Other) {
+    AutoArray &operator=(const AutoArray &Other) {
         if (this != &Other) {
-            this->~AutoPtr();
+            this->~AutoArray();
             m_data = Other.m_data;
+            m_elements = Other.m_elements;
             m_references = Other.m_references;
             __atomic_add_fetch(m_references, 1, __ATOMIC_SEQ_CST);
             memcpy(m_tag, Other.m_tag, 4);
@@ -86,12 +93,14 @@ class AutoPtr {
         return *this;
     }
 
-    AutoPtr &operator=(AutoPtr &&Other) {
+    AutoArray &operator=(AutoArray &&Other) {
         if (this != &Other) {
-            this->~AutoPtr();
+            this->~AutoArray();
             m_data = Other.m_data;
+            m_elements = Other.m_elements;
             m_references = Other.m_references;
             Other.m_data = NULL;
+            Other.m_elements = NULL;
             Other.m_references = NULL;
             memcpy(m_tag, Other.m_tag, 4);
         }
@@ -112,12 +121,12 @@ class AutoPtr {
         return m_data == NULL;
     }
 
-    Type &operator*(void) const {
-        return *m_data;
+    const Type &operator[](size_t Index) const {
+        return m_data[Index];
     }
 
-    Type *operator->(void) const {
-        return m_data;
+    Type &operator[](size_t Index) {
+        return m_data[Index];
     }
 
     /*-------------------------------------------------------------------------------------------------
@@ -130,8 +139,8 @@ class AutoPtr {
      * RETURN VALUE:
      *     Move reference to the pointer.
      *-----------------------------------------------------------------------------------------------*/
-    AutoPtr &&Move(void) {
-        return (AutoPtr &&)*this;
+    AutoArray &&Move(void) {
+        return (AutoArray &&)*this;
     }
 
     /*-------------------------------------------------------------------------------------------------
@@ -145,7 +154,7 @@ class AutoPtr {
      *     None.
      *-----------------------------------------------------------------------------------------------*/
     void Reset(void) {
-        this->~AutoPtr();
+        this->~AutoArray();
         m_data = NULL;
         m_references = NULL;
     }
@@ -165,62 +174,84 @@ class AutoPtr {
         return m_data;
     }
 
+    /*-------------------------------------------------------------------------------------------------
+     * PURPOSE:
+     *     This function returns how many elements this array has.
+     *
+     * PARAMETERS:
+     *     None.
+     *
+     * RETURN VALUE:
+     *     How many elements we have.
+     *-----------------------------------------------------------------------------------------------*/
+    size_t Size(void) const {
+        return m_elements;
+    }
+
    private:
     Type *m_data;
+    size_t m_elements;
     int *m_references;
     char m_tag[4];
 };
 
 template <typename Type>
-class ScopePtr {
+class ScopeArray {
    public:
-    ScopePtr() {
+    ScopeArray() {
     }
 
     /*-------------------------------------------------------------------------------------------------
      * PURPOSE:
-     *     This function initializes a new pointer with an auto delete at the end of the scope.
-     *     For pointers that need sharing (with reference counting), use AutoPtr<Type> instead!
+     *     This function initializes a new heap-allocated array with an auto delete at the end of
+     *     the scope. If you need sharing (with reference counting), use AutoArray<Type> instead!
      *
      * PARAMETERS:
      *     Tag - Which tag should be associated with this allocation.
-     *     ArgList - Arguments to be forwarded into the type constructor.
+     *     Elements - How many elements the array has.
      *
      * RETURN VALUE:
      *     Wrapped pointer; Make sure to check if the allocation didn't fail (either with
      *     operator!, or with .Data()), as we don't throw.
      *-----------------------------------------------------------------------------------------------*/
-    template <typename... Args>
-    ScopePtr(const char Tag[4], Args &&...ArgList) {
-        void *Data = MmAllocatePool(sizeof(Type), Tag);
+    ScopeArray(const char Tag[4], size_t Elements) {
+        void *Data = MmAllocatePool(Elements * sizeof(Type), Tag);
         if (Data) {
-            m_data = new (Data) Type(ArgList...);
+            m_data = new (Data) Type[Elements];
+            m_elements = Elements;
             memcpy(m_tag, Tag, 4);
         }
     }
 
-    ScopePtr(ScopePtr &&Other) {
+    ScopeArray(ScopeArray &&Other) {
         m_data = Other.m_data;
+        m_elements = Other.m_elements;
         Other.m_data = NULL;
+        Other.m_elements = 0;
         memcpy(m_tag, Other.m_tag, 4);
     }
 
     /* Only valid in this scope, we can't let anyone copy the pointer! */
-    ScopePtr(const ScopePtr &Other) = delete;
-    ScopePtr &operator=(const ScopePtr &Other) = delete;
+    ScopeArray(const ScopeArray &Other) = delete;
+    ScopeArray &operator=(const ScopeArray &Other) = delete;
 
-    ~ScopePtr(void) {
+    ~ScopeArray(void) {
         if (m_data) {
-            m_data->~Type();
+            for (size_t i = 0; i < m_elements; i++) {
+                m_data[i].~Type();
+            }
+
             MmFreePool(m_data, m_tag);
         }
     }
 
-    ScopePtr &operator=(ScopePtr &&Other) {
+    ScopeArray &operator=(ScopeArray &&Other) {
         if (this != &Other) {
-            this->~ScopePtr();
+            this->~ScopeArray();
             m_data = Other.m_data;
+            m_elements = Other.m_elements;
             Other.m_data = NULL;
+            Other.m_elements = 0;
             memcpy(m_tag, Other.m_tag, 4);
         }
 
@@ -240,15 +271,7 @@ class ScopePtr {
         return m_data == NULL;
     }
 
-    Type &operator*(void) const {
-        return *m_data;
-    }
-
-    Type *operator->(void) const {
-        return m_data;
-    }
-
-    Type &operator[](size_t Index) const {
+    const Type &operator[](size_t Index) const {
         return m_data[Index];
     }
 
@@ -266,8 +289,8 @@ class ScopePtr {
      * RETURN VALUE:
      *     Move reference to the pointer.
      *-----------------------------------------------------------------------------------------------*/
-    ScopePtr &&Move(void) {
-        return (ScopePtr &&)*this;
+    ScopeArray &&Move(void) {
+        return (ScopeArray &&)*this;
     }
 
     /*-------------------------------------------------------------------------------------------------
@@ -281,8 +304,9 @@ class ScopePtr {
      *     None.
      *-----------------------------------------------------------------------------------------------*/
     void Reset(void) {
-        this->~ScopePtr();
+        this->~ScopeArray();
         m_data = NULL;
+        m_elements = 0;
     }
 
     /*-------------------------------------------------------------------------------------------------
@@ -300,9 +324,24 @@ class ScopePtr {
         return m_data;
     }
 
+    /*-------------------------------------------------------------------------------------------------
+     * PURPOSE:
+     *     This function returns how many elements this array has.
+     *
+     * PARAMETERS:
+     *     None.
+     *
+     * RETURN VALUE:
+     *     How many elements we have.
+     *-----------------------------------------------------------------------------------------------*/
+    size_t Size(void) const {
+        return m_elements;
+    }
+
    private:
     Type *m_data;
+    size_t m_elements;
     char m_tag[4];
 };
 
-#endif /* _CXX_PTR_HXX_ */
+#endif /* _CXX_ARRAY_HXX_ */
