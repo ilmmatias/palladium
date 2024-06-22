@@ -139,7 +139,9 @@ void PspScheduleNext(HalRegisterState *Context) {
 
     /* Scheduler initialization, there should be no contention yet (we're using InitialThread
      * instead of the queue). */
-    if (!Processor->CurrentThread) {
+    if (!Processor->InitialThread) {
+        return;
+    } else if (!Processor->CurrentThread) {
         Processor->CurrentThread = Processor->InitialThread;
         Processor->CurrentThread->Expiration = 0;
         HalpRestoreThreadContext(Context, &Processor->CurrentThread->Context);
