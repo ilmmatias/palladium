@@ -71,7 +71,7 @@ int HalpMapPage(void *VirtualAddress, uint64_t PhysicalAddress, int Flags) {
                 return 0;
             }
 
-            memset(MI_PADDR_TO_VADDR(Page), 0, MM_PAGE_SIZE);
+            memset((void *)(Page + 0xFFFF800000000000), 0, MM_PAGE_SIZE);
             Addresses[i][Indexes[i]] = Page | 0x03;
         }
     }
@@ -97,4 +97,68 @@ int HalpMapPage(void *VirtualAddress, uint64_t PhysicalAddress, int Flags) {
     }
 
     return 1;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function maps a range of physical addresses into contiguous virtual memory.
+ *
+ * PARAMETERS:
+ *     PhysicalAddress - Source address.
+ *     Size - Size in bytes of the region.
+ *
+ * RETURN VALUE:
+ *     Pointer to the start of the virtual memory range on success, NULL otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+void *MmMapSpace(uint64_t PhysicalAddress, size_t Size) {
+    void *VirtualAddress = (void *)(PhysicalAddress + 0xFFFF800000000000);
+
+    /* Map any unmapped pages as read/write + writethrough (device); We don't need to allocate
+     * any pool space, as we already have a 1-to-1 space in virtual memory for the mappings. */
+    for (size_t i = 0; i < Size; i += MM_PAGE_SIZE) {
+        uint64_t Source = (PhysicalAddress & ~(MM_PAGE_SIZE - 1)) + i;
+        void *Target = (void *)(Source + 0xFFFF800000000000);
+        if (HalpGetPhysicalAddress(Target)) {
+            continue;
+        } else if (!HalpMapPage(Target, Source, MI_MAP_WRITE | MI_MAP_DEVICE)) {
+            return NULL;
+        }
+    }
+
+    return VirtualAddress;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function unmaps physical address previously mapped by MmMapSpace, do not use this on
+ *     normal heap pages!
+ *
+ * PARAMETERS:
+ *     VirtualAddress - Value previously returned by MmMapSpace.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void MmUnmapSpace(void *VirtualAddress) {
+    (void)VirtualAddress;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function is the equivalent of MmMapSpace for early boot.
+ *     No memory allocation functions (such as MmAllocatePage) are called.
+ *     Addresses are assumed to be mapped to one address only (repeated calls with the same
+ *     physical base will give the same virtual address), and failure to map will result in a
+ *     panic.
+ *
+ * PARAMETERS:
+ *     PhysicalAddress - Source address.
+ *     Size - Size in bytes of the region.
+ *
+ * RETURN VALUE:
+ *     Pointer to the start of the virtual memory range.
+ *-----------------------------------------------------------------------------------------------*/
+void *MiEnsureEarlySpace(uint64_t PhysicalAddress, size_t Size) {
+    (void)Size;
+    return (void *)(PhysicalAddress + 0xFFFF800000000000);
 }

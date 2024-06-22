@@ -26,11 +26,12 @@ extern RtBitmap MiPoolBitmap;
  *-----------------------------------------------------------------------------------------------*/
 static void *EarlyAllocatePages(KiLoaderBlock *LoaderBlock, uint32_t Pages) {
     RtDList *MemoryDescriptorListHead =
-        MI_PADDR_TO_VADDR((uint64_t)LoaderBlock->MemoryDescriptorListHead);
+        MiEnsureEarlySpace((uint64_t)LoaderBlock->MemoryDescriptorListHead, sizeof(RtDList));
 
-    for (RtDList *ListHeader = MI_PADDR_TO_VADDR((uint64_t)MemoryDescriptorListHead->Next);
+    for (RtDList *ListHeader = MiEnsureEarlySpace(
+             (uint64_t)MemoryDescriptorListHead->Next, sizeof(MiMemoryDescriptor));
          ListHeader != MemoryDescriptorListHead;
-         ListHeader = MI_PADDR_TO_VADDR((uint64_t)ListHeader->Next)) {
+         ListHeader = MiEnsureEarlySpace((uint64_t)ListHeader->Next, sizeof(MiMemoryDescriptor))) {
         MiMemoryDescriptor *Entry = CONTAINING_RECORD(ListHeader, MiMemoryDescriptor, ListHeader);
 
         if (Entry->PageCount < Pages ||
@@ -49,7 +50,8 @@ static void *EarlyAllocatePages(KiLoaderBlock *LoaderBlock, uint32_t Pages) {
             Entry->BasePage += 0x10 - Entry->BasePage;
         }
 
-        void *Result = MI_PADDR_TO_VADDR((uint64_t)Entry->BasePage << MM_PAGE_SHIFT);
+        void *Result =
+            MiEnsureEarlySpace((uint64_t)Entry->BasePage << MM_PAGE_SHIFT, Pages << MM_PAGE_SHIFT);
         Entry->BasePage += Pages;
         Entry->PageCount -= Pages;
         return Result;
@@ -74,12 +76,13 @@ void MiInitializePageAllocator(KiLoaderBlock *LoaderBlock) {
     /* The PFN database only tracks pages we might allocate, find the max addressable FREE
      * page. */
     RtDList *MemoryDescriptorListHead =
-        MI_PADDR_TO_VADDR((uint64_t)LoaderBlock->MemoryDescriptorListHead);
+        MiEnsureEarlySpace((uint64_t)LoaderBlock->MemoryDescriptorListHead, sizeof(RtDList));
     uint32_t MaxAddressablePage = 0;
 
-    for (RtDList *ListHeader = MI_PADDR_TO_VADDR((uint64_t)MemoryDescriptorListHead->Next);
+    for (RtDList *ListHeader = MiEnsureEarlySpace(
+             (uint64_t)MemoryDescriptorListHead->Next, sizeof(MiMemoryDescriptor));
          ListHeader != MemoryDescriptorListHead;
-         ListHeader = MI_PADDR_TO_VADDR((uint64_t)ListHeader->Next)) {
+         ListHeader = MiEnsureEarlySpace((uint64_t)ListHeader->Next, sizeof(MiMemoryDescriptor))) {
         MiMemoryDescriptor *Entry = CONTAINING_RECORD(ListHeader, MiMemoryDescriptor, ListHeader);
         if (Entry->Type == MI_PAGE_FREE || Entry->Type == MI_PAGE_OSLOADER ||
             Entry->Type == MI_PAGE_FIRMWARE_TEMPORARY) {
@@ -94,9 +97,10 @@ void MiInitializePageAllocator(KiLoaderBlock *LoaderBlock) {
     MiPageList = EarlyAllocatePages(LoaderBlock, PfnDatabasePages);
 
     /* Setup the page allocator (marking the free pages as free). */
-    for (RtDList *ListHeader = MI_PADDR_TO_VADDR((uint64_t)MemoryDescriptorListHead->Next);
+    for (RtDList *ListHeader = MiEnsureEarlySpace(
+             (uint64_t)MemoryDescriptorListHead->Next, sizeof(MiMemoryDescriptor));
          ListHeader != MemoryDescriptorListHead;
-         ListHeader = MI_PADDR_TO_VADDR((uint64_t)ListHeader->Next)) {
+         ListHeader = MiEnsureEarlySpace((uint64_t)ListHeader->Next, sizeof(MiMemoryDescriptor))) {
         MiMemoryDescriptor *Entry = CONTAINING_RECORD(ListHeader, MiMemoryDescriptor, ListHeader);
 
         if (Entry->Type != MI_PAGE_FREE && Entry->Type != MI_PAGE_FIRMWARE_TEMPORARY) {

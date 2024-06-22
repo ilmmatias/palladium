@@ -9,7 +9,6 @@
 
 #ifdef ARCH_amd64
 #define MM_PAGE_SHIFT 12
-#define MI_PADDR_TO_VADDR(Page) ((void *)((Page) + 0xFFFF800000000000))
 #else
 #error "Undefined ARCH for the kernel module!"
 #endif /* ARCH */
@@ -26,6 +25,9 @@ void MmDereferencePage(uint64_t PhysicalAddress);
 
 void *MmAllocatePool(size_t Size, const char Tag[4]);
 void MmFreePool(void *Base, const char Tag[4]);
+
+void *MmMapSpace(uint64_t PhysicalAddress, size_t Size);
+void MmUnmapSpace(void *VirtualAddress);
 
 #ifdef __cplusplus
 }

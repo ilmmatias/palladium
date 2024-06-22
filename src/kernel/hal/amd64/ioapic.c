@@ -112,18 +112,14 @@ void HalpInitializeIoapic(void) {
 
                 Entry->Id = Record->Ioapic.IoapicId;
                 Entry->GsiBase = Record->Ioapic.GsiBase;
-                Entry->VirtualAddress = MI_PADDR_TO_VADDR(Record->Ioapic.Address);
-                if (!HalpMapPage(
-                        Entry->VirtualAddress,
-                        Record->Ioapic.Address,
-                        MI_MAP_WRITE | MI_MAP_DEVICE)) {
-                    VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "couldn't allocate map an IOAPIC\n");
+                Entry->VirtualAddress = MmMapSpace(Record->Ioapic.Address, MM_PAGE_SIZE);
+                if (!Entry->VirtualAddress) {
+                    VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "couldn't map an IOAPIC\n");
                     KeFatalError(KE_OUT_OF_MEMORY);
                 }
 
-                Entry->Size = (ReadIoapicRegister(Entry, IOAPIC_VER_REG) >> 16) + 1;
-
                 /* Set some sane defaults for all IOAPICs we find. */
+                Entry->Size = (ReadIoapicRegister(Entry, IOAPIC_VER_REG) >> 16) + 1;
                 for (uint8_t i = 0; i < Entry->Size; i++) {
                     WriteIoapicRegister(Entry, IOAPIC_REDIR_REG_LOW(i), 0x10000);
                     WriteIoapicRegister(Entry, IOAPIC_REDIR_REG_HIGH(i), 0);

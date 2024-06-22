@@ -25,8 +25,8 @@ extern "C" [[noreturn]] void KiSystemStartup(uint64_t LoaderBlockPage, uint64_t 
     KeProcessor *Processor;
 
     if (LoaderBlockPage) {
-        LoaderBlock = (KiLoaderBlock *)MI_PADDR_TO_VADDR(LoaderBlockPage);
-        Processor = (KeProcessor *)MI_PADDR_TO_VADDR(ProcessorPage);
+        LoaderBlock = (KiLoaderBlock *)MiEnsureEarlySpace(LoaderBlockPage, sizeof(KiLoaderBlock));
+        Processor = (KeProcessor *)MiEnsureEarlySpace(ProcessorPage, sizeof(KeProcessor));
     } else {
         Processor = (KeProcessor *)ProcessorPage;
     }
@@ -39,12 +39,22 @@ extern "C" [[noreturn]] void KiSystemStartup(uint64_t LoaderBlockPage, uint64_t 
 
         /* Stage 2: Display initialization (for early debugging). */
         VidpInitialize(LoaderBlock);
+
+#ifdef NDEBUG
         VidPrint(
             VID_MESSAGE_INFO,
             "Kernel",
-            "palladium kernel for %s, git commit %s\n",
+            "palladium kernel for %s, git commit %s, release build\n",
             KE_ARCH,
             KE_GIT_HASH);
+#else
+        VidPrint(
+            VID_MESSAGE_INFO,
+            "Kernel",
+            "palladium kernel for %s, git commit %s, debug build\n",
+            KE_ARCH,
+            KE_GIT_HASH);
+#endif
 
         /* Stage 3.1: Save all remaining info from the boot loader. */
         KiSaveAcpiData(LoaderBlock);

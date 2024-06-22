@@ -97,8 +97,6 @@ void HalpInitializeApic(void) {
         KeFatalError(KE_BAD_ACPI_TABLES);
     }
 
-    LapicAddress = MI_PADDR_TO_VADDR(Madt->LapicAddress);
-
     /* x2APIC uses MSRs instead of the LAPIC address, so Read/WriteRegister needs to know if we
        enabled it. */
     uint32_t Eax, Ebx, Ecx, Edx;
@@ -142,7 +140,14 @@ void HalpInitializeApic(void) {
             }
 
             case LAPIC_ADDRESS_OVERRIDE_RECORD: {
-                LapicAddress = MI_PADDR_TO_VADDR(Record->LapicAddressOverride.Address);
+                if (!X2ApicEnabled) {
+                    LapicAddress = MmMapSpace(Record->LapicAddressOverride.Address, MM_PAGE_SIZE);
+                    if (!LapicAddress) {
+                        VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "couldn't map the LAPIC\n");
+                        KeFatalError(KE_OUT_OF_MEMORY);
+                    }
+                }
+
                 break;
             }
 
@@ -181,6 +186,16 @@ void HalpInitializeApic(void) {
 
     if (HalpProcessorCount < 1) {
         HalpProcessorCount = 1;
+    }
+
+    /* If no entry contained an override, default to the LAPIC address given by the MADT table
+     * itself. */
+    if (!LapicAddress && !X2ApicEnabled) {
+        LapicAddress = MmMapSpace(Madt->LapicAddress, MM_PAGE_SIZE);
+        if (!LapicAddress) {
+            VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "couldn't map the LAPIC\n");
+            KeFatalError(KE_OUT_OF_MEMORY);
+        }
     }
 }
 

@@ -29,7 +29,7 @@ void VidpInitialize(KiLoaderBlock *LoaderBlock) {
 
     /* We can't really fail until the display is initialized (calling KeFatalError would triple
      * fault), so let's hope this works, or we'll be triple faulting anyways. */
-    VidpBackBuffer = MI_PADDR_TO_VADDR((uint64_t)LoaderBlock->Framebuffer);
+    VidpBackBuffer = MmMapSpace((uint64_t)LoaderBlock->Framebuffer, VidpHeight * VidpPitch * 4);
     VidpFrontBuffer = MmAllocatePool(VidpHeight * VidpPitch * 4, "Vidp");
     for (uint64_t i = 0; i < VidpHeight * VidpPitch * 4; i += MM_PAGE_SIZE) {
         HalpMapPage(

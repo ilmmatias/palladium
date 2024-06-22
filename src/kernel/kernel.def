@@ -28,7 +28,9 @@ EXPORTS
     MmAllocatePool
     MmDereferencePage
     MmFreePool
+    MmMapSpace
     MmReferencePage
+    MmUnmapSpace
 
     PsCreateThread
     PsReadyThread

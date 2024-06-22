@@ -28,7 +28,7 @@
 #define MI_PAGE_FIRMWARE_PERMANENT 0x07
 #define MI_PAGE_SYSTEM_RESERVED 0x08
 
-#define MI_PAGE_BASE(Entry) ((uint64_t)((Entry)-MiPageList) << MM_PAGE_SHIFT)
+#define MI_PAGE_BASE(Entry) ((uint64_t)((Entry) - MiPageList) << MM_PAGE_SHIFT)
 
 typedef struct {
     RtDList ListHeader;
@@ -49,6 +49,8 @@ extern "C" {
 
 void MiInitializePageAllocator(KiLoaderBlock *LoaderBlock);
 void MiInitializePool(KiLoaderBlock *LoaderBlock);
+
+void *MiEnsureEarlySpace(uint64_t PhysicalAddress, size_t Size);
 
 #ifdef __cplusplus
 }

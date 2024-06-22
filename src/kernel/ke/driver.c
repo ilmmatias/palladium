@@ -22,13 +22,23 @@ RtDList KeModuleListHead;
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void KiSaveBootStartDrivers(KiLoaderBlock *LoaderBlock) {
-    RtDList *LoaderModuleListHead = MI_PADDR_TO_VADDR((uint64_t)LoaderBlock->BootDriverListHead);
+    RtDList *LoaderModuleListHead =
+        MmMapSpace((uint64_t)LoaderBlock->BootDriverListHead, sizeof(RtDList));
+    if (!LoaderModuleListHead) {
+        VidPrint(VID_MESSAGE_ERROR, "Kernel", "couldn't map the boot driver list head\n");
+        KeFatalError(KE_OUT_OF_MEMORY);
+    }
 
     RtInitializeDList(&KeModuleListHead);
+    RtDList *ListHeader = LoaderModuleListHead->Next;
 
-    for (RtDList *ListHeader = MI_PADDR_TO_VADDR((uint64_t)LoaderModuleListHead->Next);
-         ListHeader != LoaderModuleListHead;
-         ListHeader = MI_PADDR_TO_VADDR((uint64_t)ListHeader->Next)) {
+    while (ListHeader != LoaderBlock->BootDriverListHead) {
+        ListHeader = MmMapSpace((uint64_t)ListHeader, sizeof(KeModule));
+        if (!ListHeader) {
+            VidPrint(VID_MESSAGE_ERROR, "Kernel", "couldn't map a boot driver list entry\n");
+            KeFatalError(KE_OUT_OF_MEMORY);
+        }
+
         KeModule *SourceModule = CONTAINING_RECORD(ListHeader, KeModule, ListHeader);
         KeModule *TargetModule = MmAllocatePool(sizeof(KeModule), "KeLd");
         if (!TargetModule) {
@@ -36,7 +46,14 @@ void KiSaveBootStartDrivers(KiLoaderBlock *LoaderBlock) {
             KeFatalError(KE_OUT_OF_MEMORY);
         }
 
-        const char *SourceImageName = MI_PADDR_TO_VADDR((uint64_t)SourceModule->ImageName);
+        /* Is it safe to assume this is never going to be >1 page long? I hope so, make this
+         * a bit more dynamic if we ever start encountering such cases. */
+        char *SourceImageName = MmMapSpace((uint64_t)SourceModule->ImageName, MM_PAGE_SIZE);
+        if (!SourceImageName) {
+            VidPrint(VID_MESSAGE_ERROR, "Kernel", "couldn't map a boot driver list entry\n");
+            KeFatalError(KE_OUT_OF_MEMORY);
+        }
+
         char *TargetImageName = MmAllocatePool(strlen(SourceImageName) + 1, "KeLd");
         if (!TargetImageName) {
             VidPrint(VID_MESSAGE_ERROR, "Kernel", "couldn't allocate space for a kernel module\n");
@@ -47,7 +64,15 @@ void KiSaveBootStartDrivers(KiLoaderBlock *LoaderBlock) {
         strcpy(TargetImageName, SourceImageName);
         TargetModule->ImageName = TargetImageName;
         RtAppendDList(&KeModuleListHead, &TargetModule->ListHeader);
+
+        RtDList *Next = ListHeader->Next;
+        MmUnmapSpace(SourceImageName);
+        MmUnmapSpace(ListHeader);
+
+        ListHeader = Next;
     }
+
+    MmUnmapSpace(LoaderModuleListHead);
 }
 
 /*-------------------------------------------------------------------------------------------------
