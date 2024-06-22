@@ -34,7 +34,7 @@ class SpinLockGuard {
     /*-------------------------------------------------------------------------------------------------
      * PURPOSE:
      *     This function does an early release of the held lock; This will make the deconstructor be
-     *a noop.
+     *     a noop.
      *
      * PARAMETERS:
      *     None.

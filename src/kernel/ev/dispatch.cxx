@@ -4,6 +4,7 @@
 #include <halp.h>
 #include <psp.h>
 
+#include <cxx/critical_section.hxx>
 #include <cxx/lock.hxx>
 
 /*-------------------------------------------------------------------------------------------------
@@ -29,9 +30,8 @@ extern "C" void EvpDispatchObject(void *Object, uint64_t Timeout, int Yield) {
 
     /* Enter critical section (can't let any scheduling happen here), and update the event
        queue. */
-    void *Context = HalpEnterCriticalSection();
+    CriticalSection Guard;
     if (Header->Finished) {
-        HalpLeaveCriticalSection(Context);
         return;
     }
 
@@ -53,8 +53,6 @@ extern "C" void EvpDispatchObject(void *Object, uint64_t Timeout, int Yield) {
         Processor->ForceYield = PSP_YIELD_EVENT;
         Header->Source = Processor->CurrentThread;
     }
-
-    HalpLeaveCriticalSection(Context);
 
     if (Yield) {
         HalpNotifyProcessor(Processor, 1);
@@ -89,11 +87,10 @@ extern "C" void EvWaitObject(void *Object, uint64_t Timeout) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 extern "C" void EvCancelObject(void *Object) {
-    void *Context = HalpEnterCriticalSection();
+    CriticalSection Guard;
     EvHeader *Header = (EvHeader *)Object;
 
     if (!Header->Dispatched) {
-        HalpLeaveCriticalSection(Context);
         return;
     }
 
@@ -103,8 +100,6 @@ extern "C" void EvCancelObject(void *Object) {
     if (Header->Source) {
         PsReadyThread(Header->Source);
     }
-
-    HalpLeaveCriticalSection(Context);
 }
 
 /*-------------------------------------------------------------------------------------------------

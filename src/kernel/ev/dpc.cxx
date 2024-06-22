@@ -2,7 +2,8 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <ev.h>
-#include <halp.h>
+
+#include <cxx/critical_section.hxx>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -34,7 +35,6 @@ void EvInitializeDpc(EvDpc *Dpc, void (*Routine)(void *Context), void *Context) 
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void EvDispatchDpc(EvDpc *Dpc) {
-    void *Context = HalpEnterCriticalSection();
+    CriticalSection Guard;
     RtAppendDList(&HalGetCurrentProcessor()->DpcQueue, &Dpc->ListHeader);
-    HalpLeaveCriticalSection(Context);
 }

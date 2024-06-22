@@ -26,7 +26,7 @@ add_executable(kernel "kernel" YES
     ${SOURCES}
 
     ev/dispatch.cxx
-    ev/dpc.c
+    ev/dpc.cxx
     ev/types.c
 
     hal/timer.c
