@@ -231,7 +231,7 @@ EFI_STATUS OslpInitializeMemoryMap(void) {
                 TargetDescriptor->BasePage = BasePage;
                 TargetDescriptor->PageCount = LowPages;
                 InsertDescriptor(TargetDescriptor);
-            } while (false);
+            } while (0);
 
             if (LowPages < PageCount) {
                 BasePage += LowPages;

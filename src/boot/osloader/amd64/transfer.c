@@ -1,13 +1,13 @@
 /* SPDX-FileCopyrightText: (C) 2024 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
+#include <amd64/processor.h>
 #include <console.h>
 #include <efi/spec.h>
 #include <loader.h>
 #include <platform.h>
 
 extern uint64_t *OslpPageMap;
-extern void *OslpGetBootStack(void *BspPtr);
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -71,10 +71,13 @@ extern void *OslpGetBootStack(void *BspPtr);
     /* Load up the kernel stack, and call/jump to the kernel entry;
      * The kernel stack and the kernel entry will already be virtual addresses, but we expect
      * the kernel to convert everything else to virtual addresses (and probably relocate it). */
-    uint64_t BootStack = (uint64_t)OslpGetBootStack(BootBlock) + 0xFFFF800000000000;
+    KeProcessor *BootProcessor = BootBlock->BootProcessor;
+    uint64_t BootStack = (uint64_t)BootProcessor->SystemStack + sizeof(BootProcessor->SystemStack) +
+                         0xFFFF800000000000;
     void *EntryPoint =
         CONTAINING_RECORD(BootBlock->BootDriverListHead->Next, OslpModuleEntry, ListHeader)
             ->EntryPoint;
+
     __asm__ volatile(
         "mov %0, %%rax\n"
         "mov %1, %%rcx\n"

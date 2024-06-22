@@ -247,14 +247,14 @@ int OslpPrepareExecution(RtDList *LoadedPrograms, RtDList *MemoryDescriptors) {
         }
     }
 
-    /* And to wrap up, identity map all OSLOADER regions (we'll still be inside OSLOADER when we
-     * load this page map). */
+    /* And to wrap up, identity map all regions that we might still use before jumping to the
+     * kernel. */
     for (RtDList *ListHeader = MemoryDescriptors->Next; ListHeader != MemoryDescriptors;) {
         OslpMemoryDescriptor *Descriptor =
             CONTAINING_RECORD(ListHeader, OslpMemoryDescriptor, ListHeader);
         ListHeader = ListHeader->Next;
 
-        if (Descriptor->Type != PAGE_OSLOADER) {
+        if (Descriptor->Type != PAGE_OSLOADER && Descriptor->Type != PAGE_FIRMWARE_TEMPORARY) {
             continue;
         }
 
