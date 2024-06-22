@@ -17,6 +17,7 @@ extern void EvpHandleEvents(HalRegisterState *);
 extern uint64_t HalpInterruptHandlerTable[256];
 
 extern KeSpinLock KiPanicLock;
+extern uint32_t KiPanicLockedProcessors;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -31,8 +32,6 @@ extern KeSpinLock KiPanicLock;
  *-----------------------------------------------------------------------------------------------*/
 void HalpInterruptHandler(HalRegisterState *State) {
     KeProcessor *Processor = (KeProcessor *)HalGetCurrentProcessor();
-    KeIrql Irql = KeRaiseIrql(Processor->IdtIrqlSlots[State->InterruptNumber]);
-    __asm__ volatile("sti");
 
     if (State->InterruptNumber < 32) {
         /* We don't care about the current IRQL, reset it to DISPATCH, or most functions we want
@@ -41,6 +40,7 @@ void HalpInterruptHandler(HalRegisterState *State) {
 
         /* This should just halt if someone else already panicked; No need for LockGuard, we're
          * not releasing this. */
+        __atomic_add_fetch(&KiPanicLockedProcessors, 1, __ATOMIC_SEQ_CST);
         KeAcquireSpinLock(&KiPanicLock);
 
         /* Panics always halt everyone (the system isn't in a safe state anymore). */
@@ -51,12 +51,22 @@ void HalpInterruptHandler(HalRegisterState *State) {
             }
         }
 
+        /* Wait until everyone is halted; We don't want any processor doing anything if we
+         * crashed. */
+        for (int i = 0; i < 10; i++) {
+            if (__atomic_load_n(&KiPanicLockedProcessors, __ATOMIC_RELAXED) == HalpProcessorCount) {
+                break;
+            }
+
+            HalWaitTimer(100 * EV_MILLISECS);
+        }
+
         char ErrorMessage[256];
         snprintf(
             ErrorMessage,
             256,
-            "Processor %u received exception %llu\n",
-            Processor->ApicId,
+            "Processor %p received exception %llu\n",
+            Processor,
             State->InterruptNumber);
 
         VidSetColor(VID_COLOR_PANIC);
@@ -89,6 +99,9 @@ void HalpInterruptHandler(HalRegisterState *State) {
             HalpStopProcessor();
         }
     }
+
+    KeIrql Irql = KeRaiseIrql(Processor->IdtIrqlSlots[State->InterruptNumber]);
+    __asm__ volatile("sti");
 
     RtSList *ListHeader = Processor->IdtSlots[State->InterruptNumber - 32].ListHead.Next;
     while (ListHeader) {
