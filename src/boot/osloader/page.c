@@ -331,6 +331,7 @@ void *OslAllocatePages(uint64_t Size, uint8_t Type) {
             }
         }
 
+        memset(Result, 0, Pages * DEFAULT_PAGE_ALLOCATION_GRANULARITY);
         return Result;
     }
 
