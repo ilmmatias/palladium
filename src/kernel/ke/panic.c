@@ -19,6 +19,7 @@ static char *Messages[] = {
 };
 
 KeSpinLock KiPanicLock = {0};
+uint32_t KiPanicLockedProcessors = 0;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -41,6 +42,7 @@ KeSpinLock KiPanicLock = {0};
 
     /* This should just halt if someone else already panicked; No need for LockGuard, we're
      * not releasing this. */
+    __atomic_add_fetch(&KiPanicLockedProcessors, 1, __ATOMIC_SEQ_CST);
     KeAcquireSpinLock(&KiPanicLock);
 
     /* Panics always halt everyone (the system isn't in a safe state anymore). */
@@ -49,6 +51,15 @@ KeSpinLock KiPanicLock = {0};
             HalpProcessorList[i]->EventStatus = KE_PANIC_EVENT;
             HalpNotifyProcessor(HalpProcessorList[i], 0);
         }
+    }
+
+    /* Wait until everyone is halted; We don't want any processor doing anything if we crashed. */
+    for (int i = 0; i < 10; i++) {
+        if (__atomic_load_n(&KiPanicLockedProcessors, __ATOMIC_RELAXED) == HalpProcessorCount) {
+            break;
+        }
+
+        HalWaitTimer(100 * EV_MILLISECS);
     }
 
     if (Message < KE_FATAL_ERROR || Message >= KE_PANIC_COUNT) {
