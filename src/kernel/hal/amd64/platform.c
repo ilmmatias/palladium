@@ -26,12 +26,12 @@ void HalpInitializePlatform(KeProcessor *Processor, int IsBsp) {
         HalpInitializeIoapic();
         HalpInitializeApic();
         HalpEnableApic();
-        Processor->ApicId = HalpReadLapicRegister(0x20);
+        Processor->ApicId = HalpReadLapicId();
         HalpInitializeHpet();
         HalpInitializeSmp();
     } else {
         HalpEnableApic();
-        Processor->ApicId = HalpReadLapicRegister(0x20);
+        Processor->ApicId = HalpReadLapicId();
     }
 
     HalpInitializeApicTimer();

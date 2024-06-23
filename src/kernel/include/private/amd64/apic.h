@@ -18,7 +18,6 @@
 #define LAPIC_RECORD 0
 #define IOAPIC_RECORD 1
 #define IOAPIC_SOURCE_OVERRIDE_RECORD 2
-#define LAPIC_ADDRESS_OVERRIDE_RECORD 5
 #define X2APIC_RECORD 9
 
 typedef struct __attribute__((packed)) {

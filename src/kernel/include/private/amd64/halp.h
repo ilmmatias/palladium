@@ -19,6 +19,7 @@ void HalpInitializeApic(void);
 void HalpEnableApic(void);
 uint64_t HalpReadLapicRegister(uint32_t Number);
 void HalpWriteLapicRegister(uint32_t Number, uint64_t Data);
+uint32_t HalpReadLapicId(void);
 void HalpSendIpi(uint32_t Target, uint32_t Vector);
 void HalpWaitIpiDelivery(void);
 void HalpSendEoi(void);

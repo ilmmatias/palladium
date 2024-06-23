@@ -65,9 +65,9 @@ void HalpInterruptHandler(HalRegisterState *State) {
         snprintf(
             ErrorMessage,
             256,
-            "Processor %p received exception %llu\n",
+            "Processor %u received exception %llu\n",
             Processor,
-            State->InterruptNumber);
+            HalGetCurrentProcessor()->ApicId);
 
         VidSetColor(VID_COLOR_PANIC);
         VidPutString("CANNOT SAFELY RECOVER OPERATION\n");

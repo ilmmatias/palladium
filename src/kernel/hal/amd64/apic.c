@@ -5,6 +5,7 @@
 #include <amd64/msr.h>
 #include <amd64/port.h>
 #include <cpuid.h>
+#include <hal.h>
 #include <ke.h>
 #include <mm.h>
 #include <vid.h>
@@ -80,6 +81,21 @@ void HalpWriteLapicRegister(uint32_t Number, uint64_t Data) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
+ *     This function obtains the APIC ID for the current processor.
+ *
+ * PARAMETERS:
+ *     None.
+ *
+ * RETURN VALUE:
+ *     APIC ID for the current processor.
+ *-----------------------------------------------------------------------------------------------*/
+uint32_t HalpReadLapicId(void) {
+    uint32_t Register = HalpReadLapicRegister(0x20);
+    return X2ApicEnabled ? Register : (Register >> 24);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
  *     This function parses the APIC/MADT table, collecting all information required to enable the
  *     Local APIC. and gets the system ready to handle interrupts
  *     (and other processors) using the Local APIC.
@@ -139,18 +155,6 @@ void HalpInitializeApic(void) {
                 break;
             }
 
-            case LAPIC_ADDRESS_OVERRIDE_RECORD: {
-                if (!X2ApicEnabled) {
-                    LapicAddress = MmMapSpace(Record->LapicAddressOverride.Address, MM_PAGE_SIZE);
-                    if (!LapicAddress) {
-                        VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "couldn't map the LAPIC\n");
-                        KeFatalError(KE_OUT_OF_MEMORY);
-                    }
-                }
-
-                break;
-            }
-
             case X2APIC_RECORD: {
                 /* Prevent a bunch of entries with the same APIC ID (but probably different ACPI
                    IDs) filling our processor list. */
@@ -188,10 +192,9 @@ void HalpInitializeApic(void) {
         HalpProcessorCount = 1;
     }
 
-    /* If no entry contained an override, default to the LAPIC address given by the MADT table
-     * itself. */
-    if (!LapicAddress && !X2ApicEnabled) {
-        LapicAddress = MmMapSpace(Madt->LapicAddress, MM_PAGE_SIZE);
+    /* Default to the LAPIC address given in the MSR (if we're not using x2APIC). */
+    if (!X2ApicEnabled) {
+        LapicAddress = MmMapSpace(ReadMsr(0x1B) & ~0xFFF, MM_PAGE_SIZE);
         if (!LapicAddress) {
             VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "couldn't map the LAPIC\n");
             KeFatalError(KE_OUT_OF_MEMORY);
@@ -211,7 +214,9 @@ void HalpInitializeApic(void) {
  *-----------------------------------------------------------------------------------------------*/
 void HalpEnableApic(void) {
     if (X2ApicEnabled) {
-        WriteMsr(0x1B, ReadMsr(0x1B) | 0xC00);
+        WriteMsr(0x1B, (ReadMsr(0x1B) & ~0xFFF) | 0xC00);
+    } else {
+        WriteMsr(0x1B, (ReadMsr(0x1B) & ~0xFFF) | 0x800);
     }
 
     /* The spec says that we might not always have to mask everything on the PIC, but we always
@@ -220,9 +225,6 @@ void HalpEnableApic(void) {
        exceptions). */
     WritePortByte(0x21, 0xFF);
     WritePortByte(0xA1, 0xFF);
-
-    /* Hardware enable the Local APIC if it wasn't enabled. */
-    WriteMsr(0x1B, ReadMsr(0x1B) | 0x800);
 
     /* And setup the remaining registers, this should finish enabling the LAPIC. */
     HalpWriteLapicRegister(0x80, 0);
