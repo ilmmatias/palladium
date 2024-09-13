@@ -19,7 +19,7 @@
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void EvInitializeDpc(EvDpc *Dpc, void (*Routine)(void *Context), void *Context) {
+extern "C" void EvInitializeDpc(EvDpc *Dpc, void (*Routine)(void *Context), void *Context) {
     Dpc->Routine = Routine;
     Dpc->Context = Context;
 }
@@ -34,7 +34,7 @@ void EvInitializeDpc(EvDpc *Dpc, void (*Routine)(void *Context), void *Context) 
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void EvDispatchDpc(EvDpc *Dpc) {
+extern "C" void EvDispatchDpc(EvDpc *Dpc) {
     CriticalSection Guard;
     RtAppendDList(&HalGetCurrentProcessor()->DpcQueue, &Dpc->ListHeader);
 }

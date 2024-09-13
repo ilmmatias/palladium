@@ -22,7 +22,7 @@ extern PsThread *PspSystemThread;
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void PsReadyThread(PsThread *Thread) {
+extern "C" void PsReadyThread(PsThread *Thread) {
     /* Always try and add the thread to the least full queue. */
     size_t BestMatchSize = SIZE_MAX;
     KeProcessor *BestMatch = NULL;
@@ -61,7 +61,7 @@ void PsReadyThread(PsThread *Thread) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void PspInitializeScheduler(int IsBsp) {
+extern "C" void PspInitializeScheduler(int IsBsp) {
     KeProcessor *Processor = HalGetCurrentProcessor();
     /* PspScheduleNext should forcefully "switch" threads if we're not running anything. */
     Processor->CurrentThread = NULL;
@@ -133,7 +133,7 @@ static void TerminationDpc(PsThread *Thread) {
  * RETURN VALUE:
  *     None..
  *-----------------------------------------------------------------------------------------------*/
-void PspScheduleNext(HalRegisterState *Context) {
+extern "C" void PspScheduleNext(HalRegisterState *Context) {
     KeProcessor *Processor = HalGetCurrentProcessor();
     PsThread *CurrentThread = Processor->CurrentThread;
 

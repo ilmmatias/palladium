@@ -22,7 +22,7 @@ static KeSpinLock Lock = {0};
  * RETURN VALUE:
  *     1 on success, 0 on failure (either out of memory, or the name already exists).
  *-----------------------------------------------------------------------------------------------*/
-int IoCreateDevice(const char *Name, IoReadFn Read, IoWriteFn Write) {
+extern "C" int IoCreateDevice(const char *Name, IoReadFn Read, IoWriteFn Write) {
     if (IoOpenDevice(Name)) {
         return 0;
     }
@@ -58,7 +58,7 @@ int IoCreateDevice(const char *Name, IoReadFn Read, IoWriteFn Write) {
  * RETURN VALUE:
  *     Pointer to the device on success, NULL otherwise.
  *-----------------------------------------------------------------------------------------------*/
-IoDevice *IoOpenDevice(const char *Name) {
+extern "C" IoDevice *IoOpenDevice(const char *Name) {
     SpinLockGuard Guard(&Lock);
     RtSList *ListHeader = DeviceListHead.Next;
 

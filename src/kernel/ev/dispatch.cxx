@@ -7,7 +7,9 @@
 #include <cxx/critical_section.hxx>
 #include <cxx/lock.hxx>
 
+extern "C" {
 extern uint32_t KiPanicLockedProcessors;
+}
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:

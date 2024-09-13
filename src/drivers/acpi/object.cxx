@@ -17,28 +17,12 @@ static SList<AutoPtr<AcpipObject>> Entries("Acpi");
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void AcpipInitializeBuiltin(void) {
-    AutoPtr<AcpipObject> Scope("Acpi");
-    memcpy(Scope->Name, "_GPE", 4);
-    Scope->Value.Type = AcpipValueType::Scope;
-    Entries.Push(Scope.Move());
+    const char *BuiltinScopes[]{"_PR_", "_SB_", "_SI_", "_TZ_"};
 
-    Scope = AutoPtr<AcpipObject>("Acpi");
-    memcpy(Scope->Name, "_PR_", 4);
-    Scope->Value.Type = AcpipValueType::Scope;
-    Entries.Push(Scope.Move());
-
-    Scope = AutoPtr<AcpipObject>("Acpi");
-    memcpy(Scope->Name, "_SB_", 4);
-    Scope->Value.Type = AcpipValueType::Scope;
-    Entries.Push(Scope.Move());
-
-    Scope = AutoPtr<AcpipObject>("Acpi");
-    memcpy(Scope->Name, "_SI_", 4);
-    Scope->Value.Type = AcpipValueType::Scope;
-    Entries.Push(Scope.Move());
-
-    Scope = AutoPtr<AcpipObject>("Acpi");
-    memcpy(Scope->Name, "_TZ_", 4);
-    Scope->Value.Type = AcpipValueType::Scope;
-    Entries.Push(Scope.Move());
+    for (auto &ScopeName : BuiltinScopes) {
+        AutoPtr<AcpipObject> Scope("Acpi");
+        memcpy(Scope->Name, ScopeName, 4);
+        Scope->Value.Type = AcpipValueType::Scope;
+        Entries.Push(Scope.Move());
+    }
 }

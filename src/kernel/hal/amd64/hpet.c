@@ -8,8 +8,7 @@
 #include <vid.h>
 
 static void *HpetAddress = NULL;
-static uint64_t Period = 0;
-static uint64_t PeriodInNs = 0;
+static uint64_t Period = 1;
 static uint64_t MinimumTicks = 0;
 
 /*-------------------------------------------------------------------------------------------------
@@ -65,14 +64,13 @@ void HalpInitializeHpet(void) {
     }
 
     uint64_t Caps = ReadHpetRegister(HPET_CAP_REG);
-    Period = Caps >> 32;
-    PeriodInNs = Period / 1000000;
+    Period = (Caps >> 32) / 1000000;
     MinimumTicks = Hpet->MinimumTicks;
     VidPrint(
         VID_MESSAGE_DEBUG,
         "Kernel HAL",
         "using HPET as timer tick source (period = %llu ns)\n",
-        PeriodInNs);
+        Period);
 
     WriteHpetRegister(HPET_VAL_REG, 0);
     WriteHpetRegister(HPET_CFG_REG, 0x01);
@@ -89,7 +87,7 @@ void HalpInitializeHpet(void) {
  *     Period of the timer.
  *-----------------------------------------------------------------------------------------------*/
 uint64_t HalGetTimerPeriod(void) {
-    return PeriodInNs;
+    return Period;
 }
 
 /*-------------------------------------------------------------------------------------------------
