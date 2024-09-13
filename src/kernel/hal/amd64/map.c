@@ -101,6 +101,52 @@ int HalpMapPage(void *VirtualAddress, uint64_t PhysicalAddress, int Flags) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
+ *     This function unmaps a physical addresses from virtual memory.
+ *
+ * PARAMETERS:
+ *     VirtualAddress - Target address.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void HalpUnmapPage(void *VirtualAddress) {
+    uint64_t Indexes[] = {
+        ((uint64_t)VirtualAddress >> 39) & 0x1FF,
+        ((uint64_t)VirtualAddress >> 30) & 0x3FFFF,
+        ((uint64_t)VirtualAddress >> 21) & 0x7FFFFFF,
+        ((uint64_t)VirtualAddress >> 12) & 0xFFFFFFFFF,
+    };
+
+    /* We just want to move along into the PTE this time around. */
+    for (int i = 0; i < 4; i++) {
+        if (!(Addresses[i][Indexes[i]] & 0x01)) {
+            return;
+        } else if (!(Addresses[i][Indexes[i]] & 0x80) && i != 3) {
+            continue;
+        }
+
+        /* We're assuming that for large/huge pages, if the given VirtualAddress is properly aligned
+         * we want to unmap the whole region. */
+        if ((i == 1 && (Addresses[i][Indexes[i]] & 0x80) &&
+             ((uint64_t)VirtualAddress & 0x3FFFFFFF)) ||
+            (i == 2 && (Addresses[i][Indexes[i]] & 0x80) &&
+             ((uint64_t)VirtualAddress & 0x1FFFFF))) {
+            return;
+        }
+
+        if (Addresses[i][Indexes[i]] & 0x01) {
+            Addresses[i][Indexes[i]] = 0;
+        }
+
+        break;
+    }
+
+    /* TODO: We also want to notify other processors. */
+    __asm__ volatile("invlpg (%0)" : : "b"(VirtualAddress) : "memory");
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
  *     This function maps a range of physical addresses into contiguous virtual memory.
  *
  * PARAMETERS:

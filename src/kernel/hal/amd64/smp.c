@@ -101,6 +101,8 @@ void HalpInitializeSmp(void) {
     while (__atomic_load_n(&HalpOnlineProcessorCount, __ATOMIC_RELAXED) != HalpProcessorCount) {
         HalWaitTimer(100 * EV_MICROSECS);
     }
+
+    HalpUnmapPage((void *)0x8000);
 }
 
 /*-------------------------------------------------------------------------------------------------

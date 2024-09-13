@@ -13,6 +13,11 @@ extern MiPageEntry *MiFreePageListHead;
 extern uint64_t MiPoolStart;
 extern RtBitmap MiPoolBitmap;
 
+typedef struct {
+    RtSList ListHeader;
+    MiMemoryDescriptor Descriptor;
+} DescriptorListEntry;
+
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function allocates a given amount of contiguous pages directly from the osloader
@@ -84,8 +89,24 @@ void MiInitializePageAllocator(KiLoaderBlock *LoaderBlock) {
          ListHeader != MemoryDescriptorListHead;
          ListHeader = MiEnsureEarlySpace((uint64_t)ListHeader->Next, sizeof(MiMemoryDescriptor))) {
         MiMemoryDescriptor *Entry = CONTAINING_RECORD(ListHeader, MiMemoryDescriptor, ListHeader);
-        if (Entry->Type == MI_PAGE_FREE || Entry->Type == MI_PAGE_OSLOADER ||
-            Entry->Type == MI_PAGE_FIRMWARE_TEMPORARY) {
+
+        /* Unmapping firware temp regions should be already okay to do. */
+        if (Entry->Type == MI_PAGE_FIRMWARE_TEMPORARY) {
+            for (uint32_t i = 0; i < Entry->PageCount; i++) {
+                HalpUnmapPage((void *)((uintptr_t)(Entry->BasePage + i) << MM_PAGE_SHIFT));
+            }
+        }
+
+        if (Entry->BasePage < 0x10) {
+            if (Entry->BasePage + Entry->PageCount < 0x10) {
+                continue;
+            }
+
+            Entry->PageCount -= 0x10 - Entry->BasePage;
+            Entry->BasePage += 0x10 - Entry->BasePage;
+        }
+
+        if (Entry->Type <= MI_PAGE_FIRMWARE_TEMPORARY) {
             MaxAddressablePage = Entry->BasePage + Entry->PageCount;
         }
     }
@@ -105,15 +126,6 @@ void MiInitializePageAllocator(KiLoaderBlock *LoaderBlock) {
 
         if (Entry->Type != MI_PAGE_FREE && Entry->Type != MI_PAGE_FIRMWARE_TEMPORARY) {
             continue;
-        }
-
-        if (Entry->BasePage < 0x10) {
-            if (Entry->BasePage + Entry->PageCount < 0x10) {
-                continue;
-            }
-
-            Entry->PageCount -= 0x10 - Entry->BasePage;
-            Entry->BasePage += 0x10 - Entry->BasePage;
         }
 
         MiPageEntry *Group = &MiPageList[Entry->BasePage];
@@ -145,4 +157,70 @@ void MiInitializePool(KiLoaderBlock *LoaderBlock) {
     void *PoolBitmapBase = EarlyAllocatePages(LoaderBlock, SizeInPages);
     RtInitializeBitmap(&MiPoolBitmap, PoolBitmapBase, SizeInBits);
     RtClearAllBits(&MiPoolBitmap);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function wraps up the memory manager initialization by freeing and unmapping the
+ *     OSLOADER regions. This should only be called after LoaderBlock (and anything else from
+ *     OSLOADER) has already been used and saved somewhere else.
+ *
+ * PARAMETERS:
+ *     BootData - Data prepared by the boot loader for us.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void MiReleaseBootRegions(KiLoaderBlock *LoaderBlock) {
+    RtDList *MemoryDescriptorListHead =
+        MiEnsureEarlySpace((uint64_t)LoaderBlock->MemoryDescriptorListHead, sizeof(RtDList));
+
+    /* This will unmap the LoaderBlock itself, so we need some temporary space to save all
+     * related memory descriptors. */
+    RtSList ListHead = {};
+
+    for (RtDList *ListHeader = MiEnsureEarlySpace(
+             (uint64_t)MemoryDescriptorListHead->Next, sizeof(MiMemoryDescriptor));
+         ListHeader != MemoryDescriptorListHead;
+         ListHeader = MiEnsureEarlySpace((uint64_t)ListHeader->Next, sizeof(MiMemoryDescriptor))) {
+        MiMemoryDescriptor *Entry = CONTAINING_RECORD(ListHeader, MiMemoryDescriptor, ListHeader);
+
+        if (Entry->Type != MI_PAGE_OSLOADER) {
+            continue;
+        }
+
+        DescriptorListEntry *Target = MmAllocatePool(sizeof(DescriptorListEntry), "KeMm");
+        if (!Target) {
+            /* This could possibly be not an error (and we just break out of the for loop early)? */
+            VidPrint(
+                VID_MESSAGE_ERROR,
+                "Kernel",
+                "couldn't allocate space for copying a memory descriptor\n");
+            KeFatalError(KE_OUT_OF_MEMORY);
+        }
+
+        memcpy(&Target->Descriptor, Entry, sizeof(MiMemoryDescriptor));
+        RtPushSList(&ListHead, &Target->ListHeader);
+    }
+
+    /* Now we're safe to release and unmap all those regions. */
+    RtSList *ListHeader = ListHead.Next;
+    while (ListHeader) {
+        MiMemoryDescriptor *Entry =
+            &CONTAINING_RECORD(ListHeader, DescriptorListEntry, ListHeader)->Descriptor;
+
+        MiPageEntry *Group = &MiPageList[Entry->BasePage];
+        for (uintptr_t i = 0; i < (uintptr_t)Entry->PageCount; i++) {
+            MiPageEntry *Page = Group + i;
+            Page->NextPage = MiFreePageListHead;
+            Page->References = 0;
+            MiFreePageListHead = Page;
+            HalpUnmapPage((void *)((uintptr_t)(Entry->BasePage + i) << MM_PAGE_SHIFT));
+        }
+
+        /* We don't need the copy anymore. */
+        RtSList *Next = ListHeader->Next;
+        MmFreePool(CONTAINING_RECORD(ListHeader, DescriptorListEntry, ListHeader), "KeMm");
+        ListHeader = Next;
+    }
 }

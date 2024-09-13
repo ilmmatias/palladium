@@ -59,9 +59,12 @@ extern "C" [[noreturn]] void KiSystemStartup(uint64_t LoaderBlockPage, uint64_t 
         /* Stage 3.1: Save all remaining info from the boot loader. */
         KiSaveAcpiData(LoaderBlock);
         KiSaveBootStartDrivers(LoaderBlock);
+
+        /* Stage 3.2: Free up all OSLOADER regions (we don't need them anymore). */
+        MiReleaseBootRegions(LoaderBlock);
     }
 
-    /* Stage 3.2: Early platform/arch initialization. */
+    /* Stage 3.3: Early platform/arch initialization. */
     if (LoaderBlockPage) {
         HalpInitializePlatform(Processor, 1);
         VidPrint(VID_MESSAGE_INFO, "Kernel", "%u processors online\n", HalpProcessorCount);

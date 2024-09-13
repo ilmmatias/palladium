@@ -49,6 +49,7 @@ extern "C" {
 
 void MiInitializePageAllocator(KiLoaderBlock *LoaderBlock);
 void MiInitializePool(KiLoaderBlock *LoaderBlock);
+void MiReleaseBootRegions(KiLoaderBlock *LoaderBlock);
 
 void *MiEnsureEarlySpace(uint64_t PhysicalAddress, size_t Size);
 
