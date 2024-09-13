@@ -67,12 +67,6 @@ jobs:
     - name: Install compiler-rt for Target
       run: sudo cmake --build llvm-project/build.target --target install
 
-    - name: Configure Host Tools
-      run: cmake -S palladium/src/sdk/host -B palladium/build.host -G Ninja -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
-
-    - name: Build Host Tools
-      run: cmake --build palladium/build.host --config ${{env.BUILD_TYPE}}
-
     - name: Configure Target
       run: cmake -S palladium/src -B palladium/build.target -G Ninja -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DARCH=amd64
 
