@@ -21,9 +21,8 @@ set(CMAKE_CXX_STANDARD 23)
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Werror")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror")
+set(CMAKE_RC_FLAGS "--target=${TARGET_${ARCH}}-w64-mingw32")
 
 set(CMAKE_LINK_DEF_FILE_FLAG "")
-
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 add_link_options(-nostdlib -nodefaultlibs)
