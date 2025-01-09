@@ -1,4 +1,4 @@
-/* SPDX-FileCopyrightText: (C) 2023-2024 ilmmatias
+/* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: BSD-3-Clause */
 
 #ifndef _SDT_HXX_

@@ -1,4 +1,4 @@
-/* SPDX-FileCopyrightText: (C) 2024 ilmmatias
+/* SPDX-FileCopyrightText: (C) 2024-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <acpi.h>
@@ -68,8 +68,8 @@ OslMain(EFI_HANDLE *ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
     RtDList LoadedPrograms;
     RtInitializeDList(&LoadedPrograms);
 
-    /* TODO: Use the UEFI command like to get the path to the kernel+to each driver, falling
-     * back to this default on live/installer boot (with no arguments). */
+    /* TODO: Use the UEFI command line to get the path to the kernel+to each driver, falling
+     * back to a sane default on live/installer boot (with no arguments). */
     if (!OslLoadExecutable(&LoadedPrograms, "kernel.exe", "\\EFI\\PALLADIUM\\KERNEL.EXE") ||
         !OslLoadExecutable(&LoadedPrograms, "acpi.sys", "\\EFI\\PALLADIUM\\ACPI.SYS")) {
         return EFI_LOAD_ERROR;

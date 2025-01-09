@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: (C) 2023-2024 ilmmatias
+# SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 add_library(urt "ucrt" SHARED ${SOURCES})

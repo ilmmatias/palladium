@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: (C) 2024 ilmmatias
+# SPDX-FileCopyrightText: (C) 2024-2025 ilmmatias
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 project(os/boot/osloader)
