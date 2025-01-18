@@ -79,7 +79,7 @@ extern "C" void PspCreateSystemThread(void) {
     PspSystemThread = PsCreateThread(KiContinueSystemStartup, NULL);
     if (!PspSystemThread) {
         VidPrint(VID_MESSAGE_ERROR, "Kernel", "failed to create the system thread\n");
-        KeFatalError(KE_OUT_OF_MEMORY);
+        KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
     }
 }
 
@@ -97,6 +97,6 @@ extern "C" void PspCreateIdleThread(void) {
     HalGetCurrentProcessor()->IdleThread = PsCreateThread(PspIdleThread, NULL);
     if (!HalGetCurrentProcessor()->IdleThread) {
         VidPrint(VID_MESSAGE_ERROR, "Kernel", "failed to create the idle thread\n");
-        KeFatalError(KE_OUT_OF_MEMORY);
+        KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
     }
 }

@@ -28,6 +28,7 @@ int HalpMapPage(void *VirtualAddress, uint64_t PhysicalAddress, int Flags);
 void HalpUnmapPage(void *VirtualAddress);
 
 void HalpNotifyProcessor(KeProcessor *Processor, int WaitDelivery);
+void HalpFreezeProcessor(KeProcessor *Processor);
 
 void *HalpEnterCriticalSection(void);
 void HalpLeaveCriticalSection(void *Context);

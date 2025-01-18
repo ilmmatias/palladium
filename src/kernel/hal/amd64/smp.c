@@ -46,7 +46,7 @@ void HalpInitializeSmp(void) {
     if (!HalpProcessorList) {
         VidPrint(
             VID_MESSAGE_ERROR, "Kernel HAL", "couldn't allocate space for the processor list\n");
-        KeFatalError(KE_OUT_OF_MEMORY);
+        KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
     }
 
     for (uint32_t i = 0; i < HalpProcessorCount; i++) {
@@ -59,7 +59,7 @@ void HalpInitializeSmp(void) {
         if (!HalpProcessorList[i]) {
             VidPrint(
                 VID_MESSAGE_ERROR, "Kernel HAL", "couldn't allocate space for the a processor\n");
-            KeFatalError(KE_OUT_OF_MEMORY);
+            KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
         }
 
         HalpProcessorList[i]->ThreadQueueSize = 1;
@@ -67,6 +67,7 @@ void HalpInitializeSmp(void) {
         RtInitializeDList(&HalpProcessorList[i]->ThreadQueue);
 
         HalpProcessorList[i]->ForceYield = 0;
+        HalpProcessorList[i]->EventStatus = 0;
         RtInitializeDList(&HalpProcessorList[i]->DpcQueue);
         RtInitializeDList(&HalpProcessorList[i]->EventQueue);
     }
@@ -108,7 +109,7 @@ void HalpInitializeSmp(void) {
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function gets a pointer to the processor-specific structure of the current processor.
- *     This only works after HalpInitializePlatform().
+ *     The result of this will always be NULL before HalpInitializePlatform().
  *
  * PARAMETERS:
  *     None.
@@ -138,4 +139,20 @@ void HalpNotifyProcessor(KeProcessor *Processor, int WaitDelivery) {
     if (WaitDelivery) {
         HalpWaitIpiDelivery();
     }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function notifies another processor that it should stop running (permanently, as we
+ *     don't have a way to specify it should start running again for now).
+ *
+ * PARAMETERS:
+ *     Processor - Which processor to notify.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void HalpFreezeProcessor(KeProcessor *Processor) {
+    Processor->EventStatus = KE_EVENT_FREEZE;
+    HalpSendNmi(Processor->ApicId);
 }

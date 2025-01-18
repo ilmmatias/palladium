@@ -7,10 +7,6 @@
 #include <cxx/critical_section.hxx>
 #include <cxx/lock.hxx>
 
-extern "C" {
-extern uint32_t KiPanicLockedProcessors;
-}
-
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function dispatches the given object into the event queue.
@@ -120,17 +116,8 @@ extern "C" void EvpHandleEvents(HalRegisterState *Context) {
     KeProcessor *Processor = HalGetCurrentProcessor();
     uint64_t CurrentTicks = HalGetTimerTicks();
 
-    /* Someone else crashed? Halt this CPU, the crashing core should handle printing the error
-     * message to the screen. */
-    if (Processor->EventStatus == KE_PANIC_EVENT) {
-        HalpEnterCriticalSection();
-        __atomic_add_fetch(&KiPanicLockedProcessors, 1, __ATOMIC_SEQ_CST);
-        while (1) {
-            HalpStopProcessor();
-        }
-    }
-
-    /* Process any pending events (they might enqueue DPCs, so we need to process them first). */
+    /* Process any pending events (they might enqueue DPCs, so we need to process them
+     * first). */
     RtDList *ListHeader = Processor->EventQueue.Next;
     while (ListHeader != &Processor->EventQueue) {
         EvHeader *Header = CONTAINING_RECORD(ListHeader, EvHeader, ListHeader);

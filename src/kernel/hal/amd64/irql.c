@@ -15,7 +15,7 @@
  *-----------------------------------------------------------------------------------------------*/
 KeIrql HalpGetIrql(void) {
     KeIrql Irql;
-    __asm__ volatile("mov %%cr8, %0" : "=r"(Irql));
+    __asm__ volatile("mov %%cr8, %0" : "=r"(Irql) : : "memory");
     return Irql;
 }
 
@@ -31,5 +31,5 @@ KeIrql HalpGetIrql(void) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void HalpSetIrql(KeIrql NewIrql) {
-    __asm__ volatile("mov %0, %%cr8" : : "r"(NewIrql));
+    __asm__ volatile("mov %0, %%cr8" : : "r"(NewIrql) : "memory");
 }

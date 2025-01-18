@@ -71,7 +71,7 @@ static void CacheTable(void) {
 
     if (TableType == KI_ACPI_NONE) {
         VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "the host is not ACPI-compliant\n");
-        KeFatalError(KE_BAD_ACPI_TABLES);
+        KeFatalError(KE_PANIC_BAD_SYSTEM_TABLE);
     }
 
     /* We're forced to guess initially (as we still don't know the size); Assume <1 page, and
@@ -79,7 +79,7 @@ static void CacheTable(void) {
     SdtHeader *RootSdt = MmMapSpace(BaseAddress, MM_PAGE_SIZE);
     if (!RootSdt) {
         VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "couldn't map the R/XSDT\n");
-        KeFatalError(KE_OUT_OF_MEMORY);
+        KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
     }
 
     if (RootSdt->Length > MM_PAGE_SIZE) {
@@ -87,7 +87,7 @@ static void CacheTable(void) {
         RootSdt = MmMapSpace(BaseAddress, RootSdt->Length);
         if (!RootSdt) {
             VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "couldn't map the R/XSDT\n");
-            KeFatalError(KE_OUT_OF_MEMORY);
+            KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
         }
     }
 
@@ -98,7 +98,7 @@ static void CacheTable(void) {
     if (memcmp(RootSdt->Signature, IsXsdt ? "XSDT" : "RSDT", 4) ||
         !Checksum((char *)RootSdt, RootSdt->Length)) {
         VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "bad checksum or signature on the RSDT/XSDT\n");
-        KeFatalError(KE_BAD_ACPI_TABLES);
+        KeFatalError(KE_PANIC_BAD_SYSTEM_TABLE);
     }
 
     for (uint32_t i = 0; i < (RootSdt->Length - sizeof(SdtHeader)) / (IsXsdt ? 8 : 4); i++) {
@@ -106,7 +106,7 @@ static void CacheTable(void) {
         SdtHeader *Header = MmMapSpace(Address, MM_PAGE_SIZE);
         if (!Header) {
             VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "couldn't map an ACPI table\n");
-            KeFatalError(KE_OUT_OF_MEMORY);
+            KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
         } else if (!memcmp(Header->Signature, "DSDT", 4)) {
             MmUnmapSpace(Header);
             continue;
@@ -118,13 +118,13 @@ static void CacheTable(void) {
             Header = MmMapSpace(Address, Length);
             if (!Header) {
                 VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "couldn't map an ACPI table\n");
-                KeFatalError(KE_OUT_OF_MEMORY);
+                KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
             }
         }
 
         if (!Checksum((char *)Header, Header->Length)) {
             VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "bad checksum on an ACPI table\n");
-            KeFatalError(KE_BAD_ACPI_TABLES);
+            KeFatalError(KE_PANIC_BAD_SYSTEM_TABLE);
         }
 
         /* Calculate the current index for this entry (should realistically be 0 for most
@@ -147,7 +147,7 @@ static void CacheTable(void) {
                 VID_MESSAGE_ERROR,
                 "Kernel HAL",
                 "couldn't allocate memory for an ACPI table cache entry\n");
-            KeFatalError(KE_OUT_OF_MEMORY);
+            KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
         }
 
         Entry->SdtHeader = Header;
@@ -166,7 +166,7 @@ static void CacheTable(void) {
     SdtHeader *Header = MmMapSpace(Address, MM_PAGE_SIZE);
     if (!Header) {
         VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "couldn't map the DSDT\n");
-        KeFatalError(KE_OUT_OF_MEMORY);
+        KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
     }
 
     if (Header->Length > MM_PAGE_SIZE) {
@@ -175,13 +175,13 @@ static void CacheTable(void) {
         Header = MmMapSpace(Address, Length);
         if (!Header) {
             VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "couldn't map the DSDT\n");
-            KeFatalError(KE_OUT_OF_MEMORY);
+            KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
         }
     }
 
     if (!Checksum((char *)Header, Header->Length) || memcmp(Header->Signature, "DSDT", 4)) {
         VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "bad checksum or signature on the DSDT\n");
-        KeFatalError(KE_BAD_ACPI_TABLES);
+        KeFatalError(KE_PANIC_BAD_SYSTEM_TABLE);
     }
 
     CacheEntry *Entry = MmAllocatePool(sizeof(CacheEntry), "KAcp");
@@ -190,7 +190,7 @@ static void CacheTable(void) {
             VID_MESSAGE_ERROR,
             "Kernel HAL",
             "couldn't allocate memory for the cache entry for the DSDT\n");
-        KeFatalError(KE_OUT_OF_MEMORY);
+        KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
     }
 
     Entry->SdtHeader = Header;

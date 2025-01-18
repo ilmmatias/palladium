@@ -13,11 +13,93 @@ typedef struct {
     void (*Handler)(HalRegisterState *);
 } IdtHandler;
 
+extern void EvpHandleClock(HalRegisterState *);
 extern void EvpHandleEvents(HalRegisterState *);
+
 extern uint64_t HalpInterruptHandlerTable[256];
 
-extern KeSpinLock KiPanicLock;
-extern uint32_t KiPanicLockedProcessors;
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function handles non-maskable interrupts, such as a hardware/memory failure, or a
+ *     watchdog timer.
+ *
+ * PARAMETERS:
+ *     State - I/O; Pointer into the stack to where the current register state was saved.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+static void HandleNmi(HalRegisterState *) {
+    KeProcessor *Processor = (KeProcessor *)HalGetCurrentProcessor();
+
+    /* Just halt execution if we got here from HalpFreezeProcessor. */
+    if (Processor->EventStatus == KE_EVENT_FREEZE) {
+        while (1) {
+            HalpStopProcessor();
+        }
+    }
+
+    /* Or panic if we didn't (hardware failure probably). */
+    KeFatalError(KE_PANIC_NMI_HARDWARE_FAILURE);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function handles page faults/invalid memory accesses.
+ *
+ * PARAMETERS:
+ *     State - I/O; Pointer into the stack to where the current register state was saved.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+static void HandlePageFault(HalRegisterState *) {
+    KeFatalError(KE_PANIC_PAGE_FAULT_NOT_HANDLED);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function handles system exceptions and traps.
+ *
+ * PARAMETERS:
+ *     State - I/O; Pointer into the stack to where the current register state was saved.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+static void HandleTrap(HalRegisterState *) {
+    KeFatalError(KE_PANIC_TRAP_NOT_HANDLED);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function handles system service calls, like IRQs and IPIs.
+ *
+ * PARAMETERS:
+ *     State - I/O; Pointer into the stack to where the current register state was saved.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+static void HandleService(HalRegisterState *State) {
+    KeProcessor *Processor = (KeProcessor *)HalGetCurrentProcessor();
+    KeIrql Irql = KeRaiseIrql(Processor->IdtIrqlSlots[State->InterruptNumber]);
+    __asm__ volatile("sti");
+
+    RtSList *ListHeader = Processor->IdtSlots[State->InterruptNumber - 32].ListHead.Next;
+    if (ListHeader) {
+        while (ListHeader) {
+            CONTAINING_RECORD(ListHeader, IdtHandler, ListHeader)->Handler(State);
+            ListHeader = ListHeader->Next;
+        }
+    } else {
+        KeFatalError(KE_PANIC_SYSTEM_SERVICE_NOT_HANDLED);
+    }
+
+    HalpSendEoi();
+    __asm__ volatile("cli");
+    KeLowerIrql(Irql);
+}
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -31,87 +113,15 @@ extern uint32_t KiPanicLockedProcessors;
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void HalpInterruptHandler(HalRegisterState *State) {
-    KeProcessor *Processor = (KeProcessor *)HalGetCurrentProcessor();
-
-    if (State->InterruptNumber < 32) {
-        /* We don't care about the current IRQL, reset it to DISPATCH, or most functions we want
-         * to use won't work. */
-        HalpSetIrql(KE_IRQL_DISPATCH);
-
-        /* This should just halt if someone else already panicked; No need for LockGuard, we're
-         * not releasing this. */
-        __atomic_add_fetch(&KiPanicLockedProcessors, 1, __ATOMIC_SEQ_CST);
-        KeAcquireSpinLock(&KiPanicLock);
-
-        /* Panics always halt everyone (the system isn't in a safe state anymore). */
-        for (uint32_t i = 0; i < HalpProcessorCount; i++) {
-            if (HalpProcessorList[i] != Processor) {
-                HalpProcessorList[i]->EventStatus = KE_PANIC_EVENT;
-                HalpNotifyProcessor(HalpProcessorList[i], 0);
-            }
-        }
-
-        /* Wait until everyone is halted; We don't want any processor doing anything if we
-         * crashed. */
-        for (int i = 0; i < 10; i++) {
-            if (__atomic_load_n(&KiPanicLockedProcessors, __ATOMIC_RELAXED) == HalpProcessorCount) {
-                break;
-            }
-
-            HalWaitTimer(100 * EV_MILLISECS);
-        }
-
-        char ErrorMessage[256];
-        snprintf(
-            ErrorMessage,
-            256,
-            "Processor %u received exception %llu\n",
-            Processor,
-            HalGetCurrentProcessor()->ApicId);
-
-        VidSetColor(VID_COLOR_PANIC);
-        VidPutString("CANNOT SAFELY RECOVER OPERATION\n");
-        VidPutString(ErrorMessage);
-
-        RtContext Context;
-        RtSaveContext(&Context);
-        VidPutString("\nSTACK TRACE:\n");
-
-        while (1) {
-            KiDumpSymbol((void *)Context.Rip);
-
-            if (Context.Rip < MM_PAGE_SIZE) {
-                break;
-            }
-
-            uint64_t ImageBase = RtLookupImageBase(Context.Rip);
-            RtVirtualUnwind(
-                RT_UNW_FLAG_NHANDLER,
-                ImageBase,
-                Context.Rip,
-                RtLookupFunctionEntry(ImageBase, Context.Rip),
-                &Context,
-                NULL,
-                NULL);
-        }
-
-        while (1) {
-            HalpStopProcessor();
-        }
+    if (State->InterruptNumber == 2) {
+        HandleNmi(State);
+    } else if (State->InterruptNumber == 14) {
+        HandlePageFault(State);
+    } else if (State->InterruptNumber < 32) {
+        HandleTrap(State);
+    } else {
+        HandleService(State);
     }
-
-    KeIrql Irql = KeRaiseIrql(Processor->IdtIrqlSlots[State->InterruptNumber]);
-    __asm__ volatile("sti");
-
-    RtSList *ListHeader = Processor->IdtSlots[State->InterruptNumber - 32].ListHead.Next;
-    while (ListHeader) {
-        CONTAINING_RECORD(ListHeader, IdtHandler, ListHeader)->Handler(State);
-        ListHeader = ListHeader->Next;
-    }
-
-    HalpSendEoi();
-    __asm__ volatile("cli");
-    KeLowerIrql(Irql);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -225,8 +235,8 @@ uint8_t HalInstallInterruptHandler(void (*Handler)(HalRegisterState *), KeIrql T
  *-----------------------------------------------------------------------------------------------*/
 void *HalpEnterCriticalSection(void) {
     uint64_t Flags;
-    __asm__ volatile("pushfq; pop %0; cli" : "=r"(Flags));
-    return (void *)(Flags & 0x200);
+    __asm__ volatile("pushfq; cli; pop %0" : "=r"(Flags) : : "memory");
+    return (void *)Flags;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -240,7 +250,5 @@ void *HalpEnterCriticalSection(void) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void HalpLeaveCriticalSection(void *Context) {
-    if (Context) {
-        __asm__ volatile("sti");
-    }
+    __asm__ volatile("push %0; popf" : : "rm"(Context) : "memory", "cc");
 }

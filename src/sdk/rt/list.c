@@ -100,7 +100,7 @@ void RtAppendDList(RtDList *Head, RtDList *Entry) {
  *     Head - Header entry of the list.
  *
  * RETURN VALUE:
- *     NULL if the list was entry, what we removed otherwise.
+ *     The list header itself if the list was entry, what we removed otherwise.
  *-----------------------------------------------------------------------------------------------*/
 RtDList *RtPopDList(RtDList *Head) {
     RtDList *Entry = Head->Next;
@@ -117,7 +117,7 @@ RtDList *RtPopDList(RtDList *Head) {
  *     Head - Header entry of the list.
  *
  * RETURN VALUE:
- *     NULL if the list was entry, what we removed otherwise.
+ *     The list header itself if the list was entry, what we removed otherwise.
  *-----------------------------------------------------------------------------------------------*/
 RtDList *RtTruncateDList(RtDList *Head) {
     RtDList *Entry = Head->Prev;

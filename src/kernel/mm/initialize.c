@@ -196,7 +196,7 @@ void MiReleaseBootRegions(KiLoaderBlock *LoaderBlock) {
                 VID_MESSAGE_ERROR,
                 "Kernel",
                 "couldn't allocate space for copying a memory descriptor\n");
-            KeFatalError(KE_OUT_OF_MEMORY);
+            KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
         }
 
         memcpy(&Target->Descriptor, Entry, sizeof(MiMemoryDescriptor));

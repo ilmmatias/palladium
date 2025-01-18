@@ -19,7 +19,7 @@
 extern "C" void DriverEntry(void) {
     SdtHeader *Header = AcpipFindTable("DSDT", 0);
     if (!Header) {
-        AcpipShowErrorMessage(KE_BAD_ACPI_TABLES, "couldn't find the DSDT table\n");
+        AcpipShowErrorMessage(KE_PANIC_BAD_SYSTEM_TABLE, "couldn't find the DSDT table\n");
     }
 
     AcpipInitializeBuiltin();

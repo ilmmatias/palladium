@@ -54,13 +54,13 @@ void HalpInitializeHpet(void) {
     HpetHeader *Hpet = KiFindAcpiTable("HPET", 0);
     if (!Hpet) {
         VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "couldn't find the HPET table\n");
-        KeFatalError(KE_BAD_ACPI_TABLES);
+        KeFatalError(KE_PANIC_BAD_SYSTEM_TABLE);
     }
 
     HpetAddress = MmMapSpace(Hpet->Address, MM_PAGE_SIZE);
     if (!HpetAddress) {
         VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "couldn't map the HPET table\n");
-        KeFatalError(KE_BAD_ACPI_TABLES);
+        KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
     }
 
     uint64_t Caps = ReadHpetRegister(HPET_CAP_REG);

@@ -94,7 +94,7 @@ void HalpInitializeIoapic(void) {
     MadtHeader *Madt = KiFindAcpiTable("APIC", 0);
     if (!Madt) {
         VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "couldn't find the MADT table\n");
-        KeFatalError(KE_BAD_ACPI_TABLES);
+        KeFatalError(KE_PANIC_BAD_SYSTEM_TABLE);
     }
 
     char *Position = (char *)(Madt + 1);
@@ -107,7 +107,7 @@ void HalpInitializeIoapic(void) {
                 if (!Entry) {
                     VidPrint(
                         VID_MESSAGE_ERROR, "Kernel HAL", "couldn't allocate space for an IOAPIC\n");
-                    KeFatalError(KE_OUT_OF_MEMORY);
+                    KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
                 }
 
                 Entry->Id = Record->Ioapic.IoapicId;
@@ -115,7 +115,7 @@ void HalpInitializeIoapic(void) {
                 Entry->VirtualAddress = MmMapSpace(Record->Ioapic.Address, MM_PAGE_SIZE);
                 if (!Entry->VirtualAddress) {
                     VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "couldn't map an IOAPIC\n");
-                    KeFatalError(KE_OUT_OF_MEMORY);
+                    KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
                 }
 
                 /* Set some sane defaults for all IOAPICs we find. */
@@ -146,7 +146,7 @@ void HalpInitializeIoapic(void) {
                         VID_MESSAGE_ERROR,
                         "Kernel HAL",
                         "couldn't allocate space for an IOAPIC source override\n");
-                    KeFatalError(KE_OUT_OF_MEMORY);
+                    KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
                 }
 
                 Entry->Irq = Record->IoapicSourceOverride.IrqSource;

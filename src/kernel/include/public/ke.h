@@ -12,18 +12,25 @@
 #error "Undefined ARCH for the kernel module!"
 #endif /* ARCH */
 
-#define KE_NO_EVENT 0
-#define KE_PANIC_EVENT 1
-#define KE_INVALIDATE_PAGE_EVENT 2
+#define KE_EVENT_NONE 0
+#define KE_EVENT_FREEZE 1
 
-#define KE_FATAL_ERROR 0
-#define KE_BAD_ACPI_TABLES 1
-#define KE_BAD_POOL_HEADER 2
-#define KE_DOUBLE_POOL_FREE 3
-#define KE_DOUBLE_PAGE_FREE 4
-#define KE_OUT_OF_MEMORY 5
-#define KE_WRONG_IRQL 6
-#define KE_PANIC_COUNT 7
+#define KE_PANIC_MANUALLY_INITIATED_CRASH 0
+#define KE_PANIC_IRQL_NOT_LESS_OR_EQUAL 1
+#define KE_PANIC_IRQL_NOT_GREATER_OR_EQUAL 2
+#define KE_PANIC_IRQL_NOT_DISPATCH 3
+#define KE_PANIC_SPIN_LOCK_ALREADY_OWNED 4
+#define KE_PANIC_SPIN_LOCK_NOT_OWNED 5
+#define KE_PANIC_EXCEPTION_NOT_HANDLED 6
+#define KE_PANIC_TRAP_NOT_HANDLED 7
+#define KE_PANIC_PAGE_FAULT_NOT_HANDLED 8
+#define KE_PANIC_SYSTEM_SERVICE_NOT_HANDLED 9
+#define KE_PANIC_NMI_HARDWARE_FAILURE 10
+#define KE_PANIC_INSTALL_MORE_MEMORY 11
+#define KE_PANIC_BAD_PFN_HEADER 12
+#define KE_PANIC_BAD_POOL_HEADER 13
+#define KE_PANIC_BAD_SYSTEM_TABLE 14
+#define KE_PANIC_COUNT 15
 
 #if defined(ARCH_amd64)
 #define KE_IRQL_PASSIVE 0
@@ -65,7 +72,7 @@ KeIrql KeAcquireSpinLock(KeSpinLock *Lock);
 void KeReleaseSpinLock(KeSpinLock *Lock, KeIrql NewIrql);
 int KeTestSpinLock(KeSpinLock *Lock);
 
-[[noreturn]] void KeFatalError(int Message);
+[[noreturn]] void KeFatalError(uint32_t Message);
 
 #ifdef __cplusplus
 }

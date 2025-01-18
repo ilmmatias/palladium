@@ -110,7 +110,7 @@ void HalpInitializeApic(void) {
     MadtHeader *Madt = KiFindAcpiTable("APIC", 0);
     if (!Madt) {
         VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "couldn't find the MADT table\n");
-        KeFatalError(KE_BAD_ACPI_TABLES);
+        KeFatalError(KE_PANIC_BAD_SYSTEM_TABLE);
     }
 
     /* x2APIC uses MSRs instead of the LAPIC address, so Read/WriteRegister needs to know if we
@@ -137,7 +137,7 @@ void HalpInitializeApic(void) {
                 if (!Entry) {
                     VidPrint(
                         VID_MESSAGE_ERROR, "Kernel HAL", "couldn't allocate space for a LAPIC\n");
-                    KeFatalError(KE_OUT_OF_MEMORY);
+                    KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
                 }
 
                 Entry->ApicId = Record->Lapic.ApicId;
@@ -166,7 +166,7 @@ void HalpInitializeApic(void) {
                 if (!Entry) {
                     VidPrint(
                         VID_MESSAGE_ERROR, "Kernel HAL", "couldn't allocate space for a x2APIC\n");
-                    KeFatalError(KE_OUT_OF_MEMORY);
+                    KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
                 }
 
                 Entry->ApicId = Record->X2Apic.X2ApicId;
@@ -197,7 +197,7 @@ void HalpInitializeApic(void) {
         LapicAddress = MmMapSpace(ReadMsr(0x1B) & ~0xFFF, MM_PAGE_SIZE);
         if (!LapicAddress) {
             VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "couldn't map the LAPIC\n");
-            KeFatalError(KE_OUT_OF_MEMORY);
+            KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
         }
     }
 }
@@ -250,6 +250,25 @@ void HalpSendIpi(uint32_t Target, uint32_t Vector) {
     } else {
         HalpWriteLapicRegister(0x310, Target << 24);
         HalpWriteLapicRegister(0x300, Vector);
+    }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function sends an non-maskable interrupt to another processor.
+ *
+ * PARAMETERS:
+ *     Target - APIC ID of the target.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void HalpSendNmi(uint32_t Target) {
+    if (X2ApicEnabled) {
+        HalpWriteLapicRegister(0x300, ((uint64_t)Target << 32) | 0x400);
+    } else {
+        HalpWriteLapicRegister(0x310, Target << 24);
+        HalpWriteLapicRegister(0x300, 0x400);
     }
 }
 

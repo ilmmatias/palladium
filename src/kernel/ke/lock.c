@@ -30,7 +30,7 @@ void KeInitializeSpinLock(KeSpinLock *Lock) {
  *-----------------------------------------------------------------------------------------------*/
 int KeTryAcquireSpinLock(KeSpinLock *Lock) {
     if (KeGetIrql() != KE_IRQL_DISPATCH) {
-        KeFatalError(KE_WRONG_IRQL);
+        KeFatalError(KE_PANIC_IRQL_NOT_DISPATCH);
     }
 
     return !__atomic_load_n(Lock, __ATOMIC_RELAXED) &&
@@ -67,9 +67,8 @@ KeIrql KeAcquireSpinLock(KeSpinLock *Lock) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function releases a given spin lock. This will crash if you're at an
- *     IRQL below DISPATCH (DPC); For those cases, install a DPC for the task that needs the
- *     spinlock.
+ *     This function releases a given spin lock. We assume the caller is at DISPATCH
+ *     level, if not, we crash.
  *
  * PARAMETERS:
  *     Lock - Struct containing the lock.
@@ -79,6 +78,10 @@ KeIrql KeAcquireSpinLock(KeSpinLock *Lock) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void KeReleaseSpinLock(KeSpinLock *Lock, KeIrql NewIrql) {
+    if (KeGetIrql() != KE_IRQL_DISPATCH) {
+        KeFatalError(KE_PANIC_IRQL_NOT_DISPATCH);
+    }
+
     __atomic_clear(Lock, __ATOMIC_RELEASE);
     KeLowerIrql(NewIrql);
 }
@@ -96,7 +99,7 @@ void KeReleaseSpinLock(KeSpinLock *Lock, KeIrql NewIrql) {
  *-----------------------------------------------------------------------------------------------*/
 int KeTestSpinLock(KeSpinLock *Lock) {
     if (KeGetIrql() != KE_IRQL_DISPATCH) {
-        KeFatalError(KE_WRONG_IRQL);
+        KeFatalError(KE_PANIC_IRQL_NOT_DISPATCH);
     }
 
     return __atomic_load_n(Lock, __ATOMIC_RELAXED);

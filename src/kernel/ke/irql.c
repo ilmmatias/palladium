@@ -31,7 +31,7 @@ KeIrql KeGetIrql(void) {
 KeIrql KeRaiseIrql(KeIrql NewIrql) {
     KeIrql Irql = HalpGetIrql();
     if (NewIrql < Irql) {
-        KeFatalError(KE_WRONG_IRQL);
+        KeFatalError(KE_PANIC_IRQL_NOT_GREATER_OR_EQUAL);
     }
 
     HalpSetIrql(NewIrql);
@@ -51,7 +51,7 @@ KeIrql KeRaiseIrql(KeIrql NewIrql) {
  *-----------------------------------------------------------------------------------------------*/
 void KeLowerIrql(KeIrql NewIrql) {
     if (HalpGetIrql() < NewIrql) {
-        KeFatalError(KE_WRONG_IRQL);
+        KeFatalError(KE_PANIC_IRQL_NOT_LESS_OR_EQUAL);
     }
 
     HalpSetIrql(NewIrql);

@@ -129,7 +129,7 @@ extern "C" void *MmAllocatePool(size_t Size, const char Tag[4]) {
             CONTAINING_RECORD(RtPopSList(&SmallBlocks[i - 1]), PoolHeader, ListHeader);
 
         if (Header->Head != i) {
-            KeFatalError(KE_BAD_POOL_HEADER);
+            KeFatalError(KE_PANIC_BAD_POOL_HEADER);
         }
 
         Header->Head = Head;
@@ -195,11 +195,11 @@ extern "C" void MmFreePool(void *Base, const char Tag[4]) {
     PoolHeader *Header = (PoolHeader *)Base - 1;
 
     if (memcmp(Header->Tag, Tag, 4) || Header->Head < 1 || Header->Head >= SMALL_BLOCK_COUNT) {
-        KeFatalError(KE_BAD_POOL_HEADER);
+        KeFatalError(KE_PANIC_BAD_POOL_HEADER);
     }
 
     if (Header->ListHeader.Next) {
-        KeFatalError(KE_DOUBLE_POOL_FREE);
+        KeFatalError(KE_PANIC_BAD_POOL_HEADER);
     }
 
     RtPushSList(&SmallBlocks[Header->Head - 1], &Header->ListHeader);

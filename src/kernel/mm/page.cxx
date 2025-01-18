@@ -32,7 +32,7 @@ extern "C" uint64_t MmAllocatePage(void) {
         MiFreePageListHead = Page->NextPage;
 
         if (Page->References != 0) {
-            KeFatalError(KE_BAD_POOL_HEADER);
+            KeFatalError(KE_PANIC_BAD_PFN_HEADER);
         }
 
         Page->References = 1;
@@ -75,7 +75,7 @@ extern "C" void MmDereferencePage(uint64_t PhysicalAddress) {
     MiPageEntry *Entry = &MiPageList[PhysicalAddress >> MM_PAGE_SHIFT];
 
     if (!Entry->References--) {
-        KeFatalError(KE_DOUBLE_PAGE_FREE);
+        KeFatalError(KE_PANIC_BAD_PFN_HEADER);
     }
 
     if (Entry->References) {

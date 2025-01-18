@@ -5,21 +5,27 @@
 #include <ki.h>
 #include <mm.h>
 #include <rt/except.h>
-#include <vid.h>
+#include <vidp.h>
 
-static char *Messages[] = {
-    "An unspecified (but fatal) error occurred.\n",
-    ("Your computer does not have compliant ACPI tables.\n"
-     "Check with your system's manufacturer for a BIOS update.\n"),
-    "The kernel pool allocator data has been corrupted.\n",
-    "The kernel or a driver tried freeing the same pool data twice.\n",
-    "The kernel or a driver tried freeing the same page twice.\n",
-    "No memory left for an unpagable kernel allocation.\n",
-    "The kernel or a driver tried using a function in the wrong context.\n",
+static const char *Messages[] = {
+    "MANUALLY_INITIATED_CRASH",
+    "IRQL_NOT_LESS_OR_EQUAL",
+    "IRQL_NOT_GREATER_OR_EQUAL",
+    "IRQL_NOT_DISPATCH",
+    "SPIN_LOCK_ALREADY_OWNED",
+    "SPIN_LOCK_NOT_OWNED",
+    "EXCEPTION_NOT_HANDLED",
+    "TRAP_NOT_HANDLED",
+    "PAGE_FAULT_NOT_HANDLED",
+    "SYSTEM_SERVICE_NOT_HANDLED",
+    "NMI_HARDWARE_FAILURE",
+    "INSTALL_MORE_MEMORY",
+    "BAD_PFN_HEADER",
+    "BAD_POOL_HEADER",
+    "BAD_SYSTEM_TABLE",
 };
 
-KeSpinLock KiPanicLock = {0};
-uint32_t KiPanicLockedProcessors = 0;
+static uint64_t Lock = 0;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -32,48 +38,45 @@ uint32_t KiPanicLockedProcessors = 0;
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-[[noreturn]] void KeFatalError(int Message) {
+[[noreturn]] void KeFatalError(uint32_t Message) {
     KeProcessor *Processor = (KeProcessor *)HalGetCurrentProcessor();
 
-    /* We don't care about the current IRQL, reset it to DISPATCH, or most functions we want to use
-     * won't work. */
+    /* Let's prevent a possible exception/crash inside our crash handler. */
+    if (Message >= KE_PANIC_COUNT) {
+        Message = KE_PANIC_MANUALLY_INITIATED_CRASH;
+    }
+
+    /* Disable maskable interrupts, and raise the IRQL to the max (so we can be sure nothing
+     * will interrupts us). */
     HalpEnterCriticalSection();
     HalpSetIrql(KE_IRQL_DISPATCH);
 
-    /* This should just halt if someone else already panicked; No need for LockGuard, we're
-     * not releasing this. */
-    __atomic_add_fetch(&KiPanicLockedProcessors, 1, __ATOMIC_SEQ_CST);
-    KeAcquireSpinLock(&KiPanicLock);
+    /* Someone might have reached this handler before us (while we reached here before they sent
+     * the panic event), hang ourselves if that't the case. */
+    if (__atomic_fetch_add(&Lock, 1, __ATOMIC_SEQ_CST)) {
+        while (1) {
+            HalpStopProcessor();
+        }
+    }
 
-    /* Panics always halt everyone (the system isn't in a safe state anymore). */
+    /* We're the first to get here, freeze everyone else before continuing. */
     for (uint32_t i = 0; i < HalpProcessorCount; i++) {
         if (HalpProcessorList[i] != Processor) {
-            HalpProcessorList[i]->EventStatus = KE_PANIC_EVENT;
-            HalpNotifyProcessor(HalpProcessorList[i], 0);
+            HalpFreezeProcessor(HalpProcessorList[i]);
         }
     }
 
-    /* Wait until everyone is halted; We don't want any processor doing anything if we crashed. */
-    for (int i = 0; i < 10; i++) {
-        if (__atomic_load_n(&KiPanicLockedProcessors, __ATOMIC_RELAXED) == HalpProcessorCount) {
-            break;
-        }
-
-        HalWaitTimer(100 * EV_MILLISECS);
-    }
-
-    if (Message < KE_FATAL_ERROR || Message >= KE_PANIC_COUNT) {
-        Message = KE_FATAL_ERROR;
-    }
-
+    /* Setup the panic screen, and show the basic message + error code. */
     VidSetColor(VID_COLOR_PANIC);
-    VidPutString("CANNOT SAFELY RECOVER OPERATION\n");
+    VidResetDisplay();
+    VidPutString("*** STOP: ");
     VidPutString(Messages[Message]);
+    VidPutString("\n");
 
+    /* And a backtrace of all frames we can obtain from the stack. */
+    VidPutString("*** STACK TRACE:\n");
     RtContext Context;
     RtSaveContext(&Context);
-    VidPutString("\nSTACK TRACE:\n");
-
     while (1) {
         KiDumpSymbol((void *)Context.Rip);
 
