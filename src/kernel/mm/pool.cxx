@@ -18,6 +18,8 @@ typedef struct {
 
 extern "C" {
 extern MiPageEntry *MiPageList;
+extern RtDList MiFreePageListHead;
+extern KeSpinLock MiPageListLock;
 
 RtSList SmallBlocks[SMALL_BLOCK_COUNT] = {};
 
@@ -38,7 +40,7 @@ static KeSpinLock Lock = {0};
  * RETURN VALUE:
  *     Virtual (mapped) pointer to the allocated space, or NULL if we failed to allocate it.
  *-----------------------------------------------------------------------------------------------*/
-static void *AllocatePoolPages(uint32_t Pages) {
+static void *AllocatePoolPages(uint64_t Pages) {
     uint64_t Offset = RtFindClearBitsAndSet(&MiPoolBitmap, MiPoolBitmapHint, Pages);
     if (Offset == (uint64_t)-1) {
         return NULL;
@@ -47,15 +49,19 @@ static void *AllocatePoolPages(uint32_t Pages) {
     MiPoolBitmapHint = Offset + Pages;
 
     char *VirtualAddress = (char *)MiPoolStart + (Offset << MM_PAGE_SHIFT);
-    for (uint32_t i = 0; i < Pages; i++) {
-        uint64_t PhysicalAddress = MmAllocatePage();
+    for (uint64_t i = 0; i < Pages; i++) {
+        uint64_t PhysicalAddress = MmAllocateSinglePage();
         if (!PhysicalAddress ||
             !HalpMapPage(VirtualAddress + (i << MM_PAGE_SHIFT), PhysicalAddress, MI_MAP_WRITE)) {
             return NULL;
         }
 
-        if (!i) {
-            MiPageList[PhysicalAddress >> MM_PAGE_SHIFT].Pages = Pages;
+        MiPageEntry *Entry = &MI_PAGE_ENTRY(PhysicalAddress);
+        if (i) {
+            Entry->Flags |= MI_PAGE_FLAGS_POOL_ITEM;
+        } else {
+            Entry->Flags |= MI_PAGE_FLAGS_POOL_BASE;
+            Entry->Pages = Pages;
         }
     }
 
@@ -73,13 +79,29 @@ static void *AllocatePoolPages(uint32_t Pages) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 static void FreePoolPages(void *Base) {
-    uint64_t FirstPhysicalAddress = HalpGetPhysicalAddress(Base);
-    uint32_t Pages = MiPageList[FirstPhysicalAddress >> MM_PAGE_SHIFT].Pages;
+    SpinLockGuard Guard(&MiPageListLock);
 
-    for (uint32_t i = 0; i < Pages; i++) {
-        MmDereferencePage(HalpGetPhysicalAddress((char *)Base + (i << MM_PAGE_SHIFT)));
+    MiPageEntry *BaseEntry = &MI_PAGE_ENTRY(HalpGetPhysicalAddress(Base));
+    if (!(BaseEntry->Flags & MI_PAGE_FLAGS_USED) || !(BaseEntry->Flags & MI_PAGE_FLAGS_POOL_BASE)) {
+        KeFatalError(KE_PANIC_BAD_PFN_HEADER);
     }
 
+    uint32_t Pages = BaseEntry->Pages;
+    BaseEntry->Flags = 0;
+    RtPushDList(&MiFreePageListHead, &BaseEntry->ListHeader);
+
+    for (uint32_t Offset = MM_PAGE_SIZE; Offset < Pages << MM_PAGE_SHIFT; Offset += MM_PAGE_SIZE) {
+        MiPageEntry *ItemEntry = &MI_PAGE_ENTRY(HalpGetPhysicalAddress((char *)Base + Offset));
+        if (!(ItemEntry->Flags & MI_PAGE_FLAGS_USED) ||
+            !(ItemEntry->Flags & MI_PAGE_FLAGS_POOL_ITEM)) {
+            KeFatalError(KE_PANIC_BAD_PFN_HEADER);
+        }
+
+        ItemEntry->Flags = 0;
+        RtPushDList(&MiFreePageListHead, &ItemEntry->ListHeader);
+    }
+
+    Guard.Release();
     RtClearBits(&MiPoolBitmap, ((uint64_t)Base - MiPoolStart) >> MM_PAGE_SHIFT, Pages);
 }
 
@@ -106,7 +128,7 @@ extern "C" void *MmAllocatePool(size_t Size, const char Tag[4]) {
        pointer size isn't 64-bits. */
     uint32_t Head = (Size + 0x0F) >> 4;
     if (Head > SMALL_BLOCK_COUNT) {
-        uint32_t Pages = (Size + MM_PAGE_SIZE - 1) >> MM_PAGE_SHIFT;
+        uint64_t Pages = (Size + MM_PAGE_SIZE - 1) >> MM_PAGE_SHIFT;
         void *Base = AllocatePoolPages(Pages);
 
         /* We don't need locking from here on out (we'd just be wasting time). */
@@ -194,11 +216,8 @@ extern "C" void MmFreePool(void *Base, const char Tag[4]) {
 
     PoolHeader *Header = (PoolHeader *)Base - 1;
 
-    if (memcmp(Header->Tag, Tag, 4) || Header->Head < 1 || Header->Head >= SMALL_BLOCK_COUNT) {
-        KeFatalError(KE_PANIC_BAD_POOL_HEADER);
-    }
-
-    if (Header->ListHeader.Next) {
+    if (memcmp(Header->Tag, Tag, 4) || Header->Head < 1 || Header->Head >= SMALL_BLOCK_COUNT ||
+        Header->ListHeader.Next) {
         KeFatalError(KE_PANIC_BAD_POOL_HEADER);
     }
 

@@ -22,7 +22,10 @@ class SpinLockGuard {
      *-----------------------------------------------------------------------------------------------*/
     SpinLockGuard(KeSpinLock *Lock) {
         m_lock = Lock;
-        m_irql = KeAcquireSpinLock(Lock);
+
+        if (m_lock) {
+            m_irql = KeAcquireSpinLock(Lock);
+        }
     }
 
     ~SpinLockGuard(void) {

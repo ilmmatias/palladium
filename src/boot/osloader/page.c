@@ -23,7 +23,7 @@ static OslpMemoryDescriptor OslpMemoryDescriptors[256];
  * RETURN VALUE:
  *     1 if we don't need to InsertDescriptor(), 0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-static int TryMergeDescriptors(uint8_t Type, uint32_t BasePage, uint32_t PageCount) {
+static int TryMergeDescriptors(uint8_t Type, uint64_t BasePage, uint64_t PageCount) {
     RtDList *ListHeader = OslpMemoryDescriptorListHead.Next;
     OslpMemoryDescriptor *OtherEntry = NULL;
     OslpMemoryDescriptor *Entry = NULL;
@@ -163,10 +163,10 @@ EFI_STATUS OslpInitializeMemoryMap(void) {
 
     for (UINTN i = 0; i < MemoryMapSize; i += DescriptorSize) {
         EFI_MEMORY_DESCRIPTOR *SourceDescriptor = (EFI_MEMORY_DESCRIPTOR *)((UINTN)MemoryMap + i);
-        uint32_t BasePage =
+        uint64_t BasePage =
             (SourceDescriptor->PhysicalStart + DEFAULT_PAGE_ALLOCATION_GRANULARITY - 1) /
             DEFAULT_PAGE_ALLOCATION_GRANULARITY;
-        uint32_t PageCount = ((SourceDescriptor->NumberOfPages << EFI_PAGE_SHIFT) +
+        uint64_t PageCount = ((SourceDescriptor->NumberOfPages << EFI_PAGE_SHIFT) +
                               DEFAULT_PAGE_ALLOCATION_GRANULARITY - 1) /
                              DEFAULT_PAGE_ALLOCATION_GRANULARITY;
 
@@ -205,7 +205,7 @@ EFI_STATUS OslpInitializeMemoryMap(void) {
 
         /* We really shouldn't be messing with the low 64KiB (mark it as PAGE_LOW_MEMORY). */
         if (Type == PAGE_FREE && BasePage < 16) {
-            uint32_t LowPages = 16 - BasePage;
+            uint64_t LowPages = 16 - BasePage;
 
             if (LowPages > PageCount) {
                 LowPages = PageCount;
@@ -279,7 +279,7 @@ EFI_STATUS OslpInitializeMemoryMap(void) {
  *     Base address of the allocation, or NULL if there is no memory left.
  *-----------------------------------------------------------------------------------------------*/
 void *OslAllocatePages(uint64_t Size, uint8_t Type) {
-    uint32_t Pages =
+    uint64_t Pages =
         (Size + DEFAULT_PAGE_ALLOCATION_GRANULARITY - 1) / DEFAULT_PAGE_ALLOCATION_GRANULARITY;
 
     if (Type != PAGE_LOADED_PROGRAM && Type != PAGE_OSLOADER && Type != PAGE_BOOT_PROCESSOR &&
@@ -309,7 +309,7 @@ void *OslAllocatePages(uint64_t Size, uint8_t Type) {
                 Entry->Type = Type;
             }
         } else {
-            uint32_t BasePage = Entry->BasePage;
+            uint64_t BasePage = Entry->BasePage;
 
             /* We have some pages left, we need to update the original entry. */
             Entry->BasePage += Pages;
@@ -350,8 +350,8 @@ void *OslAllocatePages(uint64_t Size, uint8_t Type) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void OslFreePages(void *Base, uint64_t Size) {
-    uint32_t BasePage = (uintptr_t)Base / DEFAULT_PAGE_ALLOCATION_GRANULARITY;
-    uint32_t Pages =
+    uint64_t BasePage = (uintptr_t)Base / DEFAULT_PAGE_ALLOCATION_GRANULARITY;
+    uint64_t Pages =
         (Size + DEFAULT_PAGE_ALLOCATION_GRANULARITY - 1) / DEFAULT_PAGE_ALLOCATION_GRANULARITY;
 
     for (RtDList *ListHeader = OslpMemoryDescriptorListHead.Next;
@@ -391,8 +391,8 @@ void OslFreePages(void *Base, uint64_t Size) {
              *            | free |
              * The left used entry is the one we're currently sitting on, but we'll need to
              * create the right one. */
-            uint32_t OriginalBasePage = Entry->BasePage;
-            uint32_t OriginalPageCount = Entry->PageCount;
+            uint64_t OriginalBasePage = Entry->BasePage;
+            uint64_t OriginalPageCount = Entry->PageCount;
             Entry->PageCount = BasePage - Entry->BasePage;
 
             RtDList *ListHeader = RtPopDList(&OslpFreeMemoryDescriptorListHead);

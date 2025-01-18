@@ -44,8 +44,8 @@
 #error "Undefined ARCH for the kernel module!"
 #endif /* ARCH */
 
-typedef int KeSpinLock;
-typedef uintptr_t KeIrql;
+typedef uint64_t KeSpinLock;
+typedef uint64_t KeIrql;
 
 typedef struct {
     RtDList ListHeader;

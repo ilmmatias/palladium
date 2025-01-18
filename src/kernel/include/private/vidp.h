@@ -28,7 +28,10 @@ typedef struct {
 extern "C" {
 #endif /* __cplusplus */
 
-void VidpInitialize(KiLoaderBlock *LoaderBlock);
+void VidpSaveDisplayData(KiLoaderBlock *LoaderBlock);
+void VidpCreateFrontBuffer(void);
+
+void VidpAcquireOwnership(void);
 
 #ifdef __cplusplus
 }

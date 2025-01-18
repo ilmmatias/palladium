@@ -32,13 +32,20 @@ extern "C" [[noreturn]] void KiSystemStartup(uint64_t LoaderBlockPage, uint64_t 
     }
 
     if (LoaderBlockPage) {
+        /* Stage 0: Very early initialization, we need to save our memory descriptors (to allow
+         * MmMapSpace to allocate early pages if necessary), and then the display (to allow
+         * KeFatalError). */
+        MiSaveMemoryDescriptors(LoaderBlock);
+        VidpSaveDisplayData(LoaderBlock);
+
         /* Stage 1: Memory manager initialization; This won't mark the OSLOADER pages as free
          * just yet. */
-        MiInitializePool(LoaderBlock);
-        MiInitializePageAllocator(LoaderBlock);
+        MiInitializePageAllocator();
+        MiInitializePool();
 
-        /* Stage 2: Display initialization (for early debugging). */
-        VidpInitialize(LoaderBlock);
+        /* Stage 2: Late display initialization (switches from using only the back buffer to
+         * also using the front buffer). */
+        VidpCreateFrontBuffer();
 
 #ifdef NDEBUG
         VidPrint(
@@ -61,7 +68,7 @@ extern "C" [[noreturn]] void KiSystemStartup(uint64_t LoaderBlockPage, uint64_t 
         KiSaveBootStartDrivers(LoaderBlock);
 
         /* Stage 3.2: Free up all OSLOADER regions (we don't need them anymore). */
-        MiReleaseBootRegions(LoaderBlock);
+        MiReleaseBootRegions();
     }
 
     /* Stage 3.3: Early platform/arch initialization. */

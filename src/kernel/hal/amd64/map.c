@@ -4,6 +4,8 @@
 #include <mi.h>
 #include <string.h>
 
+extern MiPageEntry *MiPageList;
+
 static uint64_t *const Addresses[] = {
     (uint64_t *)0xFFFFFFFFFFFFF000,
     (uint64_t *)0xFFFFFFFFFFE00000,
@@ -66,9 +68,20 @@ int HalpMapPage(void *VirtualAddress, uint64_t PhysicalAddress, int Flags) {
         }
 
         if (!(Addresses[i][Indexes[i]] & 0x01)) {
-            uint64_t Page = MmAllocatePage();
+            uint64_t Page;
+
+            /* We're forced to use the untagged MiEarlyAllocatePages if we got here before the
+             * initialization of the memory manager. */
+            if (MiPageList) {
+                Page = MmAllocateSinglePage();
+            } else {
+                Page = (uint64_t)MiEarlyAllocatePages(NULL, 1);
+            }
+
             if (!Page) {
                 return 0;
+            } else if (!MiPageList) {
+                Page -= 0xFFFF800000000000;
             }
 
             memset((void *)(Page + 0xFFFF800000000000), 0, MM_PAGE_SIZE);
@@ -192,7 +205,7 @@ void MmUnmapSpace(void *VirtualAddress) {
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function is the equivalent of MmMapSpace for early boot.
- *     No memory allocation functions (such as MmAllocatePage) are called.
+ *     No memory allocation functions (such as MmAllocateSinglePage) are called.
  *     Addresses are assumed to be mapped to one address only (repeated calls with the same
  *     physical base will give the same virtual address), and failure to map will result in a
  *     panic.

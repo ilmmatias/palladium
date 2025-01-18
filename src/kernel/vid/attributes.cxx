@@ -11,6 +11,7 @@ extern uint32_t VidpForeground;
 extern uint16_t VidpCursorX;
 extern uint16_t VidpCursorY;
 extern KeSpinLock VidpLock;
+extern bool VidpUseLock;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -25,7 +26,7 @@ extern KeSpinLock VidpLock;
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 extern "C" void VidSetColor(uint32_t BackgroundColor, uint32_t ForegroundColor) {
-    SpinLockGuard Guard(&VidpLock);
+    SpinLockGuard Guard(VidpUseLock ? &VidpLock : NULL);
     VidpBackground = BackgroundColor;
     VidpForeground = ForegroundColor;
 }
@@ -42,7 +43,7 @@ extern "C" void VidSetColor(uint32_t BackgroundColor, uint32_t ForegroundColor) 
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 extern "C" void VidGetColor(uint32_t *BackgroundColor, uint32_t *ForegroundColor) {
-    SpinLockGuard Guard(&VidpLock);
+    SpinLockGuard Guard(VidpUseLock ? &VidpLock : NULL);
 
     if (BackgroundColor) {
         *BackgroundColor = VidpBackground;
@@ -65,7 +66,7 @@ extern "C" void VidGetColor(uint32_t *BackgroundColor, uint32_t *ForegroundColor
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 extern "C" void VidSetCursor(uint16_t X, uint16_t Y) {
-    SpinLockGuard Guard(&VidpLock);
+    SpinLockGuard Guard(VidpUseLock ? &VidpLock : NULL);
     VidpCursorX = X >= VidpWidth ? VidpWidth - 1 : X;
     VidpCursorY = Y >= VidpHeight ? VidpHeight - 1 : Y;
 }
@@ -82,7 +83,7 @@ extern "C" void VidSetCursor(uint16_t X, uint16_t Y) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 extern "C" void VidGetCursor(uint16_t *X, uint16_t *Y) {
-    SpinLockGuard Guard(&VidpLock);
+    SpinLockGuard Guard(VidpUseLock ? &VidpLock : NULL);
 
     if (X) {
         *X = VidpCursorX;

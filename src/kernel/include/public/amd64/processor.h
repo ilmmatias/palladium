@@ -9,7 +9,7 @@
 
 typedef struct {
     uint32_t ApicId;
-    int ThreadQueueLock;
+    uint64_t ThreadQueueLock;
     RtDList ThreadQueue;
     uint32_t ThreadQueueSize;
     PsThread *InitialThread;
@@ -42,7 +42,7 @@ typedef struct {
         RtSList ListHead;
         uint32_t Usage;
     } IdtSlots[224];
-    uintptr_t IdtIrqlSlots[256];
+    uint64_t IdtIrqlSlots[256];
 } KeProcessor;
 
 #endif /* _AMD64_PROCESSOR_H_ */

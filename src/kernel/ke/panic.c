@@ -49,7 +49,7 @@ static uint64_t Lock = 0;
     /* Disable maskable interrupts, and raise the IRQL to the max (so we can be sure nothing
      * will interrupts us). */
     HalpEnterCriticalSection();
-    HalpSetIrql(KE_IRQL_DISPATCH);
+    HalpSetIrql(KE_IRQL_MASK);
 
     /* Someone might have reached this handler before us (while we reached here before they sent
      * the panic event), hang ourselves if that't the case. */
@@ -66,7 +66,9 @@ static uint64_t Lock = 0;
         }
     }
 
-    /* Setup the panic screen, and show the basic message + error code. */
+    /* Acquire "ownership" of the display (disable the lock checks), setup the panic screen, and
+     * show the basic message + error code. */
+    VidpAcquireOwnership();
     VidSetColor(VID_COLOR_PANIC);
     VidResetDisplay();
     VidPutString("*** STOP: ");

@@ -31,8 +31,8 @@
 typedef struct {
     RtDList ListHeader;
     uint8_t Type;
-    uint32_t BasePage;
-    uint32_t PageCount;
+    uint64_t BasePage;
+    uint64_t PageCount;
 } OslpMemoryDescriptor;
 
 typedef struct OslpMemoryArenaEntry {

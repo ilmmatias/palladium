@@ -24,12 +24,11 @@ EXPORTS
     KeTryAcquireSpinLock
     KiFindAcpiTable
 
-    MmAllocatePage
     MmAllocatePool
-    MmDereferencePage
+    MmAllocateSinglePage
     MmFreePool
+    MmFreeSinglePage
     MmMapSpace
-    MmReferencePage
     MmUnmapSpace
 
     PsCreateThread

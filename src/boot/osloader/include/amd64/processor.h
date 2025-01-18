@@ -9,7 +9,7 @@
 /* Copy of the KeProcessor struct from src/kernel/include/public/amd64/processor.h. */
 typedef struct {
     uint32_t ApicId;
-    int ThreadQueueLock;
+    uint64_t ThreadQueueLock;
     RtDList ThreadQueue;
     uint32_t ThreadQueueSize;
     void *InitialThread;
@@ -25,7 +25,15 @@ typedef struct {
         uint16_t Limit;
         uint64_t Base;
     } GdtDescriptor;
-    char IdtEntries[4096];
+    struct __attribute__((packed)) {
+        uint16_t BaseLow;
+        uint16_t Cs;
+        uint8_t Ist;
+        uint8_t Attributes;
+        uint16_t BaseMid;
+        uint32_t BaseHigh;
+        uint32_t Reserved;
+    } IdtEntries[256];
     struct __attribute__((packed)) __attribute__((aligned(4))) {
         uint16_t Limit;
         uint64_t Base;
@@ -34,7 +42,7 @@ typedef struct {
         RtSList ListHead;
         uint32_t Usage;
     } IdtSlots[224];
-    uintptr_t IdtIrqlSlots[256];
+    uint64_t IdtIrqlSlots[256];
 } KeProcessor;
 
 #endif /* _AMD64_PROCESSOR_H_ */

@@ -19,15 +19,14 @@
 extern "C" {
 #endif /* __cplusplus */
 
-uint64_t MmAllocatePage(void);
-void MmReferencePage(uint64_t PhysicalAddress);
-void MmDereferencePage(uint64_t PhysicalAddress);
-
-void *MmAllocatePool(size_t Size, const char Tag[4]);
-void MmFreePool(void *Base, const char Tag[4]);
+uint64_t MmAllocateSinglePage();
+void MmFreeSinglePage(uint64_t PhysicalAddress);
 
 void *MmMapSpace(uint64_t PhysicalAddress, size_t Size);
 void MmUnmapSpace(void *VirtualAddress);
+
+void *MmAllocatePool(size_t Size, const char Tag[4]);
+void MmFreePool(void *Base, const char Tag[4]);
 
 #ifdef __cplusplus
 }
