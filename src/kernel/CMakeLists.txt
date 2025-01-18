@@ -25,6 +25,7 @@ endif()
 add_executable(kernel "kernel" YES
     ${SOURCES}
 
+    ev/clock.c
     ev/dispatch.cxx
     ev/dpc.cxx
     ev/types.c

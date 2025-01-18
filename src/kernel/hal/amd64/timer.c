@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <amd64/halp.h>
-#include <vid.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -31,7 +30,7 @@ void HalpInitializeApicTimer(void) {
         Accum += UINT32_MAX - HalpReadLapicRegister(0x390);
     }
 
-    /* Periodic timer, trigerring IRQ 32 (our event handler). */
+    /* Periodic timer, trigerring IRQ 32 (our clock handler). */
     HalpWriteLapicRegister(0x320, 0x20040);
     HalpWriteLapicRegister(0x3E0, 0);
     HalpWriteLapicRegister(0x380, Accum / 4);

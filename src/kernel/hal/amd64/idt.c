@@ -163,8 +163,9 @@ void HalpInitializeIdt(KeProcessor *Processor) {
     Processor->IdtDescriptor.Base = (uint64_t)Processor->IdtEntries;
     __asm__ volatile("lidt %0" : : "m"(Processor->IdtDescriptor));
 
-    /* Register the DPC/event handler. */
-    HalInstallInterruptHandlerAt(0x40, EvpHandleEvents, KE_IRQL_DISPATCH);
+    /* Register all our event handlers. */
+    HalInstallInterruptHandlerAt(0x40, EvpHandleClock, KE_IRQL_CLOCK);
+    HalInstallInterruptHandlerAt(0x41, EvpHandleEvents, KE_IRQL_DISPATCH);
 }
 
 /*-------------------------------------------------------------------------------------------------

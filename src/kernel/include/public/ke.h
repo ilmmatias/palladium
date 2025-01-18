@@ -34,9 +34,9 @@
 
 #if defined(ARCH_amd64)
 #define KE_IRQL_PASSIVE 0
-#define KE_IRQL_DISPATCH 4
-#define KE_IRQL_DEVICE 5
-#define KE_IRQL_CLOCK 14
+#define KE_IRQL_DISPATCH 1
+#define KE_IRQL_CLOCK 13
+#define KE_IRQL_IPI 14
 #define KE_IRQL_MASK 15
 
 #define KE_STACK_SIZE 0x2000

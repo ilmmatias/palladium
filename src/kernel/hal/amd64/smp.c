@@ -134,7 +134,7 @@ KeProcessor *HalGetCurrentProcessor(void) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void HalpNotifyProcessor(KeProcessor *Processor, int WaitDelivery) {
-    HalpSendIpi(Processor->ApicId, 0x40);
+    HalpSendIpi(Processor->ApicId, 0x41);
 
     if (WaitDelivery) {
         HalpWaitIpiDelivery();
