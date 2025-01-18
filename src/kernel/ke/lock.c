@@ -33,8 +33,25 @@ int KeTryAcquireSpinLock(KeSpinLock *Lock) {
         KeFatalError(KE_PANIC_IRQL_NOT_DISPATCH);
     }
 
+    /* Raise a fatal error if we already acquired this lock on the same thread (recursive/dead
+     * lock detected). */
+    uint64_t CurrentThread = 1;
+    KeProcessor *Processor = HalGetCurrentProcessor();
+
+    if (Processor && Processor->CurrentThread) {
+        CurrentThread |= (uint64_t)Processor;
+    } else if (Processor) {
+        CurrentThread |= (uint64_t)Processor->CurrentThread;
+    }
+
+    if (__atomic_load_n(Lock, __ATOMIC_RELAXED) == CurrentThread) {
+        KeFatalError(KE_PANIC_SPIN_LOCK_ALREADY_OWNED);
+    }
+
+    uint64_t DesiredValue = 0;
     return !__atomic_load_n(Lock, __ATOMIC_RELAXED) &&
-           !__atomic_test_and_set(Lock, __ATOMIC_ACQUIRE);
+           __atomic_compare_exchange_n(
+               Lock, &DesiredValue, CurrentThread, 0, __ATOMIC_SEQ_CST, __ATOMIC_ACQUIRE);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -52,8 +69,26 @@ int KeTryAcquireSpinLock(KeSpinLock *Lock) {
 KeIrql KeAcquireSpinLock(KeSpinLock *Lock) {
     KeIrql Irql = KeRaiseIrql(KE_IRQL_DISPATCH);
 
+    /* Raise a fatal error if we already acquired this lock on the same thread (recursive/dead
+     * lock detected). */
+    uint64_t CurrentThread = 1;
+    KeProcessor *Processor = HalGetCurrentProcessor();
+
+    if (Processor && Processor->CurrentThread) {
+        CurrentThread |= (uint64_t)Processor;
+    } else if (Processor) {
+        CurrentThread |= (uint64_t)Processor->CurrentThread;
+    }
+
+    if (__atomic_load_n(Lock, __ATOMIC_RELAXED) == CurrentThread) {
+        KeFatalError(KE_PANIC_SPIN_LOCK_ALREADY_OWNED);
+    }
+
     while (1) {
-        if (!__atomic_test_and_set(Lock, __ATOMIC_ACQUIRE)) {
+        uint64_t DesiredValue = 0;
+
+        if (__atomic_compare_exchange_n(
+                Lock, &DesiredValue, CurrentThread, 0, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED)) {
             break;
         }
 
@@ -82,7 +117,21 @@ void KeReleaseSpinLock(KeSpinLock *Lock, KeIrql NewIrql) {
         KeFatalError(KE_PANIC_IRQL_NOT_DISPATCH);
     }
 
-    __atomic_clear(Lock, __ATOMIC_RELEASE);
+    /* Raise a fatal error if the lock wasn't acquired by this thread too. */
+    uint64_t CurrentThread = 1;
+    KeProcessor *Processor = HalGetCurrentProcessor();
+
+    if (Processor && Processor->CurrentThread) {
+        CurrentThread |= (uint64_t)Processor;
+    } else if (Processor) {
+        CurrentThread |= (uint64_t)Processor->CurrentThread;
+    }
+
+    if (__atomic_load_n(Lock, __ATOMIC_RELAXED) != CurrentThread) {
+        KeFatalError(KE_PANIC_SPIN_LOCK_NOT_OWNED);
+    }
+
+    __atomic_store_n(Lock, 0, __ATOMIC_RELEASE);
     KeLowerIrql(NewIrql);
 }
 
@@ -102,5 +151,5 @@ int KeTestSpinLock(KeSpinLock *Lock) {
         KeFatalError(KE_PANIC_IRQL_NOT_DISPATCH);
     }
 
-    return __atomic_load_n(Lock, __ATOMIC_RELAXED);
+    return __atomic_load_n(Lock, __ATOMIC_RELAXED) != 0;
 }
