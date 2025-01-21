@@ -2,7 +2,8 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <console.h>
-#include <memory.h>
+#include <efi/spec.h>
+#include <stdint.h>
 #include <string.h>
 
 static EFI_FILE_HANDLE OslpRootVolume = NULL;
@@ -54,12 +55,11 @@ EFI_STATUS OslpInitializeRootVolume(void) {
  * PARAMETERS:
  *     Path - Path relative to the root; This needs to be in the UEFI format (using
  *            backslashes/Windows-like).
- *     Size - Size of the buffer; Use this do OslFreePages() if required.
  *
  * RETURN VALUE:
- *     Either a buffer allocated using OslAllocatePages containing all the file data, or NULL.
+ *     Either a buffer allocated using gBS->AllocatePool containing all the file data, or NULL.
  *-----------------------------------------------------------------------------------------------*/
-void *OslReadFile(const char *Path, uint64_t *Size) {
+void *OslReadFile(const char *Path) {
     size_t PathSize = strlen(Path);
     CHAR16 Path16[strlen(Path) + 1];
     Path16[PathSize] = 0;
@@ -83,19 +83,17 @@ void *OslReadFile(const char *Path, uint64_t *Size) {
     EFI_FILE_INFO *FileInfo = NULL;
 
     while (1) {
-        UINTN PreviousBufferSize = FileInfoSize;
         Status = Handle->GetInfo(Handle, &gEfiFileInfoGuid, &FileInfoSize, (VOID *)FileInfo);
         if (Status != EFI_BUFFER_TOO_SMALL) {
             break;
         }
 
         if (FileInfo) {
-            OslFreePages(FileInfo, PreviousBufferSize);
+            gBS->FreePool(FileInfo);
         }
 
-        FileInfo = OslAllocatePages(FileInfoSize, PAGE_OSLOADER);
-        if (!FileInfo) {
-            Status = EFI_OUT_OF_RESOURCES;
+        Status = gBS->AllocatePool(EfiLoaderData, FileInfoSize, (VOID **)&FileInfo);
+        if (Status != EFI_SUCCESS) {
             break;
         }
     }
@@ -107,18 +105,19 @@ void *OslReadFile(const char *Path, uint64_t *Size) {
 
     /* Now we just need to allocate enough space for the destination buffer, and we should be
      * ready to go. */
-    *Size = FileInfo->FileSize;
-    OslFreePages(FileInfo, FileInfoSize);
+    void *Buffer = NULL;
+    UINT64 BufferSize = FileInfo->FileSize;
+    gBS->FreePool(FileInfo);
 
-    void *Buffer = OslAllocatePages(*Size, PAGE_OSLOADER);
-    if (!Buffer) {
+    Status = gBS->AllocatePool(EfiLoaderData, BufferSize, &Buffer);
+    if (Status != EFI_SUCCESS) {
         Handle->Close(Handle);
         return NULL;
     }
 
-    Status = Handle->Read(Handle, Size, Buffer);
+    Status = Handle->Read(Handle, &BufferSize, Buffer);
     if (Status != EFI_SUCCESS) {
-        OslFreePages(Buffer, *Size);
+        gBS->FreePool(Buffer);
         Handle->Close(Handle);
         return NULL;
     }

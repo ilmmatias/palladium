@@ -3,37 +3,71 @@
 
 #include <amd64/halp.h>
 #include <amd64/msr.h>
+#include <mm.h>
 #include <vid.h>
+
+extern void KiInitializeBspScheduler(void);
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function runs any early arch-specific initialization routines.
+ *     This function allocates the BSP processor structure (along with its stack), and runs any
+ *     early arch-specific initialization routines required for the boot processor.
  *
  * PARAMETERS:
- *     Processor - Pointer to the processor-specific structure.
- *     IsBsp - Set this to 1 if we're the bootstrap processor, or 0 otherwise.
+ *     None.
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void HalpInitializePlatform(KeProcessor *Processor, int IsBsp) {
+[[noreturn]] void HalpInitializeBsp(void) {
+    KeProcessor *Processor = MmAllocatePool(sizeof(KeProcessor), "Halp");
+    if (!Processor) {
+        KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
+    }
+
     WriteMsr(0xC0000102, (uint64_t)Processor);
     HalpSetIrql(KE_IRQL_PASSIVE);
     HalpInitializeGdt(Processor);
     HalpInitializeIdt(Processor);
+    HalpInitializeIoapic();
+    HalpInitializeApic();
+    HalpEnableApic();
+    Processor->ApicId = HalpReadLapicId();
+    HalpInitializeHpet();
+    HalpInitializeSmp();
+    HalpInitializeApicTimer();
 
-    if (IsBsp) {
-        HalpInitializeIoapic();
-        HalpInitializeApic();
-        HalpEnableApic();
-        Processor->ApicId = HalpReadLapicId();
-        HalpInitializeHpet();
-        HalpInitializeSmp();
-    } else {
-        HalpEnableApic();
-        Processor->ApicId = HalpReadLapicId();
+    __asm__ volatile("mov %0, %%rax\n"
+                     "mov %1, %%rsp\n"
+                     "jmp *%%rax\n"
+                     :
+                     : "r"(KiInitializeBspScheduler),
+                       "r"(Processor->SystemStack + sizeof(Processor->SystemStack))
+                     : "%rax");
+
+    while (1) {
+        HalpStopProcessor();
     }
+}
 
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function runs any early arch-specific initialization routines required for the
+ *     secondary/application processors.
+ *
+ * PARAMETERS:
+ *     Processor - Pointer to the processor-specific structure.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void HalpInitializeAp(KeProcessor *Processor) {
+    WriteMsr(0xC0000102, (uint64_t)Processor);
+    HalpSetIrql(KE_IRQL_PASSIVE);
+    HalpInitializeGdt(Processor);
+    HalpInitializeIdt(Processor);
+    HalpEnableApic();
+    Processor->ApicId = HalpReadLapicId();
     HalpInitializeApicTimer();
 }
 

@@ -17,77 +17,47 @@ RtDList MiMemoryDescriptorListHead;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function tries finding some space in the given memory descriptor.
- *
- * PARAMETERS:
- *     Entry - Which memory descriptor we're currently trying to use.
- *     Pages - How many contiguous pages we need.
- *
- * RETURN VALUE:
- *     Virtual address of the allocated area, or NULL on failure.
- *-----------------------------------------------------------------------------------------------*/
-static void *TryAllocatingPagesIn(MiMemoryDescriptor *Entry, uint64_t Pages) {
-    if (Entry->PageCount < Pages ||
-        (Entry->Type != MI_DESCR_FREE && Entry->Type != MI_DESCR_FIRMWARE_TEMPORARY)) {
-        return NULL;
-    }
-
-    /* We need to make sure we won't use the low 64KiB; They are reserved if the kernel needs any
-     * low memory (for initializing SMP or anything else like that). */
-    if (Entry->BasePage < 0x10) {
-        if (Entry->BasePage + Entry->PageCount < 0x10) {
-            return NULL;
-        }
-
-        Entry->PageCount -= 0x10 - Entry->BasePage;
-        Entry->BasePage += 0x10 - Entry->BasePage;
-    }
-
-    void *Result =
-        MiEnsureEarlySpace((uint64_t)Entry->BasePage << MM_PAGE_SHIFT, Pages << MM_PAGE_SHIFT);
-    Entry->BasePage += Pages;
-    Entry->PageCount -= Pages;
-    return Result;
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
  *     This function allocates a given amount of contiguous pages directly from the osloader
  *     memory map; This should only be used before the initialization of the pool and the PFN.
  *
  * PARAMETERS:
- *     LoaderBlock - Data prepared by the boot loader for us. Set this to NULL if
- *                   MiSaveMemoryDescriptors has already been called.
+ *     LoaderBlock - Data prepared by the boot loader for us.
  *     Pages - How many contiguous pages we need.
  *
  * RETURN VALUE:
  *     Virtual address of the allocated area, or NULL on failure.
  *-----------------------------------------------------------------------------------------------*/
-void *MiEarlyAllocatePages(KiLoaderBlock *LoaderBlock, uint64_t Pages) {
-    if (LoaderBlock) {
-        RtDList *MemoryDescriptorListHead =
-            MiEnsureEarlySpace((uint64_t)LoaderBlock->MemoryDescriptorListHead, sizeof(RtDList));
-        for (RtDList *ListHeader = MiEnsureEarlySpace(
-                 (uint64_t)MemoryDescriptorListHead->Next, sizeof(MiMemoryDescriptor));
-             ListHeader != MemoryDescriptorListHead;
-             ListHeader =
-                 MiEnsureEarlySpace((uint64_t)ListHeader->Next, sizeof(MiMemoryDescriptor))) {
-            void *Result = TryAllocatingPagesIn(
-                CONTAINING_RECORD(ListHeader, MiMemoryDescriptor, ListHeader), Pages);
-            if (Result) {
-                return Result;
-            }
+static void *EarlyAllocatePages(KiLoaderBlock *LoaderBlock, uint64_t Pages) {
+    RtDList *MemoryDescriptorListHead =
+        MiEnsureEarlySpace((uint64_t)LoaderBlock->MemoryDescriptorListHead, sizeof(RtDList));
+
+    for (RtDList *ListHeader = MiEnsureEarlySpace(
+             (uint64_t)MemoryDescriptorListHead->Next, sizeof(MiMemoryDescriptor));
+         ListHeader != MemoryDescriptorListHead;
+         ListHeader = MiEnsureEarlySpace((uint64_t)ListHeader->Next, sizeof(MiMemoryDescriptor))) {
+        MiMemoryDescriptor *Entry = CONTAINING_RECORD(ListHeader, MiMemoryDescriptor, ListHeader);
+
+        if (Entry->PageCount < Pages ||
+            (Entry->Type != MI_DESCR_FREE && Entry->Type != MI_DESCR_FIRMWARE_TEMPORARY)) {
+            continue;
         }
-    } else {
-        for (RtDList *ListHeader = MiMemoryDescriptorListHead.Next;
-             ListHeader != &MiMemoryDescriptorListHead;
-             ListHeader = ListHeader->Next) {
-            void *Result = TryAllocatingPagesIn(
-                CONTAINING_RECORD(ListHeader, MiMemoryDescriptor, ListHeader), Pages);
-            if (Result) {
-                return Result;
+
+        /* We need to make sure we won't use the low 64KiB; They are reserved if the kernel needs
+         * any low memory (for initializing SMP or anything else like that). */
+        if (Entry->BasePage < 0x10) {
+            if (Entry->BasePage + Entry->PageCount < 0x10) {
+                continue;
             }
+
+            Entry->PageCount -= 0x10 - Entry->BasePage;
+            Entry->BasePage += 0x10 - Entry->BasePage;
         }
+
+        void *Result =
+            MiEnsureEarlySpace((uint64_t)Entry->BasePage << MM_PAGE_SHIFT, Pages << MM_PAGE_SHIFT);
+        Entry->BasePage += Pages;
+        Entry->PageCount -= Pages;
+        return Result;
     }
 
     return NULL;
@@ -95,9 +65,8 @@ void *MiEarlyAllocatePages(KiLoaderBlock *LoaderBlock, uint64_t Pages) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function allocates some early (non-osloader) space and copies over all the memory
- *     descriptors from loader block.
- *     This should be called before initializing the pool and page allocators.
+ *     This function saves up all memory descriptors in kernel memory, and initializes the physical
+ *     page allocator (and the page database).
  *
  * PARAMETERS:
  *     LoaderBlock - Data prepared by the boot loader for us.
@@ -105,64 +74,27 @@ void *MiEarlyAllocatePages(KiLoaderBlock *LoaderBlock, uint64_t Pages) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void MiSaveMemoryDescriptors(KiLoaderBlock *LoaderBlock) {
+void MiInitializePageAllocator(KiLoaderBlock *LoaderBlock) {
     RtDList *MemoryDescriptorListHead =
         MiEnsureEarlySpace((uint64_t)LoaderBlock->MemoryDescriptorListHead, sizeof(RtDList));
 
-    /* First, collect the amount of entries we have (and more specifically, how many bytes we need
-     * to store them all). */
-    uint64_t RequiredSpace = 0;
-    for (RtDList *ListHeader = MiEnsureEarlySpace(
-             (uint64_t)MemoryDescriptorListHead->Next, sizeof(MiMemoryDescriptor));
-         ListHeader != MemoryDescriptorListHead;
-         ListHeader = MiEnsureEarlySpace((uint64_t)ListHeader->Next, sizeof(MiMemoryDescriptor))) {
-        RequiredSpace += sizeof(MiMemoryDescriptor);
-    }
-
-    /* Find a memory map entry with enough space for the descriptor list. We have no option but to
-     * hang without any error messages if we fail here. */
-    MiMemoryDescriptor *Descriptor =
-        MiEarlyAllocatePages(LoaderBlock, (RequiredSpace + MM_PAGE_SIZE - 1) >> MM_PAGE_SHIFT);
-    if (!Descriptor) {
-        while (1) {
-            HalpStopProcessor();
-        }
-    }
-
-    /* Now, copy over all the osloader data to kernel land. */
-    RtInitializeDList(&MiMemoryDescriptorListHead);
-    for (RtDList *ListHeader = MiEnsureEarlySpace(
-             (uint64_t)MemoryDescriptorListHead->Next, sizeof(MiMemoryDescriptor));
-         ListHeader != MemoryDescriptorListHead;
-         ListHeader = MiEnsureEarlySpace((uint64_t)ListHeader->Next, sizeof(MiMemoryDescriptor))) {
-        MiMemoryDescriptor *Entry = CONTAINING_RECORD(ListHeader, MiMemoryDescriptor, ListHeader);
-        memcpy(Descriptor, Entry, sizeof(MiMemoryDescriptor));
-        RtAppendDList(&MiMemoryDescriptorListHead, &Descriptor->ListHeader);
-        Descriptor++;
-    }
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function initializes the physical page allocator (and the page database).
- *
- * PARAMETERS:
- *     None.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-void MiInitializePageAllocator(void) {
     /* The PFN database only tracks pages we might allocate, find the max addressable FREE
      * page. */
     uint64_t MaxAddressablePage = 0;
-    for (RtDList *ListHeader = MiMemoryDescriptorListHead.Next;
-         ListHeader != &MiMemoryDescriptorListHead;
-         ListHeader = ListHeader->Next) {
+    uint64_t MemoryDescriptorListSize = 0;
+    for (RtDList *ListHeader = MiEnsureEarlySpace(
+             (uint64_t)MemoryDescriptorListHead->Next, sizeof(MiMemoryDescriptor));
+         ListHeader != MemoryDescriptorListHead;
+         ListHeader = MiEnsureEarlySpace((uint64_t)ListHeader->Next, sizeof(MiMemoryDescriptor))) {
         MiMemoryDescriptor *Entry = CONTAINING_RECORD(ListHeader, MiMemoryDescriptor, ListHeader);
 
-        /* Unmapping firware temp regions should be already okay to do. */
-        if (Entry->Type == MI_DESCR_FIRMWARE_TEMPORARY) {
+        /* Let's use the fact we're iterating through the list and already save its size (for
+         * copying it into kernel land later). */
+        MemoryDescriptorListSize += sizeof(MiMemoryDescriptor);
+
+        /* Unmapping the 1:1 firware temp regions should be already okay to do. */
+        if (Entry->Type == MI_DESCR_FIRMWARE_TEMPORARY ||
+            Entry->Type == MI_DESCR_FIRMWARE_PERMANENT) {
             for (uint32_t i = 0; i < Entry->PageCount; i++) {
                 HalpUnmapPage((void *)((uint64_t)(Entry->BasePage + i) << MM_PAGE_SHIFT));
             }
@@ -182,16 +114,21 @@ void MiInitializePageAllocator(void) {
         }
     }
 
-    /* Find a memory map entry with enough space for the PFN database. We're assuming such entry
-     * exists, we'll crash with a NULL dereference at some point if it doesn't. */
-    MiPageList = MiEarlyAllocatePages(
-        NULL, (MaxAddressablePage * sizeof(MiPageEntry) + MM_PAGE_SIZE - 1) >> MM_PAGE_SHIFT);
+    /* Find a memory map entry with enough space for the PFN database. This is the last place we
+     * should need to use EarlyAllocatePages. */
+    MiPageList = EarlyAllocatePages(
+        LoaderBlock,
+        (MaxAddressablePage * sizeof(MiPageEntry) + MM_PAGE_SIZE - 1) >> MM_PAGE_SHIFT);
+    if (!MiPageList) {
+        KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
+    }
 
     /* Setup the page allocator (marking the free pages as free). */
     RtInitializeDList(&MiFreePageListHead);
-    for (RtDList *ListHeader = MiMemoryDescriptorListHead.Next;
-         ListHeader != &MiMemoryDescriptorListHead;
-         ListHeader = ListHeader->Next) {
+    for (RtDList *ListHeader = MiEnsureEarlySpace(
+             (uint64_t)MemoryDescriptorListHead->Next, sizeof(MiMemoryDescriptor));
+         ListHeader != MemoryDescriptorListHead;
+         ListHeader = MiEnsureEarlySpace((uint64_t)ListHeader->Next, sizeof(MiMemoryDescriptor))) {
         MiMemoryDescriptor *Entry = CONTAINING_RECORD(ListHeader, MiMemoryDescriptor, ListHeader);
 
         MiPageEntry *Group = &MiPageList[Entry->BasePage];
@@ -207,6 +144,24 @@ void MiInitializePageAllocator(void) {
             }
         }
     }
+
+    /* Now we should be free to allocate some pool memory and copy the memory descriptor list in its
+     * current state. */
+    MiMemoryDescriptor *Descriptor = MmAllocatePool(MemoryDescriptorListSize, "KeMm");
+    if (!Descriptor) {
+        KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
+    }
+
+    RtInitializeDList(&MiMemoryDescriptorListHead);
+    for (RtDList *ListHeader = MiEnsureEarlySpace(
+             (uint64_t)MemoryDescriptorListHead->Next, sizeof(MiMemoryDescriptor));
+         ListHeader != MemoryDescriptorListHead;
+         ListHeader = MiEnsureEarlySpace((uint64_t)ListHeader->Next, sizeof(MiMemoryDescriptor))) {
+        MiMemoryDescriptor *Entry = CONTAINING_RECORD(ListHeader, MiMemoryDescriptor, ListHeader);
+        memcpy(Descriptor, Entry, sizeof(MiMemoryDescriptor));
+        RtAppendDList(&MiMemoryDescriptorListHead, &Descriptor->ListHeader);
+        Descriptor++;
+    }
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -214,18 +169,21 @@ void MiInitializePageAllocator(void) {
  *     This function sets up the kernel pool allocator.
  *
  * PARAMETERS:
- *     None.
+ *     LoaderBlock - Data prepared by the boot loader for us.
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void MiInitializePool(void) {
-    uint64_t SizeInBits = (MI_POOL_SIZE + MM_PAGE_SIZE - 1) >> MM_PAGE_SHIFT;
-    uint64_t SizeInPages = ((SizeInBits >> 3) + MM_PAGE_SIZE - 1) >> MM_PAGE_SHIFT;
-
+void MiInitializePool(KiLoaderBlock *LoaderBlock) {
     MiPoolStart = MI_POOL_START;
 
-    void *PoolBitmapBase = MiEarlyAllocatePages(NULL, SizeInPages);
+    uint64_t SizeInBits = (MI_POOL_SIZE + MM_PAGE_SIZE - 1) >> MM_PAGE_SHIFT;
+    uint64_t SizeInPages = ((SizeInBits >> 3) + MM_PAGE_SIZE - 1) >> MM_PAGE_SHIFT;
+    void *PoolBitmapBase = EarlyAllocatePages(LoaderBlock, SizeInPages);
+    if (!PoolBitmapBase) {
+        KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
+    }
+
     RtInitializeBitmap(&MiPoolBitmap, PoolBitmapBase, SizeInBits);
     RtClearAllBits(&MiPoolBitmap);
 }
@@ -247,7 +205,7 @@ void MiReleaseBootRegions(void) {
          ListHeader != &MiMemoryDescriptorListHead;
          ListHeader = ListHeader->Next) {
         MiMemoryDescriptor *Entry = CONTAINING_RECORD(ListHeader, MiMemoryDescriptor, ListHeader);
-        if (Entry->Type != MI_DESCR_OSLOADER) {
+        if (Entry->Type != MI_DESCR_OSLOADER_TEMPORARY) {
             continue;
         }
 

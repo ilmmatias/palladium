@@ -68,20 +68,9 @@ int HalpMapPage(void *VirtualAddress, uint64_t PhysicalAddress, int Flags) {
         }
 
         if (!(Addresses[i][Indexes[i]] & 0x01)) {
-            uint64_t Page;
-
-            /* We're forced to use the untagged MiEarlyAllocatePages if we got here before the
-             * initialization of the memory manager. */
-            if (MiPageList) {
-                Page = MmAllocateSinglePage();
-            } else {
-                Page = (uint64_t)MiEarlyAllocatePages(NULL, 1);
-            }
-
+            uint64_t Page = MmAllocateSinglePage();
             if (!Page) {
                 return 0;
-            } else if (!MiPageList) {
-                Page -= 0xFFFF800000000000;
             }
 
             memset((void *)(Page + 0xFFFF800000000000), 0, MM_PAGE_SIZE);

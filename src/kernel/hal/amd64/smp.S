@@ -85,7 +85,7 @@ HalpApEntry:
     mov %ax, %ss
 
     /* Get our kernel processor ID, and indicate that we're fully online (and about to enter
-     * KiSystemStartup). */
+     * KiApEntry). */
     movabs $HalpOnlineProcessorCount, %rbp
     mov $1, %eax
     lock xadd %eax, (%rbp)
@@ -93,10 +93,9 @@ HalpApEntry:
     /* Now we only need to setup the stack, and we can get out of assembly land. */
     movabs $HalpProcessorList, %rbp
     mov (%rbp), %rbp
-    mov (%rbp, %rax, 8), %rdx
-    lea 0x3000(%rdx), %rsp
-    movabs $KiSystemStartup, %rax
-    xor %rcx, %rcx
+    mov (%rbp, %rax, 8), %rcx
+    lea 0x3000(%rcx), %rsp
+    movabs $KiApEntry, %rax
     jmp *%rax
 
 .align 8

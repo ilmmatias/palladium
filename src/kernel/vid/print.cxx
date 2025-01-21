@@ -62,18 +62,11 @@ static void Flush(void) {
 static void ScrollUp(void) {
     const uint32_t ScreenSize = VidpPitch * VidpHeight;
     const uint32_t LineSize = VidpPitch * VidpFont.Height;
-
-    if (VidpFrontBuffer) {
-        memmove(VidpFrontBuffer, VidpFrontBuffer + LineSize, ScreenSize - LineSize);
-        memset(VidpFrontBuffer + ScreenSize - LineSize, 0, LineSize);
-        PendingFullFlush = 1;
-        FlushY = 0;
-        FlushLines = VidpHeight;
-    } else {
-        /* Let's hope we don't need to use this, because it's gonna be slow. */
-        memmove(VidpBackBuffer, VidpBackBuffer + LineSize, ScreenSize - LineSize);
-        memset(VidpBackBuffer + ScreenSize - LineSize, 0, LineSize);
-    }
+    memmove(VidpFrontBuffer, VidpFrontBuffer + LineSize, ScreenSize - LineSize);
+    memset(VidpFrontBuffer + ScreenSize - LineSize, 0, LineSize);
+    PendingFullFlush = 1;
+    FlushY = 0;
+    FlushLines = VidpHeight;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -114,15 +107,8 @@ static void DrawCharacter(char Character) {
     const uint8_t *Data = &VidpFont.GlyphData[Info->Offset];
     uint16_t GlyphLeft = Info->Left;
     uint16_t GlyphTop = VidpFont.Ascender - Info->Top;
-    char *Buffer;
-
-    if (VidpFrontBuffer) {
-        Buffer =
-            &VidpFrontBuffer[(VidpCursorY + GlyphTop) * VidpPitch + (VidpCursorX + GlyphLeft) * 4];
-    } else {
-        Buffer =
-            &VidpBackBuffer[(VidpCursorY + GlyphTop) * VidpPitch + (VidpCursorX + GlyphLeft) * 4];
-    }
+    char *Buffer =
+        &VidpFrontBuffer[(VidpCursorY + GlyphTop) * VidpPitch + (VidpCursorX + GlyphLeft) * 4];
 
     /* The code after us only cares about the foreground, so we're left to manually clear the
        background. */
@@ -136,13 +122,9 @@ static void DrawCharacter(char Character) {
                 break;
             }
 
-            if (VidpFrontBuffer) {
-                *(uint32_t *)&VidpFrontBuffer
-                    [(VidpCursorY + Top) * VidpPitch + (VidpCursorX + Left) * 4] = VidpBackground;
-            } else {
-                *(uint32_t *)&VidpBackBuffer
-                    [(VidpCursorY + Top) * VidpPitch + (VidpCursorX + Left) * 4] = VidpBackground;
-            }
+            *(uint32_t
+                  *)&VidpFrontBuffer[(VidpCursorY + Top) * VidpPitch + (VidpCursorX + Left) * 4] =
+                VidpBackground;
         }
     }
 
@@ -185,23 +167,15 @@ extern "C" void VidResetDisplay(void) {
     VidpCursorX = 0;
     VidpCursorY = 0;
 
-    if (VidpFrontBuffer) {
-        for (int i = 0; i < VidpHeight; i++) {
-            for (int j = 0; j < VidpWidth; j++) {
-                *(uint32_t *)&VidpFrontBuffer[i * VidpPitch + j * 4] = VidpBackground;
-            }
-        }
-
-        FlushY = 0;
-        FlushLines = VidpHeight;
-        Flush();
-    } else {
-        for (int i = 0; i < VidpHeight; i++) {
-            for (int j = 0; j < VidpWidth; j++) {
-                *(uint32_t *)&VidpBackBuffer[i * VidpPitch + j * 4] = VidpBackground;
-            }
+    for (int i = 0; i < VidpHeight; i++) {
+        for (int j = 0; j < VidpWidth; j++) {
+            *(uint32_t *)&VidpFrontBuffer[i * VidpPitch + j * 4] = VidpBackground;
         }
     }
+
+    FlushY = 0;
+    FlushLines = VidpHeight;
+    Flush();
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -289,18 +263,14 @@ static void PutBuffer(const void *buffer, int size, void *context) {
 extern "C" void VidPutChar(char Character) {
     SpinLockGuard Guard(VidpUseLock ? &VidpLock : NULL);
 
-    if (VidpFrontBuffer) {
-        FlushY = VidpCursorY;
-        PutChar(Character);
+    FlushY = VidpCursorY;
+    PutChar(Character);
 
-        if (!PendingFullFlush) {
-            FlushLines = VidpCursorY - FlushY + VidpFont.Height;
-        }
-
-        Flush();
-    } else {
-        PutChar(Character);
+    if (!PendingFullFlush) {
+        FlushLines = VidpCursorY - FlushY + VidpFont.Height;
     }
+
+    Flush();
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -316,18 +286,14 @@ extern "C" void VidPutChar(char Character) {
 extern "C" void VidPutString(const char *String) {
     SpinLockGuard Guard(VidpUseLock ? &VidpLock : NULL);
 
-    if (VidpFrontBuffer) {
-        FlushY = VidpCursorY;
-        PutString(String);
+    FlushY = VidpCursorY;
+    PutString(String);
 
-        if (!PendingFullFlush) {
-            FlushLines = VidpCursorY - FlushY + VidpFont.Height;
-        }
-
-        Flush();
-    } else {
-        PutString(String);
+    if (!PendingFullFlush) {
+        FlushLines = VidpCursorY - FlushY + VidpFont.Height;
     }
+
+    Flush();
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -392,24 +358,17 @@ VidPrintVariadic(int Type, const char *Prefix, const char *Message, va_list Argu
             break;
     }
 
-    if (VidpFrontBuffer) {
-        FlushY = VidpCursorY;
-        PutString(Prefix);
-        PutString(Suffix);
-        VidpForeground = OriginalForeground;
-        __vprintf(Message, Arguments, NULL, PutBuffer);
+    FlushY = VidpCursorY;
+    PutString(Prefix);
+    PutString(Suffix);
+    VidpForeground = OriginalForeground;
+    __vprintf(Message, Arguments, NULL, PutBuffer);
 
-        if (!PendingFullFlush) {
-            FlushLines = VidpCursorY - FlushY + VidpFont.Height;
-        }
-
-        Flush();
-    } else {
-        PutString(Prefix);
-        PutString(Suffix);
-        VidpForeground = OriginalForeground;
-        __vprintf(Message, Arguments, NULL, PutBuffer);
+    if (!PendingFullFlush) {
+        FlushLines = VidpCursorY - FlushY + VidpFont.Height;
     }
+
+    Flush();
 }
 
 /*-------------------------------------------------------------------------------------------------

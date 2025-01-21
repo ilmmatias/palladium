@@ -67,5 +67,5 @@ execute_process(
 target_include_directories(kernel PRIVATE include/private PUBLIC include/public)
 target_compile_options(kernel PRIVATE $<$<COMPILE_LANGUAGE:C,CXX>:-ffreestanding>)
 target_compile_definitions(kernel PRIVATE "-DKE_GIT_HASH=\"${GIT_HASH}\"" PRIVATE "-DKE_ARCH=\"${ARCH_STR}\"")
-target_link_options(kernel PRIVATE -Wl,--subsystem=native,--entry=KiSystemStartup)
+target_link_options(kernel PRIVATE -Wl,--subsystem=native,--entry=KiBspEntry)
 set_target_properties(kernel PROPERTIES ENABLE_EXPORTS TRUE)

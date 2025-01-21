@@ -16,10 +16,10 @@ typedef struct {
     uint64_t LoaderVersion;
     RtDList *MemoryDescriptorListHead;
     RtDList *BootDriverListHead;
-    void *BootProcessor;
     void *AcpiTable;
     uint32_t AcpiTableVersion;
-    void *Framebuffer;
+    void *BackBuffer;
+    void *FrontBuffer;
     uint32_t FramebufferWidth;
     uint32_t FramebufferHeight;
     uint32_t FramebufferPitch;

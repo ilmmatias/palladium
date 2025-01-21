@@ -19,7 +19,8 @@ extern "C" {
 extern uint32_t HalpProcessorCount;
 extern KeProcessor **HalpProcessorList;
 
-void HalpInitializePlatform(KeProcessor *Processor, int IsBsp);
+[[noreturn]] void HalpInitializeBsp(void);
+void HalpInitializeAp(KeProcessor *Processor);
 void HalpStopProcessor(void);
 void HalpPauseProcessor(void);
 

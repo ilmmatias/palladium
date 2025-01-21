@@ -1,6 +1,6 @@
 #!/bin/bash
 
-dd if=/dev/zero of=fat.img bs=1k count=184320 1>/dev/null 2>&1
+dd if=/dev/zero of=fat.img bs=1k count=33792 1>/dev/null 2>&1
 mformat -F -i fat.img
 mmd -i fat.img ::/EFI
 mmd -i fat.img ::/EFI/BOOT

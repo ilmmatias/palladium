@@ -5,8 +5,7 @@ project(os/boot/osloader)
 
 if(ARCH STREQUAL "amd64")
     set(SOURCES
-        ${ARCH}/bsp.c
-        ${ARCH}/prepare.c
+        ${ARCH}/page.c
         ${ARCH}/transfer.c
     )
 endif()
@@ -15,6 +14,7 @@ add_executable(osloader "kstdlib" NO
     ${SOURCES}
     acpi.c
     console.c
+    descriptors.c
     entropy.c
     file.c
     graphics.c

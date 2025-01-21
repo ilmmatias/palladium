@@ -1,7 +1,6 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#include <halp.h>
 #include <mi.h>
 #include <vidp.h>
 
@@ -14,8 +13,8 @@ extern int VidpUseLock;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function saves all display related data from the boot block, and maps the back buffer
- *     into virtual memory, allowing us to use KeFatalError.
+ *     This function saves all display related data from the boot block, and resets the display (to
+ *     remove any data still visible from osloader).
  *
  * PARAMETERS:
  *     LoaderBlock - Data prepared by the boot loader for us.
@@ -23,37 +22,13 @@ extern int VidpUseLock;
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void VidpSaveDisplayData(KiLoaderBlock *LoaderBlock) {
+void VidpInitialize(KiLoaderBlock *LoaderBlock) {
+    uint64_t FrameBufferSize = VidpHeight * VidpPitch * 4;
+    VidpBackBuffer = MiEnsureEarlySpace((uint64_t)LoaderBlock->BackBuffer, FrameBufferSize);
+    VidpFrontBuffer = MiEnsureEarlySpace((uint64_t)LoaderBlock->FrontBuffer, FrameBufferSize);
     VidpWidth = LoaderBlock->FramebufferWidth;
     VidpHeight = LoaderBlock->FramebufferHeight;
     VidpPitch = LoaderBlock->FramebufferPitch;
-
-    /* As the display still isn't initialized, this is the only init stage that can't KeFatalError,
-     * so we just gotta halt execution (and not show any error messages). */
-    VidpBackBuffer = MmMapSpace((uint64_t)LoaderBlock->Framebuffer, VidpHeight * VidpPitch * 4);
-    if (!VidpBackBuffer) {
-        while (1) {
-            HalpStopProcessor();
-        }
-    }
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function finishes up the display initialization by allocating the front buffer.
- *
- * PARAMETERS:
- *     None.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-void VidpCreateFrontBuffer(void) {
-    VidpFrontBuffer = MmAllocatePool(VidpHeight * VidpPitch * 4, "Vidp");
-    if (!VidpFrontBuffer) {
-        KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
-    }
-
     VidResetDisplay();
 }
 

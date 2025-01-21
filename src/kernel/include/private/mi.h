@@ -19,14 +19,13 @@
 #define MI_MAP_DEVICE 0x04
 
 #define MI_DESCR_FREE 0x00
-#define MI_DESCR_LOW_MEMORY 0x01
+#define MI_DESCR_PAGE_MAP 0x01
 #define MI_DESCR_LOADED_PROGRAM 0x02
-#define MI_DESCR_OSLOADER 0x03
-#define MI_DESCR_BOOT_PROCESSOR 0x04
-#define MI_DESCR_BOOT_TABLES 0x05
-#define MI_DESCR_FIRMWARE_TEMPORARY 0x06
-#define MI_DESCR_FIRMWARE_PERMANENT 0x07
-#define MI_DESCR_SYSTEM_RESERVED 0x08
+#define MI_DESCR_GRAPHICS_BUFFER 0x03
+#define MI_DESCR_OSLOADER_TEMPORARY 0x04
+#define MI_DESCR_FIRMWARE_TEMPORARY 0x05
+#define MI_DESCR_FIRMWARE_PERMANENT 0x06
+#define MI_DESCR_SYSTEM_RESERVED 0x07
 
 #define MI_PAGE_FLAGS_USED 0x01
 #define MI_PAGE_FLAGS_CONTIG_BASE 0x02
@@ -58,14 +57,11 @@ typedef struct MiPageEntry {
 extern "C" {
 #endif /* __cplusplus */
 
-void MiSaveMemoryDescriptors(KiLoaderBlock *KiLoaderBlock);
-void MiInitializePageAllocator(void);
-void MiInitializePool(void);
+void MiInitializePageAllocator(KiLoaderBlock *LoaderBlock);
+void MiInitializePool(KiLoaderBlock *LoaderBlock);
 void MiReleaseBootRegions(void);
 
 void *MiEnsureEarlySpace(uint64_t PhysicalAddress, size_t Size);
-
-void *MiEarlyAllocatePages(KiLoaderBlock *LoaderBlock, uint64_t Pages);
 
 #ifdef __cplusplus
 }

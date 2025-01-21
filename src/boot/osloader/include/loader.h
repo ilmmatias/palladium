@@ -35,6 +35,6 @@ typedef struct {
 int OslLoadExecutable(RtDList *LoadedPrograms, const char *ImageName, const char *ImagePath);
 int OslFixupImports(RtDList *LoadedPrograms);
 void OslFixupRelocations(RtDList *LoadedPrograms);
-void OslCreateKernelModuleList(RtDList *LoadedPrograms, RtDList *ModuleListHead);
+RtDList *OslCreateKernelModuleList(RtDList *LoadedPrograms);
 
 #endif /* _LOADER_H_ */

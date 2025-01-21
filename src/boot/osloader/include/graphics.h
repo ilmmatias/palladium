@@ -8,7 +8,8 @@
 #include <stdint.h>
 
 EFI_STATUS OslpInitializeGraphics(
-    void **Framebuffer,
+    void **BackBuffer,
+    void **FrontBuffer,
     uint32_t *FramebufferWidth,
     uint32_t *FramebufferHeight,
     uint32_t *FramebufferPitch);

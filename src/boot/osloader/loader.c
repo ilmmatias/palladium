@@ -8,11 +8,6 @@
 #include <pe.h>
 #include <string.h>
 
-/* Each arena entry should be one PE file, so this should be enough... */
-static OslpLoadedProgram OslpProgramEntries[ARENA_ENTRIES];
-static OslpModuleEntry OslpModuleEntries[ARENA_ENTRIES];
-static int OslpLastProgram = 0;
-
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function loads up the given PE image into memory, and adds it to the loaded programs
@@ -62,29 +57,33 @@ int OslLoadExecutable(RtDList *LoadedPrograms, const char *ImageName, const char
     uint32_t Strings = *(uint32_t *)(SourceSymbols + Header->NumberOfSymbols * 18);
     uint32_t SymbolTableSize = Strings + Header->NumberOfSymbols * 18;
     uint32_t ImagePages =
-        (Header->SizeOfImage + SymbolTableSize + DEFAULT_PAGE_ALLOCATION_GRANULARITY - 1) /
-        DEFAULT_PAGE_ALLOCATION_GRANULARITY;
+        (Header->SizeOfImage + SymbolTableSize + EFI_PAGE_SIZE - 1) >> EFI_PAGE_SHIFT;
 
     /* Start filling the OslpLoadedProgram structure. */
-    if (OslpLastProgram >= ARENA_ENTRIES) {
-        OslPrint("Failed to load a kernel/driver file.\r\n");
-        OslPrint("The system ran out of program entries while loading %s.\r\n", ImagePath);
-        OslPrint("The boot process cannot continue.\r\n");
-        return 0;
-    }
-
-    OslpLoadedProgram *ThisProgram = &OslpProgramEntries[OslpLastProgram++];
-    ThisProgram->Name = ImageName;
-    ThisProgram->ImageSize = ImagePages * DEFAULT_PAGE_ALLOCATION_GRANULARITY;
-    ThisProgram->PageFlags = OslAllocatePages(ImagePages * sizeof(int), PAGE_OSLOADER);
-    if (!ThisProgram->PageFlags) {
+    OslpLoadedProgram *ThisProgram = NULL;
+    EFI_STATUS Status =
+        gBS->AllocatePool(EfiLoaderData, sizeof(OslpLoadedProgram), (VOID **)&ThisProgram);
+    if (Status != EFI_SUCCESS) {
         OslPrint("Failed to load a kernel/driver file.\r\n");
         OslPrint("The system ran out of memory while loading %s.\r\n", ImagePath);
         OslPrint("The boot process cannot continue.\r\n");
         return 0;
     }
 
-    ThisProgram->PhysicalAddress = OslAllocatePages(ThisProgram->ImageSize, PAGE_LOADED_PROGRAM);
+    ThisProgram->Name = ImageName;
+    ThisProgram->ImageSize = ImagePages * EFI_PAGE_SIZE;
+
+    Status = gBS->AllocatePool(
+        EfiLoaderData, ImagePages * sizeof(int), (VOID **)&ThisProgram->PageFlags);
+    if (Status != EFI_SUCCESS) {
+        OslPrint("Failed to load a kernel/driver file.\r\n");
+        OslPrint("The system ran out of memory while loading %s.\r\n", ImagePath);
+        OslPrint("The boot process cannot continue.\r\n");
+        return 0;
+    }
+
+    ThisProgram->PhysicalAddress = OslAllocatePages(
+        ThisProgram->ImageSize, (1 << VIRTUAL_RANDOM_SHIFT), PAGE_TYPE_LOADED_PROGRAM);
     if (!ThisProgram->PhysicalAddress) {
         OslPrint("Failed to load a kernel/driver file.\r\n");
         OslPrint("The system ran out of memory while loading %s.\r\n", ImagePath);
@@ -101,9 +100,7 @@ int OslLoadExecutable(RtDList *LoadedPrograms, const char *ImageName, const char
     }
 
     /* Cleanup the page flags array. */
-    for (uint32_t i = 0; i < ImagePages; i++) {
-        ThisProgram->PageFlags[i] = 0;
-    }
+    memset(ThisProgram->PageFlags, 0, ImagePages * sizeof(int));
 
     /* The kernel might use information from the base headers and section headers; SizeOfImage
        should have given us the code/data size + all headers, so we're assuming that and loading
@@ -134,11 +131,8 @@ int OslLoadExecutable(RtDList *LoadedPrograms, const char *ImageName, const char
             Size = Sections[i].SizeOfRawData;
         }
 
-        for (uint32_t Page = 0; Page < (Size + DEFAULT_PAGE_ALLOCATION_GRANULARITY - 1) /
-                                           DEFAULT_PAGE_ALLOCATION_GRANULARITY;
-             Page++) {
-            ThisProgram->PageFlags
-                [(Sections[i].VirtualAddress / DEFAULT_PAGE_ALLOCATION_GRANULARITY) + Page] = Flags;
+        for (uint32_t Page = 0; Page < (Size + EFI_PAGE_SIZE - 1) >> EFI_PAGE_SHIFT; Page++) {
+            ThisProgram->PageFlags[(Sections[i].VirtualAddress >> EFI_PAGE_SHIFT) + Page] = Flags;
         }
 
         if (Sections[i].SizeOfRawData) {
@@ -171,9 +165,12 @@ int OslLoadExecutable(RtDList *LoadedPrograms, const char *ImageName, const char
             (uint32_t *)((char *)ThisProgram->PhysicalAddress + ExportHeader->NamePointerRva);
 
         ThisProgram->ExportTableSize = ExportHeader->NumberOfNamePointers;
-        ThisProgram->ExportTable = OslAllocatePages(
-            ExportHeader->NumberOfNamePointers * sizeof(OslpExportEntry), PAGE_OSLOADER);
-        if (!ThisProgram->ExportTable) {
+
+        Status = gBS->AllocatePool(
+            EfiLoaderData,
+            ExportHeader->NumberOfNamePointers * sizeof(OslpExportEntry),
+            (VOID **)&ThisProgram->ExportTable);
+        if (Status != EFI_SUCCESS) {
             OslPrint("Failed to load a kernel/driver file.\r\n");
             OslPrint("The system ran out of memory while loading %s.\r\n", ImagePath);
             OslPrint("The boot process cannot continue.\r\n");
@@ -192,7 +189,7 @@ int OslLoadExecutable(RtDList *LoadedPrograms, const char *ImageName, const char
     }
 
     /* We should have loaded the whole file, so it's safe to free the buffer. */
-    OslFreePages(Buffer, BufferSize);
+    gBS->FreePool(Buffer);
     RtAppendDList(LoadedPrograms, &ThisProgram->ListHeader);
     return 1;
 }
@@ -384,26 +381,41 @@ void OslFixupRelocations(RtDList *LoadedPrograms) {
  *
  * PARAMETERS:
  *     LoadedPrograms - Header of the loaded programs list.
- *     ModuleListHead - Where to store the kernel module list.
  *
  * RETURN VALUE:
- *     None.
+ *     Head of the module list, or NULL if we failed to allocate anything.
  *-----------------------------------------------------------------------------------------------*/
-void OslCreateKernelModuleList(RtDList *LoadedPrograms, RtDList *ModuleListHead) {
-    RtDList *ListHeader = LoadedPrograms->Next;
-    int i = 0;
+RtDList *OslCreateKernelModuleList(RtDList *LoadedPrograms) {
+    RtDList *ModuleListHead = NULL;
+    EFI_STATUS Status = gBS->AllocatePool(EfiLoaderData, sizeof(RtDList), (VOID **)&ModuleListHead);
+    if (Status != EFI_SUCCESS) {
+        OslPrint("Failed to create the kernel module list.\r\n");
+        OslPrint("The system ran out of memory while allocating the list head.\r\n");
+        OslPrint("The boot process cannot continue.\r\n");
+        return NULL;
+    }
 
-    while (ListHeader != LoadedPrograms) {
+    RtInitializeDList(ModuleListHead);
+
+    for (RtDList *ListHeader = LoadedPrograms->Next; ListHeader != LoadedPrograms;
+         ListHeader = ListHeader->Next) {
+        OslpModuleEntry *TargetEntry = NULL;
+        Status = gBS->AllocatePool(EfiLoaderData, sizeof(OslpModuleEntry), (VOID **)&TargetEntry);
+        if (Status != EFI_SUCCESS) {
+            OslPrint("Failed to create the kernel module list.\r\n");
+            OslPrint("The system ran out of memory while allocating a list item.\r\n");
+            OslPrint("The boot process cannot continue.\r\n");
+            return NULL;
+        }
+
         OslpLoadedProgram *SourceEntry =
             CONTAINING_RECORD(ListHeader, OslpLoadedProgram, ListHeader);
-        OslpModuleEntry *TargetEntry = &OslpModuleEntries[i++];
-
         TargetEntry->ImageBase = SourceEntry->VirtualAddress;
         TargetEntry->EntryPoint = SourceEntry->EntryPoint;
         TargetEntry->SizeOfImage = SourceEntry->ImageSize;
         TargetEntry->ImageName = SourceEntry->Name;
         RtAppendDList(ModuleListHead, &TargetEntry->ListHeader);
+    };
 
-        ListHeader = ListHeader->Next;
-    }
+    return ModuleListHead;
 }
