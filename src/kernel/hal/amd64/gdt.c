@@ -7,6 +7,40 @@ extern void HalpFlushGdt(void);
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
+ *     This function initializes an entry inside the GDT.
+ *
+ * PARAMETERS:
+ *     Processor - Pointer to the processor-specific structure.
+ *     EntryOffset - Which entry to initialize.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+static void InitializeEntry(
+    KeProcessor *Processor,
+    uint8_t EntryOffset,
+    uint64_t Base,
+    uint32_t Limit,
+    uint8_t Type,
+    uint8_t Dpl) {
+    HalpGdtEntry *Entry = (HalpGdtEntry *)(Processor->GdtEntries + EntryOffset);
+    Entry->LimitLow = Limit & 0xFFFF;
+    Entry->BaseLow = Base & 0xFFFFFF;
+    Entry->Type = Type;
+    Entry->Dpl = Dpl;
+    Entry->Present = 1;
+    Entry->LimitHigh = (Limit >> 16) & 0x0F;
+    Entry->System = 0;
+    Entry->LongMode = 1;
+    Entry->DefaultBig = 0;
+    Entry->Granularity = 1;
+    Entry->BaseHigh = (Base >> 24) & 0xFF;
+    Entry->BaseUpper = (Base >> 32) & 0xFFFFFFFF;
+    Entry->MustBeZero = 0;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
  *     This function initializes the Global Descriptor Table. This, in combination with
  *     InitializeIdt, means we're safe to unmap the first 2MiB (and map the SMP entry point to it).
  *
@@ -17,15 +51,23 @@ extern void HalpFlushGdt(void);
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void HalpInitializeGdt(KeProcessor *Processor) {
-    Processor->GdtEntries[0] = 0x0000000000000000;
-    Processor->GdtEntries[1] = 0x00AF9A000000FFFF;
-    Processor->GdtEntries[2] = 0x00AF92000000FFFF;
-    Processor->GdtEntries[3] = 0x00AFFA000000FFFF;
-    Processor->GdtEntries[4] = 0x00AFF2000000FFFF;
+    /* The NULL descriptor should have already been zeroed out during the processor block
+     * allocation. */
+    InitializeEntry(Processor, GDT_ENTRY_KCODE, 0, 0xFFFFF, GDT_TYPE_CODE, GDT_DPL_KERNEL);
+    InitializeEntry(Processor, GDT_ENTRY_KDATA, 0, 0xFFFFF, GDT_TYPE_DATA, GDT_DPL_KERNEL);
+    InitializeEntry(Processor, GDT_ENTRY_UCODE, 0, 0xFFFFF, GDT_TYPE_CODE, GDT_DPL_USER);
+    InitializeEntry(Processor, GDT_ENTRY_UDATA, 0, 0xFFFFF, GDT_TYPE_DATA, GDT_DPL_USER);
 
-    Processor->GdtDescriptor.Limit = sizeof(Processor->GdtEntries) - 1;
-    Processor->GdtDescriptor.Base = (uint64_t)Processor->GdtEntries;
+    uint64_t TssBase = (uint64_t)&Processor->TssEntry;
+    uint16_t TssSize = sizeof(HalpTssEntry);
+    InitializeEntry(Processor, GDT_ENTRY_TSS, TssBase, TssSize, GDT_TYPE_TSS, GDT_DPL_KERNEL);
+    Processor->TssEntry.Rsp0 = (uint64_t)&Processor->SystemStack;
+    Processor->TssEntry.IoMapBase = TssSize;
 
-    __asm__ volatile("lgdt %0" : : "m"(Processor->GdtDescriptor));
+    HalpGdtDescriptor Descriptor;
+    Descriptor.Limit = sizeof(Processor->GdtEntries) - 1;
+    Descriptor.Base = (uint64_t)Processor->GdtEntries;
+    __asm__ volatile("lgdt %0" : : "m"(Descriptor));
     HalpFlushGdt();
+    __asm__ volatile("mov $0x28, %%ax; ltr %%ax" : : : "%rax");
 }

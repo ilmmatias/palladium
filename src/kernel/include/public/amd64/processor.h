@@ -4,6 +4,7 @@
 #ifndef _AMD64_PROCESSOR_H_
 #define _AMD64_PROCESSOR_H_
 
+#include <amd64/gdt.h>
 #include <ps.h>
 #include <rt/list.h>
 
@@ -20,11 +21,8 @@ typedef struct {
     RtDList DpcQueue;
     RtDList EventQueue;
     char SystemStack[8192] __attribute__((aligned(4096)));
-    uint64_t GdtEntries[5];
-    struct __attribute__((packed)) __attribute__((aligned(4))) {
-        uint16_t Limit;
-        uint64_t Base;
-    } GdtDescriptor;
+    char GdtEntries[56];
+    HalpTssEntry TssEntry;
     struct __attribute__((packed)) {
         uint16_t BaseLow;
         uint16_t Cs;
