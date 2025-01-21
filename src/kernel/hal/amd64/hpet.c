@@ -9,7 +9,6 @@
 
 static void *HpetAddress = NULL;
 static uint64_t Period = 1;
-static uint64_t MinimumTicks = 0;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -63,17 +62,29 @@ void HalpInitializeHpet(void) {
         KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
     }
 
-    uint64_t Caps = ReadHpetRegister(HPET_CAP_REG);
-    Period = (Caps >> 32) / 1000000;
-    MinimumTicks = Hpet->MinimumTicks;
+    /* We can't/shouldn't be messing with the HPET registers if the counter (and interrupts) are
+     * enabled. */
+    uint64_t Reg = ReadHpetRegister(HPET_CFG_REG);
+    WriteHpetRegister(HPET_CFG_REG, Reg & ~HPET_CFG_MASK);
+
+    /* We'll just assume that the firmware left the HPET comparators in a state that would be bad to
+     * us, and reset all comparators. */
+    for (uint8_t i = 0; i < Hpet->ComparatorCount + 1; i++) {
+        Reg = ReadHpetRegister(HPET_TIMER_CAP_REG(i));
+        WriteHpetRegister(HPET_TIMER_CAP_REG(i), Reg & ~HPET_TIMER_MASK);
+    }
+
+    Period = (ReadHpetRegister(HPET_CAP_REG) >> 32) / 1000000;
     VidPrint(
         VID_MESSAGE_DEBUG,
         "Kernel HAL",
         "using HPET as timer tick source (period = %llu ns)\n",
         Period);
 
+    /* At last we can reenable the main counter (after zeroing it). */
+    Reg = ReadHpetRegister(HPET_CFG_REG);
     WriteHpetRegister(HPET_VAL_REG, 0);
-    WriteHpetRegister(HPET_CFG_REG, 0x01);
+    WriteHpetRegister(HPET_CFG_REG, (Reg & ~HPET_CFG_MASK) | HPET_CFG_INT_ENABLE);
 }
 
 /*-------------------------------------------------------------------------------------------------

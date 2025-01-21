@@ -14,13 +14,27 @@
 #define HPET_TIMER_CMP_REG(n) (0x108 + ((n) << 5))
 #define HPET_TIMER_FSB_REG(n) (0x110 + ((n) << 5))
 
+#define HPET_CFG_INT_ENABLE 0x01
+#define HPET_CFG_LEGACY_ENABLE 0x02
+#define HPET_CFG_MASK (HPET_CFG_INT_ENABLE | HPET_CFG_LEGACY_ENABLE)
+
+#define HPET_TIMER_INT_ENABLE 0x04
+#define HPET_TIMER_32B_ENABLE 0x100
+#define HPET_TIMER_FSB_ENABLE 0x4000
+#define HPET_TIMER_MASK (HPET_TIMER_INT_ENABLE | HPET_TIMER_32B_ENABLE | HPET_TIMER_FSB_ENABLE)
+
 typedef struct __attribute__((packed)) {
     char Unused[36];
-    uint32_t HardwareId;
+    uint8_t HardwareId;
+    uint8_t ComparatorCount : 5;
+    uint8_t CounterSize : 1;
+    uint8_t Reserved0 : 1;
+    uint8_t LegacyReplacement : 1;
+    uint16_t PciVendorId;
     uint8_t AddressSpaceId;
     uint8_t RegisterBitWidth;
     uint8_t RegisterBitOffset;
-    uint8_t Reserved;
+    uint8_t Reserved1;
     uint64_t Address;
     uint8_t SequenceNumber;
     uint16_t MinimumTicks;
