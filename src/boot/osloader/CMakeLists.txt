@@ -21,8 +21,7 @@ add_executable(osloader "kstdlib" NO
     guid.c
     loader.c
     main.c
-    page.c
-    virt.c
+    memory.c
 )
 
 target_include_directories(osloader PRIVATE include)

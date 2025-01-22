@@ -82,8 +82,8 @@ int OslLoadExecutable(RtDList *LoadedPrograms, const char *ImageName, const char
         return 0;
     }
 
-    ThisProgram->PhysicalAddress = OslAllocatePages(
-        ThisProgram->ImageSize, (1 << VIRTUAL_RANDOM_SHIFT), PAGE_TYPE_LOADED_PROGRAM);
+    ThisProgram->PhysicalAddress =
+        OslAllocatePages(ThisProgram->ImageSize, (1 << VIRTUAL_RANDOM_SHIFT));
     if (!ThisProgram->PhysicalAddress) {
         OslPrint("Failed to load a kernel/driver file.\r\n");
         OslPrint("The system ran out of memory while loading %s.\r\n", ImagePath);

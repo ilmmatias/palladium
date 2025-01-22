@@ -30,20 +30,13 @@
 #define PAGE_FLAGS_DEVICE 0x04
 
 typedef struct {
-    RtSList ListHeader;
-    void *Buffer;
-    size_t Size;
-    uint8_t Type;
-} OslpAllocation;
-
-typedef struct {
     RtDList ListHeader;
     uint8_t Type;
     uint64_t BasePage;
     uint64_t PageCount;
 } OslpMemoryDescriptor;
 
-void *OslAllocatePages(size_t Size, uint64_t Alignment, uint8_t Type);
+void *OslAllocatePages(size_t Size, uint64_t Alignment);
 
 EFI_STATUS OslpInitializeVirtualAllocator(void);
 void *OslAllocateVirtualAddress(uint64_t Pages);

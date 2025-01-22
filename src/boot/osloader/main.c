@@ -96,7 +96,7 @@ OslMain(EFI_HANDLE *ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
 
     /* We need to create a small (8KiB) temporary stack (for use during the kernel BSP
      * initialization, as the current UEFI stack probably won't be mapped in). */
-    void *BootStack = OslAllocatePages(SIZE_8KB, SIZE_4KB, PAGE_TYPE_OSLOADER_TEMPORARY);
+    void *BootStack = OslAllocatePages(SIZE_8KB, SIZE_4KB);
     if (!BootStack) {
         OslPrint("Failed to allocate space for the boot stack.\r\n");
         OslPrint("The boot process cannot continue.\r\n");
@@ -112,6 +112,9 @@ OslMain(EFI_HANDLE *ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
     UINTN DescriptorSize = 0;
     UINT32 DescriptorVersion = 0;
     if (!OslpCreateMemoryDescriptors(
+            &LoadedPrograms,
+            FrontBuffer,
+            FramebufferHeight * FramebufferPitch * 4,
             &MemoryDescriptorListHead,
             &MemoryDescriptorStack,
             &MemoryMapSize,

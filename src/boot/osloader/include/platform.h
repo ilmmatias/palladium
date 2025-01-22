@@ -24,6 +24,9 @@ typedef struct {
 } OslpBootBlock;
 
 int OslpCreateMemoryDescriptors(
+    RtDList *LoadedPrograms,
+    void *FrontBuffer,
+    UINTN FrameBufferSize,
     RtDList **MemoryDescriptorListHead,
     RtDList *MemoryDescriptorStack,
     UINTN *MemoryMapSize,

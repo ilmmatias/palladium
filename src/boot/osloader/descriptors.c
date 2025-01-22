@@ -2,17 +2,19 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <console.h>
+#include <loader.h>
 #include <platform.h>
 #include <string.h>
-
-extern RtSList OslpAllocationListHead;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function creates the memory descriptor list using the EFI memory map and our
- *     OslpAllocation list data.
+ *     loaded program list data.
  *
  * PARAMETERS:
+ *     LoadedPrograms - Header of the loaded programs list.
+ *     FrontBuffer - Physical address of the double/frontbuffer.
+ *     FrameBufferSize - Size of the framebuffer.
  *     MemoryDescriptorListHead - Output; Pointer to store the descriptor list head.
  *     MemoryDescriptorStack - Output; List to be initialized as the descriptor entry stack.
  *     MemoryMapSize - Output; Size of the runtime services memory map.
@@ -24,6 +26,9 @@ extern RtSList OslpAllocationListHead;
  *     1 on success, 0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
 int OslpCreateMemoryDescriptors(
+    RtDList *LoadedPrograms,
+    void *FrontBuffer,
+    UINTN FrameBufferSize,
     RtDList **MemoryDescriptorListHead,
     RtDList *MemoryDescriptorStack,
     UINTN *MemoryMapSize,
@@ -136,19 +141,28 @@ int OslpCreateMemoryDescriptors(
         }
     }
 
-    /* Now wrap up things by cutting into the free regions with the regions we setup a special
-     * descriptor type using OslAllocatePages. */
-    for (RtSList *ListHeader = OslpAllocationListHead.Next; ListHeader;
+    /* Cut into the free regions with the regions we loaded our kernel and boot driver images. */
+    for (RtDList *ListHeader = LoadedPrograms->Next; ListHeader != LoadedPrograms;
          ListHeader = ListHeader->Next) {
-        OslpAllocation *Allocation = CONTAINING_RECORD(ListHeader, OslpAllocation, ListHeader);
+        OslpLoadedProgram *Program = CONTAINING_RECORD(ListHeader, OslpLoadedProgram, ListHeader);
         if (!OslpUpdateMemoryDescriptors(
                 *MemoryDescriptorListHead,
                 MemoryDescriptorStack,
-                Allocation->Type,
-                (uint64_t)Allocation->Buffer >> EFI_PAGE_SHIFT,
-                (Allocation->Size + EFI_PAGE_SIZE - 1) >> EFI_PAGE_SHIFT)) {
+                PAGE_TYPE_LOADED_PROGRAM,
+                (uint64_t)Program->PhysicalAddress >> EFI_PAGE_SHIFT,
+                (Program->ImageSize + EFI_PAGE_SIZE - 1) >> EFI_PAGE_SHIFT)) {
             return 0;
         }
+    }
+
+    /* And cut into the free regions with the frontbuffer as well. */
+    if (!OslpUpdateMemoryDescriptors(
+            *MemoryDescriptorListHead,
+            MemoryDescriptorStack,
+            PAGE_TYPE_GRAPHICS_BUFFER,
+            (uint64_t)FrontBuffer >> EFI_PAGE_SHIFT,
+            (FrameBufferSize + EFI_PAGE_SIZE - 1) >> EFI_PAGE_SHIFT)) {
+        return 0;
     }
 
     return 1;

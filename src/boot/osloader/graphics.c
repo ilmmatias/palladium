@@ -88,7 +88,7 @@ EFI_STATUS OslpInitializeGraphics(
 
     uint64_t FrameBufferSize = *FramebufferHeight * *FramebufferPitch * 4;
     uint64_t FrontBufferSize = (FrameBufferSize + SIZE_2MB - 1) & ~(SIZE_2MB - 1);
-    *FrontBuffer = OslAllocatePages(FrontBufferSize, SIZE_2MB, PAGE_TYPE_GRAPHICS_BUFFER);
+    *FrontBuffer = OslAllocatePages(FrontBufferSize, SIZE_2MB);
     if (!*FrontBuffer) {
         OslPrint("Failed to allocate the display buffer.\r\n");
         OslPrint("The boot process cannot continue.\r\n");
