@@ -9,6 +9,7 @@
 
 static void *HpetAddress = NULL;
 static uint64_t Period = 1;
+static int Width = HAL_TIMER_WIDTH_64B;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -74,17 +75,35 @@ void HalpInitializeHpet(void) {
         WriteHpetRegister(HPET_TIMER_CAP_REG(i), Reg & ~HPET_TIMER_MASK);
     }
 
-    Period = (ReadHpetRegister(HPET_CAP_REG) >> 32) / 1000000;
+    Reg = ReadHpetRegister(HPET_CAP_REG);
+    Width = (Reg & HPET_CAP_64B) ? HAL_TIMER_WIDTH_64B : HAL_TIMER_WIDTH_32B;
+    Period = (Reg >> HPET_CAP_FREQ_START) / 1000000;
     VidPrint(
         VID_MESSAGE_DEBUG,
         "Kernel HAL",
-        "using HPET as timer tick source (period = %llu ns)\n",
+        "using HPET as timer tick source (%u-bits counter, period = %llu ns)\n",
+        Width,
         Period);
 
     /* At last we can reenable the main counter (after zeroing it). */
     Reg = ReadHpetRegister(HPET_CFG_REG);
     WriteHpetRegister(HPET_VAL_REG, 0);
     WriteHpetRegister(HPET_CFG_REG, (Reg & ~HPET_CFG_MASK) | HPET_CFG_INT_ENABLE);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function returns the width of the timer (useful for handling overflow!).
+ *
+ * PARAMETERS:
+ *     None.
+ *
+ * RETURN VALUE:
+ *     HAL_TIMER_WIDTH_32B if the timer is 32-bits long, or HAL_TIMER_WIDTH_64B if the timer is
+ *     64-bits long.
+ *-----------------------------------------------------------------------------------------------*/
+int HalGetTimerWidth(void) {
+    return Width;
 }
 
 /*-------------------------------------------------------------------------------------------------

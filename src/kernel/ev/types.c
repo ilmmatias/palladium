@@ -11,8 +11,8 @@
  *
  * PARAMETERS:
  *     Timer - Pointer to the timer struct.
- *     Timeout - How many nanoseconds to sleep for; If this is set too low, EvWaitObject(s)
- *     Dpc - Optional DPC to be executed/enqueued when we sleep.
+ *     Timeout - How many nanoseconds to sleep for.
+ *     Dpc - Optional DPC to be executed/enqueued when we finish.
  *
  * RETURN VALUE:
  *     None.

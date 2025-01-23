@@ -103,7 +103,7 @@ extern "C" [[noreturn]] void KiApEntry(KeProcessor *Processor) {
     /* Stage 1 (AP): Create the idle thread, and spin up the scheduler (we'll be on the wait for
      * threads to run). */
     PspCreateIdleThread();
-    PspInitializeScheduler(1);
+    PspInitializeScheduler(0);
 
     while (1) {
         HalpStopProcessor();

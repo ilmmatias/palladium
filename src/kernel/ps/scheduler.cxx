@@ -43,9 +43,9 @@ extern "C" void PsReadyThread(PsThread *Thread) {
     RtAppendDList(&BestMatch->ThreadQueue, &Thread->ListHeader);
     Guard.Release();
 
-    /* PspScheduleNext uses Expiration=0 as a sign that we need to switch asap (we were out of
+    /* PspScheduleNext uses ExpirationTicks=0 as a sign that we need to switch asap (we were out of
        work). */
-    if (!BestMatch->CurrentThread->Expiration) {
+    if (!BestMatch->CurrentThread->ExpirationTicks) {
         HalpNotifyProcessor(BestMatch, 0);
     }
 }
@@ -143,7 +143,8 @@ extern "C" void PspScheduleNext(HalRegisterState *Context) {
         return;
     } else if (!Processor->CurrentThread) {
         Processor->CurrentThread = Processor->InitialThread;
-        Processor->CurrentThread->Expiration = 0;
+        Processor->CurrentThread->ExpirationReference = 0;
+        Processor->CurrentThread->ExpirationTicks = 0;
         HalpRestoreThreadContext(Context, &Processor->CurrentThread->Context);
         return;
     }
@@ -155,7 +156,10 @@ extern "C" void PspScheduleNext(HalRegisterState *Context) {
     /* On quantum expiry, we switch threads if possible;
      * On force yield, we always switch threads (into the idle if nothing is left). */
     uint64_t CurrentTicks = HalGetTimerTicks();
-    if (CurrentTicks < CurrentThread->Expiration && !Processor->ForceYield) {
+    if (CurrentThread->ExpirationTicks &&
+        !HalCheckTimerExpiration(
+            CurrentTicks, CurrentThread->ExpirationReference, CurrentThread->ExpirationTicks) &&
+        !Processor->ForceYield) {
         return;
     }
 
@@ -165,14 +169,16 @@ extern "C" void PspScheduleNext(HalRegisterState *Context) {
     }
 
     if (NewThread == Processor->IdleThread) {
-        NewThread->Expiration = 0;
+        NewThread->ExpirationReference = 0;
+        NewThread->ExpirationTicks = 0;
     } else {
         uint64_t ThreadQuantum = PSP_THREAD_QUANTUM / Processor->ThreadQueueSize;
         if (ThreadQuantum < PSP_THREAD_MIN_QUANTUM) {
             ThreadQuantum = PSP_THREAD_MIN_QUANTUM;
         }
 
-        NewThread->Expiration = CurrentTicks + ThreadQuantum / HalGetTimerPeriod();
+        NewThread->ExpirationReference = CurrentTicks;
+        NewThread->ExpirationTicks = ThreadQuantum / HalGetTimerPeriod();
     }
 
     /* Thread cleanup cannot be done at the moment (we're still on the thread context!),

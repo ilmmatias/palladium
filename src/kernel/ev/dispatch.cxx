@@ -38,9 +38,10 @@ extern "C" void EvpDispatchObject(void *Object, uint64_t Timeout, int Yield) {
     /* Ignore the target timeout for already dispatched objects (we probably just want to yield
        this thread out). */
     if (!Header->Dispatched) {
-        Header->Deadline = 0;
+        Header->DeadlineTicks = 0;
         if (Timeout) {
-            Header->Deadline = CurrentTicks + Timeout / HalGetTimerPeriod();
+            Header->DeadlineReference = CurrentTicks;
+            Header->DeadlineTicks = Timeout / HalGetTimerPeriod();
         }
     }
 
@@ -125,7 +126,9 @@ extern "C" void EvpHandleEvents(HalRegisterState *Context) {
 
         /* Out of the deadline, for anything but timers, this will make WaitObject return an
            error. */
-        if (Header->Deadline && CurrentTicks >= Header->Deadline) {
+        if (Header->DeadlineTicks &&
+            HalCheckTimerExpiration(
+                CurrentTicks, Header->DeadlineReference, Header->DeadlineTicks)) {
             Header->Finished = 1;
         }
 

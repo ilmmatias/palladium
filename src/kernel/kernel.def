@@ -6,9 +6,11 @@ EXPORTS
     EvInitializeTimer
     EvWaitObject
 
+    HalCheckTimerExpiration
     HalGetCurrentProcessor
     HalGetTimerPeriod
     HalGetTimerTicks
+    HalGetTimerWidth
     HalWaitTimer
 
     IoCreateDevice

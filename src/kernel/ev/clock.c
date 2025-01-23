@@ -23,7 +23,10 @@ void EvpHandleClock(HalRegisterState *) {
     while (ListHeader != &Processor->EventQueue) {
         EvHeader *Header = CONTAINING_RECORD(ListHeader, EvHeader, ListHeader);
         ListHeader = ListHeader->Next;
-        if ((Header->Deadline && CurrentTicks >= Header->Deadline) || Header->Finished) {
+        if ((Header->DeadlineTicks &&
+             HalCheckTimerExpiration(
+                 CurrentTicks, Header->DeadlineReference, Header->DeadlineTicks)) ||
+            Header->Finished) {
             TriggerEvent = 1;
         }
     }
@@ -34,12 +37,14 @@ void EvpHandleClock(HalRegisterState *) {
         TriggerEvent = 1;
     }
 
-    /* At last, check for anything that would swap out the thread (we probably only really need to
-     * heck quanta expiration though). */
-    if (Processor->InitialThread &&
-        (Processor->CurrentThread->Terminated ||
-         CurrentTicks >= Processor->CurrentThread->Expiration || Processor->ForceYield)) {
-        TriggerEvent = 1;
+    /* At last, check for anything that would swap out the thread. */
+    if (Processor->InitialThread) {
+        PsThread *CurrentThread = Processor->CurrentThread;
+        int QuantaExpired = HalCheckTimerExpiration(
+            CurrentTicks, CurrentThread->ExpirationReference, CurrentThread->ExpirationTicks);
+        if (CurrentThread->Terminated || QuantaExpired || Processor->ForceYield) {
+            TriggerEvent = 1;
+        }
     }
 
     /* Finally, trigger an event at dispatch IRQL if we need to do anything else. */

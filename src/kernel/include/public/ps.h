@@ -14,7 +14,8 @@
 
 typedef struct PsThread {
     RtDList ListHeader;
-    uint64_t Expiration;
+    uint64_t ExpirationReference;
+    uint64_t ExpirationTicks;
     int Terminated;
     EvDpc TerminationDpc;
     HalRegisterState Context;

@@ -28,7 +28,8 @@ typedef struct {
     int Finished;
     struct PsThread *Source;
     EvDpc *Dpc;
-    uint64_t Deadline;
+    uint64_t DeadlineReference;
+    uint64_t DeadlineTicks;
 } EvHeader, EvTimer;
 
 #ifdef __cplusplus
