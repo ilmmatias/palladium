@@ -4,9 +4,6 @@
 #include <halp.h>
 #include <psp.h>
 
-#include <cxx/critical_section.hxx>
-#include <cxx/lock.hxx>
-
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function dispatches the given object into the event queue.
@@ -23,15 +20,16 @@
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-extern "C" void EvpDispatchObject(void *Object, uint64_t Timeout, int Yield) {
+void EvpDispatchObject(void *Object, uint64_t Timeout, int Yield) {
     KeProcessor *Processor = HalGetCurrentProcessor();
     uint64_t CurrentTicks = HalGetTimerTicks();
     EvHeader *Header = (EvHeader *)Object;
 
     /* Enter critical section (can't let any scheduling happen here), and update the event
        queue. */
-    CriticalSection Guard;
+    void *Context = HalpEnterCriticalSection();
     if (Header->Finished) {
+        HalpLeaveCriticalSection(Context);
         return;
     }
 
@@ -58,6 +56,8 @@ extern "C" void EvpDispatchObject(void *Object, uint64_t Timeout, int Yield) {
     if (Yield) {
         HalpNotifyProcessor(Processor, 1);
     }
+
+    HalpLeaveCriticalSection(Context);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -72,7 +72,7 @@ extern "C" void EvpDispatchObject(void *Object, uint64_t Timeout, int Yield) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-extern "C" void EvWaitObject(void *Object, uint64_t Timeout) {
+void EvWaitObject(void *Object, uint64_t Timeout) {
     EvpDispatchObject(Object, Timeout, 1);
 }
 
@@ -87,11 +87,12 @@ extern "C" void EvWaitObject(void *Object, uint64_t Timeout) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-extern "C" void EvCancelObject(void *Object) {
-    CriticalSection Guard;
+void EvCancelObject(void *Object) {
+    void *Context = HalpEnterCriticalSection();
     EvHeader *Header = (EvHeader *)Object;
 
     if (!Header->Dispatched) {
+        HalpLeaveCriticalSection(Context);
         return;
     }
 
@@ -101,6 +102,8 @@ extern "C" void EvCancelObject(void *Object) {
     if (Header->Source) {
         PsReadyThread(Header->Source);
     }
+
+    HalpLeaveCriticalSection(Context);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -113,7 +116,7 @@ extern "C" void EvCancelObject(void *Object) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-extern "C" void EvpHandleEvents(HalRegisterState *Context) {
+void EvpHandleEvents(HalRegisterState *Context) {
     KeProcessor *Processor = HalGetCurrentProcessor();
     uint64_t CurrentTicks = HalGetTimerTicks();
 
@@ -138,9 +141,10 @@ extern "C" void EvpHandleEvents(HalRegisterState *Context) {
 
             if (Header->Source) {
                 /* Boost the priority of the waiting task, and insert it back. */
-                SpinLockGuard Guard(&Processor->ThreadQueueLock);
+                KeIrql OldIrql = KeAcquireSpinLock(&Processor->ThreadQueueLock);
                 __atomic_add_fetch(&Processor->ThreadQueueSize, 1, __ATOMIC_SEQ_CST);
                 RtPushDList(&Processor->ThreadQueue, &Header->Source->ListHeader);
+                KeReleaseSpinLock(&Processor->ThreadQueueLock, OldIrql);
             }
 
             if (Header->Dpc) {

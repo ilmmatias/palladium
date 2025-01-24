@@ -25,7 +25,7 @@ add_executable(osloader "kstdlib" NO
 )
 
 target_include_directories(osloader PRIVATE include)
-target_compile_options(osloader PRIVATE $<$<COMPILE_LANGUAGE:C,CXX>:-ffreestanding>)
+target_compile_options(osloader PRIVATE $<$<COMPILE_LANGUAGE:C>:-ffreestanding>)
 target_compile_options(osloader PRIVATE -fshort-wchar)
 target_link_options(osloader
     PRIVATE -Wl,/driver

@@ -6,14 +6,10 @@
 #include <psp.h>
 #include <vid.h>
 
-#include <cxx/lock.hxx>
-
-extern "C" {
 extern void KiContinueSystemStartup(void *);
 extern void PspIdleThread(void *);
 
 PsThread *PspSystemThread = NULL;
-}
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -27,7 +23,7 @@ PsThread *PspSystemThread = NULL;
  * RETURN VALUE:
  *     Pointer to the thread structure, or NULL on failure.
  *-----------------------------------------------------------------------------------------------*/
-extern "C" PsThread *PsCreateThread(void (*EntryPoint)(void *), void *Parameter) {
+PsThread *PsCreateThread(void (*EntryPoint)(void *), void *Parameter) {
     PsThread *Thread = (PsThread *)MmAllocatePool(sizeof(PsThread), "Ps  ");
     if (!Thread) {
         return NULL;
@@ -55,7 +51,7 @@ extern "C" PsThread *PsCreateThread(void (*EntryPoint)(void *), void *Parameter)
  * RETURN VALUE:
  *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
-extern "C" [[noreturn]] void PsTerminateThread(void) {
+[[noreturn]] void PsTerminateThread(void) {
     KeProcessor *Processor = HalGetCurrentProcessor();
     PsThread *Thread = Processor->CurrentThread;
     Thread->Terminated = 1;
@@ -75,7 +71,7 @@ extern "C" [[noreturn]] void PsTerminateThread(void) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-extern "C" void PspCreateSystemThread(void) {
+void PspCreateSystemThread(void) {
     PspSystemThread = PsCreateThread(KiContinueSystemStartup, NULL);
     if (!PspSystemThread) {
         VidPrint(VID_MESSAGE_ERROR, "Kernel", "failed to create the system thread\n");
@@ -93,7 +89,7 @@ extern "C" void PspCreateSystemThread(void) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-extern "C" void PspCreateIdleThread(void) {
+void PspCreateIdleThread(void) {
     HalGetCurrentProcessor()->IdleThread = PsCreateThread(PspIdleThread, NULL);
     if (!HalGetCurrentProcessor()->IdleThread) {
         VidPrint(VID_MESSAGE_ERROR, "Kernel", "failed to create the idle thread\n");

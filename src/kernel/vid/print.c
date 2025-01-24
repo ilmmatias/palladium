@@ -2,17 +2,15 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <crt_impl.h>
+#include <ke.h>
 #include <string.h>
 #include <vidp.h>
 
-#include <cxx/lock.hxx>
+extern const VidpFontData VidpFont;
 
 static int PendingFullFlush = 0;
 static uint16_t FlushY = 0;
 static uint16_t FlushLines = 0;
-
-extern "C" {
-extern const VidpFontData VidpFont;
 
 char *VidpBackBuffer = NULL;
 char *VidpFrontBuffer = NULL;
@@ -27,6 +25,39 @@ uint16_t VidpCursorY = 0;
 
 KeSpinLock VidpLock = {0};
 int VidpUseLock = 1;
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function acquires the display lock if required.
+ *
+ * PARAMETERS:
+ *     None.
+ *
+ * RETURN VALUE:
+ *     IRQL used for releasing the lock.
+ *-----------------------------------------------------------------------------------------------*/
+static KeIrql AcquireSpinLock(void) {
+    if (VidpUseLock) {
+        return KeAcquireSpinLock(&VidpLock);
+    } else {
+        return 0;
+    }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function releases the display lock if required.
+ *
+ * PARAMETERS:
+ *     OldIrql - Return value of AcquireSpinLock.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+static void ReleaseSpinLock(KeIrql OldIrql) {
+    if (VidpUseLock) {
+        KeReleaseSpinLock(&VidpLock, OldIrql);
+    }
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -160,10 +191,9 @@ static void DrawCharacter(char Character) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-extern "C" void VidResetDisplay(void) {
-    SpinLockGuard Guard(VidpUseLock ? &VidpLock : NULL);
-
+void VidResetDisplay(void) {
     /* While the color/attribute is left untouched, the cursor is always reset to 0;0. */
+    KeIrql OldIrql = AcquireSpinLock();
     VidpCursorX = 0;
     VidpCursorY = 0;
 
@@ -176,6 +206,7 @@ extern "C" void VidResetDisplay(void) {
     FlushY = 0;
     FlushLines = VidpHeight;
     Flush();
+    ReleaseSpinLock(OldIrql);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -260,8 +291,8 @@ static void PutBuffer(const void *buffer, int size, void *context) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-extern "C" void VidPutChar(char Character) {
-    SpinLockGuard Guard(VidpUseLock ? &VidpLock : NULL);
+void VidPutChar(char Character) {
+    KeIrql OldIrql = AcquireSpinLock();
 
     FlushY = VidpCursorY;
     PutChar(Character);
@@ -271,6 +302,7 @@ extern "C" void VidPutChar(char Character) {
     }
 
     Flush();
+    ReleaseSpinLock(OldIrql);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -283,8 +315,8 @@ extern "C" void VidPutChar(char Character) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-extern "C" void VidPutString(const char *String) {
-    SpinLockGuard Guard(VidpUseLock ? &VidpLock : NULL);
+void VidPutString(const char *String) {
+    KeIrql OldIrql = AcquireSpinLock();
 
     FlushY = VidpCursorY;
     PutString(String);
@@ -294,6 +326,7 @@ extern "C" void VidPutString(const char *String) {
     }
 
     Flush();
+    ReleaseSpinLock(OldIrql);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -310,10 +343,7 @@ extern "C" void VidPutString(const char *String) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-extern "C" void
-VidPrintVariadic(int Type, const char *Prefix, const char *Message, va_list Arguments) {
-    SpinLockGuard Guard(VidpUseLock ? &VidpLock : NULL);
-
+void VidPrintVariadic(int Type, const char *Prefix, const char *Message, va_list Arguments) {
     /* Make sure this specific type of message wasn't disabled at compile time. */
     switch (Type) {
         case VID_MESSAGE_TRACE:
@@ -336,6 +366,7 @@ VidPrintVariadic(int Type, const char *Prefix, const char *Message, va_list Argu
             break;
     }
 
+    KeIrql OldIrql = AcquireSpinLock();
     uint32_t OriginalForeground = VidpForeground;
 
     const char *Suffix;
@@ -369,6 +400,7 @@ VidPrintVariadic(int Type, const char *Prefix, const char *Message, va_list Argu
     }
 
     Flush();
+    ReleaseSpinLock(OldIrql);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -384,7 +416,7 @@ VidPrintVariadic(int Type, const char *Prefix, const char *Message, va_list Argu
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-extern "C" void VidPrint(int Type, const char *Prefix, const char *Message, ...) {
+void VidPrint(int Type, const char *Prefix, const char *Message, ...) {
     va_list Arguments;
     va_start(Arguments, Message);
     VidPrintVariadic(Type, Prefix, Message, Arguments);

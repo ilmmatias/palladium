@@ -9,7 +9,7 @@ include(sdk/cmake/toolchain.cmake)
 include(sdk/cmake/project.cmake)
 
 project(os)
-enable_language(ASM C CXX RC)
+enable_language(ASM C RC)
 
 add_subdirectory(boot)
 add_subdirectory(drivers)

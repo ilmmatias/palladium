@@ -54,6 +54,6 @@ set(USER_SOURCES
 add_library(ucrt "nostdlib" SHARED ${USER_SOURCES} ucrt.def)
 
 target_include_directories(ucrt PUBLIC include)
-target_compile_options(ucrt PRIVATE $<$<COMPILE_LANGUAGE:C,CXX>:-ffreestanding>)
+target_compile_options(ucrt PRIVATE $<$<COMPILE_LANGUAGE:C>:-ffreestanding>)
 target_compile_definitions(ucrt PRIVATE _DLL)
 target_link_options(ucrt PRIVATE -Wl,--entry=CRTDLL_INIT)

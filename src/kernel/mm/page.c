@@ -1,16 +1,13 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
+#include <ke.h>
 #include <mi.h>
 #include <vid.h>
 
-#include <cxx/lock.hxx>
-
-extern "C" {
 MiPageEntry *MiPageList = NULL;
 RtDList MiFreePageListHead;
 KeSpinLock MiPageListLock = {0};
-}
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -22,10 +19,11 @@ KeSpinLock MiPageListLock = {0};
  * RETURN VALUE:
  *     Physical address of the allocated page, or 0 on failure.
  *-----------------------------------------------------------------------------------------------*/
-extern "C" uint64_t MmAllocateSinglePage() {
-    SpinLockGuard Guard(&MiPageListLock);
-
+uint64_t MmAllocateSinglePage() {
+    KeIrql OldIrql = KeAcquireSpinLock(&MiPageListLock);
     RtDList *ListHeader = RtPopDList(&MiFreePageListHead);
+    KeReleaseSpinLock(&MiPageListLock, OldIrql);
+
     if (ListHeader == &MiFreePageListHead) {
         return 0;
     }
@@ -49,8 +47,8 @@ extern "C" uint64_t MmAllocateSinglePage() {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-extern "C" void MmFreeSinglePage(uint64_t PhysicalAddress) {
-    SpinLockGuard Guard(&MiPageListLock);
+void MmFreeSinglePage(uint64_t PhysicalAddress) {
+    KeIrql OldIrql = KeAcquireSpinLock(&MiPageListLock);
     MiPageEntry *Entry = &MI_PAGE_ENTRY(PhysicalAddress);
 
     if (!(Entry->Flags & MI_PAGE_FLAGS_USED) ||
@@ -59,5 +57,7 @@ extern "C" void MmFreeSinglePage(uint64_t PhysicalAddress) {
     }
 
     Entry->Flags = 0;
+
     RtPushDList(&MiFreePageListHead, &Entry->ListHeader);
+    KeReleaseSpinLock(&MiPageListLock, OldIrql);
 }

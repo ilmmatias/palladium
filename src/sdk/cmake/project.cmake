@@ -23,10 +23,10 @@ function(add_executable target type has_lib)
         target_compile_options(
             ${target}
             PRIVATE
-            $<$<COMPILE_LANGUAGE:C,CXX>:-mno-mmx>
-            $<$<COMPILE_LANGUAGE:C,CXX>:-mno-sse>
-            $<$<COMPILE_LANGUAGE:C,CXX>:-mno-sse2>
-            $<$<COMPILE_LANGUAGE:C,CXX>:-mno-red-zone>)
+            $<$<COMPILE_LANGUAGE:C>:-mno-mmx>
+            $<$<COMPILE_LANGUAGE:C>:-mno-sse>
+            $<$<COMPILE_LANGUAGE:C>:-mno-sse2>
+            $<$<COMPILE_LANGUAGE:C>:-mno-red-zone>)
     endif()
 
     target_compile_options(
@@ -38,9 +38,7 @@ function(add_executable target type has_lib)
         -mno-stack-arg-probe
         -fexceptions
         -fseh-exceptions
-        -fms-extensions
-        $<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions>
-        $<$<COMPILE_LANGUAGE:CXX>:-fno-rtti>)
+        -fms-extensions)
 
     target_link_options(
     	${target}
@@ -64,6 +62,8 @@ function(add_library target type)
             target_link_libraries(${target} ucrt)
         elseif(type STREQUAL "kstdlib")
             target_link_libraries(${target} kcrt krt)
+        elseif(type STREQUAL "kernel")
+            target_link_libraries(${target} PUBLIC kcrt PUBLIC krt)
         else()
             target_link_libraries(${target} ucrt urt)
         endif()
@@ -74,10 +74,10 @@ function(add_library target type)
         target_compile_options(
             ${target}
             PRIVATE
-            $<$<COMPILE_LANGUAGE:C,CXX>:-mno-mmx>
-            $<$<COMPILE_LANGUAGE:C,CXX>:-mno-sse>
-            $<$<COMPILE_LANGUAGE:C,CXX>:-mno-sse2>
-            $<$<COMPILE_LANGUAGE:C,CXX>:-mno-red-zone>)
+            $<$<COMPILE_LANGUAGE:C>:-mno-mmx>
+            $<$<COMPILE_LANGUAGE:C>:-mno-sse>
+            $<$<COMPILE_LANGUAGE:C>:-mno-sse2>
+            $<$<COMPILE_LANGUAGE:C>:-mno-red-zone>)
     endif()
 
     target_compile_options(
@@ -89,9 +89,7 @@ function(add_library target type)
         -mno-stack-arg-probe
         -fexceptions
         -fseh-exceptions
-        -fms-extensions
-        $<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions>
-        $<$<COMPILE_LANGUAGE:CXX>:-fno-rtti>)
+        -fms-extensions)
 
     target_link_options(
         	${target}

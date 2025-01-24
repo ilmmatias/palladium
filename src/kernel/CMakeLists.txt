@@ -26,33 +26,33 @@ add_executable(kernel "kernel" YES
     ${SOURCES}
 
     ev/clock.c
-    ev/dispatch.cxx
-    ev/dpc.cxx
+    ev/dispatch.c
+    ev/dpc.c
     ev/types.c
 
     hal/timer.c
 
-    io/device.cxx
+    io/device.c
 
     ke/acpi.c
     ke/driver.c
-    ke/entry.cxx
+    ke/entry.c
     ke/irql.c
     ke/lock.c
     ke/panic.c
 
     mm/initialize.c
-    mm/page.cxx
-    mm/pool.cxx
+    mm/page.c
+    mm/pool.c
 
     ps/idle.c
-    ps/scheduler.cxx
-    ps/thread.cxx
+    ps/scheduler.c
+    ps/thread.c
 
-    vid/attributes.cxx
+    vid/attributes.c
     vid/font.c
     vid/initialize.c
-    vid/print.cxx
+    vid/print.c
 
     kernel.def)
 
@@ -65,7 +65,7 @@ execute_process(
     )
 
 target_include_directories(kernel PRIVATE include/private PUBLIC include/public)
-target_compile_options(kernel PRIVATE $<$<COMPILE_LANGUAGE:C,CXX>:-ffreestanding>)
+target_compile_options(kernel PRIVATE $<$<COMPILE_LANGUAGE:C>:-ffreestanding>)
 target_compile_definitions(kernel PRIVATE "-DKE_GIT_HASH=\"${GIT_HASH}\"" PRIVATE "-DKE_ARCH=\"${ARCH_STR}\"")
 target_link_options(kernel PRIVATE -Wl,--subsystem=native,--entry=KiBspEntry)
 set_target_properties(kernel PROPERTIES ENABLE_EXPORTS TRUE)

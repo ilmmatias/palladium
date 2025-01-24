@@ -6,11 +6,7 @@
 #include <mm.h>
 #include <psp.h>
 
-#include <cxx/lock.hxx>
-
-extern "C" {
 extern PsThread *PspSystemThread;
-}
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -22,7 +18,7 @@ extern PsThread *PspSystemThread;
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-extern "C" void PsReadyThread(PsThread *Thread) {
+void PsReadyThread(PsThread *Thread) {
     /* Always try and add the thread to the least full queue. */
     size_t BestMatchSize = SIZE_MAX;
     KeProcessor *BestMatch = NULL;
@@ -38,10 +34,10 @@ extern "C" void PsReadyThread(PsThread *Thread) {
 
     /* Now we're forced to lock the processor queue (there was no need up until now, as we were
        only reading). */
-    SpinLockGuard Guard(&BestMatch->ThreadQueueLock);
+    KeIrql OldIrql = KeAcquireSpinLock(&BestMatch->ThreadQueueLock);
     __atomic_add_fetch(&BestMatch->ThreadQueueSize, 1, __ATOMIC_SEQ_CST);
     RtAppendDList(&BestMatch->ThreadQueue, &Thread->ListHeader);
-    Guard.Release();
+    KeReleaseSpinLock(&BestMatch->ThreadQueueLock, OldIrql);
 
     /* PspScheduleNext uses ExpirationTicks=0 as a sign that we need to switch asap (we were out of
        work). */
@@ -61,7 +57,7 @@ extern "C" void PsReadyThread(PsThread *Thread) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-extern "C" void PspInitializeScheduler(int IsBsp) {
+void PspInitializeScheduler(int IsBsp) {
     KeProcessor *Processor = HalGetCurrentProcessor();
     /* PspScheduleNext should forcefully "switch" threads if we're not running anything. */
     Processor->CurrentThread = NULL;
@@ -80,9 +76,9 @@ extern "C" void PspInitializeScheduler(int IsBsp) {
  *     Which thread to execute next.
  *-----------------------------------------------------------------------------------------------*/
 static PsThread *GetNextReadyThread(KeProcessor *Processor) {
-    SpinLockGuard Guard(&Processor->ThreadQueueLock);
+    KeIrql OldIrql = KeAcquireSpinLock(&Processor->ThreadQueueLock);
     RtDList *ListHeader = RtPopDList(&Processor->ThreadQueue);
-    Guard.Release();
+    KeReleaseSpinLock(&Processor->ThreadQueueLock, OldIrql);
 
     if (ListHeader != &Processor->ThreadQueue) {
         return CONTAINING_RECORD(ListHeader, PsThread, ListHeader);
@@ -95,9 +91,9 @@ static PsThread *GetNextReadyThread(KeProcessor *Processor) {
             continue;
         }
 
-        SpinLockGuard Guard(&HalpProcessorList[i]->ThreadQueueLock);
+        KeIrql OldIrql = KeAcquireSpinLock(&Processor->ThreadQueueLock);
         RtDList *ListHeader = RtPopDList(&Processor->ThreadQueue);
-        Guard.Release();
+        KeReleaseSpinLock(&Processor->ThreadQueueLock, OldIrql);
 
         if (ListHeader != &Processor->ThreadQueue) {
             return CONTAINING_RECORD(ListHeader, PsThread, ListHeader);
@@ -133,7 +129,7 @@ static void TerminationDpc(PsThread *Thread) {
  * RETURN VALUE:
  *     None..
  *-----------------------------------------------------------------------------------------------*/
-extern "C" void PspScheduleNext(HalRegisterState *Context) {
+void PspScheduleNext(HalRegisterState *Context) {
     KeProcessor *Processor = HalGetCurrentProcessor();
     PsThread *CurrentThread = Processor->CurrentThread;
 
@@ -196,8 +192,9 @@ extern "C" void PspScheduleNext(HalRegisterState *Context) {
     if (Processor->ForceYield == PSP_YIELD_EVENT) {
         __atomic_sub_fetch(&Processor->ThreadQueueSize, 1, __ATOMIC_SEQ_CST);
     } else if (CurrentThread != Processor->IdleThread) {
-        SpinLockGuard Guard(&Processor->ThreadQueueLock);
+        KeIrql OldIrql = KeAcquireSpinLock(&Processor->ThreadQueueLock);
         RtAppendDList(&Processor->ThreadQueue, &CurrentThread->ListHeader);
+        KeReleaseSpinLock(&Processor->ThreadQueueLock, OldIrql);
     }
 
     Processor->ForceYield = PSP_YIELD_NONE;

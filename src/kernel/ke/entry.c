@@ -5,7 +5,6 @@
 #include <ki.h>
 #include <mi.h>
 #include <psp.h>
-#include <stdio.h>
 #include <vidp.h>
 
 /*-------------------------------------------------------------------------------------------------
@@ -19,7 +18,7 @@
  * RETURN VALUE:
  *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
-extern "C" [[noreturn]] void KiBspEntry(uint64_t LoaderBlockPage) {
+[[noreturn]] void KiBspEntry(uint64_t LoaderBlockPage) {
     KiLoaderBlock *LoaderBlock =
         (KiLoaderBlock *)MiEnsureEarlySpace(LoaderBlockPage, sizeof(KiLoaderBlock));
 
@@ -68,7 +67,7 @@ extern "C" [[noreturn]] void KiBspEntry(uint64_t LoaderBlockPage) {
  * RETURN VALUE:
  *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
-extern "C" [[noreturn]] void KiInitializeBspScheduler(void) {
+[[noreturn]] void KiInitializeBspScheduler(void) {
     VidPrint(VID_MESSAGE_INFO, "Kernel", "%u processors online\n", HalpProcessorCount);
 
     /* Stage 4 (BSP): Release and unmap all OSLOADER memory regions; Everything we need should have
@@ -96,7 +95,7 @@ extern "C" [[noreturn]] void KiInitializeBspScheduler(void) {
  * RETURN VALUE:
  *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
-extern "C" [[noreturn]] void KiApEntry(KeProcessor *Processor) {
+[[noreturn]] void KiApEntry(KeProcessor *Processor) {
     /* Stage 0 (AP): Early platform/arch initialization. */
     HalpInitializeAp(Processor);
 
@@ -121,7 +120,7 @@ extern "C" [[noreturn]] void KiApEntry(KeProcessor *Processor) {
  * RETURN VALUE:
  *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
-extern "C" [[noreturn]] void KiContinueSystemStartup(void *) {
+[[noreturn]] void KiContinueSystemStartup(void *) {
     /* Stage 6 (BSP): Initialize all boot drivers; We can't load anything further than this without
        them. */
     KiRunBootStartDrivers();
