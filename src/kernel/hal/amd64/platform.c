@@ -42,7 +42,7 @@ extern void KiInitializeBspScheduler(void);
                      "jmp *%%rax\n"
                      :
                      : "r"(KiInitializeBspScheduler),
-                       "r"(Processor->SystemStack + sizeof(Processor->SystemStack))
+                       "r"(Processor->SystemStack + sizeof(Processor->SystemStack) - 8)
                      : "%rax");
 
     while (1) {

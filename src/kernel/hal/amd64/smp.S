@@ -90,11 +90,25 @@ HalpApEntry:
     mov $1, %eax
     lock xadd %eax, (%rbp)
 
-    /* Now we only need to setup the stack, and we can get out of assembly land. */
+    /* Setup the stack, we need it for the SSE initialization (offset by 8, because CALL vs JMP). */
     movabs $HalpProcessorList, %rbp
     mov (%rbp), %rbp
     mov (%rbp, %rax, 8), %rcx
-    lea 0x3000(%rcx), %rsp
+    lea 0x2FF8(%rcx), %rsp
+
+    /* Now we can enable SSE and load up the same sane defaults the BSP uses. */
+    fninit
+    mov %cr0, %rax
+    and $0xFFFB, %ax
+    or $0x02, %rax
+    mov %rax, %cr0
+    mov %cr4, %rax
+    or $0x600, %rax
+    mov %rax, %cr4
+    movl $0x1F80, (%rsp)
+    ldmxcsr (%rsp)
+
+    /* Now we should be safe to jump to the kernel entry. */
     movabs $KiApEntry, %rax
     jmp *%rax
 

@@ -44,9 +44,22 @@
      * interrupts. */
     __asm__ volatile("cli");
 
+    /* Enable SSE; We'll loadup some sane defaults after we switch our stack. */
+    __asm__ volatile("fninit\n"
+                     "mov %%cr0, %%rax\n"
+                     "and $0xFFFB, %%ax\n"
+                     "or $0x02, %%rax\n"
+                     "mov %%rax, %%cr0\n"
+                     "mov %%cr4, %%rax\n"
+                     "or $0x600, %%rax\n"
+                     "mov %%rax, %%cr4\n"
+                     :
+                     :
+                     : "%rax");
+
     /* We almost certainly want PSE (Page Size Extension) enabled. */
     __asm__ volatile("mov %%cr4, %%rax\n"
-                     "or $0x08, %%rax\n"
+                     "or $0x10, %%rax\n"
                      "mov %%rax, %%cr4\n"
                      :
                      :
@@ -93,9 +106,8 @@
         }
     }
 
-    /* At last, call/jump into to the kernel entry; We'll be using the temporary stack, and we
-     * expect the kernel to create the BSP structure and start using its stack before freeing
-     * the loader temporary entries. */
+    /* Load up all registers we need, and then load up the default SSE register configuration before
+     * jumping. */
     void *EntryPoint =
         CONTAINING_RECORD(BootBlock->BootDriverListHead->Next, OslpModuleEntry, ListHeader)
             ->EntryPoint;
@@ -103,9 +115,12 @@
     __asm__ volatile("mov %0, %%rax\n"
                      "mov %1, %%rcx\n"
                      "mov %2, %%rsp\n"
+                     "movl $0x1F80, (%%rsp)\n"
+                     "ldmxcsr (%%rsp)\n"
+                     "xor %%rdx, %%rdx\n"
                      "jmp *%%rax\n"
                      :
-                     : "r"(EntryPoint), "r"(BootBlock), "r"(BootStack)
+                     : "r"(EntryPoint), "r"(BootBlock), "r"((uint64_t)BootStack - 8)
                      : "%rax", "%rcx");
 
     /* It should be impossible to get here (because we jmp'ed instead of call'ing). */
