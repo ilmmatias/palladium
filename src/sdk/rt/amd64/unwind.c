@@ -259,6 +259,120 @@ RtExceptionRoutine RtVirtualUnwind(
         *EstablisherFrame = FrameBase;
     }
 
+    do {
+        if (UnwindInfo->Version >= 2) {
+            break;
+        }
+
+        /* For versions<2, we're forced to manually detect the epilogue sequence and simulate it. */
+        if (Offset < UnwindInfo->SizeOfProlog) {
+            break;
+        }
+
+        RtContext LocalContext;
+        memcpy(&LocalContext, ContextRecord, sizeof(RtContext));
+
+        /* Epilogs are allowed an ADD RSP, CONSTANT or a LEA RSP, CONSTANT[FPREG] at the
+           start. */
+        uint64_t InstrPtr = ControlPc;
+        uint32_t Instr = *(uint32_t *)InstrPtr;
+        if ((Instr & 0xFFFFFF) == 0xC48348) {
+            /* ADD RSP, IMM8 */
+            LocalContext.Rsp += Instr >> 24;
+            InstrPtr += 4;
+        } else if ((Instr & 0xFFFFFF) == 0xC48148) {
+            /* ADD RSP, IMM32 */
+            LocalContext.Rsp += *(uint32_t *)(InstrPtr + 3);
+            InstrPtr += 7;
+        } else if ((Instr & 0x38FFFE) == 0x208D48) {
+            /* LEA RSP, M */
+            LocalContext.Rsp = LocalContext.Gpr[((Instr >> 16) & 0x07) + (Instr & 0x01) * 8];
+            switch ((Instr >> 22) & 0x03) {
+                /* [R] */
+                case 0:
+                    InstrPtr += 3;
+                    break;
+                /* [R + imm8] */
+                case 1:
+                    LocalContext.Rsp += (int8_t)(Instr >> 24);
+                    InstrPtr += 4;
+                    break;
+                /* [R + imm32] */
+                case 2:
+                    LocalContext.Rsp += *(int32_t *)(InstrPtr + 3);
+                    InstrPtr += 7;
+                    break;
+            }
+        }
+
+        /* Now, we should have N register pops, anything other than a pop (or a return/jump),
+           means this isn't an epilog. */
+        while (1) {
+            Instr = *(uint32_t *)InstrPtr;
+            if ((Instr & 0xF8) == 0x58) {
+                /* POP REG */
+                LocalContext.Gpr[Instr & 0x07] = *(uint64_t *)LocalContext.Rsp;
+                LocalContext.Rsp += sizeof(uint64_t);
+                InstrPtr += 1;
+            } else if ((Instr & 0xF8FB) == 0x5841) {
+                /* REX.B POP REG */
+                LocalContext.Gpr[((Instr >> 8) & 0x07) + 8] = *(uint64_t *)LocalContext.Rsp;
+                LocalContext.Rsp += sizeof(uint64_t);
+                InstrPtr += 2;
+            } else {
+                break;
+            }
+        }
+
+        /* A REPNE prefix (which is actually BND prefix) is allowed before the return/jump
+         * instruction. */
+        Instr = *(uint32_t *)InstrPtr;
+        if ((Instr & 0xFF) == 0xF2) {
+            InstrPtr += 1;
+            Instr = *(uint32_t *)InstrPtr;
+        }
+
+        /* Now we should be followed by a jump or return to outside the current function. */
+        if ((Instr & 0xFF) == 0xEB || (Instr & 0xFF) == 0xE9) {
+            /* JMP IMM
+               Both branches into another function and into tail recursion means this is an
+               epilog. */
+
+            uint64_t Target = InstrPtr - ImageBase;
+            if ((Instr & 0xFF) == 0xEB) {
+                /* JMP IMM8 */
+                Target += (int8_t)(Instr >> 8) + 2;
+            } else {
+                /* JMP IMM32 */
+                Target += *(int32_t *)(InstrPtr + 1) + 5;
+            }
+
+            /* TODO: This isn't enough to be sure this is a jump to outside this function; We should
+             * take into consideration chained function entries too. */
+            if ((Target > FunctionEntry->BeginAddress && Target <= FunctionEntry->EndAddress) ||
+                (Target == FunctionEntry->BeginAddress &&
+                 (UnwindInfo->Flags & RT_UNW_FLAG_CHAININFO))) {
+                break;
+            }
+        } else if (
+            (Instr & 0xFF) != 0xC2 && (Instr & 0xFF) != 0xC3 && (Instr & 0xFFFF) != 0xC3F3 &&
+            (Instr & 0xFFFF) != 0x25FF && (Instr & 0x38FFF8) != 0x20FF48) {
+            break;
+        }
+
+        /* We're RETing anyways, even on jumps (remember that we're trying to backtrack, not go
+           forward). */
+        LocalContext.Rip = *(uint64_t *)LocalContext.Rsp;
+        LocalContext.Rsp += sizeof(uint64_t);
+
+        memcpy(ContextRecord, &LocalContext, sizeof(RtContext));
+        return NULL;
+    } while (0);
+
+    if (UnwindInfo->Version >= 2) {
+        /* TODO: For versions>=2, we need to use UWOP_EPILOGUE. */
+    }
+
     while (1) {
         Offset = ControlPc - ImageBase - FunctionEntry->BeginAddress;
         UnwindInfo = (RtUnwindInfo *)(ImageBase + FunctionEntry->UnwindData);
