@@ -6,9 +6,9 @@
 
 #include <stdint.h>
 
-typedef struct {
+typedef struct __attribute__((packed)) {
     union {
-        struct {
+        struct __attribute__((packed)) {
             uint64_t Rax;
             uint64_t Rcx;
             uint64_t Rdx;
@@ -28,7 +28,27 @@ typedef struct {
         };
         uint64_t Gpr[16];
     };
-
+    union {
+        struct __attribute__((packed)) {
+            __m128 Xmm0;
+            __m128 Xmm1;
+            __m128 Xmm2;
+            __m128 Xmm3;
+            __m128 Xmm4;
+            __m128 Xmm5;
+            __m128 Xmm6;
+            __m128 Xmm7;
+            __m128 Xmm8;
+            __m128 Xmm9;
+            __m128 Xmm10;
+            __m128 Xmm11;
+            __m128 Xmm12;
+            __m128 Xmm13;
+            __m128 Xmm14;
+            __m128 Xmm15;
+        };
+        __m128 Xmm[16];
+    };
     uint64_t Rip;
     uint64_t Rflags;
 } RtContext;

@@ -20,9 +20,9 @@ static const int UnwindOpSlots[] = {
     /* RT_UWOP_SAVE_NONVOL_FAR */
     3,
     /* RT_UWOP_EPILOG */
-    1,
-    /* RT_UWOP_SPARE_CODE */
     2,
+    /* RT_UWOP_SPARE_CODE */
+    3,
     /* RT_UWOP_SAVE_XMM128 */
     2,
     /* RT_UWOP_SAVE_XMM128_FAR */
@@ -56,12 +56,17 @@ static int GetUnwindOpSlots(RtUnwindCode *Code) {
  * PARAMETERS:
  *     ContextRecord - Register state the frame was being executed in.
  *     UnwindInfo - Pointer to the function's unwind/exception data.
+ *     FrameBase - Stack frame address of the current function.
  *     OpIndex - Where to start parsing the opcodes.
  *
  * RETURN VALUE:
- *     1 if we encountered a MACHFRAME (we're fully done), 0 otherwise.
+ *     1 if we encountered a MACHFRAME, 0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-static int ProcessUnwindOps(RtContext *ContextRecord, RtUnwindInfo *UnwindInfo, int OpIndex) {
+static int ProcessUnwindOps(
+    RtContext *ContextRecord,
+    RtUnwindInfo *UnwindInfo,
+    uint64_t FrameBase,
+    int OpIndex) {
     while (OpIndex < UnwindInfo->CountOfCodes) {
         RtUnwindCode *Code = &UnwindInfo->UnwindCode[OpIndex];
 
@@ -96,33 +101,33 @@ static int ProcessUnwindOps(RtContext *ContextRecord, RtUnwindInfo *UnwindInfo, 
 
             case RT_UWOP_SAVE_NONVOL:
                 ContextRecord->Gpr[Code->OpInfo] =
-                    *(uint64_t *)(ContextRecord->Rsp +
-                                  UnwindInfo->UnwindCode[OpIndex + 1].FrameOffset);
+                    *(uint64_t *)(FrameBase + UnwindInfo->UnwindCode[OpIndex + 1].FrameOffset * 8);
                 OpIndex += 2;
                 break;
 
             case RT_UWOP_SAVE_NONVOL_FAR:
                 ContextRecord->Gpr[Code->OpInfo] =
-                    *(uint64_t *)(ContextRecord->Rsp +
-                                  *(uint32_t *)&UnwindInfo->UnwindCode[OpIndex + 1]);
+                    *(uint64_t *)(FrameBase + *(uint32_t *)&UnwindInfo->UnwindCode[OpIndex + 1]);
                 OpIndex += 3;
                 break;
 
             case RT_UWOP_EPILOG:
-                OpIndex += 1;
-                break;
-
-            case RT_UWOP_SPARE_CODE:
                 OpIndex += 2;
                 break;
 
-            /* We currently ignore/don't use XMM registers on the kernel, but once we start
-               handling that, TODO: restore XMM ContextRecord here too! */
+            case RT_UWOP_SPARE_CODE:
+                OpIndex += 3;
+                break;
+
             case RT_UWOP_SAVE_XMM128:
+                ContextRecord->Xmm[Code->OpInfo] =
+                    *(__m128 *)(FrameBase + UnwindInfo->UnwindCode[OpIndex + 1].FrameOffset * 16);
                 OpIndex += 2;
                 break;
 
             case RT_UWOP_SAVE_XMM128_FAR:
+                ContextRecord->Xmm[Code->OpInfo] =
+                    *(__m128 *)(FrameBase + *(uint32_t *)&UnwindInfo->UnwindCode[OpIndex + 1]);
                 OpIndex += 3;
                 break;
 
@@ -130,9 +135,6 @@ static int ProcessUnwindOps(RtContext *ContextRecord, RtUnwindInfo *UnwindInfo, 
                 ContextRecord->Rsp += Code->OpInfo * sizeof(uint64_t);
                 ContextRecord->Rip = *(uint64_t *)ContextRecord->Rsp;
                 ContextRecord->Rsp = *(uint64_t *)(ContextRecord->Rsp + 24);
-
-                /* MACHFRAME should mean we're done (no matter if we have more ops ahead, though
-                   we should have none). */
                 return 1;
         }
     }
@@ -168,13 +170,13 @@ RtRuntimeFunction *RtLookupFunctionEntry(uint64_t ImageBase, uint64_t Address) {
     /* The table should be sorted, so we can do a binary search. */
     uint32_t Start = 0;
     uint32_t End = Size;
-    while (Start <= End) {
+    while (Start < End) {
         uint32_t Mid = (Start + End) / 2;
         RtRuntimeFunction *Entry = &Table[Mid];
 
         if (Address < Entry->BeginAddress) {
             End = Mid;
-        } else if (Address > Entry->EndAddress) {
+        } else if (Address >= Entry->EndAddress) {
             Start = Mid + 1;
         } else {
             return Entry;
@@ -217,17 +219,14 @@ RtExceptionRoutine RtVirtualUnwind(
         return NULL;
     }
 
-    uint64_t Offset = ControlPc - FunctionEntry->BeginAddress;
+    uint64_t Offset = ControlPc - ImageBase - FunctionEntry->BeginAddress;
     RtUnwindInfo *UnwindInfo = (RtUnwindInfo *)(ImageBase + FunctionEntry->UnwindData);
+    uint64_t FrameBase = 0;
 
     do {
-        if (!EstablisherFrame) {
-            break;
-        }
-
         /* If we have no frame pointer, the frame pointer is RSP. */
         if (!UnwindInfo->FrameRegister) {
-            *EstablisherFrame = ContextRecord->Rsp;
+            FrameBase = ContextRecord->Rsp;
             break;
         }
 
@@ -249,38 +248,44 @@ RtExceptionRoutine RtVirtualUnwind(
         }
 
         if (HasSetFpreg) {
-            *EstablisherFrame =
+            FrameBase =
                 ContextRecord->Gpr[UnwindInfo->FrameRegister] - UnwindInfo->FrameOffset * 16;
         } else {
-            *EstablisherFrame = ContextRecord->Rsp;
+            FrameBase = ContextRecord->Rsp;
         }
     } while (0);
 
-    /* Any compilers following the current SEH standard really shouldn't be depending on us
-     * manually detecting and executing the epilog instructions, so it should be safe to just
-     * fallback everything to the common path. */
-
-    /* Skip any ops smaller than the current offset (they don't need to be executed/unwinded). */
-    int OpIndex = 0;
-    while (OpIndex < UnwindInfo->CountOfCodes &&
-           UnwindInfo->UnwindCode[OpIndex].CodeOffset > Offset) {
-        OpIndex += GetUnwindOpSlots(&UnwindInfo->UnwindCode[OpIndex]);
+    if (EstablisherFrame) {
+        *EstablisherFrame = FrameBase;
     }
 
-    /* Process any remaining unwind ops. */
-    int Done = ProcessUnwindOps(ContextRecord, UnwindInfo, OpIndex);
+    while (1) {
+        Offset = ControlPc - ImageBase - FunctionEntry->BeginAddress;
+        UnwindInfo = (RtUnwindInfo *)(ImageBase + FunctionEntry->UnwindData);
 
-    /* Process the chained info if this function entry has it. */
-    while (!Done && (UnwindInfo->Flags & RT_UNW_FLAG_CHAININFO)) {
-        UnwindInfo = (RtUnwindInfo *)(ImageBase +
-                                      RtGetChainedFunctionEntry(ImageBase, UnwindInfo)->UnwindData);
-        Done = ProcessUnwindOps(ContextRecord, UnwindInfo, 0);
-    }
+        /* Skip any ops smaller than the current offset (they don't need to be
+         * executed/unwinded). */
+        int OpIndex = 0;
+        while (OpIndex < UnwindInfo->CountOfCodes &&
+               UnwindInfo->UnwindCode[OpIndex].CodeOffset > Offset) {
+            OpIndex += GetUnwindOpSlots(&UnwindInfo->UnwindCode[OpIndex]);
+        }
 
-    /* Pop RIP (fully restoring the frame) if we haven't done that yet. */
-    if (!Done && ContextRecord->Rsp) {
-        ContextRecord->Rip = *(uint64_t *)ContextRecord->Rsp;
-        ContextRecord->Rsp += sizeof(uint64_t);
+        /* Process any remaining unwind ops. */
+        int HasMachineFrame = ProcessUnwindOps(ContextRecord, UnwindInfo, FrameBase, OpIndex);
+
+        /* And update the function entry if we have more chained info. */
+        if (UnwindInfo->Flags & RT_UNW_FLAG_CHAININFO) {
+            FunctionEntry = RtGetChainedFunctionEntry(ImageBase, UnwindInfo);
+        } else {
+            /* Or pop RIP (fully restoring the frame) if we haven't done that yet. */
+            if (!HasMachineFrame) {
+                ContextRecord->Rip = *(uint64_t *)ContextRecord->Rsp;
+                ContextRecord->Rsp += sizeof(uint64_t);
+            }
+
+            break;
+        }
     }
 
     /* We want to return the handler/callback if we have one matching the request type. */
