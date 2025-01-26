@@ -23,7 +23,7 @@ static struct {
     {HalpDefaultTrapEntryWithoutErrorCode, DESCR_IST_NONE, DESCR_DPL_KERNEL},
     {HalpDefaultTrapEntryWithoutErrorCode, DESCR_IST_NONE, DESCR_DPL_KERNEL},
     {HalpNmiTrapEntry, DESCR_IST_NMI, DESCR_DPL_KERNEL},
-    {HalpDefaultTrapEntryWithoutErrorCode, DESCR_IST_NONE, DESCR_DPL_KERNEL},
+    {HalpDefaultTrapEntryWithoutErrorCode, DESCR_IST_NONE, DESCR_DPL_USER},
     {HalpDefaultTrapEntryWithoutErrorCode, DESCR_IST_NONE, DESCR_DPL_KERNEL},
     {HalpDefaultTrapEntryWithoutErrorCode, DESCR_IST_NONE, DESCR_DPL_KERNEL},
     {HalpDefaultTrapEntryWithoutErrorCode, DESCR_IST_NONE, DESCR_DPL_KERNEL},
@@ -156,11 +156,13 @@ void HalpInitializeIdt(KeProcessor *Processor) {
     for (int i = 0; i < 256; i++) {
         uint64_t Base = 0;
         uint8_t Ist = DESCR_IST_NONE;
+        uint8_t Dpl = DESCR_DPL_KERNEL;
 
         /* Exception handlers. */
         if (i < 32) {
             Base = (uint64_t)TrapEntries[i].Handler;
             Ist = TrapEntries[i].Ist;
+            Dpl = TrapEntries[i].Dpl;
         }
 
         /* Interrupt handlers with special conditions (reserved IRQL, or not following the standard
