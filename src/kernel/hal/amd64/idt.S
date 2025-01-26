@@ -70,8 +70,7 @@ HalpPageFaultTrapEntry:
 .global HalpNmiTrapEntry
 HalpNmiTrapEntry:
     ENTER_INTERRUPT
-    mov $KE_PANIC_NMI_HARDWARE_FAILURE, %rcx
-    call KeFatalError
+    call HalpNmiHandler
 1:  jmp 1b
 .seh_endproc
 

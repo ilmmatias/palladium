@@ -52,6 +52,26 @@ static void (*TrapEntries[32])(void) = {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
+ *     This function tries handling a NMI (either as a processor freeze, or a machine check/panic).
+ *
+ * PARAMETERS:
+ *     InterruptFrame - Current interrupt data.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void HalpNmiHandler(HalInterruptFrame *) {
+    if (HalGetCurrentProcessor()->EventStatus == KE_EVENT_FREEZE) {
+        while (1) {
+            HalpStopProcessor();
+        }
+    }
+
+    KeFatalError(KE_PANIC_NMI_HARDWARE_FAILURE);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
  *     This function tries running all registered/enabled handlers for the current interrupt.
  *
  * PARAMETERS:
