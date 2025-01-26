@@ -111,7 +111,7 @@ static void InitializeApplicationProcessor(KeProcessor *Processor) {
     }
 
     /* Yield into the initial thread (PsYieldExecution should never return for us). */
-    PsYieldExecution();
+    PsYieldExecution(PS_YIELD_WAITING);
     while (1) {
         HalpStopProcessor();
     }

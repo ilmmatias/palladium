@@ -7,6 +7,9 @@
 #include <ev.h>
 #include <generic/context.h>
 
+#define PS_YIELD_NORMAL 0x00
+#define PS_YIELD_WAITING 0x01
+
 typedef struct PsThread {
     RtDList ListHeader;
     uint64_t ExpirationReference;
@@ -24,7 +27,7 @@ extern "C" {
 PsThread *PsCreateThread(void (*EntryPoint)(void *), void *Parameter);
 void PsReadyThread(PsThread *Thread);
 [[noreturn]] void PsTerminateThread(void);
-void PsYieldExecution(void);
+void PsYieldExecution(int Type);
 
 #ifdef __cplusplus
 }

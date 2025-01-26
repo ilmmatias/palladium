@@ -84,7 +84,7 @@ void PsReadyThread(PsThread *Thread) {
     KeProcessor *Processor = HalGetCurrentProcessor();
     PsThread *Thread = Processor->CurrentThread;
     Thread->Terminated = 1;
-    PsYieldExecution();
+    PsYieldExecution(PS_YIELD_WAITING);
     while (1) {
         HalpStopProcessor();
     }

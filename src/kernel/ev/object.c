@@ -50,7 +50,7 @@ void EvpDispatchObject(void *Object, uint64_t Timeout, int Yield) {
 
     if (Yield) {
         Header->Source = Processor->CurrentThread;
-        PsYieldExecution();
+        PsYieldExecution(PS_YIELD_WAITING);
 
         /* Idle loop to make sure we won't return too early. */
         while (!Header->Finished) {

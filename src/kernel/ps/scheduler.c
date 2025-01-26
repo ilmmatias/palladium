@@ -119,20 +119,20 @@ static void AdjustQueue(KeProcessor *Processor, PsThread *Thread) {
  * PARAMETERS:
  *     Processor - Which CPU scheduler we're using.
  *     Thread - Which thread to adjust the expiration.
- *     ThreadQueueSize - Size of the processor's thread queue.
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-static void AdjustExpiration(KeProcessor *Processor, PsThread *Thread, uint32_t ThreadQueueSize) {
+static void AdjustExpiration(KeProcessor *Processor, PsThread *Thread) {
     uint64_t CurrentTicks = HalGetTimerTicks();
+    uint64_t ThreadQueueSize = Processor->ThreadQueueSize;
     if (Thread == Processor->IdleThread || !ThreadQueueSize) {
         /* No use in setting an expiration if we have no more threads ahead. */
         Thread->ExpirationReference = 0;
         Thread->ExpirationTicks = 0;
     } else {
         /* Otherwise just make sure we limit how low the quantum can be. */
-        uint64_t ThreadQuantum = PSP_THREAD_QUANTUM / Processor->ThreadQueueSize;
+        uint64_t ThreadQuantum = PSP_THREAD_QUANTUM / ThreadQueueSize;
         if (ThreadQuantum < PSP_THREAD_MIN_QUANTUM) {
             ThreadQuantum = PSP_THREAD_MIN_QUANTUM;
         }
@@ -147,12 +147,12 @@ static void AdjustExpiration(KeProcessor *Processor, PsThread *Thread, uint32_t 
  *     This function forcefully switches out the current thread.
  *
  * PARAMETERS:
- *     None.
+ *     Type - Type of the yield (should we readd this thread to the queue?).
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void PsYieldExecution(void) {
+void PsYieldExecution(int Type) {
     /* Raise to DISPATCH (simulating the environment of the scheduler). */
     KeIrql OldIrql = KeRaiseIrql(KE_IRQL_DISPATCH);
     KeProcessor *Processor = HalGetCurrentProcessor();
@@ -162,9 +162,11 @@ void PsYieldExecution(void) {
      * (KiSystemStartup) into the scheduler world (KiContinueSystemStartup or PspIdleThread). */
     PsThread *TargetThread = GetNextThread(Processor, 1);
     CheckTermination(Processor, CurrentThread);
-    AdjustExpiration(Processor, TargetThread, Processor->ThreadQueueSize);
+    if (Type != PS_YIELD_WAITING) {
+        AdjustQueue(Processor, CurrentThread);
+    }
+    AdjustExpiration(Processor, TargetThread);
 
-    /* Now TargetThread should be pointing to something; If not, we're about to page fault.*/
     Processor->CurrentThread = TargetThread;
     if (CurrentThread) {
         HalpSwitchContext(&CurrentThread->Context, &TargetThread->Context);
@@ -220,7 +222,7 @@ void PspProcessQueue(HalInterruptFrame *) {
     /* Otherwise adjust both threads, and switch away.*/
     CheckTermination(Processor, CurrentThread);
     AdjustQueue(Processor, CurrentThread);
-    AdjustExpiration(Processor, TargetThread, Processor->ThreadQueueSize);
+    AdjustExpiration(Processor, TargetThread);
     Processor->CurrentThread = TargetThread;
     HalpSwitchContext(&CurrentThread->Context, &TargetThread->Context);
 }
