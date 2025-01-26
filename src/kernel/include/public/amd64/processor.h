@@ -20,6 +20,9 @@ typedef struct {
     RtDList DpcQueue;
     RtDList EventQueue;
     char SystemStack[8192] __attribute__((aligned(4096)));
+    char NmiStack[8192] __attribute__((aligned(4096)));
+    char DoubleFaultStack[8192] __attribute__((aligned(4096)));
+    char MachineCheckStack[8192] __attribute__((aligned(4096)));
     char GdtEntries[56];
     HalpTssEntry TssEntry;
     HalpIdtEntry IdtEntries[256];

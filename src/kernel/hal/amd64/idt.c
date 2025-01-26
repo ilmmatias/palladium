@@ -15,39 +15,43 @@ extern void HalpNmiTrapEntry(void);
 extern void HalpDispatchEntry(void);
 extern void HalpTimerEntry(void);
 
-static void (*TrapEntries[32])(void) = {
-    HalpDefaultTrapEntryWithoutErrorCode,
-    HalpDefaultTrapEntryWithoutErrorCode,
-    HalpNmiTrapEntry,
-    HalpDefaultTrapEntryWithoutErrorCode,
-    HalpDefaultTrapEntryWithoutErrorCode,
-    HalpDefaultTrapEntryWithoutErrorCode,
-    HalpDefaultTrapEntryWithoutErrorCode,
-    HalpDefaultTrapEntryWithoutErrorCode,
-    HalpDefaultTrapEntryWithErrorCode,
-    HalpDefaultTrapEntryWithoutErrorCode,
-    HalpDefaultTrapEntryWithErrorCode,
-    HalpDefaultTrapEntryWithErrorCode,
-    HalpDefaultTrapEntryWithErrorCode,
-    HalpDefaultTrapEntryWithErrorCode,
-    HalpPageFaultTrapEntry,
-    HalpDefaultTrapEntryWithoutErrorCode,
-    HalpDefaultTrapEntryWithoutErrorCode,
-    HalpDefaultTrapEntryWithErrorCode,
-    HalpDefaultTrapEntryWithoutErrorCode,
-    HalpDefaultTrapEntryWithoutErrorCode,
-    HalpDefaultTrapEntryWithoutErrorCode,
-    HalpDefaultTrapEntryWithErrorCode,
-    HalpDefaultTrapEntryWithoutErrorCode,
-    HalpDefaultTrapEntryWithoutErrorCode,
-    HalpDefaultTrapEntryWithoutErrorCode,
-    HalpDefaultTrapEntryWithoutErrorCode,
-    HalpDefaultTrapEntryWithoutErrorCode,
-    HalpDefaultTrapEntryWithoutErrorCode,
-    HalpDefaultTrapEntryWithoutErrorCode,
-    HalpDefaultTrapEntryWithErrorCode,
-    HalpDefaultTrapEntryWithErrorCode,
-    HalpDefaultTrapEntryWithoutErrorCode,
+static struct {
+    void (*Handler)(void);
+    uint8_t Ist;
+    uint8_t Dpl;
+} TrapEntries[32] = {
+    {HalpDefaultTrapEntryWithoutErrorCode, DESCR_IST_NONE, DESCR_DPL_KERNEL},
+    {HalpDefaultTrapEntryWithoutErrorCode, DESCR_IST_NONE, DESCR_DPL_KERNEL},
+    {HalpNmiTrapEntry, DESCR_IST_NMI, DESCR_DPL_KERNEL},
+    {HalpDefaultTrapEntryWithoutErrorCode, DESCR_IST_NONE, DESCR_DPL_KERNEL},
+    {HalpDefaultTrapEntryWithoutErrorCode, DESCR_IST_NONE, DESCR_DPL_KERNEL},
+    {HalpDefaultTrapEntryWithoutErrorCode, DESCR_IST_NONE, DESCR_DPL_KERNEL},
+    {HalpDefaultTrapEntryWithoutErrorCode, DESCR_IST_NONE, DESCR_DPL_KERNEL},
+    {HalpDefaultTrapEntryWithoutErrorCode, DESCR_IST_NONE, DESCR_DPL_KERNEL},
+    {HalpDefaultTrapEntryWithErrorCode, DESCR_IST_DOUBLE_FAULT, DESCR_DPL_KERNEL},
+    {HalpDefaultTrapEntryWithoutErrorCode, DESCR_IST_NONE, DESCR_DPL_KERNEL},
+    {HalpDefaultTrapEntryWithErrorCode, DESCR_IST_NONE, DESCR_DPL_KERNEL},
+    {HalpDefaultTrapEntryWithErrorCode, DESCR_IST_NONE, DESCR_DPL_KERNEL},
+    {HalpDefaultTrapEntryWithErrorCode, DESCR_IST_NONE, DESCR_DPL_KERNEL},
+    {HalpDefaultTrapEntryWithErrorCode, DESCR_IST_NONE, DESCR_DPL_KERNEL},
+    {HalpPageFaultTrapEntry, DESCR_IST_NONE, DESCR_DPL_KERNEL},
+    {HalpDefaultTrapEntryWithoutErrorCode, DESCR_IST_NONE, DESCR_DPL_KERNEL},
+    {HalpDefaultTrapEntryWithoutErrorCode, DESCR_IST_NONE, DESCR_DPL_KERNEL},
+    {HalpDefaultTrapEntryWithErrorCode, DESCR_IST_NONE, DESCR_DPL_KERNEL},
+    {HalpDefaultTrapEntryWithoutErrorCode, DESCR_IST_MACHINE_CHECK, DESCR_DPL_KERNEL},
+    {HalpDefaultTrapEntryWithoutErrorCode, DESCR_IST_NONE, DESCR_DPL_KERNEL},
+    {HalpDefaultTrapEntryWithoutErrorCode, DESCR_IST_NONE, DESCR_DPL_KERNEL},
+    {HalpDefaultTrapEntryWithErrorCode, DESCR_IST_NONE, DESCR_DPL_KERNEL},
+    {HalpDefaultTrapEntryWithoutErrorCode, DESCR_IST_NONE, DESCR_DPL_KERNEL},
+    {HalpDefaultTrapEntryWithoutErrorCode, DESCR_IST_NONE, DESCR_DPL_KERNEL},
+    {HalpDefaultTrapEntryWithoutErrorCode, DESCR_IST_NONE, DESCR_DPL_KERNEL},
+    {HalpDefaultTrapEntryWithoutErrorCode, DESCR_IST_NONE, DESCR_DPL_KERNEL},
+    {HalpDefaultTrapEntryWithoutErrorCode, DESCR_IST_NONE, DESCR_DPL_KERNEL},
+    {HalpDefaultTrapEntryWithoutErrorCode, DESCR_IST_NONE, DESCR_DPL_KERNEL},
+    {HalpDefaultTrapEntryWithoutErrorCode, DESCR_IST_NONE, DESCR_DPL_KERNEL},
+    {HalpDefaultTrapEntryWithErrorCode, DESCR_IST_NONE, DESCR_DPL_KERNEL},
+    {HalpDefaultTrapEntryWithErrorCode, DESCR_IST_NONE, DESCR_DPL_KERNEL},
+    {HalpDefaultTrapEntryWithoutErrorCode, DESCR_IST_NONE, DESCR_DPL_KERNEL},
 };
 
 /*-------------------------------------------------------------------------------------------------
@@ -151,10 +155,12 @@ static void InitializeEntry(
 void HalpInitializeIdt(KeProcessor *Processor) {
     for (int i = 0; i < 256; i++) {
         uint64_t Base = 0;
+        uint8_t Ist = DESCR_IST_NONE;
 
         /* Exception handlers. */
         if (i < 32) {
-            Base = (uint64_t)TrapEntries[i];
+            Base = (uint64_t)TrapEntries[i].Handler;
+            Ist = TrapEntries[i].Ist;
         }
 
         /* Interrupt handlers with special conditions (reserved IRQL, or not following the standard
@@ -170,7 +176,7 @@ void HalpInitializeIdt(KeProcessor *Processor) {
             Base = (uint64_t)&HalpDefaultInterruptHandlers[i - 32];
         }
 
-        InitializeEntry(Processor, i, Base, DESCR_SEG_KCODE, 0, IDT_TYPE_INT, DESCR_DPL_KERNEL);
+        InitializeEntry(Processor, i, Base, DESCR_SEG_KCODE, Ist, IDT_TYPE_INT, DESCR_DPL_KERNEL);
         RtInitializeDList(&Processor->InterruptList[i]);
     }
 

@@ -67,6 +67,9 @@ void HalpInitializeGdt(KeProcessor *Processor) {
     uint16_t TssSize = sizeof(HalpTssEntry);
     InitializeEntry(Processor, DESCR_SEG_TSS, TssBase, TssSize, GDT_TYPE_TSS, DESCR_DPL_KERNEL);
     Processor->TssEntry.Rsp0 = (uint64_t)&Processor->SystemStack;
+    Processor->TssEntry.Ist[DESCR_IST_NMI - 1] = (uint64_t)&Processor->NmiStack;
+    Processor->TssEntry.Ist[DESCR_IST_DOUBLE_FAULT - 1] = (uint64_t)&Processor->DoubleFaultStack;
+    Processor->TssEntry.Ist[DESCR_IST_MACHINE_CHECK - 1] = (uint64_t)&Processor->MachineCheckStack;
     Processor->TssEntry.IoMapBase = TssSize;
 
     HalpGdtDescriptor Descriptor;
