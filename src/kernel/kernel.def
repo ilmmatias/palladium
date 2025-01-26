@@ -17,13 +17,15 @@ EXPORTS
     IoOpenDevice
 
     KeAcquireSpinLock
+    KeAcquireSpinLockHighIrql
     KeFatalError
     KeGetIrql
     KeLowerIrql
     KeRaiseIrql
     KeReleaseSpinLock
+    KeReleaseSpinLockHighIrql
     KeTestSpinLock
-    KeTryAcquireSpinLock
+    KeTryAcquireSpinLockHighIrql
     KiFindAcpiTable
 
     MmAllocatePool
