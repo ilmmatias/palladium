@@ -16,20 +16,20 @@
  * RETURN VALUE:
  *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
-.global HalpApEntry
+.global HalpApplicationProcessorEntry
 .code16
-HalpApEntry:
+HalpApplicationProcessorEntry:
     cli
     cld
 
     /* Setup a proper 32-bits GDT. */
-    lgdtl (HalpTemporaryGdtSize32 - HalpApEntry + 0x8000)
+    lgdtl (HalpTemporaryGdtSize32 - HalpApplicationProcessorEntry + 0x8000)
 
     /* Set the protected bit, and ljmp into protected mode. */
     mov %cr0, %eax
     or $1, %eax
     mov %eax, %cr0
-    ljmpl $8, $(0f - HalpApEntry + 0x8000)
+    ljmpl $8, $(0f - HalpApplicationProcessorEntry + 0x8000)
 
 .code32
 0:
@@ -65,15 +65,15 @@ HalpApEntry:
     wrmsr
 
     /* Install the kernel page map, and enable paging. */
-    mov (HalpKernelPageMap - HalpApEntry)(%ebp), %eax
+    mov (HalpKernelPageMap - HalpApplicationProcessorEntry)(%ebp), %eax
     mov %eax, %cr3
     mov %cr0, %eax
     or $0x80010000, %eax
     mov %eax, %cr0
 
     /* All we've left is loading a proper 64-bits GDT, and long jmp'ing into 64-bits mode. */
-    lgdt (HalpTemporaryGdtSize64 - HalpApEntry + 0x8000)
-    ljmpl $8, $(0f - HalpApEntry + 0x8000)
+    lgdt (HalpTemporaryGdtSize64 - HalpApplicationProcessorEntry + 0x8000)
+    ljmpl $8, $(0f - HalpApplicationProcessorEntry + 0x8000)
 
 .code64
 0:
@@ -85,7 +85,7 @@ HalpApEntry:
     mov %ax, %ss
 
     /* Get our kernel processor ID, and indicate that we're fully online (and about to enter
-     * KiApEntry). */
+     * KiSystemStartup). */
     movabs $HalpOnlineProcessorCount, %rbp
     mov $1, %eax
     lock xadd %eax, (%rbp)
@@ -93,8 +93,8 @@ HalpApEntry:
     /* Setup the stack, we need it for the SSE initialization (offset by 8, because CALL vs JMP). */
     movabs $HalpProcessorList, %rbp
     mov (%rbp), %rbp
-    mov (%rbp, %rax, 8), %rcx
-    lea 0x2FF8(%rcx), %rsp
+    mov (%rbp, %rax, 8), %rdx
+    lea 0x2FF8(%rdx), %rsp
 
     /* Now we can enable SSE and load up the same sane defaults the BSP uses. */
     fninit
@@ -109,18 +109,19 @@ HalpApEntry:
     ldmxcsr (%rsp)
 
     /* Now we should be safe to jump to the kernel entry. */
-    movabs $KiApEntry, %rax
+    movabs $KiSystemStartup, %rax
+    xor %rcx, %rcx
     jmp *%rax
 
 .align 8
 HalpTemporaryGdtDescs32: .quad 0x0000000000000000, 0x00CF9A000000FFFF, 0x00CF92000000FFFF
 HalpTemporaryGdtSize32: .short HalpTemporaryGdtSize32 - HalpTemporaryGdtDescs32 - 1
-HalpTemporaryGdtBase32: .long HalpTemporaryGdtDescs32 - HalpApEntry + 0x8000
+HalpTemporaryGdtBase32: .long HalpTemporaryGdtDescs32 - HalpApplicationProcessorEntry + 0x8000
 
 .align 8
 HalpTemporaryGdtDescs64: .quad 0x0000000000000000, 0x00AF9A000000FFFF, 0x00AF92000000FFFF
 HalpTemporaryGdtSize64: .short HalpTemporaryGdtSize64 - HalpTemporaryGdtDescs64 - 1
-HalpTemporaryGdtBase64: .long HalpTemporaryGdtDescs64 - HalpApEntry + 0x8000, 0
+HalpTemporaryGdtBase64: .long HalpTemporaryGdtDescs64 - HalpApplicationProcessorEntry + 0x8000, 0
 
 .global HalpKernelPageMap
 HalpKernelPageMap: .quad 0

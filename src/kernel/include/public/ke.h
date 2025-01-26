@@ -67,9 +67,11 @@ KeIrql KeGetIrql(void);
 KeIrql KeRaiseIrql(KeIrql NewIrql);
 void KeLowerIrql(KeIrql NewIrql);
 
-int KeTryAcquireSpinLock(KeSpinLock *Lock);
+int KeTryAcquireSpinLockHighIrql(KeSpinLock *Lock);
 KeIrql KeAcquireSpinLock(KeSpinLock *Lock);
+void KeAcquireSpinLockHighIrql(KeSpinLock *Lock);
 void KeReleaseSpinLock(KeSpinLock *Lock, KeIrql NewIrql);
+void KeReleaseSpinLockHighIrql(KeSpinLock *Lock);
 int KeTestSpinLock(KeSpinLock *Lock);
 
 [[noreturn]] void KeFatalError(uint32_t Message);

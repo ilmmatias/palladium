@@ -3,7 +3,6 @@
 
 #include <ke.h>
 #include <mi.h>
-#include <vid.h>
 
 MiPageEntry *MiPageList = NULL;
 RtDList MiFreePageListHead;

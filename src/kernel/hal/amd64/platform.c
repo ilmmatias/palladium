@@ -4,14 +4,46 @@
 #include <amd64/halp.h>
 #include <amd64/msr.h>
 #include <mm.h>
-#include <vid.h>
 
-extern void KiInitializeBspScheduler(void);
+[[noreturn]] extern void KiSystemStartup(KiLoaderBlock *LoaderBlock, KeProcessor *Processor);
+
+/* This is pretty important to be here, as we need it before the memory manager initialization
+ * to switch out of the bootloader stack. */
+static KeProcessor BootProcessor __attribute__((aligned(4096))) = {};
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function allocates the BSP processor structure (along with its stack), and runs any
- *     early arch-specific initialization routines required for the boot processor.
+ *     This function re-enters KiSystemStartup using the boot processor kernel stack instead of the
+ *     osloader temporary stack.
+ *
+ * PARAMETERS:
+ *     LoaderBlock - Data prepared by the boot loader for us.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void HalpInitializeBootStack(KiLoaderBlock *LoaderBlock) {
+    __asm__ volatile("mov %0, %%rax\n"
+                     "mov %1, %%rcx\n"
+                     "mov %2, %%rdx\n"
+                     "mov %3, %%rsp\n"
+                     "jmp *%%rax\n"
+                     :
+                     : "r"(KiSystemStartup),
+                       "r"(LoaderBlock),
+                       "r"(&BootProcessor),
+                       "r"(BootProcessor.SystemStack + sizeof(BootProcessor.SystemStack) - 8)
+                     : "%rax", "%rcx", "%rdx");
+
+    while (1) {
+        HalpStopProcessor();
+    }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function runs any early arch-specific initialization routines required for the boot
+ *     processor.
  *
  * PARAMETERS:
  *     None.
@@ -19,35 +51,19 @@ extern void KiInitializeBspScheduler(void);
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-[[noreturn]] void HalpInitializeBsp(void) {
-    KeProcessor *Processor = MmAllocatePool(sizeof(KeProcessor), "Halp");
-    if (!Processor) {
-        KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
-    }
-
-    WriteMsr(0xC0000102, (uint64_t)Processor);
-    HalpSetIrql(KE_IRQL_PASSIVE);
-    HalpInitializeGdt(Processor);
-    HalpInitializeIdt(Processor);
+void HalpInitializeBootProcessor(void) {
+    /* This should always go well (if it doesn't, KeFatalError is called outside of us). */
+    WriteMsr(0xC0000102, (uint64_t)&BootProcessor);
+    HalpInitializeGdt(&BootProcessor);
+    HalpInitializeIdt(&BootProcessor);
     HalpInitializeIoapic();
     HalpInitializeApic();
     HalpEnableApic();
-    Processor->ApicId = HalpReadLapicId();
+    BootProcessor.ApicId = HalpReadLapicId();
     HalpInitializeHpet();
     HalpInitializeSmp();
     HalpInitializeApicTimer();
-
-    __asm__ volatile("mov %0, %%rax\n"
-                     "mov %1, %%rsp\n"
-                     "jmp *%%rax\n"
-                     :
-                     : "r"(KiInitializeBspScheduler),
-                       "r"(Processor->SystemStack + sizeof(Processor->SystemStack) - 8)
-                     : "%rax");
-
-    while (1) {
-        HalpStopProcessor();
-    }
+    HalpSetIrql(KE_IRQL_PASSIVE);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -61,14 +77,14 @@ extern void KiInitializeBspScheduler(void);
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void HalpInitializeAp(KeProcessor *Processor) {
+void HalpInitializeApplicationProcessor(KeProcessor *Processor) {
     WriteMsr(0xC0000102, (uint64_t)Processor);
-    HalpSetIrql(KE_IRQL_PASSIVE);
     HalpInitializeGdt(Processor);
     HalpInitializeIdt(Processor);
     HalpEnableApic();
     Processor->ApicId = HalpReadLapicId();
     HalpInitializeApicTimer();
+    HalpSetIrql(KE_IRQL_PASSIVE);
 }
 
 /*-------------------------------------------------------------------------------------------------

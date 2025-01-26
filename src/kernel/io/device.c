@@ -26,12 +26,12 @@ int IoCreateDevice(const char *Name, IoReadFn Read, IoWriteFn Write) {
         return 0;
     }
 
-    IoDevice *Entry = (IoDevice *)MmAllocatePool(sizeof(IoDevice), "Io  ");
+    IoDevice *Entry = MmAllocatePool(sizeof(IoDevice), "Io  ");
     if (!Entry) {
         return 0;
     }
 
-    Entry->Name = (char *)MmAllocatePool(strlen(Name) + 1, "Io  ");
+    Entry->Name = MmAllocatePool(strlen(Name) + 1, "Io  ");
     if (!Entry->Name) {
         MmFreePool(Entry, "Io  ");
         return 0;

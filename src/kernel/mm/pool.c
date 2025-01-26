@@ -164,7 +164,7 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
         return Header + 1;
     }
 
-    PoolHeader *Header = (PoolHeader *)AllocatePoolPages(1);
+    PoolHeader *Header = AllocatePoolPages(1);
     if (!Header) {
         KeReleaseSpinLock(&Lock, OldIrql);
         return NULL;

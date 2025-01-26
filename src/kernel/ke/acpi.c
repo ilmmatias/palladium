@@ -157,7 +157,7 @@ static void CacheTable(void) {
 
     /* We're still missing the DSDT (we're not trusting any DSDT in the RSDT), grab the FACP, and
      * the use the DSDT from there. */
-    FadtHeader *Fadt = (FadtHeader *)KiFindAcpiTable("FACP", 0);
+    FadtHeader *Fadt = KiFindAcpiTable("FACP", 0);
     if (!Fadt) {
         return;
     }

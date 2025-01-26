@@ -7,7 +7,7 @@
 #include <efi/spec.h>
 #include <stdint.h>
 
-typedef struct __attribute__((aligned)) {
+typedef struct __attribute__((packed)) {
     char Signature[8];
     uint8_t Checksum;
     char OemId[6];

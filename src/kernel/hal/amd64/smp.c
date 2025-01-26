@@ -9,7 +9,7 @@
 #include <string.h>
 #include <vid.h>
 
-extern void HalpApEntry(void);
+extern void HalpApplicationProcessorEntry(void);
 extern uint64_t HalpKernelPageMap;
 extern RtSList HalpLapicListHead;
 
@@ -18,8 +18,8 @@ uint32_t HalpOnlineProcessorCount = 1;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function switches on all APs (Application Processors, aka, CPUs other than the startup
- *     CPU), and starts their setup process.
+ *     This function gets all APs (Application Processors, aka, CPUs other than the startup CPU)
+ *     online, and starts their setup process.
  *
  * PARAMETERS:
  *     None.
@@ -32,13 +32,13 @@ void HalpInitializeSmp(void) {
 
     /* Map the AP startup code (0x8000), and copy all the trampoline data to it. */
     HalpMapPage((void *)0x8000, 0x8000, MI_MAP_WRITE | MI_MAP_EXEC);
-    memcpy((void *)0x8000, HalpApEntry, MM_PAGE_SIZE);
+    memcpy((void *)0x8000, HalpApplicationProcessorEntry, MM_PAGE_SIZE);
 
     /* Save the kernel page map (shared between all processors).
        The address is guaranteed to be on the low 4GiBs (because of bootmgr). */
-    __asm__ volatile(
-        "mov %%cr3, %0"
-        : "=r"(*(uint64_t *)((uint64_t)&HalpKernelPageMap - (uint64_t)HalpApEntry + 0x8000)));
+    __asm__ volatile("mov %%cr3, %0"
+                     : "=r"(*(uint64_t *)((uint64_t)&HalpKernelPageMap -
+                                          (uint64_t)HalpApplicationProcessorEntry + 0x8000)));
 
     /* Allocate space for all the processors (this is just the pointer list, we'll be allocating
      * each processor after that). */
@@ -51,7 +51,7 @@ void HalpInitializeSmp(void) {
 
     for (uint32_t i = 0; i < HalpProcessorCount; i++) {
         if (!i) {
-            HalpProcessorList[i] = (KeProcessor *)HalGetCurrentProcessor();
+            HalpProcessorList[i] = HalGetCurrentProcessor();
         } else {
             HalpProcessorList[i] = MmAllocatePool(sizeof(KeProcessor), "Halp");
         }
@@ -62,12 +62,7 @@ void HalpInitializeSmp(void) {
             KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
         }
 
-        HalpProcessorList[i]->ThreadQueueSize = 1;
-        HalpProcessorList[i]->ThreadQueueLock = 0;
         RtInitializeDList(&HalpProcessorList[i]->ThreadQueue);
-
-        HalpProcessorList[i]->ForceYield = 0;
-        HalpProcessorList[i]->EventStatus = 0;
         RtInitializeDList(&HalpProcessorList[i]->DpcQueue);
         RtInitializeDList(&HalpProcessorList[i]->EventQueue);
     }

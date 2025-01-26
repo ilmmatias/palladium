@@ -11,6 +11,7 @@
 #endif /* ARCH */
 
 #include <hal.h>
+#include <ki.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -19,8 +20,9 @@ extern "C" {
 extern uint32_t HalpProcessorCount;
 extern KeProcessor **HalpProcessorList;
 
-[[noreturn]] void HalpInitializeBsp(void);
-void HalpInitializeAp(KeProcessor *Processor);
+void HalpInitializeBootStack(KiLoaderBlock *LoaderBlock);
+void HalpInitializeBootProcessor(void);
+void HalpInitializeApplicationProcessor(KeProcessor *Processor);
 void HalpStopProcessor(void);
 void HalpPauseProcessor(void);
 

@@ -5,7 +5,6 @@
 #include <mi.h>
 #include <rt/bitmap.h>
 #include <string.h>
-#include <vid.h>
 
 extern MiPageEntry *MiPageList;
 extern RtDList MiFreePageListHead;
