@@ -5,6 +5,7 @@
 #define _RT_AMD64_CONTEXT_H_
 
 #include <stdint.h>
+#include <x86intrin.h>
 
 typedef struct __attribute__((packed)) {
     union {

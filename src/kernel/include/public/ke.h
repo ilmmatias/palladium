@@ -4,13 +4,13 @@
 #ifndef _KE_H_
 #define _KE_H_
 
-#include <rt/list.h>
-
 #ifdef ARCH_amd64
 #include <amd64/processor.h>
 #else
 #error "Undefined ARCH for the kernel module!"
-#endif /* ARCH */
+#endif /* ARCH_amd64 */
+
+#include <rt/list.h>
 
 #define KE_EVENT_NONE 0
 #define KE_EVENT_FREEZE 1
@@ -24,19 +24,17 @@
 #define KE_PANIC_EXCEPTION_NOT_HANDLED 6
 #define KE_PANIC_TRAP_NOT_HANDLED 7
 #define KE_PANIC_PAGE_FAULT_NOT_HANDLED 8
-#define KE_PANIC_SYSTEM_SERVICE_NOT_HANDLED 9
-#define KE_PANIC_NMI_HARDWARE_FAILURE 10
-#define KE_PANIC_INSTALL_MORE_MEMORY 11
-#define KE_PANIC_BAD_PFN_HEADER 12
-#define KE_PANIC_BAD_POOL_HEADER 13
-#define KE_PANIC_BAD_SYSTEM_TABLE 14
-#define KE_PANIC_COUNT 15
+#define KE_PANIC_NMI_HARDWARE_FAILURE 9
+#define KE_PANIC_INSTALL_MORE_MEMORY 10
+#define KE_PANIC_BAD_PFN_HEADER 11
+#define KE_PANIC_BAD_POOL_HEADER 12
+#define KE_PANIC_BAD_SYSTEM_TABLE 13
+#define KE_PANIC_COUNT 14
 
 #if defined(ARCH_amd64)
 #define KE_IRQL_PASSIVE 0
-#define KE_IRQL_DISPATCH 1
-#define KE_IRQL_CLOCK 13
-#define KE_IRQL_IPI 14
+#define KE_IRQL_DISPATCH 2
+#define KE_IRQL_DEVICE 3
 #define KE_IRQL_MASK 15
 
 #define KE_STACK_SIZE 0x2000

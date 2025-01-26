@@ -2,111 +2,12 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <halp.h>
-#include <ki.h>
 #include <mm.h>
 #include <psp.h>
 
-extern PsThread *PspSystemThread;
-
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function adds a thread to a processor queue, calling a switch event if overdue.
- *
- * PARAMETERS:
- *     Thread - Which thread to add.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-void PsReadyThread(PsThread *Thread) {
-    /* Always try and add the thread to the least full queue. */
-    size_t BestMatchSize = SIZE_MAX;
-    KeProcessor *BestMatch = NULL;
-
-    for (uint32_t i = 0; i < HalpProcessorCount; i++) {
-        /* Unless the processor list is somehow NULL, we should be TRUE in the if below at least
-           once. */
-        if (!BestMatch || HalpProcessorList[i]->ThreadQueueSize < BestMatchSize) {
-            BestMatchSize = HalpProcessorList[i]->ThreadQueueSize;
-            BestMatch = HalpProcessorList[i];
-        }
-    }
-
-    /* Now we're forced to lock the processor queue (there was no need up until now, as we were
-       only reading). */
-    KeIrql OldIrql = KeAcquireSpinLock(&BestMatch->ThreadQueueLock);
-    __atomic_add_fetch(&BestMatch->ThreadQueueSize, 1, __ATOMIC_SEQ_CST);
-    RtAppendDList(&BestMatch->ThreadQueue, &Thread->ListHeader);
-    KeReleaseSpinLock(&BestMatch->ThreadQueueLock, OldIrql);
-
-    /* PspScheduleNext uses ExpirationTicks=0 as a sign that we need to switch asap (we were out of
-       work). */
-    if (!BestMatch->CurrentThread->ExpirationTicks) {
-        HalpNotifyProcessor(BestMatch, 0);
-    }
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function initializes the thread queue for the current processor, and switches into
- *     either the idle thread (for APs) or the system thread (for the BSP).
- *
- * PARAMETERS:
- *     IsBsp - Set this to 1 if we're initializing the BSP, or to 0 for the APs.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-void PspInitializeScheduler(int IsBsp) {
-    KeProcessor *Processor = HalGetCurrentProcessor();
-    /* PspScheduleNext should forcefully "switch" threads if we're not running anything. */
-    Processor->CurrentThread = NULL;
-    Processor->InitialThread = IsBsp ? PspSystemThread : Processor->IdleThread;
-    HalpNotifyProcessor(Processor, 1);
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function gets the next highest priority thread that can be executed.
- *
- * PARAMETERS:
- *     Processor - Which CPU scheduler we're using.
- *
- * RETURN VALUE:
- *     Which thread to execute next.
- *-----------------------------------------------------------------------------------------------*/
-static PsThread *GetNextReadyThread(KeProcessor *Processor) {
-    KeIrql OldIrql = KeAcquireSpinLock(&Processor->ThreadQueueLock);
-    RtDList *ListHeader = RtPopDList(&Processor->ThreadQueue);
-    KeReleaseSpinLock(&Processor->ThreadQueueLock, OldIrql);
-
-    if (ListHeader != &Processor->ThreadQueue) {
-        return CONTAINING_RECORD(ListHeader, PsThread, ListHeader);
-    }
-
-    /* Failed to obtain the thread, let's try stealing something from another processor (so that
-     * we don't stay empty). */
-    for (uint32_t i = 0; i < HalpProcessorCount; i++) {
-        if (HalpProcessorList[i] == Processor) {
-            continue;
-        }
-
-        KeIrql OldIrql = KeAcquireSpinLock(&Processor->ThreadQueueLock);
-        RtDList *ListHeader = RtPopDList(&Processor->ThreadQueue);
-        KeReleaseSpinLock(&Processor->ThreadQueueLock, OldIrql);
-
-        if (ListHeader != &Processor->ThreadQueue) {
-            return CONTAINING_RECORD(ListHeader, PsThread, ListHeader);
-        }
-    }
-
-    return Processor->ForceYield ? Processor->IdleThread : NULL;
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     Cleanup routine for killed/terminated threads; We're forced to use a DPC (+this method), as
- *     PspScheduleNext runs in the context of the terminated thread.
+ *     Cleanup routine for killed/terminated threads.
  *
  * PARAMETERS:
  *     Thread - Which thread was killed.
@@ -114,94 +15,212 @@ static PsThread *GetNextReadyThread(KeProcessor *Processor) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-static void TerminationDpc(PsThread *Thread) {
+static void TerminationDpc(void *ThreadPointer) {
+    PsThread *Thread = ThreadPointer;
     MmFreePool(Thread->Stack, "Ps  ");
     MmFreePool(Thread, "Ps  ");
 }
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function tries scheduling and executing the next available thread.
+ *     This function tries getting a new thread to be executed.
  *
  * PARAMETERS:
- *     Context - Current processor state.
+ *     Processor - Which CPU scheduler we're using.
+ *     AllowInitial - Set this to 1 if we should allow scheduling the initial system thread.
  *
  * RETURN VALUE:
- *     None..
+ *     Which thread we should run.
  *-----------------------------------------------------------------------------------------------*/
-void PspScheduleNext(HalRegisterState *Context) {
-    KeProcessor *Processor = HalGetCurrentProcessor();
-    PsThread *CurrentThread = Processor->CurrentThread;
-
-    /* Scheduler initialization, there should be no contention yet (we're using InitialThread
-     * instead of the queue). */
-    if (!Processor->InitialThread) {
-        return;
-    } else if (!Processor->CurrentThread) {
-        Processor->CurrentThread = Processor->InitialThread;
-        Processor->CurrentThread->ExpirationReference = 0;
-        Processor->CurrentThread->ExpirationTicks = 0;
-        HalpRestoreThreadContext(Context, &Processor->CurrentThread->Context);
-        return;
+static PsThread *GetNextThread(KeProcessor *Processor, int AllowInitial) {
+    /* First try getting a thread from the current processor wait list. */
+    if (Processor->ThreadQueueSize) {
+        KeIrql OldIrql = KeAcquireSpinLock(&Processor->ThreadQueueLock);
+        RtDList *ListHeader = RtPopDList(&Processor->ThreadQueue);
+        if (ListHeader != &Processor->ThreadQueue) {
+            __atomic_sub_fetch(&Processor->ThreadQueueSize, 1, __ATOMIC_SEQ_CST);
+            KeReleaseSpinLock(&Processor->ThreadQueueLock, OldIrql);
+            return CONTAINING_RECORD(ListHeader, PsThread, ListHeader);
+        }
+        KeReleaseSpinLock(&Processor->ThreadQueueLock, OldIrql);
     }
 
-    if (Processor->CurrentThread->Terminated) {
-        Processor->ForceYield = PSP_YIELD_EVENT;
+    /* If we fail to do so, let's try stealing something from another processor. */
+    for (uint32_t i = 0; i < HalpProcessorCount; i++) {
+        if (HalpProcessorList[i] == Processor || !HalpProcessorList[i]->ThreadQueueSize) {
+            continue;
+        }
+
+        KeIrql OldIrql = KeAcquireSpinLock(&HalpProcessorList[i]->ThreadQueueLock);
+        RtDList *ListHeader = RtPopDList(&HalpProcessorList[i]->ThreadQueue);
+        if (ListHeader != &HalpProcessorList[i]->ThreadQueue) {
+            __atomic_sub_fetch(&HalpProcessorList[i]->ThreadQueueSize, 1, __ATOMIC_SEQ_CST);
+            KeReleaseSpinLock(&HalpProcessorList[i]->ThreadQueueLock, OldIrql);
+            return CONTAINING_RECORD(ListHeader, PsThread, ListHeader);
+        }
+        KeReleaseSpinLock(&HalpProcessorList[i]->ThreadQueueLock, OldIrql);
     }
 
-    /* On quantum expiry, we switch threads if possible;
-     * On force yield, we always switch threads (into the idle if nothing is left). */
+    /* If that failed as well, then try to use the initial thread (in case this is the scheduler
+     * initialization). */
+    if (AllowInitial && Processor->InitialThread) {
+        PsThread *Thread = Processor->InitialThread;
+        Processor->InitialThread = NULL;
+        return Thread;
+    }
+
+    /* Fallback to the idle thread if all else failed. */
+    return Processor->IdleThread;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function creates a DPC to handle thread termination if required.
+ *
+ * PARAMETERS:
+ *     Processor - Which CPU scheduler we're using.
+ *     Thread - Which thread to check for termination.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+static void CheckTermination(KeProcessor *Processor, PsThread *Thread) {
+    if (Thread && Thread->Terminated) {
+        EvInitializeDpc(&Thread->TerminationDpc, TerminationDpc, Thread);
+        RtAppendDList(&Processor->DpcQueue, &Thread->TerminationDpc.ListHeader);
+    }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function appends the given thread back into the queue.
+ *
+ * PARAMETERS:
+ *     Processor - Which CPU scheduler we're using.
+ *     Thread - Which thread to enqueue.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+static void AdjustQueue(KeProcessor *Processor, PsThread *Thread) {
+    if (!Thread->Terminated) {
+        KeIrql OldIrql = KeAcquireSpinLock(&Processor->ThreadQueueLock);
+        RtAppendDList(&Processor->ThreadQueue, &Thread->ListHeader);
+        __atomic_add_fetch(&Processor->ThreadQueueSize, 1, __ATOMIC_SEQ_CST);
+        KeReleaseSpinLock(&Processor->ThreadQueueLock, OldIrql);
+    }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function adjusts the expiration of the new current thread using the thread queue
+ *     size.
+ *
+ * PARAMETERS:
+ *     Processor - Which CPU scheduler we're using.
+ *     Thread - Which thread to adjust the expiration.
+ *     ThreadQueueSize - Size of the processor's thread queue.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+static void AdjustExpiration(KeProcessor *Processor, PsThread *Thread, uint32_t ThreadQueueSize) {
     uint64_t CurrentTicks = HalGetTimerTicks();
-    if (CurrentThread->ExpirationTicks &&
-        !HalCheckTimerExpiration(
-            CurrentTicks, CurrentThread->ExpirationReference, CurrentThread->ExpirationTicks) &&
-        !Processor->ForceYield) {
-        return;
-    }
-
-    PsThread *NewThread = GetNextReadyThread(Processor);
-    if (!NewThread) {
-        return;
-    }
-
-    if (NewThread == Processor->IdleThread) {
-        NewThread->ExpirationReference = 0;
-        NewThread->ExpirationTicks = 0;
+    if (Thread == Processor->IdleThread || !ThreadQueueSize) {
+        /* No use in setting an expiration if we have no more threads ahead. */
+        Thread->ExpirationReference = 0;
+        Thread->ExpirationTicks = 0;
     } else {
+        /* Otherwise just make sure we limit how low the quantum can be. */
         uint64_t ThreadQuantum = PSP_THREAD_QUANTUM / Processor->ThreadQueueSize;
         if (ThreadQuantum < PSP_THREAD_MIN_QUANTUM) {
             ThreadQuantum = PSP_THREAD_MIN_QUANTUM;
         }
 
-        NewThread->ExpirationReference = CurrentTicks;
-        NewThread->ExpirationTicks = ThreadQuantum / HalGetTimerPeriod();
+        Thread->ExpirationReference = CurrentTicks;
+        Thread->ExpirationTicks = ThreadQuantum / HalGetTimerPeriod();
+    }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function forcefully switches out the current thread.
+ *
+ * PARAMETERS:
+ *     None.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void PsYieldExecution(void) {
+    /* Raise to DISPATCH (simulating the environment of the scheduler). */
+    KeIrql OldIrql = KeRaiseIrql(KE_IRQL_DISPATCH);
+    KeProcessor *Processor = HalGetCurrentProcessor();
+    PsThread *CurrentThread = Processor->CurrentThread;
+
+    /* This is the only place that's allowed to switch from the non-scheduler world
+     * (KiSystemStartup) into the scheduler world (KiContinueSystemStartup or PspIdleThread). */
+    PsThread *TargetThread = GetNextThread(Processor, 1);
+    CheckTermination(Processor, CurrentThread);
+    AdjustExpiration(Processor, TargetThread, Processor->ThreadQueueSize);
+
+    /* Now TargetThread should be pointing to something; If not, we're about to page fault.*/
+    Processor->CurrentThread = TargetThread;
+    if (CurrentThread) {
+        HalpSwitchContext(&CurrentThread->Context, &TargetThread->Context);
+    } else {
+        HalpSwitchContext(NULL, &TargetThread->Context);
     }
 
-    /* Thread cleanup cannot be done at the moment (we're still on the thread context!),
-     * we need to enqueue a DPC if we yielded out because of PsTerminateThread. */
-    if (Processor->CurrentThread->Terminated) {
-        EvInitializeDpc(
-            &Processor->CurrentThread->TerminationDpc,
-            (void (*)(void *))TerminationDpc,
-            Processor->CurrentThread);
-        RtAppendDList(&Processor->DpcQueue, &Processor->CurrentThread->TerminationDpc.ListHeader);
+    /* And if HalpSwitchContext returned, we should be back from the thread we yielded into. */
+    KeLowerIrql(OldIrql);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function handles switching the current thread if required. We expect to already be at
+ *     the DISPATCH IRQL.
+ *
+ * PARAMETERS:
+ *     InterruptFrame - Current processor state.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void PspProcessQueue(HalInterruptFrame *) {
+    if (KeGetIrql() != KE_IRQL_DISPATCH) {
+        KeFatalError(KE_PANIC_IRQL_NOT_DISPATCH);
     }
 
-    Processor->CurrentThread = NewThread;
-
-    if (Processor->ForceYield == PSP_YIELD_EVENT) {
-        __atomic_sub_fetch(&Processor->ThreadQueueSize, 1, __ATOMIC_SEQ_CST);
-    } else if (CurrentThread != Processor->IdleThread) {
-        KeIrql OldIrql = KeAcquireSpinLock(&Processor->ThreadQueueLock);
-        RtAppendDList(&Processor->ThreadQueue, &CurrentThread->ListHeader);
-        KeReleaseSpinLock(&Processor->ThreadQueueLock, OldIrql);
+    /* Don't bother with anything if PsYieldExecution still hasn't gotten us out of
+     * KiSystemStartup.*/
+    KeProcessor *Processor = HalGetCurrentProcessor();
+    PsThread *CurrentThread = Processor->CurrentThread;
+    if (!CurrentThread) {
+        return;
     }
 
-    Processor->ForceYield = PSP_YIELD_NONE;
-
-    if (CurrentThread != Processor->IdleThread) {
-        HalpSaveThreadContext(Context, &CurrentThread->Context);
+    /* Don't bother with anything if the current thread still has time left til expiration. */
+    uint64_t CurrentTicks = HalGetTimerTicks();
+    if (CurrentThread->ExpirationTicks &&
+        !HalCheckTimerExpiration(
+            CurrentTicks, CurrentThread->ExpirationReference, CurrentThread->ExpirationTicks)) {
+        return;
     }
 
-    HalpRestoreThreadContext(Context, &NewThread->Context);
+    /* Don't bother with switching if we have no more threads to run; Just set the expiration to 0
+     * to indicate that we want to switch asap (once we have something to do). */
+    PsThread *TargetThread = GetNextThread(Processor, 0);
+    if (TargetThread == Processor->IdleThread) {
+        CurrentThread->ExpirationReference = 0;
+        CurrentThread->ExpirationTicks = 0;
+        return;
+    }
+
+    /* Otherwise adjust both threads, and switch away.*/
+    CheckTermination(Processor, CurrentThread);
+    AdjustQueue(Processor, CurrentThread);
+    AdjustExpiration(Processor, TargetThread, Processor->ThreadQueueSize);
+    Processor->CurrentThread = TargetThread;
+    HalpSwitchContext(&CurrentThread->Context, &TargetThread->Context);
 }

@@ -7,6 +7,7 @@ if(ARCH STREQUAL "amd64")
     set(SOURCES
         hal/${ARCH}/apic.c
         hal/${ARCH}/context.c
+        hal/${ARCH}/context.S
         hal/${ARCH}/gdt.c
         hal/${ARCH}/gdt.S
         hal/${ARCH}/hpet.c
@@ -25,11 +26,11 @@ endif()
 add_executable(kernel "kernel" YES
     ${SOURCES}
 
-    ev/clock.c
-    ev/dispatch.c
     ev/dpc.c
-    ev/types.c
+    ev/object.c
+    ev/timer.c
 
+    hal/interrupt.c
     hal/timer.c
 
     io/device.c
@@ -67,5 +68,5 @@ execute_process(
 target_include_directories(kernel PRIVATE include/private PUBLIC include/public)
 target_compile_options(kernel PRIVATE $<$<COMPILE_LANGUAGE:C>:-ffreestanding>)
 target_compile_definitions(kernel PRIVATE "-DKE_GIT_HASH=\"${GIT_HASH}\"" PRIVATE "-DKE_ARCH=\"${ARCH_STR}\"")
-target_link_options(kernel PRIVATE -Wl,--subsystem=native,--entry=KiBspEntry)
+target_link_options(kernel PRIVATE -Wl,--subsystem=native,--entry=KiSystemStartup)
 set_target_properties(kernel PROPERTIES ENABLE_EXPORTS TRUE)

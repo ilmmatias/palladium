@@ -30,8 +30,8 @@ void HalpInitializeApicTimer(void) {
         Accum += UINT32_MAX - HalpReadLapicRegister(0x390);
     }
 
-    /* Periodic timer, trigerring IRQ 32 (our clock handler). */
-    HalpWriteLapicRegister(0x320, 0x20040);
+    /* Now we can enable the LAPIC in periodic mode. */
+    HalpWriteLapicRegister(0x320, 0x20000 | HAL_INT_TIMER_VECTOR);
     HalpWriteLapicRegister(0x3E0, 0);
     HalpWriteLapicRegister(0x380, Accum / 4);
 }

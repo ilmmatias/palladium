@@ -37,6 +37,7 @@ EXPORTS
 
     PsCreateThread
     PsReadyThread
+    PsYieldExecution
 
     VidGetColor
     VidGetCursor

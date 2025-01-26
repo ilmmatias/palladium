@@ -12,6 +12,10 @@ extern void HalpFlushGdt(void);
  * PARAMETERS:
  *     Processor - Pointer to the processor-specific structure.
  *     EntryOffset - Which entry to initialize.
+ *     Base - Virtual address of the TSS; Should be zero for all other entries.
+ *     Limit - Size of the TSS in bytes; Should 0xFFFFF for all other entries.
+ *     Type - Type of the descriptor.
+ *     Dpl - Privilege level of the descriptor.
  *
  * RETURN VALUE:
  *     None.
@@ -25,7 +29,8 @@ static void InitializeEntry(
     uint8_t Dpl) {
     HalpGdtEntry *Entry = (HalpGdtEntry *)(Processor->GdtEntries + EntryOffset);
     Entry->LimitLow = Limit & 0xFFFF;
-    Entry->BaseLow = Base & 0xFFFFFF;
+    Entry->BaseLow = Base & 0xFFFF;
+    Entry->BaseMiddle = (Base >> 16) & 0xFF;
     Entry->Type = Type;
     Entry->Dpl = Dpl;
     Entry->Present = 1;
@@ -53,14 +58,14 @@ static void InitializeEntry(
 void HalpInitializeGdt(KeProcessor *Processor) {
     /* The NULL descriptor should have already been zeroed out during the processor block
      * allocation. */
-    InitializeEntry(Processor, GDT_ENTRY_KCODE, 0, 0xFFFFF, GDT_TYPE_CODE, GDT_DPL_KERNEL);
-    InitializeEntry(Processor, GDT_ENTRY_KDATA, 0, 0xFFFFF, GDT_TYPE_DATA, GDT_DPL_KERNEL);
-    InitializeEntry(Processor, GDT_ENTRY_UCODE, 0, 0xFFFFF, GDT_TYPE_CODE, GDT_DPL_USER);
-    InitializeEntry(Processor, GDT_ENTRY_UDATA, 0, 0xFFFFF, GDT_TYPE_DATA, GDT_DPL_USER);
+    InitializeEntry(Processor, DESCR_SEG_KCODE, 0, 0xFFFFF, GDT_TYPE_CODE, DESCR_DPL_KERNEL);
+    InitializeEntry(Processor, DESCR_SEG_KDATA, 0, 0xFFFFF, GDT_TYPE_DATA, DESCR_DPL_KERNEL);
+    InitializeEntry(Processor, DESCR_SEG_UCODE, 0, 0xFFFFF, GDT_TYPE_CODE, DESCR_DPL_USER);
+    InitializeEntry(Processor, DESCR_SEG_UDATA, 0, 0xFFFFF, GDT_TYPE_DATA, DESCR_DPL_USER);
 
     uint64_t TssBase = (uint64_t)&Processor->TssEntry;
     uint16_t TssSize = sizeof(HalpTssEntry);
-    InitializeEntry(Processor, GDT_ENTRY_TSS, TssBase, TssSize, GDT_TYPE_TSS, GDT_DPL_KERNEL);
+    InitializeEntry(Processor, DESCR_SEG_TSS, TssBase, TssSize, GDT_TYPE_TSS, DESCR_DPL_KERNEL);
     Processor->TssEntry.Rsp0 = (uint64_t)&Processor->SystemStack;
     Processor->TssEntry.IoMapBase = TssSize;
 
@@ -70,4 +75,19 @@ void HalpInitializeGdt(KeProcessor *Processor) {
     __asm__ volatile("lgdt %0" : : "m"(Descriptor));
     HalpFlushGdt();
     __asm__ volatile("mov $0x28, %%ax; ltr %%ax" : : : "%rax");
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function updates the TSS Rsp0 field using the current thread.
+ *
+ * PARAMETERS:
+ *     None.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void HalpUpdateTss(void) {
+    KeProcessor *Processor = HalGetCurrentProcessor();
+    Processor->TssEntry.Rsp0 = (uint64_t)Processor->CurrentThread->Stack;
 }

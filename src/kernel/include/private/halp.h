@@ -4,12 +4,7 @@
 #ifndef _HALP_H_
 #define _HALP_H_
 
-#ifdef ARCH_amd64
-#include <amd64/regs.h>
-#else
-#error "Undefined ARCH for the kernel module!"
-#endif /* ARCH */
-
+#include <generic/context.h>
 #include <hal.h>
 #include <ki.h>
 
@@ -39,14 +34,13 @@ void HalpLeaveCriticalSection(void *Context);
 KeIrql HalpGetIrql(void);
 void HalpSetIrql(KeIrql NewIrql);
 
-void HalpInitializeThreadContext(
-    HalRegisterState *Context,
+void HalpInitializeContext(
+    HalContextFrame *Context,
     char *Stack,
     uint64_t StackSize,
     void (*EntryPoint)(void *),
     void *Parameter);
-void HalpSaveThreadContext(HalRegisterState *Source, HalRegisterState *Thread);
-void HalpRestoreThreadContext(HalRegisterState *Target, HalRegisterState *Thread);
+void HalpSwitchContext(HalContextFrame *CurrentThread, HalContextFrame *TargetThread);
 
 #ifdef __cplusplus
 }

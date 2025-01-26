@@ -23,7 +23,7 @@
 void EvpDispatchObject(void *Object, uint64_t Timeout, int Yield) {
     KeProcessor *Processor = HalGetCurrentProcessor();
     uint64_t CurrentTicks = HalGetTimerTicks();
-    EvHeader *Header = (EvHeader *)Object;
+    EvHeader *Header = Object;
 
     /* Enter critical section (can't let any scheduling happen here), and update the event
        queue. */
@@ -41,23 +41,22 @@ void EvpDispatchObject(void *Object, uint64_t Timeout, int Yield) {
             Header->DeadlineReference = CurrentTicks;
             Header->DeadlineTicks = Timeout / HalGetTimerPeriod();
         }
-    }
 
-    if (!Header->Dispatched) {
         RtAppendDList(&HalGetCurrentProcessor()->EventQueue, &Header->ListHeader);
         Header->Dispatched = 1;
     }
 
-    if (Yield) {
-        Processor->ForceYield = PSP_YIELD_EVENT;
-        Header->Source = Processor->CurrentThread;
-    }
-
-    if (Yield) {
-        HalpNotifyProcessor(Processor, 1);
-    }
-
     HalpLeaveCriticalSection(Context);
+
+    if (Yield) {
+        Header->Source = Processor->CurrentThread;
+        PsYieldExecution();
+
+        /* Idle loop to make sure we won't return too early. */
+        while (!Header->Finished) {
+            HalpStopProcessor();
+        }
+    }
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -89,7 +88,7 @@ void EvWaitObject(void *Object, uint64_t Timeout) {
  *-----------------------------------------------------------------------------------------------*/
 void EvCancelObject(void *Object) {
     void *Context = HalpEnterCriticalSection();
-    EvHeader *Header = (EvHeader *)Object;
+    EvHeader *Header = Object;
 
     if (!Header->Dispatched) {
         HalpLeaveCriticalSection(Context);
@@ -104,62 +103,4 @@ void EvCancelObject(void *Object) {
     }
 
     HalpLeaveCriticalSection(Context);
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function handles any pending kernel events.
- *
- * PARAMETERS:
- *     Context - Current processor state.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-void EvpHandleEvents(HalRegisterState *Context) {
-    KeProcessor *Processor = HalGetCurrentProcessor();
-    uint64_t CurrentTicks = HalGetTimerTicks();
-
-    /* Process any pending events (they might enqueue DPCs, so we need to process them
-     * first). */
-    RtDList *ListHeader = Processor->EventQueue.Next;
-    while (ListHeader != &Processor->EventQueue) {
-        EvHeader *Header = CONTAINING_RECORD(ListHeader, EvHeader, ListHeader);
-        ListHeader = ListHeader->Next;
-
-        /* Out of the deadline, for anything but timers, this will make WaitObject return an
-           error. */
-        if (Header->DeadlineTicks &&
-            HalCheckTimerExpiration(
-                CurrentTicks, Header->DeadlineReference, Header->DeadlineTicks)) {
-            Header->Finished = 1;
-        }
-
-        if (Header->Finished) {
-            Header->Dispatched = 0;
-            RtUnlinkDList(&Header->ListHeader);
-
-            if (Header->Source) {
-                /* Boost the priority of the waiting task, and insert it back. */
-                KeIrql OldIrql = KeAcquireSpinLock(&Processor->ThreadQueueLock);
-                __atomic_add_fetch(&Processor->ThreadQueueSize, 1, __ATOMIC_SEQ_CST);
-                RtPushDList(&Processor->ThreadQueue, &Header->Source->ListHeader);
-                KeReleaseSpinLock(&Processor->ThreadQueueLock, OldIrql);
-            }
-
-            if (Header->Dpc) {
-                RtAppendDList(&Processor->DpcQueue, &Header->Dpc->ListHeader);
-            }
-        }
-    }
-
-    /* Process any pending DPCs. */
-    while (Processor->DpcQueue.Next != &Processor->DpcQueue) {
-        EvDpc *Dpc = CONTAINING_RECORD(RtPopDList(&Processor->DpcQueue), EvDpc, ListHeader);
-        Dpc->Routine(Dpc->Context);
-    }
-
-    /* Wrap up by calling the scheduler; It should handle initialization+retriggering the event
-       handler if required. */
-    PspScheduleNext(Context);
 }

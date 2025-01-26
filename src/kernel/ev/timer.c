@@ -1,19 +1,50 @@
 /* SPDX-FileCopyrightText: (C) 2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
+#include <evp.h>
 #include <halp.h>
+#include <string.h>
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function initializes the given timer event, setting its deadline relative to the
+ *     current time.
+ *
+ * PARAMETERS:
+ *     Timer - Pointer to the timer struct.
+ *     Timeout - How many nanoseconds to sleep for.
+ *     Dpc - Optional DPC to be executed/enqueued when we finish.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void EvInitializeTimer(EvTimer *Timer, uint64_t Timeout, EvDpc *Dpc) {
+    memset(Timer, 0, sizeof(EvTimer));
+    Timer->Type = EV_TYPE_TIMER;
+    Timer->Dpc = Dpc;
+
+    /* Dispatch the DPC if this is 0-timeout event, and don't bother with the event dispatcher
+       (just set us as finished). */
+    if (!Timeout) {
+        Timer->Finished = 1;
+        EvDispatchDpc(Dpc);
+        return;
+    }
+
+    EvpDispatchObject(Timer, Timeout, 0);
+}
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function handles a clock event (triggers a dispatch event if neessary).
  *
  * PARAMETERS:
- *     Context - Current processor state.
+ *     None that we make use of.
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void EvpHandleClock(HalRegisterState *) {
+void EvpHandleTimer(HalInterruptFrame *) {
     KeProcessor *Processor = HalGetCurrentProcessor();
     uint64_t CurrentTicks = HalGetTimerTicks();
     int TriggerEvent = 0;
@@ -37,12 +68,11 @@ void EvpHandleClock(HalRegisterState *) {
         TriggerEvent = 1;
     }
 
-    /* At last, check for anything that would swap out the thread. */
-    if (Processor->InitialThread) {
+    /* At last, check for a quantum expiration (thread swap). */
+    if (Processor->CurrentThread) {
         PsThread *CurrentThread = Processor->CurrentThread;
-        int QuantaExpired = HalCheckTimerExpiration(
-            CurrentTicks, CurrentThread->ExpirationReference, CurrentThread->ExpirationTicks);
-        if (CurrentThread->Terminated || QuantaExpired || Processor->ForceYield) {
+        if (HalCheckTimerExpiration(
+                CurrentTicks, CurrentThread->ExpirationReference, CurrentThread->ExpirationTicks)) {
             TriggerEvent = 1;
         }
     }

@@ -57,7 +57,6 @@ static void InitializeBootProcessor(KiLoaderBlock *LoaderBlock) {
     /* Stage 5 (BSP): Scheduler initialization. */
     PspCreateIdleThread();
     PspCreateSystemThread();
-    PspInitializeScheduler(1);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -77,7 +76,6 @@ static void InitializeApplicationProcessor(KeProcessor *Processor) {
 
     /* Stage 1 (AP): Scheduler initialization. */
     PspCreateIdleThread();
-    PspInitializeScheduler(1);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -112,6 +110,8 @@ static void InitializeApplicationProcessor(KeProcessor *Processor) {
         InitializeApplicationProcessor(Processor);
     }
 
+    /* Yield into the initial thread (PsYieldExecution should never return for us). */
+    PsYieldExecution();
     while (1) {
         HalpStopProcessor();
     }

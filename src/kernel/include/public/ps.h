@@ -4,13 +4,8 @@
 #ifndef _PS_H_
 #define _PS_H_
 
-#if defined(ARCH_amd64)
-#include <amd64/regs.h>
-#else
-#error "Undefined ARCH for the kernel module!"
-#endif /* ARCH */
-
 #include <ev.h>
+#include <generic/context.h>
 
 typedef struct PsThread {
     RtDList ListHeader;
@@ -18,7 +13,7 @@ typedef struct PsThread {
     uint64_t ExpirationTicks;
     int Terminated;
     EvDpc TerminationDpc;
-    HalRegisterState Context;
+    HalContextFrame Context;
     char *Stack;
 } PsThread;
 
@@ -29,6 +24,7 @@ extern "C" {
 PsThread *PsCreateThread(void (*EntryPoint)(void *), void *Parameter);
 void PsReadyThread(PsThread *Thread);
 [[noreturn]] void PsTerminateThread(void);
+void PsYieldExecution(void);
 
 #ifdef __cplusplus
 }

@@ -4,8 +4,13 @@
 #ifndef _AMD64_HALP_H_
 #define _AMD64_HALP_H_
 
-#include <amd64/hal.h>
 #include <halp.h>
+
+#define HAL_INT_DISPATCH_IRQL KE_IRQL_DISPATCH
+#define HAL_INT_DISPATCH_VECTOR (HAL_INT_DISPATCH_IRQL << 4)
+
+#define HAL_INT_TIMER_IRQL (KE_IRQL_DEVICE + 10)
+#define HAL_INT_TIMER_VECTOR (HAL_INT_TIMER_IRQL << 4)
 
 #ifdef __cplusplus
 extern "C" {
@@ -14,6 +19,7 @@ extern "C" {
 void HalpInitializeIdt(KeProcessor *Processor);
 void HalpInitializeGdt(KeProcessor *Processor);
 void HalpFlushGdt(void);
+void HalpUpdateTss(void);
 
 void HalpInitializeApic(void);
 void HalpEnableApic(void);
