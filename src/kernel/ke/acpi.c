@@ -4,7 +4,6 @@
 #include <ki.h>
 #include <mi.h>
 #include <string.h>
-#include <vid.h>
 
 static uint64_t BaseAddress = 0;
 static int TableType = KI_ACPI_NONE;
@@ -70,24 +69,36 @@ static void CacheTable(void) {
     CacheTableDone = 1;
 
     if (TableType == KI_ACPI_NONE) {
-        VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "the host is not ACPI-compliant\n");
-        KeFatalError(KE_PANIC_BAD_SYSTEM_TABLE);
+        KeFatalError(
+            KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+            KE_PANIC_PARAMETER_ACPI_INITIALIZATION_FAILURE,
+            KE_PANIC_PARAMETER_BAD_RSDT_TABLE,
+            KE_PANIC_PARAMETER_TABLE_NOT_FOUND,
+            0);
     }
 
     /* We're forced to guess initially (as we still don't know the size); Assume <1 page, and
      * remap if wrong. */
     SdtHeader *RootSdt = MmMapSpace(BaseAddress, MM_PAGE_SIZE);
     if (!RootSdt) {
-        VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "couldn't map the R/XSDT\n");
-        KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
+        KeFatalError(
+            KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+            KE_PANIC_PARAMETER_ACPI_INITIALIZATION_FAILURE,
+            KE_PANIC_PARAMETER_BAD_RSDT_TABLE,
+            KE_PANIC_PARAMETER_OUT_OF_RESOURCES,
+            0);
     }
 
     if (RootSdt->Length > MM_PAGE_SIZE) {
         MmUnmapSpace(RootSdt);
         RootSdt = MmMapSpace(BaseAddress, RootSdt->Length);
         if (!RootSdt) {
-            VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "couldn't map the R/XSDT\n");
-            KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
+            KeFatalError(
+                KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+                KE_PANIC_PARAMETER_ACPI_INITIALIZATION_FAILURE,
+                KE_PANIC_PARAMETER_BAD_RSDT_TABLE,
+                KE_PANIC_PARAMETER_OUT_OF_RESOURCES,
+                0);
         }
     }
 
@@ -97,16 +108,24 @@ static void CacheTable(void) {
 
     if (memcmp(RootSdt->Signature, IsXsdt ? "XSDT" : "RSDT", 4) ||
         !Checksum((char *)RootSdt, RootSdt->Length)) {
-        VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "bad checksum or signature on the RSDT/XSDT\n");
-        KeFatalError(KE_PANIC_BAD_SYSTEM_TABLE);
+        KeFatalError(
+            KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+            KE_PANIC_PARAMETER_ACPI_INITIALIZATION_FAILURE,
+            KE_PANIC_PARAMETER_BAD_RSDT_TABLE,
+            KE_PANIC_PARAMETER_INVALID_TABLE_CHECKSUM,
+            0);
     }
 
     for (uint32_t i = 0; i < (RootSdt->Length - sizeof(SdtHeader)) / (IsXsdt ? 8 : 4); i++) {
         uintptr_t Address = IsXsdt ? XsdtTables[i] : RsdtTables[i];
         SdtHeader *Header = MmMapSpace(Address, MM_PAGE_SIZE);
         if (!Header) {
-            VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "couldn't map an ACPI table\n");
-            KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
+            KeFatalError(
+                KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+                KE_PANIC_PARAMETER_ACPI_INITIALIZATION_FAILURE,
+                KE_PANIC_PARAMETER_BAD_RSDT_TABLE,
+                KE_PANIC_PARAMETER_OUT_OF_RESOURCES,
+                0);
         } else if (!memcmp(Header->Signature, "DSDT", 4)) {
             MmUnmapSpace(Header);
             continue;
@@ -117,14 +136,22 @@ static void CacheTable(void) {
             MmUnmapSpace(Header);
             Header = MmMapSpace(Address, Length);
             if (!Header) {
-                VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "couldn't map an ACPI table\n");
-                KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
+                KeFatalError(
+                    KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+                    KE_PANIC_PARAMETER_ACPI_INITIALIZATION_FAILURE,
+                    KE_PANIC_PARAMETER_BAD_RSDT_TABLE,
+                    KE_PANIC_PARAMETER_OUT_OF_RESOURCES,
+                    0);
             }
         }
 
         if (!Checksum((char *)Header, Header->Length)) {
-            VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "bad checksum on an ACPI table\n");
-            KeFatalError(KE_PANIC_BAD_SYSTEM_TABLE);
+            KeFatalError(
+                KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+                KE_PANIC_PARAMETER_ACPI_INITIALIZATION_FAILURE,
+                KE_PANIC_PARAMETER_BAD_RSDT_TABLE,
+                KE_PANIC_PARAMETER_INVALID_TABLE_CHECKSUM,
+                0);
         }
 
         /* Calculate the current index for this entry (should realistically be 0 for most
@@ -143,11 +170,12 @@ static void CacheTable(void) {
 
         CacheEntry *Entry = MmAllocatePool(sizeof(CacheEntry), "KAcp");
         if (!Entry) {
-            VidPrint(
-                VID_MESSAGE_ERROR,
-                "Kernel HAL",
-                "couldn't allocate memory for an ACPI table cache entry\n");
-            KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
+            KeFatalError(
+                KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+                KE_PANIC_PARAMETER_ACPI_INITIALIZATION_FAILURE,
+                KE_PANIC_PARAMETER_BAD_RSDT_TABLE,
+                KE_PANIC_PARAMETER_OUT_OF_RESOURCES,
+                0);
         }
 
         Entry->SdtHeader = Header;
@@ -165,8 +193,12 @@ static void CacheTable(void) {
     uint64_t Address = IsXsdt && Fadt->XDsdt ? Fadt->XDsdt : Fadt->Dsdt;
     SdtHeader *Header = MmMapSpace(Address, MM_PAGE_SIZE);
     if (!Header) {
-        VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "couldn't map the DSDT\n");
-        KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
+        KeFatalError(
+            KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+            KE_PANIC_PARAMETER_ACPI_INITIALIZATION_FAILURE,
+            KE_PANIC_PARAMETER_BAD_DSDT_TABLE,
+            KE_PANIC_PARAMETER_OUT_OF_RESOURCES,
+            0);
     }
 
     if (Header->Length > MM_PAGE_SIZE) {
@@ -174,23 +206,32 @@ static void CacheTable(void) {
         MmUnmapSpace(Header);
         Header = MmMapSpace(Address, Length);
         if (!Header) {
-            VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "couldn't map the DSDT\n");
-            KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
+            KeFatalError(
+                KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+                KE_PANIC_PARAMETER_ACPI_INITIALIZATION_FAILURE,
+                KE_PANIC_PARAMETER_BAD_DSDT_TABLE,
+                KE_PANIC_PARAMETER_OUT_OF_RESOURCES,
+                0);
         }
     }
 
     if (!Checksum((char *)Header, Header->Length) || memcmp(Header->Signature, "DSDT", 4)) {
-        VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "bad checksum or signature on the DSDT\n");
-        KeFatalError(KE_PANIC_BAD_SYSTEM_TABLE);
+        KeFatalError(
+            KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+            KE_PANIC_PARAMETER_ACPI_INITIALIZATION_FAILURE,
+            KE_PANIC_PARAMETER_BAD_DSDT_TABLE,
+            KE_PANIC_PARAMETER_INVALID_TABLE_CHECKSUM,
+            0);
     }
 
     CacheEntry *Entry = MmAllocatePool(sizeof(CacheEntry), "KAcp");
     if (!Entry) {
-        VidPrint(
-            VID_MESSAGE_ERROR,
-            "Kernel HAL",
-            "couldn't allocate memory for the cache entry for the DSDT\n");
-        KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
+        KeFatalError(
+            KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+            KE_PANIC_PARAMETER_ACPI_INITIALIZATION_FAILURE,
+            KE_PANIC_PARAMETER_BAD_DSDT_TABLE,
+            KE_PANIC_PARAMETER_OUT_OF_RESOURCES,
+            0);
     }
 
     Entry->SdtHeader = Header;

@@ -119,7 +119,12 @@ void MiInitializePageAllocator(KiLoaderBlock *LoaderBlock) {
         LoaderBlock,
         (MaxAddressablePage * sizeof(MiPageEntry) + MM_PAGE_SIZE - 1) >> MM_PAGE_SHIFT);
     if (!MiPageList) {
-        KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
+        KeFatalError(
+            KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+            KE_PANIC_PARAMETER_PFN_INITIALIZATION_FAILURE,
+            KE_PANIC_PARAMETER_OUT_OF_RESOURCES,
+            0,
+            0);
     }
 
     /* Setup the page allocator (marking the free pages as free). */
@@ -148,7 +153,12 @@ void MiInitializePageAllocator(KiLoaderBlock *LoaderBlock) {
      * current state. */
     MiMemoryDescriptor *Descriptor = MmAllocatePool(MemoryDescriptorListSize, "KeMm");
     if (!Descriptor) {
-        KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
+        KeFatalError(
+            KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+            KE_PANIC_PARAMETER_PFN_INITIALIZATION_FAILURE,
+            KE_PANIC_PARAMETER_OUT_OF_RESOURCES,
+            0,
+            0);
     }
 
     RtInitializeDList(&MiMemoryDescriptorListHead);
@@ -180,7 +190,12 @@ void MiInitializePool(KiLoaderBlock *LoaderBlock) {
     uint64_t SizeInPages = ((SizeInBits >> 3) + MM_PAGE_SIZE - 1) >> MM_PAGE_SHIFT;
     void *PoolBitmapBase = EarlyAllocatePages(LoaderBlock, SizeInPages);
     if (!PoolBitmapBase) {
-        KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
+        KeFatalError(
+            KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+            KE_PANIC_PARAMETER_POOL_INITIALIZATION_FAILURE,
+            KE_PANIC_PARAMETER_OUT_OF_RESOURCES,
+            0,
+            0);
     }
 
     RtInitializeBitmap(&MiPoolBitmap, PoolBitmapBase, SizeInBits);

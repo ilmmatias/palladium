@@ -94,7 +94,7 @@ void HalpDispatchNmi(HalInterruptFrame *) {
         }
     }
 
-    KeFatalError(KE_PANIC_NMI_HARDWARE_FAILURE);
+    KeFatalError(KE_PANIC_NMI_HARDWARE_FAILURE, 0, 0, 0, 0);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -113,9 +113,16 @@ void HalpDispatchException(
     uint32_t ExceptionCode,
     HalInterruptFrame *InterruptFrame,
     HalExceptionFrame *ExceptionFrame) {
-    /* FLT_INVALID_OPERATION is our "magic number" to indicate we need to expand which floating
-     * point fault happend. TODO: There is a bit more of handling (of other exceptions) we need to
-     * do here too. */
+    /* Build the exception record. */
+    RtExceptionRecord ExceptionRecord;
+    memset(&ExceptionRecord, 0, sizeof(RtExceptionRecord));
+    ExceptionRecord.ExceptionCode = ExceptionCode;
+    ExceptionRecord.ExceptionFlags = 0;
+    ExceptionRecord.ExceptionRecord = NULL;
+    ExceptionRecord.ExceptionAddress = (void *)InterruptFrame->Rip;
+    ExceptionRecord.NumberOfParameters = 0;
+
+    /* A few of the exception codes actually have special meanings (we have to parse them). */
     if (ExceptionCode == RT_EXC_FLT_INVALID_OPERATION) {
         if (InterruptFrame->Mxcsr & 0x01) {
             ExceptionCode = RT_EXC_FLT_INVALID_OPERATION;
@@ -130,16 +137,17 @@ void HalpDispatchException(
         } else if (InterruptFrame->Mxcsr & 0x20) {
             ExceptionCode = RT_EXC_FLT_INEXACT_RESULT;
         }
+        ExceptionRecord.ExceptionCode = ExceptionCode;
+    } else if (ExceptionCode == RT_EXC_GENERAL_PROTECTION_FAULT) {
+        /* How exactly should we do this (or at least fill the exception data)? */
+        ExceptionRecord.ExceptionCode = RT_EXC_ACCESS_VIOLATION;
+        ExceptionRecord.NumberOfParameters = 2;
+    } else if (ExceptionCode == RT_EXC_PAGE_FAULT) {
+        ExceptionRecord.ExceptionCode = RT_EXC_ACCESS_VIOLATION;
+        ExceptionRecord.NumberOfParameters = 2;
+        ExceptionRecord.ExceptionInformation[0] = (void *)((InterruptFrame->ErrorCode & 0x02) >> 1);
+        ExceptionRecord.ExceptionInformation[1] = (void *)InterruptFrame->FaultAddress;
     }
-
-    /* Now build the exception record. */
-    RtExceptionRecord ExceptionRecord;
-    memset(&ExceptionRecord, 0, sizeof(RtExceptionRecord));
-    ExceptionRecord.ExceptionCode = ExceptionCode;
-    ExceptionRecord.ExceptionFlags = 0;
-    ExceptionRecord.ExceptionRecord = NULL;
-    ExceptionRecord.ExceptionAddress = (void *)InterruptFrame->Rip;
-    ExceptionRecord.NumberOfParameters = 0;
 
     /* And the unwind context (using both frames). */
     RtContext ContextRecord;
@@ -178,47 +186,56 @@ void HalpDispatchException(
     ContextRecord.Rip = InterruptFrame->Rip;
     ContextRecord.Rflags = InterruptFrame->Rflags;
 
-    /* If we fail to dispatch, we're just falling back to panicking. */
-    if (!RtDispatchException(&ExceptionRecord, &ContextRecord)) {
-        KeFatalError(KE_PANIC_TRAP_NOT_HANDLED);
+    if (RtDispatchException(&ExceptionRecord, &ContextRecord)) {
+        /* CONTINUE_EXECUTION, just rebuild the frames and return from the interrupt. */
+        InterruptFrame->Rax = ContextRecord.Rax;
+        InterruptFrame->Rcx = ContextRecord.Rcx;
+        InterruptFrame->Rdx = ContextRecord.Rdx;
+        ExceptionFrame->Rbx = ContextRecord.Rbx;
+        InterruptFrame->Rsp = ContextRecord.Rsp;
+        ExceptionFrame->Rbp = ContextRecord.Rbp;
+        ExceptionFrame->Rsi = ContextRecord.Rsi;
+        ExceptionFrame->Rdi = ContextRecord.Rdi;
+        InterruptFrame->R8 = ContextRecord.R8;
+        InterruptFrame->R9 = ContextRecord.R9;
+        InterruptFrame->R10 = ContextRecord.R10;
+        InterruptFrame->R11 = ContextRecord.R11;
+        ExceptionFrame->R12 = ContextRecord.R12;
+        ExceptionFrame->R13 = ContextRecord.R13;
+        ExceptionFrame->R14 = ContextRecord.R14;
+        ExceptionFrame->R15 = ContextRecord.R15;
+        InterruptFrame->Xmm0 = ContextRecord.Xmm0;
+        InterruptFrame->Xmm1 = ContextRecord.Xmm1;
+        InterruptFrame->Xmm2 = ContextRecord.Xmm2;
+        InterruptFrame->Xmm3 = ContextRecord.Xmm3;
+        InterruptFrame->Xmm4 = ContextRecord.Xmm4;
+        InterruptFrame->Xmm5 = ContextRecord.Xmm5;
+        ExceptionFrame->Xmm6 = ContextRecord.Xmm6;
+        ExceptionFrame->Xmm7 = ContextRecord.Xmm7;
+        ExceptionFrame->Xmm8 = ContextRecord.Xmm8;
+        ExceptionFrame->Xmm9 = ContextRecord.Xmm9;
+        ExceptionFrame->Xmm10 = ContextRecord.Xmm10;
+        ExceptionFrame->Xmm11 = ContextRecord.Xmm11;
+        ExceptionFrame->Xmm12 = ContextRecord.Xmm12;
+        ExceptionFrame->Xmm13 = ContextRecord.Xmm13;
+        ExceptionFrame->Xmm14 = ContextRecord.Xmm14;
+        ExceptionFrame->Xmm15 = ContextRecord.Xmm15;
+        InterruptFrame->Rip = ContextRecord.Rip;
+        InterruptFrame->Rflags = ContextRecord.Rflags;
+        return;
     }
 
-    /* Otherwise, we gotta do the opposite now (rebuild our interrupt and exception frames using the
-     * context record). */
-    InterruptFrame->Rax = ContextRecord.Rax;
-    InterruptFrame->Rcx = ContextRecord.Rcx;
-    InterruptFrame->Rdx = ContextRecord.Rdx;
-    ExceptionFrame->Rbx = ContextRecord.Rbx;
-    InterruptFrame->Rsp = ContextRecord.Rsp;
-    ExceptionFrame->Rbp = ContextRecord.Rbp;
-    ExceptionFrame->Rsi = ContextRecord.Rsi;
-    ExceptionFrame->Rdi = ContextRecord.Rdi;
-    InterruptFrame->R8 = ContextRecord.R8;
-    InterruptFrame->R9 = ContextRecord.R9;
-    InterruptFrame->R10 = ContextRecord.R10;
-    InterruptFrame->R11 = ContextRecord.R11;
-    ExceptionFrame->R12 = ContextRecord.R12;
-    ExceptionFrame->R13 = ContextRecord.R13;
-    ExceptionFrame->R14 = ContextRecord.R14;
-    ExceptionFrame->R15 = ContextRecord.R15;
-    InterruptFrame->Xmm0 = ContextRecord.Xmm0;
-    InterruptFrame->Xmm1 = ContextRecord.Xmm1;
-    InterruptFrame->Xmm2 = ContextRecord.Xmm2;
-    InterruptFrame->Xmm3 = ContextRecord.Xmm3;
-    InterruptFrame->Xmm4 = ContextRecord.Xmm4;
-    InterruptFrame->Xmm5 = ContextRecord.Xmm5;
-    ExceptionFrame->Xmm6 = ContextRecord.Xmm6;
-    ExceptionFrame->Xmm7 = ContextRecord.Xmm7;
-    ExceptionFrame->Xmm8 = ContextRecord.Xmm8;
-    ExceptionFrame->Xmm9 = ContextRecord.Xmm9;
-    ExceptionFrame->Xmm10 = ContextRecord.Xmm10;
-    ExceptionFrame->Xmm11 = ContextRecord.Xmm11;
-    ExceptionFrame->Xmm12 = ContextRecord.Xmm12;
-    ExceptionFrame->Xmm13 = ContextRecord.Xmm13;
-    ExceptionFrame->Xmm14 = ContextRecord.Xmm14;
-    ExceptionFrame->Xmm15 = ContextRecord.Xmm15;
-    InterruptFrame->Rip = ContextRecord.Rip;
-    InterruptFrame->Rflags = ContextRecord.Rflags;
+    /* Page faults have a different format. */
+    if (ExceptionCode == RT_EXC_PAGE_FAULT) {
+        KeFatalError(
+            KE_PANIC_PAGE_FAULT_NOT_HANDLED,
+            (uint64_t)InterruptFrame->FaultAddress,
+            InterruptFrame->ErrorCode,
+            0,
+            0);
+    } else {
+        KeFatalError(KE_PANIC_TRAP_NOT_HANDLED, ExceptionCode, InterruptFrame->ErrorCode, 0, 0);
+    }
 }
 
 /*-------------------------------------------------------------------------------------------------

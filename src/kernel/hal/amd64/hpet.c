@@ -53,14 +53,22 @@ static void WriteHpetRegister(uint32_t Number, uint64_t Data) {
 void HalpInitializeHpet(void) {
     HpetHeader *Hpet = KiFindAcpiTable("HPET", 0);
     if (!Hpet) {
-        VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "couldn't find the HPET table\n");
-        KeFatalError(KE_PANIC_BAD_SYSTEM_TABLE);
+        KeFatalError(
+            KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+            KE_PANIC_PARAMETER_HPET_INITIALIZATION_FAILURE,
+            KE_PANIC_PARAMETER_TABLE_NOT_FOUND,
+            0,
+            0);
     }
 
     HpetAddress = MmMapSpace(Hpet->Address, MM_PAGE_SIZE);
     if (!HpetAddress) {
-        VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "couldn't map the HPET table\n");
-        KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
+        KeFatalError(
+            KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+            KE_PANIC_PARAMETER_HPET_INITIALIZATION_FAILURE,
+            KE_PANIC_PARAMETER_OUT_OF_RESOURCES,
+            0,
+            0);
     }
 
     /* We can't/shouldn't be messing with the HPET registers if the counter (and interrupts) are

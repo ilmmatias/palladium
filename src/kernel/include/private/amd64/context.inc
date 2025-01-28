@@ -55,6 +55,14 @@
 #define EXCEPTION_FRAME_RETURN_ADDRESS 0xE8
 #define EXCEPTION_FRAME_SIZE 0xF0
 
+/* Keep these in sync with the HalStartFrame in context.h. */
+#define START_FRAME_ENTRY_POINT 0x00
+#define START_FRAME_PARAMETER 0x08
+#define START_FRAME_SIZE 0x10
+
+/* Keep these in sync with the HalContextFrame in context.h. */
+#define CONTEXT_FRAME_RSP 0x00
+
 /* Flags for the ENTER_INTERRUPT macro. */
 #define INTERRUPT_FLAGS_HAS_ERROR_CODE 0x01
 

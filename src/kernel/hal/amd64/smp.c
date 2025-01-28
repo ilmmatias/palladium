@@ -7,7 +7,6 @@
 #include <ke.h>
 #include <mi.h>
 #include <string.h>
-#include <vid.h>
 
 extern void HalpApplicationProcessorEntry(void);
 extern uint64_t HalpKernelPageMap;
@@ -44,9 +43,12 @@ void HalpInitializeSmp(void) {
      * each processor after that). */
     HalpProcessorList = MmAllocatePool(HalpProcessorCount * sizeof(KeProcessor *), "Halp");
     if (!HalpProcessorList) {
-        VidPrint(
-            VID_MESSAGE_ERROR, "Kernel HAL", "couldn't allocate space for the processor list\n");
-        KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
+        KeFatalError(
+            KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+            KE_PANIC_PARAMETER_SMP_INITIALIZATION_FAILURE,
+            KE_PANIC_PARAMETER_OUT_OF_RESOURCES,
+            0,
+            0);
     }
 
     for (uint32_t i = 0; i < HalpProcessorCount; i++) {
@@ -57,9 +59,12 @@ void HalpInitializeSmp(void) {
         }
 
         if (!HalpProcessorList[i]) {
-            VidPrint(
-                VID_MESSAGE_ERROR, "Kernel HAL", "couldn't allocate space for the a processor\n");
-            KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
+            KeFatalError(
+                KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+                KE_PANIC_PARAMETER_SMP_INITIALIZATION_FAILURE,
+                KE_PANIC_PARAMETER_OUT_OF_RESOURCES,
+                0,
+                0);
         }
 
         RtInitializeDList(&HalpProcessorList[i]->ThreadQueue);

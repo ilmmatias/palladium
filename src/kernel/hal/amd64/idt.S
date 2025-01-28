@@ -5,49 +5,9 @@
 .text
 
 #include <amd64/context.inc>
-
-/* Sync these ones to their values in ke.h (if the list gets reorganized). */
-#define KE_PANIC_TRAP_NOT_HANDLED 7
-#define KE_PANIC_PAGE_FAULT_NOT_HANDLED 8
-#define KE_PANIC_NMI_HARDWARE_FAILURE 9
-
-/* Sync these ones to their values in ke.h as well. */
-#define KE_IRQL_DISPATCH 2
-
-/* And sync these ones with their values on except.h. */
-#define RT_EXC_ACCESS_VIOLATION 0
-#define RT_EXC_ARRAY_BOUNDS_EXCEEDED 1
-#define RT_EXC_STACK_OVERFLOW 2
-#define RT_EXC_BREAKPOINT 3
-#define RT_EXC_SINGLE_STEP 4
-#define RT_EXC_DATATYPE_MISALIGNMENT 5
-#define RT_EXC_FLT_DENORMAL_OPERAND 6
-#define RT_EXC_FLT_DIVIDE_BY_ZERO 7
-#define RT_EXC_FLT_INEXACT_RESULT 8
-#define RT_EXC_FLT_INVALID_OPERATION 9
-#define RT_EXC_FLT_OVERFLOW 10
-#define RT_EXC_FLT_UNDERFLOW 11
-#define RT_EXC_INT_DIVIDE_BY_ZERO 12
-#define RT_EXC_INT_OVERFLOW 13
-#define RT_EXC_ILLEGAL_INSTRUCTION 14
-#define RT_EXC_PRIV_INSTRUCTION 15
-#define RT_EXC_INVALID_DISPOSITION 16
-#define RT_EXC_NONCONTINUABLE_EXCEPTION 17
-#define RT_EXC_UNWIND 18
-#define RT_EXC_FLT_STACK_CHECK 19
-#define RT_EXC_NUMERIC_COPROCESSOR 20
-#define RT_EXC_DOUBLE_FAULT 21
-#define RT_EXC_SEGMENT_OVERRUN 22
-#define RT_EXC_INVALID_TSS 23
-#define RT_EXC_SEGMENT_NOT_PRESENT 24
-#define RT_EXC_STACK_SEGMENT 25
-#define RT_EXC_MACHINE_CHECK 26
-#define RT_EXC_VIRTUALIZATION 27
-#define RT_EXC_CONTROL_PROTECTION 28
-#define RT_EXC_HYPERVISOR_INJECTION 29
-#define RT_EXC_VMM_COMMUNICATION 30
-#define RT_EXC_SECURITY 31
-#define RT_EXC_RESERVED 32
+#include <amd64/except.inc>
+#include <amd64/irql.inc>
+#include <amd64/panic.inc>
 
 .extern EvpProcessQueue
 .extern EvpHandleTimer
@@ -202,7 +162,7 @@ HalpStackSegmentTrapEntry:
 .global HalpGeneralProtectionTrapEntry
 HalpGeneralProtectionTrapEntry:
     ENTER_INTERRUPT (INTERRUPT_FLAGS_HAS_ERROR_CODE)
-    mov $RT_EXC_ACCESS_VIOLATION, %rcx
+    mov $RT_EXC_GENERAL_PROTECTION_FAULT, %rcx
     mov %rsp, %rdx
     call HalpExceptionEntry
     LEAVE_INTERRUPT
@@ -212,7 +172,7 @@ HalpGeneralProtectionTrapEntry:
 .global HalpPageFaultTrapEntry
 HalpPageFaultTrapEntry:
     ENTER_INTERRUPT (INTERRUPT_FLAGS_HAS_ERROR_CODE)
-    mov $RT_EXC_ACCESS_VIOLATION, %rcx
+    mov $RT_EXC_PAGE_FAULT, %rcx
     mov %rsp, %rdx
     call HalpExceptionEntry
     LEAVE_INTERRUPT

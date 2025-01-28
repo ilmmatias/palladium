@@ -190,8 +190,9 @@ void PsYieldExecution(int Type) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void PspProcessQueue(HalInterruptFrame *) {
-    if (KeGetIrql() != KE_IRQL_DISPATCH) {
-        KeFatalError(KE_PANIC_IRQL_NOT_DISPATCH);
+    KeIrql Irql = KeGetIrql();
+    if (Irql != KE_IRQL_DISPATCH) {
+        KeFatalError(KE_PANIC_IRQL_NOT_DISPATCH, Irql, 0, 0, 0);
     }
 
     /* Don't bother with anything if PsYieldExecution still hasn't gotten us out of

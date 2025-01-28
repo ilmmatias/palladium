@@ -93,8 +93,12 @@ static void UnmaskIoapicVector(
 void HalpInitializeIoapic(void) {
     MadtHeader *Madt = KiFindAcpiTable("APIC", 0);
     if (!Madt) {
-        VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "couldn't find the MADT table\n");
-        KeFatalError(KE_PANIC_BAD_SYSTEM_TABLE);
+        KeFatalError(
+            KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+            KE_PANIC_PARAMETER_IOAPIC_INITIALIZATION_FAILURE,
+            KE_PANIC_PARAMETER_TABLE_NOT_FOUND,
+            0,
+            0);
     }
 
     char *Position = (char *)(Madt + 1);
@@ -105,17 +109,24 @@ void HalpInitializeIoapic(void) {
             case IOAPIC_RECORD: {
                 IoapicEntry *Entry = MmAllocatePool(sizeof(IoapicEntry), "Apic");
                 if (!Entry) {
-                    VidPrint(
-                        VID_MESSAGE_ERROR, "Kernel HAL", "couldn't allocate space for an IOAPIC\n");
-                    KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
+                    KeFatalError(
+                        KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+                        KE_PANIC_PARAMETER_IOAPIC_INITIALIZATION_FAILURE,
+                        KE_PANIC_PARAMETER_OUT_OF_RESOURCES,
+                        0,
+                        0);
                 }
 
                 Entry->Id = Record->Ioapic.IoapicId;
                 Entry->GsiBase = Record->Ioapic.GsiBase;
                 Entry->VirtualAddress = MmMapSpace(Record->Ioapic.Address, MM_PAGE_SIZE);
                 if (!Entry->VirtualAddress) {
-                    VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "couldn't map an IOAPIC\n");
-                    KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
+                    KeFatalError(
+                        KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+                        KE_PANIC_PARAMETER_IOAPIC_INITIALIZATION_FAILURE,
+                        KE_PANIC_PARAMETER_OUT_OF_RESOURCES,
+                        0,
+                        0);
                 }
 
                 /* Set some sane defaults for all IOAPICs we find. */
@@ -142,11 +153,12 @@ void HalpInitializeIoapic(void) {
             case IOAPIC_SOURCE_OVERRIDE_RECORD: {
                 IoapicOverrideEntry *Entry = MmAllocatePool(sizeof(IoapicOverrideEntry), "Apic");
                 if (!Entry) {
-                    VidPrint(
-                        VID_MESSAGE_ERROR,
-                        "Kernel HAL",
-                        "couldn't allocate space for an IOAPIC source override\n");
-                    KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
+                    KeFatalError(
+                        KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+                        KE_PANIC_PARAMETER_IOAPIC_INITIALIZATION_FAILURE,
+                        KE_PANIC_PARAMETER_OUT_OF_RESOURCES,
+                        0,
+                        0);
                 }
 
                 Entry->Irq = Record->IoapicSourceOverride.IrqSource;

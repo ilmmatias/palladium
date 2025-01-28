@@ -109,8 +109,12 @@ uint32_t HalpReadLapicId(void) {
 void HalpInitializeApic(void) {
     MadtHeader *Madt = KiFindAcpiTable("APIC", 0);
     if (!Madt) {
-        VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "couldn't find the MADT table\n");
-        KeFatalError(KE_PANIC_BAD_SYSTEM_TABLE);
+        KeFatalError(
+            KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+            KE_PANIC_PARAMETER_APIC_INITIALIZATION_FAILURE,
+            KE_PANIC_PARAMETER_TABLE_NOT_FOUND,
+            0,
+            0);
     }
 
     /* x2APIC uses MSRs instead of the LAPIC address, so Read/WriteRegister needs to know if we
@@ -135,9 +139,12 @@ void HalpInitializeApic(void) {
 
                 LapicEntry *Entry = MmAllocatePool(sizeof(LapicEntry), "Apic");
                 if (!Entry) {
-                    VidPrint(
-                        VID_MESSAGE_ERROR, "Kernel HAL", "couldn't allocate space for a LAPIC\n");
-                    KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
+                    KeFatalError(
+                        KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+                        KE_PANIC_PARAMETER_APIC_INITIALIZATION_FAILURE,
+                        KE_PANIC_PARAMETER_OUT_OF_RESOURCES,
+                        0,
+                        0);
                 }
 
                 Entry->ApicId = Record->Lapic.ApicId;
@@ -164,9 +171,12 @@ void HalpInitializeApic(void) {
 
                 LapicEntry *Entry = MmAllocatePool(sizeof(LapicEntry), "Apic");
                 if (!Entry) {
-                    VidPrint(
-                        VID_MESSAGE_ERROR, "Kernel HAL", "couldn't allocate space for a x2APIC\n");
-                    KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
+                    KeFatalError(
+                        KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+                        KE_PANIC_PARAMETER_APIC_INITIALIZATION_FAILURE,
+                        KE_PANIC_PARAMETER_OUT_OF_RESOURCES,
+                        0,
+                        0);
                 }
 
                 Entry->ApicId = Record->X2Apic.X2ApicId;
@@ -196,8 +206,12 @@ void HalpInitializeApic(void) {
     if (!X2ApicEnabled) {
         LapicAddress = MmMapSpace(ReadMsr(0x1B) & ~0xFFF, MM_PAGE_SIZE);
         if (!LapicAddress) {
-            VidPrint(VID_MESSAGE_ERROR, "Kernel HAL", "couldn't map the LAPIC\n");
-            KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
+            KeFatalError(
+                KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+                KE_PANIC_PARAMETER_APIC_INITIALIZATION_FAILURE,
+                KE_PANIC_PARAMETER_OUT_OF_RESOURCES,
+                0,
+                0);
         }
     }
 }

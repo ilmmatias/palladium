@@ -29,7 +29,7 @@ uint64_t MmAllocateSinglePage() {
 
     MiPageEntry *Entry = CONTAINING_RECORD(ListHeader, MiPageEntry, ListHeader);
     if (Entry->Flags & MI_PAGE_FLAGS_USED) {
-        KeFatalError(KE_PANIC_BAD_PFN_HEADER);
+        KeFatalError(KE_PANIC_BAD_PFN_HEADER, MI_PAGE_BASE(Entry), Entry->Flags, 0, 0);
     }
 
     Entry->Flags = MI_PAGE_FLAGS_USED;
@@ -52,7 +52,7 @@ void MmFreeSinglePage(uint64_t PhysicalAddress) {
 
     if (!(Entry->Flags & MI_PAGE_FLAGS_USED) ||
         (Entry->Flags & (MI_PAGE_FLAGS_CONTIG_ANY | MI_PAGE_FLAGS_POOL_ANY))) {
-        KeFatalError(KE_PANIC_BAD_PFN_HEADER);
+        KeFatalError(KE_PANIC_BAD_PFN_HEADER, PhysicalAddress, Entry->Flags, 0, 0);
     }
 
     Entry->Flags = 0;

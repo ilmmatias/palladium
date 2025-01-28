@@ -103,8 +103,12 @@ void PsReadyThread(PsThread *Thread) {
 void PspCreateSystemThread(void) {
     HalGetCurrentProcessor()->InitialThread = PsCreateThread(KiContinueSystemStartup, NULL);
     if (!HalGetCurrentProcessor()->InitialThread) {
-        VidPrint(VID_MESSAGE_ERROR, "Kernel", "failed to create the system thread\n");
-        KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
+        KeFatalError(
+            KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+            KE_PANIC_PARAMETER_SCHEDULER_INITIALIZATION_FAILURE,
+            KE_PANIC_PARAMETER_OUT_OF_RESOURCES,
+            0,
+            0);
     }
 }
 
@@ -121,7 +125,11 @@ void PspCreateSystemThread(void) {
 void PspCreateIdleThread(void) {
     HalGetCurrentProcessor()->IdleThread = PsCreateThread(PspIdleThread, NULL);
     if (!HalGetCurrentProcessor()->IdleThread) {
-        VidPrint(VID_MESSAGE_ERROR, "Kernel", "failed to create the idle thread\n");
-        KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
+        KeFatalError(
+            KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+            KE_PANIC_PARAMETER_SCHEDULER_INITIALIZATION_FAILURE,
+            KE_PANIC_PARAMETER_OUT_OF_RESOURCES,
+            0,
+            0);
     }
 }

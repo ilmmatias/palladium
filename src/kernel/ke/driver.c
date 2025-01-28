@@ -25,8 +25,12 @@ void KiSaveBootStartDrivers(KiLoaderBlock *LoaderBlock) {
     RtDList *LoaderModuleListHead =
         MmMapSpace((uint64_t)LoaderBlock->BootDriverListHead, sizeof(RtDList));
     if (!LoaderModuleListHead) {
-        VidPrint(VID_MESSAGE_ERROR, "Kernel", "couldn't map the boot driver list head\n");
-        KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
+        KeFatalError(
+            KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+            KE_PANIC_PARAMETER_DRIVER_INITIALIZATION_FAILURE,
+            KE_PANIC_PARAMETER_OUT_OF_RESOURCES,
+            0,
+            0);
     }
 
     RtInitializeDList(&KeModuleListHead);
@@ -35,29 +39,45 @@ void KiSaveBootStartDrivers(KiLoaderBlock *LoaderBlock) {
     while (ListHeader != LoaderBlock->BootDriverListHead) {
         ListHeader = MmMapSpace((uint64_t)ListHeader, sizeof(KeModule));
         if (!ListHeader) {
-            VidPrint(VID_MESSAGE_ERROR, "Kernel", "couldn't map a boot driver list entry\n");
-            KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
+            KeFatalError(
+                KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+                KE_PANIC_PARAMETER_DRIVER_INITIALIZATION_FAILURE,
+                KE_PANIC_PARAMETER_OUT_OF_RESOURCES,
+                0,
+                0);
         }
 
         KeModule *SourceModule = CONTAINING_RECORD(ListHeader, KeModule, ListHeader);
         KeModule *TargetModule = MmAllocatePool(sizeof(KeModule), "KeLd");
         if (!TargetModule) {
-            VidPrint(VID_MESSAGE_ERROR, "Kernel", "couldn't allocate space for a kernel module\n");
-            KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
+            KeFatalError(
+                KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+                KE_PANIC_PARAMETER_DRIVER_INITIALIZATION_FAILURE,
+                KE_PANIC_PARAMETER_OUT_OF_RESOURCES,
+                0,
+                0);
         }
 
         /* Is it safe to assume this is never going to be >1 page long? I hope so, make this
          * a bit more dynamic if we ever start encountering such cases. */
         char *SourceImageName = MmMapSpace((uint64_t)SourceModule->ImageName, MM_PAGE_SIZE);
         if (!SourceImageName) {
-            VidPrint(VID_MESSAGE_ERROR, "Kernel", "couldn't map a boot driver list entry\n");
-            KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
+            KeFatalError(
+                KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+                KE_PANIC_PARAMETER_DRIVER_INITIALIZATION_FAILURE,
+                KE_PANIC_PARAMETER_OUT_OF_RESOURCES,
+                0,
+                0);
         }
 
         char *TargetImageName = MmAllocatePool(strlen(SourceImageName) + 1, "KeLd");
         if (!TargetImageName) {
-            VidPrint(VID_MESSAGE_ERROR, "Kernel", "couldn't allocate space for a kernel module\n");
-            KeFatalError(KE_PANIC_INSTALL_MORE_MEMORY);
+            KeFatalError(
+                KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+                KE_PANIC_PARAMETER_DRIVER_INITIALIZATION_FAILURE,
+                KE_PANIC_PARAMETER_OUT_OF_RESOURCES,
+                0,
+                0);
         }
 
         memcpy(TargetModule, SourceModule, sizeof(KeModule));
@@ -110,6 +130,7 @@ void KiRunBootStartDrivers(void) {
  *-----------------------------------------------------------------------------------------------*/
 void KiDumpSymbol(void *Address) {
     uint64_t Offset = (uint64_t)Address;
+    char OffsetString[128];
 
     RtDList *ListHeader = KeModuleListHead.Next;
     KeModule *Image = NULL;
@@ -127,8 +148,7 @@ void KiDumpSymbol(void *Address) {
     }
 
     if (ListHeader == &KeModuleListHead) {
-        char OffsetString[25];
-        sprintf(OffsetString, "0x%016llx - ??\n", Offset);
+        snprintf(OffsetString, sizeof(OffsetString), "0x%016llx - ??\n", Offset);
         VidPutString(OffsetString);
         return;
     }
@@ -165,10 +185,8 @@ void KiDumpSymbol(void *Address) {
         Symbol += Symbol->NumberOfAuxSymbols + 1;
     }
 
-    char OffsetString[23];
-    sprintf(OffsetString, "0x%016llx - ", Offset);
+    snprintf(OffsetString, sizeof(OffsetString), "0x%016llx - ", Offset);
     VidPutString(OffsetString);
-
     VidPutString(Image->ImageName);
     VidPutString("!");
 
@@ -181,7 +199,9 @@ void KiDumpSymbol(void *Address) {
     }
 
     if (Offset - ClosestAddress) {
-        sprintf(OffsetString, "+%#llx\n", Offset - ClosestAddress);
+        snprintf(OffsetString, sizeof(OffsetString), "+%#llx\n", Offset - ClosestAddress);
         VidPutString(OffsetString);
+    } else {
+        VidPutChar('\n');
     }
 }

@@ -53,9 +53,9 @@ void EvDispatchDpc(EvDpc *Dpc) {
 void EvpProcessQueue(HalInterruptFrame *) {
     KeProcessor *Processor = HalGetCurrentProcessor();
     uint64_t CurrentTicks = HalGetTimerTicks();
-
-    if (KeGetIrql() != KE_IRQL_DISPATCH) {
-        KeFatalError(KE_PANIC_IRQL_NOT_DISPATCH);
+    KeIrql Irql = KeGetIrql();
+    if (Irql != KE_IRQL_DISPATCH) {
+        KeFatalError(KE_PANIC_IRQL_NOT_DISPATCH, Irql, 0, 0, 0);
     }
 
     /* Process any pending events (they might enqueue DPCs, so we need to process them

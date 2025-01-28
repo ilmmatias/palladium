@@ -4,17 +4,7 @@
 .text
 
 #include <amd64/context.inc>
-
-/* Keep these in sync with their values in ke.h. */
-#define KE_IRQL_PASSIVE 0
-
-/* Keep these in sync with the HalStartFrame in context.h. */
-#define START_FRAME_ENTRY_POINT 0x00
-#define START_FRAME_PARAMETER 0x08
-#define START_FRAME_SIZE 0x10
-
-/* Keep these in sync with the HalContextFrame in context.h. */
-#define CONTEXT_FRAME_RSP 0x00
+#include <amd64/irql.inc>
 
 .extern HalpUpdateTss
 

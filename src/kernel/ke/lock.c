@@ -62,15 +62,16 @@ static inline void AcquireLock(KeSpinLock *Lock, uint64_t TargetValue) {
  *     1 on success, 0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
 int KeTryAcquireSpinLockHighIrql(KeSpinLock *Lock) {
-    if (KeGetIrql() < KE_IRQL_DISPATCH) {
-        KeFatalError(KE_PANIC_IRQL_NOT_GREATER_OR_EQUAL);
+    KeIrql Irql = KeGetIrql();
+    if (Irql < KE_IRQL_DISPATCH) {
+        KeFatalError(KE_PANIC_IRQL_NOT_GREATER_OR_EQUAL, Irql, KE_IRQL_DISPATCH, 0, 0);
     }
 
     /* Raise a fatal error if we already acquired this lock on the same thread (recursive/dead
      * lock detected). */
     uint64_t TargetValue = GetTargetLockValue();
     if (__atomic_load_n(Lock, __ATOMIC_RELAXED) == TargetValue) {
-        KeFatalError(KE_PANIC_SPIN_LOCK_ALREADY_OWNED);
+        KeFatalError(KE_PANIC_SPIN_LOCK_ALREADY_OWNED, (uint64_t)Lock, TargetValue, 0, 0);
     }
 
     uint64_t DesiredValue = 0;
@@ -96,7 +97,7 @@ KeIrql KeAcquireSpinLock(KeSpinLock *Lock) {
      * lock detected). */
     uint64_t TargetValue = GetTargetLockValue();
     if (__atomic_load_n(Lock, __ATOMIC_RELAXED) == TargetValue) {
-        KeFatalError(KE_PANIC_SPIN_LOCK_ALREADY_OWNED);
+        KeFatalError(KE_PANIC_SPIN_LOCK_ALREADY_OWNED, (uint64_t)Lock, TargetValue, 0, 0);
     }
 
     AcquireLock(Lock, TargetValue);
@@ -119,7 +120,7 @@ void KeAcquireSpinLockHighIrql(KeSpinLock *Lock) {
      * lock detected). */
     uint64_t TargetValue = GetTargetLockValue();
     if (__atomic_load_n(Lock, __ATOMIC_RELAXED) == TargetValue) {
-        KeFatalError(KE_PANIC_SPIN_LOCK_ALREADY_OWNED);
+        KeFatalError(KE_PANIC_SPIN_LOCK_ALREADY_OWNED, (uint64_t)Lock, TargetValue, 0, 0);
     }
 
     AcquireLock(Lock, TargetValue);
@@ -138,14 +139,15 @@ void KeAcquireSpinLockHighIrql(KeSpinLock *Lock) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void KeReleaseSpinLock(KeSpinLock *Lock, KeIrql NewIrql) {
-    if (KeGetIrql() != KE_IRQL_DISPATCH) {
-        KeFatalError(KE_PANIC_IRQL_NOT_DISPATCH);
+    KeIrql Irql = KeGetIrql();
+    if (Irql != KE_IRQL_DISPATCH) {
+        KeFatalError(KE_PANIC_IRQL_NOT_DISPATCH, Irql, 0, 0, 0);
     }
 
     /* Raise a fatal error if the lock wasn't acquired by this thread too. */
     uint64_t TargetValue = GetTargetLockValue();
     if (__atomic_load_n(Lock, __ATOMIC_RELAXED) != TargetValue) {
-        KeFatalError(KE_PANIC_SPIN_LOCK_NOT_OWNED);
+        KeFatalError(KE_PANIC_SPIN_LOCK_NOT_OWNED, (uint64_t)Lock, TargetValue, 0, 0);
     }
 
     __atomic_store_n(Lock, 0, __ATOMIC_RELEASE);
@@ -167,7 +169,7 @@ void KeReleaseSpinLockHighIrql(KeSpinLock *Lock) {
     /* Raise a fatal error if the lock wasn't acquired by this thread too. */
     uint64_t TargetValue = GetTargetLockValue();
     if (__atomic_load_n(Lock, __ATOMIC_RELAXED) != TargetValue) {
-        KeFatalError(KE_PANIC_SPIN_LOCK_NOT_OWNED);
+        KeFatalError(KE_PANIC_SPIN_LOCK_NOT_OWNED, (uint64_t)Lock, TargetValue, 0, 0);
     }
 
     __atomic_store_n(Lock, 0, __ATOMIC_RELEASE);

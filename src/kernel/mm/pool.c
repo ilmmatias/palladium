@@ -75,9 +75,10 @@ static void *AllocatePoolPages(uint64_t Pages) {
  *-----------------------------------------------------------------------------------------------*/
 static void FreePoolPages(void *Base) {
     KeIrql OldIrql = KeAcquireSpinLock(&MiPageListLock);
-    MiPageEntry *BaseEntry = &MI_PAGE_ENTRY(HalpGetPhysicalAddress(Base));
+    uint64_t PhysicalAddress = HalpGetPhysicalAddress(Base);
+    MiPageEntry *BaseEntry = &MI_PAGE_ENTRY(PhysicalAddress);
     if (!(BaseEntry->Flags & MI_PAGE_FLAGS_USED) || !(BaseEntry->Flags & MI_PAGE_FLAGS_POOL_BASE)) {
-        KeFatalError(KE_PANIC_BAD_PFN_HEADER);
+        KeFatalError(KE_PANIC_BAD_PFN_HEADER, PhysicalAddress, BaseEntry->Flags, 0, 0);
     }
 
     uint32_t Pages = BaseEntry->Pages;
@@ -85,10 +86,11 @@ static void FreePoolPages(void *Base) {
     RtPushDList(&MiFreePageListHead, &BaseEntry->ListHeader);
 
     for (uint32_t Offset = MM_PAGE_SIZE; Offset < Pages << MM_PAGE_SHIFT; Offset += MM_PAGE_SIZE) {
-        MiPageEntry *ItemEntry = &MI_PAGE_ENTRY(HalpGetPhysicalAddress((char *)Base + Offset));
+        uint64_t PhysicalAdddress = HalpGetPhysicalAddress((char *)Base + Offset);
+        MiPageEntry *ItemEntry = &MI_PAGE_ENTRY(PhysicalAdddress);
         if (!(ItemEntry->Flags & MI_PAGE_FLAGS_USED) ||
             !(ItemEntry->Flags & MI_PAGE_FLAGS_POOL_ITEM)) {
-            KeFatalError(KE_PANIC_BAD_PFN_HEADER);
+            KeFatalError(KE_PANIC_BAD_PFN_HEADER, PhysicalAddress, ItemEntry->Flags, 0, 0);
         }
 
         ItemEntry->Flags = 0;
@@ -145,7 +147,12 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
             CONTAINING_RECORD(RtPopSList(&SmallBlocks[i - 1]), PoolHeader, ListHeader);
 
         if (Header->Head != i) {
-            KeFatalError(KE_PANIC_BAD_POOL_HEADER);
+            KeFatalError(
+                KE_PANIC_BAD_POOL_HEADER,
+                (uint64_t)Header,
+                (uint64_t)Header->ListHeader.Next,
+                *(uint32_t *)Header->Tag,
+                Header->Head);
         }
 
         Header->Head = Head;
@@ -214,7 +221,12 @@ void MmFreePool(void *Base, const char Tag[4]) {
 
     if (memcmp(Header->Tag, Tag, 4) || Header->Head < 1 || Header->Head >= SMALL_BLOCK_COUNT ||
         Header->ListHeader.Next) {
-        KeFatalError(KE_PANIC_BAD_POOL_HEADER);
+        KeFatalError(
+            KE_PANIC_BAD_POOL_HEADER,
+            (uint64_t)Header,
+            (uint64_t)Header->ListHeader.Next,
+            *(uint32_t *)Header->Tag,
+            Header->Head);
     }
 
     RtPushSList(&SmallBlocks[Header->Head - 1], &Header->ListHeader);
