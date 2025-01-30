@@ -31,7 +31,7 @@ char *fgets(char *str, int count, struct FILE *stream) {
         return NULL;
     }
 
-    int fail = 0;
+    bool fail = false;
     char *dest = str;
     stream->flags |= __STDIO_FLAGS_READING;
 
@@ -39,7 +39,7 @@ char *fgets(char *str, int count, struct FILE *stream) {
         int ch = fgetc(stream);
 
         if (ch == EOF) {
-            fail = 1;
+            fail = true;
             break;
         }
 

@@ -26,7 +26,7 @@
  *
  * PARAMETERS:
  *     base - Which base the number is in, or 0 for auto detection.
- *     width_set - Set to 1 if we should take into consideration the width.
+ *     width_set - Set to true if we should take into consideration the width.
  *     width - Maximum amount of characters we're allowed to read.
  *     value - Output; Where to store the number on success.
  *     read - I/O; Pointer to an integer storing the `total amount of characters read`.
@@ -35,11 +35,11 @@
  *     unread_ch - What to do when we failed to match something, and we need to unwind the input.
  *
  * RETURN VALUE:
- *     1 on success, 0 on failure.
+ *     true on success, false on failure.
  *-----------------------------------------------------------------------------------------------*/
-static int _strtoi(
+static bool _strtoi(
     int base,
-    int width_set,
+    bool width_set,
     int width,
     intmax_t *value,
     int *read,
@@ -68,9 +68,9 @@ static int _strtoi(
         (*read)++;
     }
 
-    int prefix = 0;
+    bool prefix = false;
     size_t accum = 0;
-    int overflow = 0;
+    bool overflow = false;
 
     if (base == 0 && ch == '0') {
         if (!width_set || --width) {
@@ -95,7 +95,7 @@ static int _strtoi(
             return 1;
         }
 
-        prefix = 1;
+        prefix = true;
     } else if (base == 0) {
         base = 10;
     }
@@ -123,7 +123,7 @@ static int _strtoi(
     }
 
     *value = 0;
-    while (1) {
+    while (true) {
         intmax_t last = *value;
         if (ch == EOF) {
             break;
@@ -149,7 +149,7 @@ static int _strtoi(
             *value = (*value * base) + ch;
             if (*value < last) {
                 *value = INTMAX_MAX;
-                overflow = 1;
+                overflow = true;
             }
         }
 
@@ -167,13 +167,13 @@ static int _strtoi(
     unread_ch(context, ch);
 
     if (overflow) {
-        return 1;
+        return true;
     } else if (accum) {
         *value *= sign;
-        return 1;
+        return true;
     } else {
         *value = 0;
-        return 0;
+        return false;
     }
 }
 
@@ -184,7 +184,7 @@ static int _strtoi(
  *
  * PARAMETERS:
  *     base - Which base the number is in, or 0 for auto detection.
- *     width_set - Set to 1 if we should take into consideration the width.
+ *     width_set - Set to true if we should take into consideration the width.
  *     width - Maximum amount of characters we're allowed to read.
  *     value - Output; Where to store the number on success.
  *     read - I/O; Pointer to an integer storing the `total amount of characters read`.
@@ -193,11 +193,11 @@ static int _strtoi(
  *     unread_ch - What to do when we failed to match something, and we need to unwind the input.
  *
  * RETURN VALUE:
- *     1 on success, 0 on failure.
+ *     true on success, false on failure.
  *-----------------------------------------------------------------------------------------------*/
-static int _strtou(
+static bool _strtou(
     int base,
-    int width_set,
+    bool width_set,
     int width,
     uintmax_t *value,
     int *read,
@@ -211,7 +211,7 @@ static int _strtou(
     }
 
     size_t accum = 0;
-    int overflow = 0;
+    bool overflow = false;
 
     /* Base detection is disabled/absent, as scanf doesn't have an auto-detect specifier for
        unsigned integers. */
@@ -233,12 +233,12 @@ static int _strtou(
             }
         } else {
             *value = 0;
-            return 1;
+            return true;
         }
     }
 
     *value = 0;
-    while (1) {
+    while (true) {
         uintmax_t last = *value;
         if (ch == EOF) {
             break;
@@ -262,7 +262,7 @@ static int _strtou(
             *value = (*value * base) + ch;
             if (*value < last) {
                 *value = UINTMAX_MAX;
-                overflow = 1;
+                overflow = true;
             }
         }
 
@@ -315,7 +315,7 @@ int __vscanf(
                 ch = *(++format);
             }
 
-            while (1) {
+            while (true) {
                 ch = read_ch(context);
 
                 if (!isspace(ch)) {
@@ -341,17 +341,17 @@ int __vscanf(
         }
 
         /* Output supressor, doesn't write to any varidic arguemnts when set. */
-        int supress = *format == '*';
+        bool supress = *format == '*';
         if (supress) {
             format++;
         }
 
         /* Width specifier, use this together with '%s', unless you want a buffer overflow. */
         int width = 0;
-        int width_set = 0;
+        bool width_set = false;
         if (isdigit(*format)) {
             width = strtol(format, (char **)&format, 10);
-            width_set = 1;
+            width_set = true;
         }
 
         /* Final group, length modifiers. */
@@ -457,7 +457,7 @@ int __vscanf(
                 }
 
                 unread_ch(context, ch);
-                while (1) {
+                while (true) {
                     if (width_set && width-- <= 0) {
                         break;
                     }

@@ -14,7 +14,7 @@ RtSList HalpLapicListHead = {};
 uint32_t HalpProcessorCount = 0;
 
 static void *LapicAddress = NULL;
-static int X2ApicEnabled = 0;
+static bool X2ApicEnabled = false;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -122,7 +122,7 @@ void HalpInitializeApic(void) {
     uint32_t Eax, Ebx, Ecx, Edx;
     __cpuid(1, Eax, Ebx, Ecx, Edx);
     if (Ecx & 0x200000) {
-        X2ApicEnabled = 1;
+        X2ApicEnabled = true;
     }
 
     char *Position = (char *)(Madt + 1);
@@ -149,7 +149,7 @@ void HalpInitializeApic(void) {
 
                 Entry->ApicId = Record->Lapic.ApicId;
                 Entry->AcpiId = Record->Lapic.AcpiId;
-                Entry->IsX2Apic = 0;
+                Entry->IsX2Apic = false;
                 RtPushSList(&HalpLapicListHead, &Entry->ListHeader);
                 VidPrint(
                     VID_MESSAGE_DEBUG,
@@ -181,7 +181,7 @@ void HalpInitializeApic(void) {
 
                 Entry->ApicId = Record->X2Apic.X2ApicId;
                 Entry->AcpiId = Record->X2Apic.AcpiId;
-                Entry->IsX2Apic = 1;
+                Entry->IsX2Apic = true;
                 RtPushSList(&HalpLapicListHead, &Entry->ListHeader);
                 VidPrint(
                     VID_MESSAGE_DEBUG,
@@ -233,10 +233,8 @@ void HalpEnableApic(void) {
         WriteMsr(0x1B, (ReadMsr(0x1B) & ~0xFFF) | 0x800);
     }
 
-    /* The spec says that we might not always have to mask everything on the PIC, but we always
-       do that anyways.
-       The boot manager should have already remapped the IRQs (for handling early kernel
-       exceptions). */
+    /* Reconfigure and mask the PIC (this seems to be necessary on all processors, or things can
+     * get a bit hairy). */
     WritePortByte(0x21, 0xFF);
     WritePortByte(0xA1, 0xFF);
 

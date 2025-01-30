@@ -8,7 +8,7 @@
 #include <platform.h>
 #include <string.h>
 
-static int HasHugePages = 0;
+static bool HasHugePages = false;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -18,12 +18,12 @@ static int HasHugePages = 0;
  *     Frame - Which frame to setup.
  *     Address - Which address to use.
  *     Flags - Which page flags to use.
- *     LargeLevel - Set to 1 if this needs the PageSize bit in the entry, or 0 otherwise.
+ *     LargeLevel - Set to true if this needs the PageSize bit in the entry, or false otherwise.
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-static void SetupFrame(PageFrame *Frame, uint64_t Address, int Flags, int LargeLevel) {
+static void SetupFrame(PageFrame *Frame, uint64_t Address, int Flags, bool LargeLevel) {
     Frame->Present = 1;
     Frame->Address = Address >> 12;
 
@@ -58,9 +58,9 @@ static void SetupFrame(PageFrame *Frame, uint64_t Address, int Flags, int LargeL
  *     Levels - How many levels we need to go down.
  *
  * RETURN VALUE:
- *     1 if the page frame already exists, 0 otherwise.
+ *     true if the page frame already exists, false otherwise.
  *-----------------------------------------------------------------------------------------------*/
-static int CheckLevel(PageFrame *PageMap, uint64_t VirtualAddress, int Levels) {
+static bool CheckLevel(PageFrame *PageMap, uint64_t VirtualAddress, int Levels) {
     size_t Shift = 39;
 
     while (Levels--) {
@@ -69,12 +69,12 @@ static int CheckLevel(PageFrame *PageMap, uint64_t VirtualAddress, int Levels) {
         /* Not present level is an instant return (no chance of anything being mapped here
          * already). */
         if (!PageMap[Index].Present) {
-            return 1;
+            return true;
         }
 
         /* And a large/huge page (when we don't want it) means we can't map anything here. */
         if (PageMap[Index].PageSize) {
-            return 0;
+            return false;
         }
 
         PageMap = (PageFrame *)(PageMap[Index].Address << 12);
@@ -116,7 +116,7 @@ static PageFrame *PrepareLevel(
             if (Status != EFI_SUCCESS) {
                 OslPrint("The system ran out of memory while creating the boot page map.\r\n");
                 OslPrint("The boot process cannot continue.\r\n");
-                return 0;
+                return NULL;
             } else if (!OslpUpdateMemoryDescriptors(
                            MemoryDescriptorListHead,
                            MemoryDescriptorStack,
@@ -127,7 +127,7 @@ static PageFrame *PrepareLevel(
             }
 
             memset((void *)PhysicalAddress, 0, SIZE_4KB);
-            SetupFrame(&PageMap[Index], PhysicalAddress, PAGE_FLAGS_WRITE | PAGE_FLAGS_EXEC, 0);
+            SetupFrame(&PageMap[Index], PhysicalAddress, PAGE_FLAGS_WRITE | PAGE_FLAGS_EXEC, false);
         }
 
         PageMap = (PageFrame *)(PageMap[Index].Address << 12);
@@ -150,13 +150,13 @@ static PageFrame *PrepareLevel(
  *     PhysicalAddress - Current address of the source range.
  *     Flags - Page flags for the mapping.
  *     Levels - How many levels we need to go down.
- *     LargeLevel - Set to 1 if this needs the PageSize bit in the entry, or 0 otherwise.
+ *     LargeLevel - Set to true if this needs the PageSize bit in the entry, or false otherwise.
  *     LevelShift - How many bits we need to shift the VirtualAddress to get the target level index.
  *
  * RETURN VALUE:
- *     1 on success, 0 otherwise.
+ *     true on success, false otherwise.
  *-----------------------------------------------------------------------------------------------*/
-static int MapPage(
+static bool MapPage(
     RtDList *MemoryDescriptorListHead,
     RtDList *MemoryDescriptorStack,
     PageFrame *PageMap,
@@ -164,17 +164,17 @@ static int MapPage(
     uint64_t PhysicalAddress,
     int Flags,
     int Levels,
-    int LargeLevel,
+    bool LargeLevel,
     uint64_t LevelShift) {
     PageFrame *TableLevel = PrepareLevel(
         MemoryDescriptorListHead, MemoryDescriptorStack, PageMap, VirtualAddress, Levels);
     if (!TableLevel) {
-        return 0;
+        return false;
     }
 
     PageFrame *Frame = &TableLevel[(VirtualAddress >> LevelShift) & 511];
     SetupFrame(Frame, PhysicalAddress, Flags, LargeLevel);
-    return 1;
+    return true;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -192,9 +192,9 @@ static int MapPage(
  *     Flags - How we want to map the page.
  *
  * RETURN VALUE:
- *     1 on success, 0 otherwise.
+ *     true on success, false otherwise.
  *-----------------------------------------------------------------------------------------------*/
-static int MapRange(
+static bool MapRange(
     RtDList *MemoryDescriptorListHead,
     RtDList *MemoryDescriptorStack,
     PageFrame *PageMap,
@@ -204,9 +204,9 @@ static int MapRange(
     int Flags) {
     while (Size) {
         /* Use as many 1GiB pages as possible. */
-        int UseHugePage = HasHugePages && CheckLevel(PageMap, VirtualAddress, 1) &&
-                          !(VirtualAddress & (SIZE_1GB - 1)) &&
-                          !(PhysicalAddress & (SIZE_1GB - 1)) && Size >= SIZE_1GB;
+        bool UseHugePage = HasHugePages && CheckLevel(PageMap, VirtualAddress, 1) &&
+                           !(VirtualAddress & (SIZE_1GB - 1)) &&
+                           !(PhysicalAddress & (SIZE_1GB - 1)) && Size >= SIZE_1GB;
         if (UseHugePage) {
             if (!MapPage(
                     MemoryDescriptorListHead,
@@ -216,9 +216,9 @@ static int MapRange(
                     PhysicalAddress,
                     Flags,
                     1,
-                    1,
+                    true,
                     30)) {
-                return 0;
+                return false;
             }
 
             VirtualAddress += SIZE_1GB;
@@ -228,9 +228,9 @@ static int MapRange(
         }
 
         /* Followed by large (2MiB) pages. */
-        int UseLargePage = CheckLevel(PageMap, VirtualAddress, 2) &&
-                           !(VirtualAddress & (SIZE_2MB - 1)) &&
-                           !(PhysicalAddress & (SIZE_2MB - 1)) && Size >= SIZE_2MB;
+        bool UseLargePage = CheckLevel(PageMap, VirtualAddress, 2) &&
+                            !(VirtualAddress & (SIZE_2MB - 1)) &&
+                            !(PhysicalAddress & (SIZE_2MB - 1)) && Size >= SIZE_2MB;
         if (UseLargePage) {
             if (!MapPage(
                     MemoryDescriptorListHead,
@@ -240,9 +240,9 @@ static int MapRange(
                     PhysicalAddress,
                     Flags,
                     2,
-                    1,
+                    true,
                     21)) {
-                return 0;
+                return false;
             }
 
             VirtualAddress += SIZE_2MB;
@@ -252,7 +252,7 @@ static int MapRange(
         }
 
         /* Fallback to 4KiB pages if we have too few left/or if things weren't aligned properly. */
-        int UseSmallPage = CheckLevel(PageMap, VirtualAddress, 3);
+        bool UseSmallPage = CheckLevel(PageMap, VirtualAddress, 3);
         if (UseSmallPage) {
             if (!MapPage(
                     MemoryDescriptorListHead,
@@ -262,9 +262,9 @@ static int MapRange(
                     PhysicalAddress,
                     Flags,
                     3,
-                    0,
+                    false,
                     12)) {
-                return 0;
+                return false;
             }
         }
 
@@ -273,7 +273,7 @@ static int MapRange(
         Size -= SIZE_4KB;
     }
 
-    return 1;
+    return true;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -321,7 +321,7 @@ void *OslpCreatePageMap(
      * kernel can easily manipulate the page map). */
     PageFrame *PageMap = (PageFrame *)PhysicalAddress;
     memset(PageMap, 0, SIZE_4KB);
-    SetupFrame(&PageMap[511], (uint64_t)PageMap, PAGE_FLAGS_WRITE, 0);
+    SetupFrame(&PageMap[511], (uint64_t)PageMap, PAGE_FLAGS_WRITE, false);
 
     /* Identity map all descriptors that are either OSLOADER (because we need them while we change
      * CR3) or FIRMWARE (we need them for SetVirtualAddressMap). */

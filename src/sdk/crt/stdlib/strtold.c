@@ -18,7 +18,7 @@
  *-----------------------------------------------------------------------------------------------*/
 static long double parse_hex(const char *str, long double sign) {
     long double value = 0.L;
-    int dot = 0;
+    bool dot = false;
     int p = 0;
 
     /* We combine handling the digits before and after the dot. */
@@ -26,7 +26,7 @@ static long double parse_hex(const char *str, long double sign) {
         int digit = *(str++);
 
         if (digit == '.') {
-            dot = 1;
+            dot = true;
             continue;
         } else if (dot) {
             /* Each digit is a nibble (4-bits). */
@@ -85,7 +85,7 @@ static long double parse_hex(const char *str, long double sign) {
  *-----------------------------------------------------------------------------------------------*/
 static long double parse_dec(const char *str, long double sign) {
     long double value = 0.L;
-    int dot = 0;
+    bool dot = false;
     int e = 0;
 
     /* We combine handling the digits before and after the dot. */
@@ -93,7 +93,7 @@ static long double parse_dec(const char *str, long double sign) {
         int digit = *(str++);
 
         if (digit == '.') {
-            dot = 1;
+            dot = true;
             continue;
         } else if (dot) {
             e -= 1;

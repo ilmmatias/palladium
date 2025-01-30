@@ -19,6 +19,6 @@ typedef struct __attribute__((packed)) {
     uint8_t Reserved[3];
 } RsdpHeader;
 
-int OslpInitializeAcpi(void **AcpiTable, uint32_t *AcpiTableVersion);
+bool OslpInitializeAcpi(void **AcpiTable, uint32_t *AcpiTableVersion);
 
 #endif /* _ACPI_H_ */

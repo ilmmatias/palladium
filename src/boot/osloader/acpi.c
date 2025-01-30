@@ -14,10 +14,10 @@
  *     AcpiTableVersion - Output; Where to store the version of the ACPI root table.
  *
  * RETURN VALUE:
- *     1 on success, 0 if we didn't find the table.
+ *     true on success, false if we didn't find the table.
  *-----------------------------------------------------------------------------------------------*/
-int OslpInitializeAcpi(void **AcpiTable, uint32_t *AcpiTableVersion) {
-    int Status = 0;
+bool OslpInitializeAcpi(void **AcpiTable, uint32_t *AcpiTableVersion) {
+    bool Status = false;
 
     for (UINTN i = 0; i < gST->NumberOfTableEntries; i++) {
         RsdpHeader *Rsdp = gST->ConfigurationTable[i].VendorTable;
@@ -26,7 +26,7 @@ int OslpInitializeAcpi(void **AcpiTable, uint32_t *AcpiTableVersion) {
                 &gST->ConfigurationTable[i].VendorGuid, &gEfiAcpi20TableGuid, sizeof(EFI_GUID))) {
             *AcpiTable = (void *)(UINTN)Rsdp->XsdtAddress;
             *AcpiTableVersion = 2;
-            Status = 1;
+            Status = true;
             /* ACPI 2.0 is our target, we can stop if we find it. */
             break;
         }
@@ -35,7 +35,7 @@ int OslpInitializeAcpi(void **AcpiTable, uint32_t *AcpiTableVersion) {
                 &gST->ConfigurationTable[i].VendorGuid, &gEfiAcpi10TableGuid, sizeof(EFI_GUID))) {
             *AcpiTable = (void *)(UINTN)Rsdp->RsdtAddress;
             *AcpiTableVersion = 1;
-            Status = 1;
+            Status = true;
         }
     }
 

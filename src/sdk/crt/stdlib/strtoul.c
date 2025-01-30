@@ -45,9 +45,9 @@ unsigned long strtoul(const char *str, char **str_end, int base) {
 
     const char *after_prefixes = str;
     unsigned long value = 0;
-    int error = 0;
+    bool error = false;
 
-    while (1) {
+    while (true) {
         unsigned long last = value;
         int digit = *str;
 
@@ -70,7 +70,7 @@ unsigned long strtoul(const char *str, char **str_end, int base) {
             value = (value * base) + digit;
             if (value < last) {
                 value = ULONG_MAX;
-                error = 1;
+                error = true;
             }
         }
 
@@ -78,7 +78,7 @@ unsigned long strtoul(const char *str, char **str_end, int base) {
     }
 
     if (after_prefixes == str) {
-        error = 1;
+        error = true;
         value = 0;
         str = start;
     }

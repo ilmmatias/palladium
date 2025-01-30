@@ -37,7 +37,7 @@ EFI_STATUS OslpInitializeRootVolume(void) {
         }
 
         Status = VolumeIo->OpenVolume(VolumeIo, &OslpRootVolume);
-    } while (0);
+    } while (false);
 
     if (Status != EFI_SUCCESS) {
         OslPrint("Failed to open the root/boot partition.\r\n");
@@ -82,7 +82,7 @@ void *OslReadFile(const char *Path) {
     UINTN FileInfoSize = 0;
     EFI_FILE_INFO *FileInfo = NULL;
 
-    while (1) {
+    while (true) {
         Status = Handle->GetInfo(Handle, &gEfiFileInfoGuid, &FileInfoSize, (VOID *)FileInfo);
         if (Status != EFI_BUFFER_TOO_SMALL) {
             break;

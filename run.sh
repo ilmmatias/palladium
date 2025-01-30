@@ -12,4 +12,4 @@ mkdir -p _root
 cp fat.img _root/fat.img
 mkisofs -R -f -eltorito-boot fat.img -no-emul-boot -o iso9660.iso _root 1>/dev/null 2>&1
 rm -rf _root
-qemu-system-x86_64 -enable-kvm -M smm=off -cpu host -smp $(nproc) -drive if=pflash,format=raw,unit=0,file=/usr/share/ovmf/OVMF.fd,readonly=on -cdrom iso9660.iso -no-reboot $*
+qemu-system-x86_64 -enable-kvm -cpu host -smp $(nproc) -drive if=pflash,format=raw,unit=0,file=/usr/share/ovmf/OVMF.fd,readonly=on -cdrom iso9660.iso -no-reboot -no-shutdown $*

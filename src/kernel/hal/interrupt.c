@@ -30,7 +30,7 @@ HalInterrupt *HalCreateInterrupt(
         return NULL;
     }
 
-    Interrupt->Enabled = 0;
+    Interrupt->Enabled = false;
     Interrupt->Lock = 0;
     Interrupt->Irql = Irql;
     Interrupt->Vector = Vector;

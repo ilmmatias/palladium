@@ -25,7 +25,7 @@
  * PARAMETERS:
  *     buffer - Output buffer.
  *     size - Output buffer size.
- *     left - Controls if we need to left-align (0), or right-align (1).
+ *     left - Controls if we need to left-align (false), or right-align (true).
  *     width - Minimum width specifier.
  *     prec - Maximum width specifier.
  *     context - Implementation-defined context.
@@ -37,7 +37,7 @@
 static int pad(
     const void *buffer,
     int size,
-    int left,
+    bool left,
     int width,
     int prec,
     void *context,
@@ -78,8 +78,8 @@ static int pad(
  *     sign - Controls if we should display a sign (either '-' or ' '), or not (0).
  *     alt - Controls if we should use the octal alt form ('o'), hex alt form ('x' or 'X'), or
  *           just the normal form (0).
- *     left - Controls if we need to left-align (0), or right-align (1).
- *     zero - Controls if the pad character is a space (0), or a zero (1).
+ *     left - Controls if we need to left-align (false), or right-align (true).
+ *     zero - Controls if the pad character is a space (false), or a zero (true).
  *     width - Minimum width specifier.
  *     prec - Maximum width specifier.
  *     context - Implementation-defined context.
@@ -93,8 +93,8 @@ static int pad_num(
     int size,
     int sign,
     int alt,
-    int left,
-    int zero,
+    bool left,
+    bool zero,
     int width,
     int prec,
     void *context,
@@ -179,8 +179,8 @@ static int pad_num(
  * PARAMETERS:
  *     value - What to convert and output.
  *     sign - Controls if we should use a ' ' or '+' when there's not sign.
- *     left - Controls if we need to left-align (0), or right-align (1).
- *     zero - Controls if the pad character is a space (0), or a zero (1).
+ *     left - Controls if we need to left-align (false), or right-align (true).
+ *     zero - Controls if the pad character is a space (false), or a zero (true).
  *     width - Minimum width specifier.
  *     prec - Maximum width specifier.
  *     context - Implementation-defined context.
@@ -192,13 +192,13 @@ static int pad_num(
 static int itoa(
     intmax_t value,
     int sign,
-    int left,
-    int zero,
+    bool left,
+    bool zero,
     int width,
     int prec,
     void *context,
     void (*put_buf)(const void *buffer, int size, void *context)) {
-    int value_sign = value < 0;
+    bool value_sign = value < 0;
     char buffer[64];
     int size = 0;
     int pos = 63;
@@ -233,8 +233,8 @@ static int itoa(
  *     base - Which base should we output it.
  *     upper - Control if we should use uppercase letters for digits >=10.
  *     alt - Controls if we should use the alternative form.
- *     left - Controls if we need to left-align (0), or right-align (1).
- *     zero - Controls if the pad character is a space (0), or a zero (1).
+ *     left - Controls if we need to left-align (false), or right-align (true).
+ *     zero - Controls if the pad character is a space (false), or a zero (true).
  *     width - Minimum width specifier.
  *     prec - Maximum width specifier.
  *     context - Implementation-defined context.
@@ -246,10 +246,10 @@ static int itoa(
 static int utoa(
     uintmax_t value,
     int base,
-    int upper,
-    int alt,
-    int left,
-    int zero,
+    bool upper,
+    bool alt,
+    bool left,
+    bool zero,
     int width,
     int prec,
     void *context,
@@ -313,15 +313,15 @@ int __vprintf(
 
         /* First group, options can appear in any order (and we don't care about repeats). */
         int sign = 0;
-        int left = 0;
-        int alt = 0;
-        int zero = 0;
-        while (1) {
-            int stop = 0;
+        bool left = false;
+        bool alt = false;
+        bool zero = false;
+        while (true) {
+            bool stop = false;
 
             switch (*format) {
                 case '-':
-                    left = 1;
+                    left = true;
                     break;
                 case '+':
                     sign = '+';
@@ -332,13 +332,13 @@ int __vprintf(
                     }
                     break;
                 case '#':
-                    alt = 1;
+                    alt = true;
                     break;
                 case '0':
-                    zero = 1;
+                    zero = true;
                     break;
                 default:
-                    stop = 1;
+                    stop = true;
                     break;
             }
 
@@ -541,7 +541,7 @@ int __vprintf(
                 size += utoa(
                     (uintmax_t)va_arg(vlist, void *),
                     16,
-                    0,
+                    false,
                     'X',
                     left,
                     zero,

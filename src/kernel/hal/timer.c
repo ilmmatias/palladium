@@ -14,9 +14,9 @@
  *     Time - How much timer ticks past the reference we want to wait until expiration.
  *
  * RETURN VALUE:
- *     1 if we reached the target time, 0 otherwise.
+ *     true if we reached the target time, false otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int HalCheckTimerExpiration(uint64_t Current, uint64_t Reference, uint64_t Ticks) {
+bool HalCheckTimerExpiration(uint64_t Current, uint64_t Reference, uint64_t Ticks) {
     uint64_t Target = Reference + Ticks;
 
     if (HalGetTimerWidth() == HAL_TIMER_WIDTH_64B) {

@@ -45,7 +45,7 @@ void OslpInitializeEntropy(void) {
         } else if (Edx & bit_TSC) {
             __asm__ volatile("rdtsc" : "=a"(SeedLow), "=d"(SeedHigh));
         }
-    } while (0);
+    } while (false);
 
     if (SeedLow || SeedHigh) {
         __srand64(((uint64_t)SeedHigh << 32) | SeedLow);
@@ -68,7 +68,7 @@ void OslpInitializeEntropy(void) {
 
         __srand64(Seed);
         return;
-    } while (0);
+    } while (false);
 
     OslPrint("Failed to initialize the entropy source.\r\n");
     OslPrint("KASLR will be predictable across reboots.\r\n");

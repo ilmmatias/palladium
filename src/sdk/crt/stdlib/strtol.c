@@ -47,9 +47,9 @@ long strtol(const char *str, char **str_end, int base) {
 
     const char *after_prefixes = str;
     long value = 0;
-    int error = 0;
+    bool error = false;
 
-    while (1) {
+    while (true) {
         long last = value;
         int digit = *str;
 
@@ -72,7 +72,7 @@ long strtol(const char *str, char **str_end, int base) {
             value = (value * base) + digit;
             if (value < last) {
                 value = LONG_MAX;
-                error = 1;
+                error = true;
             }
         }
 
@@ -80,7 +80,7 @@ long strtol(const char *str, char **str_end, int base) {
     }
 
     if (after_prefixes == str) {
-        error = 1;
+        error = true;
         value = 0;
         str = start;
     }

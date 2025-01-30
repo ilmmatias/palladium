@@ -8,7 +8,7 @@
 static uint64_t BaseAddress = 0;
 static int TableType = KI_ACPI_NONE;
 static RtSList ListHead = {};
-static int CacheTableDone = 0;
+static bool CacheTableDone = false;
 
 typedef struct __attribute__((packed)) {
     char Signature[4];
@@ -42,9 +42,9 @@ typedef struct {
  *     Length - Size of the table.
  *
  * RETURN VALUE:
- *     1 if the checksum is valid, 0 otherwise.
+ *     true if the checksum is valid, false otherwise.
  *-----------------------------------------------------------------------------------------------*/
-static int Checksum(const char *Table, uint32_t Length) {
+static bool Checksum(const char *Table, uint32_t Length) {
     uint8_t Sum = 0;
 
     while (Length--) {
@@ -66,7 +66,7 @@ static int Checksum(const char *Table, uint32_t Length) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 static void CacheTable(void) {
-    CacheTableDone = 1;
+    CacheTableDone = true;
 
     if (TableType == KI_ACPI_NONE) {
         KeFatalError(
@@ -104,7 +104,7 @@ static void CacheTable(void) {
 
     uint32_t *RsdtTables = (uint32_t *)(RootSdt + 1);
     uint64_t *XsdtTables = (uint64_t *)(RootSdt + 1);
-    int IsXsdt = TableType == KI_ACPI_XSDT;
+    bool IsXsdt = TableType == KI_ACPI_XSDT;
 
     if (memcmp(RootSdt->Signature, IsXsdt ? "XSDT" : "RSDT", 4) ||
         !Checksum((char *)RootSdt, RootSdt->Length)) {

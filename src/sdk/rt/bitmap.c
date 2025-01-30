@@ -171,12 +171,13 @@ void RtSetAllBits(RtBitmap *Header) {
  *     Header - Bitmap header struct.
  *     Offset - Where in the bitmap we should start.
  *     NumberOfBits - The max amount of bits we should count.
- *     Inverse - 1 for set (1) bits, otherwise, we'll count clear (0) bits.
+ *     Inverse - true for set (1) bits, otherwise, we'll count clear (0) bits.
  *
  * RETURN VALUE:
  *     Amount of clear bits in a row.
  *-----------------------------------------------------------------------------------------------*/
-static uint64_t CountBitRow(RtBitmap *Header, uint64_t Offset, uint64_t NumberOfBits, int Inverse) {
+static uint64_t
+CountBitRow(RtBitmap *Header, uint64_t Offset, uint64_t NumberOfBits, bool Inverse) {
     uint64_t *Buffer = Header->Buffer + (Offset >> 6);
     uint64_t *End = Buffer + ((NumberOfBits + 63) >> 6);
 
@@ -205,12 +206,12 @@ static uint64_t CountBitRow(RtBitmap *Header, uint64_t Offset, uint64_t NumberOf
  *     Header - Bitmap header struct.
  *     Hint - Where to start looking for the range.
  *     NumberOfBits - How many bits we need to find.
- *     Inverse - 1 for set (1) bits, otherwise, we'll count clear (0) bits.
+ *     Inverse - true for set (1) bits, otherwise, we'll count clear (0) bits.
  *
  * RETURN VALUE:
  *     The number/index of the first bit in the range, or -1 on failure.
  *-----------------------------------------------------------------------------------------------*/
-static uint64_t FindBitRow(RtBitmap *Header, uint64_t Hint, uint64_t NumberOfBits, int Inverse) {
+static uint64_t FindBitRow(RtBitmap *Header, uint64_t Hint, uint64_t NumberOfBits, bool Inverse) {
     if (Hint >= Header->NumberOfBits) {
         Hint = 0;
     }
@@ -265,7 +266,7 @@ static uint64_t FindBitRow(RtBitmap *Header, uint64_t Hint, uint64_t NumberOfBit
  *     The number/index of the first bit in the range, or -1 on failure.
  *-----------------------------------------------------------------------------------------------*/
 uint64_t RtFindClearBits(RtBitmap *Header, uint64_t Hint, uint64_t NumberOfBits) {
-    return FindBitRow(Header, Hint, NumberOfBits, 0);
+    return FindBitRow(Header, Hint, NumberOfBits, false);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -282,7 +283,7 @@ uint64_t RtFindClearBits(RtBitmap *Header, uint64_t Hint, uint64_t NumberOfBits)
  *     The number/index of the first bit in the range, or -1 on failure.
  *-----------------------------------------------------------------------------------------------*/
 uint64_t RtFindClearBitsAndSet(RtBitmap *Header, uint64_t Hint, uint64_t NumberOfBits) {
-    uint64_t Start = FindBitRow(Header, Hint, NumberOfBits, 0);
+    uint64_t Start = FindBitRow(Header, Hint, NumberOfBits, false);
 
     if (Start != (uint64_t)-1) {
         RtSetBits(Header, Start, NumberOfBits);
@@ -304,7 +305,7 @@ uint64_t RtFindClearBitsAndSet(RtBitmap *Header, uint64_t Hint, uint64_t NumberO
  *     The number/index of the first bit in the range, or -1 on failure.
  *-----------------------------------------------------------------------------------------------*/
 uint64_t RtFindSetBits(RtBitmap *Header, uint64_t Hint, uint64_t NumberOfBits) {
-    return FindBitRow(Header, Hint, NumberOfBits, 1);
+    return FindBitRow(Header, Hint, NumberOfBits, true);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -321,7 +322,7 @@ uint64_t RtFindSetBits(RtBitmap *Header, uint64_t Hint, uint64_t NumberOfBits) {
  *     The number/index of the first bit in the range, or -1 on failure.
  *-----------------------------------------------------------------------------------------------*/
 uint64_t RtFindSetBitsAndClear(RtBitmap *Header, uint64_t Hint, uint64_t NumberOfBits) {
-    uint64_t Start = FindBitRow(Header, Hint, NumberOfBits, 1);
+    uint64_t Start = FindBitRow(Header, Hint, NumberOfBits, true);
 
     if (Start != (uint64_t)-1) {
         RtClearBits(Header, Start, NumberOfBits);

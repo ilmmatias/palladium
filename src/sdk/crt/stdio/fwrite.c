@@ -46,7 +46,7 @@ size_t fwrite(const void *buffer, size_t size, size_t count, struct FILE *stream
         return wrote / size;
     }
 
-    int new_line = 0;
+    bool new_line = false;
     size_t accum = 0;
 
     /* The procedure for _IOFBF and _IOLBF are somewhat simillar; Check where the next new line
@@ -63,7 +63,7 @@ size_t fwrite(const void *buffer, size_t size, size_t count, struct FILE *stream
             char *pos = memchr(src, '\n', copy_size);
             if (pos) {
                 copy_size = pos - src + 1;
-                new_line = 1;
+                new_line = true;
             }
         }
 

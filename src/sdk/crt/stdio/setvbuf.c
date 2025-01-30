@@ -25,7 +25,7 @@ void setvbuf(struct FILE *stream, char *buffer, int mode, size_t size) {
     }
 
     /* We'll be overwriting those fields in the next block, so we need to save it. */
-    int user_buffer = stream->user_buffer;
+    bool user_buffer = stream->user_buffer;
     fflush(stream);
 
     if (mode == _IOLBF || mode == _IOFBF) {
@@ -36,9 +36,9 @@ void setvbuf(struct FILE *stream, char *buffer, int mode, size_t size) {
                 return;
             }
 
-            stream->user_buffer = 0;
+            stream->user_buffer = false;
         } else {
-            stream->user_buffer = 1;
+            stream->user_buffer = true;
         }
 
         stream->buffer_type = mode;

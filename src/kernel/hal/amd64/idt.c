@@ -359,31 +359,31 @@ void HalpInitializeIdt(KeProcessor *Processor) {
  *     Interrupt - Target interrupt to be enabled.
  *
  * RETURN VALUE:
- *     0 if the interrupt couldn't be registered, 1 otherwise.
+ *     false if the interrupt couldn't be registered, true otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int HalEnableInterrupt(HalInterrupt *Interrupt) {
+bool HalEnableInterrupt(HalInterrupt *Interrupt) {
     /* We'll be assuming that if the interrupt is already enabled, the caller would rather receive a
      * "success" than a failure (as a previous call with the exact same interrupt object did
      * succeed). */
     if (Interrupt->Enabled) {
-        return 1;
+        return true;
     }
 
     /* The IOAPIC uses the top 4 bits as the TPR (which is our IRQL); TPRs of 0 and 1 don't make
      * sense (they are traps/exceptions!), and we don't want anyone registering any interrupt
      * directly at dispatch level (just register a DPC instead). */
     if (Interrupt->Irql != (Interrupt->Vector >> 4) && Interrupt->Irql <= KE_IRQL_DISPATCH) {
-        return 0;
+        return false;
     }
 
     /* Related to that, don't try using any reserved vector! */
     if (Interrupt->Vector == HAL_INT_TIMER_VECTOR) {
-        return 0;
+        return false;
     }
 
     /* Other than that, we also are limited by our IDT (only 256 vectors). */
     if (Interrupt->Vector > 255) {
-        return 0;
+        return false;
     }
 
     KeProcessor *Processor = HalGetCurrentProcessor();
@@ -396,15 +396,15 @@ int HalEnableInterrupt(HalInterrupt *Interrupt) {
          * edge triggered, not both). */
         if (CONTAINING_RECORD(Handlers->Next, HalInterrupt, ListHeader)->Type != Interrupt->Type) {
             KeReleaseSpinLock(&Processor->InterruptListLock, OldIrql);
-            return 0;
+            return false;
         }
     }
 
     RtAppendDList(Handlers, &Interrupt->ListHeader);
     KeReleaseSpinLock(&Processor->InterruptListLock, OldIrql);
-    Interrupt->Enabled = 1;
+    Interrupt->Enabled = true;
 
-    return 1;
+    return true;
 }
 
 /*-------------------------------------------------------------------------------------------------

@@ -22,7 +22,7 @@ extern "C" {
 
 typedef struct {
     RtDList ListHeader;
-    int Enabled;
+    bool Enabled;
     KeSpinLock Lock;
     KeIrql Irql;
     uint32_t Vector;
@@ -36,7 +36,7 @@ KeProcessor *HalGetCurrentProcessor(void);
 int HalGetTimerWidth(void);
 uint64_t HalGetTimerPeriod(void);
 uint64_t HalGetTimerTicks(void);
-int HalCheckTimerExpiration(uint64_t Current, uint64_t Reference, uint64_t Ticks);
+bool HalCheckTimerExpiration(uint64_t Current, uint64_t Reference, uint64_t Ticks);
 void HalWaitTimer(uint64_t Time);
 
 HalInterrupt *HalCreateInterrupt(
@@ -45,7 +45,7 @@ HalInterrupt *HalCreateInterrupt(
     uint8_t Type,
     void (*Handler)(HalInterruptFrame *, void *),
     void *HandlerContext);
-int HalEnableInterrupt(HalInterrupt *Interrupt);
+bool HalEnableInterrupt(HalInterrupt *Interrupt);
 void HalDisableInterrupt(HalInterrupt *Interrupt);
 
 #ifdef __cplusplus

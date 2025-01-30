@@ -8,7 +8,7 @@
 
 extern const VidpFontData VidpFont;
 
-static int PendingFullFlush = 0;
+static bool PendingFullFlush = false;
 static uint16_t FlushY = 0;
 static uint16_t FlushLines = 0;
 
@@ -24,7 +24,7 @@ uint16_t VidpCursorX = 0;
 uint16_t VidpCursorY = 0;
 
 KeSpinLock VidpLock = {0};
-int VidpUseLock = 1;
+bool VidpUseLock = true;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -38,7 +38,7 @@ int VidpUseLock = 1;
  *-----------------------------------------------------------------------------------------------*/
 static KeIrql AcquireSpinLock(void) {
     if (VidpUseLock) {
-        return KeAcquireSpinLock(&VidpLock);
+        return KeAcquireSpinLockAndRaiseIrql(&VidpLock, KE_IRQL_DISPATCH);
     } else {
         return 0;
     }
@@ -56,7 +56,7 @@ static KeIrql AcquireSpinLock(void) {
  *-----------------------------------------------------------------------------------------------*/
 static void ReleaseSpinLock(KeIrql OldIrql) {
     if (VidpUseLock) {
-        KeReleaseSpinLock(&VidpLock, OldIrql);
+        KeReleaseSpinLockAndLowerIrql(&VidpLock, OldIrql);
     }
 }
 
@@ -77,7 +77,7 @@ static void Flush(void) {
         VidpBackBuffer + FlushY * VidpPitch,
         VidpFrontBuffer + FlushY * VidpPitch,
         FlushLines * VidpPitch);
-    PendingFullFlush = 0;
+    PendingFullFlush = false;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -95,7 +95,7 @@ static void ScrollUp(void) {
     const uint32_t LineSize = VidpPitch * VidpFont.Height;
     memmove(VidpFrontBuffer, VidpFrontBuffer + LineSize, ScreenSize - LineSize);
     memset(VidpFrontBuffer + ScreenSize - LineSize, 0, LineSize);
-    PendingFullFlush = 1;
+    PendingFullFlush = true;
     FlushY = 0;
     FlushLines = VidpHeight;
 }

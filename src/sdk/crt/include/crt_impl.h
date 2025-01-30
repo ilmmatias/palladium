@@ -13,7 +13,7 @@ struct FILE {
     size_t file_size;
     size_t file_pos;
     char *buffer;
-    int user_buffer;
+    bool user_buffer;
     int buffer_type;
     size_t buffer_size;
     size_t buffer_read;

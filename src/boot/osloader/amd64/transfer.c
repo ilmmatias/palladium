@@ -101,7 +101,7 @@
     /* Maybe we should do this in the kernel (to have access to the KeFatalError function)? */
     Status = gRT->SetVirtualAddressMap(MemoryMapSize, DescriptorSize, DescriptorVersion, MemoryMap);
     if (Status != EFI_SUCCESS) {
-        while (1) {
+        while (true) {
             __asm__ volatile("hlt");
         }
     }
@@ -124,7 +124,7 @@
                      : "%rax", "%rcx");
 
     /* It should be impossible to get here (because we jmp'ed instead of call'ing). */
-    while (1) {
+    while (true) {
         __asm__ volatile("hlt");
     }
 }

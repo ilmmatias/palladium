@@ -51,9 +51,9 @@ uint64_t HalpGetPhysicalAddress(void *VirtualAddress) {
  *     Flags - How we want to map the page.
  *
  * RETURN VALUE:
- *     1 on success, 0 otherwise.
+ *     true on success, false otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int HalpMapPage(void *VirtualAddress, uint64_t PhysicalAddress, int Flags) {
+bool HalpMapPage(void *VirtualAddress, uint64_t PhysicalAddress, int Flags) {
     uint64_t Indexes[] = {
         ((uint64_t)VirtualAddress >> 39) & 0x1FF,
         ((uint64_t)VirtualAddress >> 30) & 0x3FFFF,
@@ -64,13 +64,13 @@ int HalpMapPage(void *VirtualAddress, uint64_t PhysicalAddress, int Flags) {
     /* We need to move into the PTE (4KiB), allocating any pages along the way. */
     for (int i = 0; i < 3; i++) {
         if (Addresses[i][Indexes[i]] & 0x80) {
-            return 1;
+            return true;
         }
 
         if (!(Addresses[i][Indexes[i]] & 0x01)) {
             uint64_t Page = MmAllocateSinglePage();
             if (!Page) {
-                return 0;
+                return false;
             }
 
             memset((void *)(Page + 0xFFFF800000000000), 0, MM_PAGE_SIZE);
@@ -98,7 +98,7 @@ int HalpMapPage(void *VirtualAddress, uint64_t PhysicalAddress, int Flags) {
         Addresses[3][Indexes[3]] = PhysicalAddress | PageFlags;
     }
 
-    return 1;
+    return true;
 }
 
 /*-------------------------------------------------------------------------------------------------

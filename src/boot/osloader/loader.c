@@ -19,9 +19,9 @@
  *     ImagePath - Full path where the executable is.
  *
  * RETURN VALUE:
- *     1 on success, 0 otherwise.
+ *     true on success, false otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int OslLoadExecutable(RtDList *LoadedPrograms, const char *ImageName, const char *ImagePath) {
+bool OslLoadExecutable(RtDList *LoadedPrograms, const char *ImageName, const char *ImagePath) {
     OslPrint("loading up %s\r\n", ImagePath);
 
     /* Preload the entire file (to prevent multiple small reads). */
@@ -31,7 +31,7 @@ int OslLoadExecutable(RtDList *LoadedPrograms, const char *ImageName, const char
         OslPrint("Failed to open a kernel/driver file.\r\n");
         OslPrint("Couldn't find %s on the boot/root volume.\r\n", ImagePath);
         OslPrint("The boot process cannot continue.\r\n");
-        return 0;
+        return false;
     }
 
     /* The PE data is prefixed with a MZ header and a MS-DOS stub; The offset into the PE data is
@@ -47,7 +47,7 @@ int OslLoadExecutable(RtDList *LoadedPrograms, const char *ImageName, const char
         OslPrint("Failed to load a kernel/driver file.\r\n");
         OslPrint("The file at %s doesn't seem to be a valid for this architecture.\r\n", ImagePath);
         OslPrint("The boot process cannot continue.\r\n");
-        return 0;
+        return false;
     }
 
     /* Calculate the size (and were to put) the symbol table; Loading up all sections to the proper
@@ -67,7 +67,7 @@ int OslLoadExecutable(RtDList *LoadedPrograms, const char *ImageName, const char
         OslPrint("Failed to load a kernel/driver file.\r\n");
         OslPrint("The system ran out of memory while loading %s.\r\n", ImagePath);
         OslPrint("The boot process cannot continue.\r\n");
-        return 0;
+        return false;
     }
 
     ThisProgram->Name = ImageName;
@@ -79,7 +79,7 @@ int OslLoadExecutable(RtDList *LoadedPrograms, const char *ImageName, const char
         OslPrint("Failed to load a kernel/driver file.\r\n");
         OslPrint("The system ran out of memory while loading %s.\r\n", ImagePath);
         OslPrint("The boot process cannot continue.\r\n");
-        return 0;
+        return false;
     }
 
     ThisProgram->PhysicalAddress =
@@ -88,7 +88,7 @@ int OslLoadExecutable(RtDList *LoadedPrograms, const char *ImageName, const char
         OslPrint("Failed to load a kernel/driver file.\r\n");
         OslPrint("The system ran out of memory while loading %s.\r\n", ImagePath);
         OslPrint("The boot process cannot continue.\r\n");
-        return 0;
+        return false;
     }
 
     ThisProgram->VirtualAddress = OslAllocateVirtualAddress(ImagePages);
@@ -96,7 +96,7 @@ int OslLoadExecutable(RtDList *LoadedPrograms, const char *ImageName, const char
         OslPrint("Failed to load a kernel/driver file.\r\n");
         OslPrint("The system ran out of virtual memory while loading %s.\r\n", ImagePath);
         OslPrint("The boot process cannot continue.\r\n");
-        return 0;
+        return false;
     }
 
     /* Cleanup the page flags array. */
@@ -174,7 +174,7 @@ int OslLoadExecutable(RtDList *LoadedPrograms, const char *ImageName, const char
             OslPrint("Failed to load a kernel/driver file.\r\n");
             OslPrint("The system ran out of memory while loading %s.\r\n", ImagePath);
             OslPrint("The boot process cannot continue.\r\n");
-            return 0;
+            return false;
         }
 
         for (uint32_t i = 0; i < ExportHeader->NumberOfNamePointers; i++) {
@@ -191,7 +191,7 @@ int OslLoadExecutable(RtDList *LoadedPrograms, const char *ImageName, const char
     /* We should have loaded the whole file, so it's safe to free the buffer. */
     gBS->FreePool(Buffer);
     RtAppendDList(LoadedPrograms, &ThisProgram->ListHeader);
-    return 1;
+    return true;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -203,9 +203,9 @@ int OslLoadExecutable(RtDList *LoadedPrograms, const char *ImageName, const char
  *     LoadedPrograms - Header of the loaded programs list.
  *
  * RETURN VALUE:
- *     1 on success, 0 otherwise.
+ *     true on success, false otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int OslFixupImports(RtDList *LoadedPrograms) {
+bool OslFixupImports(RtDList *LoadedPrograms) {
     for (RtDList *ListHeader = LoadedPrograms->Next; ListHeader != LoadedPrograms;
          ListHeader = ListHeader->Next) {
         OslpLoadedProgram *ThisProgram =
@@ -231,7 +231,7 @@ int OslFixupImports(RtDList *LoadedPrograms) {
                     break;
                 }
 
-                int Found = 0;
+                bool Found = false;
                 RtDList *OtherEntry = LoadedPrograms->Next;
                 OslpLoadedProgram *ImportedProgram = NULL;
 
@@ -241,7 +241,7 @@ int OslFixupImports(RtDList *LoadedPrograms) {
                     if (!strcmp(
                             (char *)ThisProgram->PhysicalAddress + ImportHeader->NameRva,
                             ImportedProgram->Name)) {
-                        Found = 1;
+                        Found = true;
                         break;
                     }
 
@@ -255,7 +255,7 @@ int OslFixupImports(RtDList *LoadedPrograms) {
                         ThisProgram->Name,
                         (char *)ThisProgram->PhysicalAddress + ImportHeader->NameRva);
                     OslPrint("The boot process cannot continue.\r\n");
-                    return 0;
+                    return false;
                 }
 
                 uint64_t *ImportTable = (uint64_t *)((char *)ThisProgram->PhysicalAddress +
@@ -272,16 +272,16 @@ int OslFixupImports(RtDList *LoadedPrograms) {
                             "The kernel/driver %s tried importing by ordinal.\r\n",
                             ThisProgram->Name);
                         OslPrint("The boot process cannot continue.\r\n");
-                        return 0;
+                        return false;
                     }
 
                     char *SearchName = (char *)ThisProgram->PhysicalAddress + *(ImportTable++) + 2;
-                    int Found = 0;
+                    bool Found = false;
 
                     for (size_t i = 0; i < ImportedProgram->ExportTableSize; i++) {
                         if (!strcmp(ImportedProgram->ExportTable[i].Name, SearchName)) {
                             *(AddressTable++) = ImportedProgram->ExportTable[i].Address;
-                            Found = 1;
+                            Found = true;
                             break;
                         }
                     }
@@ -295,7 +295,7 @@ int OslFixupImports(RtDList *LoadedPrograms) {
                             SearchName,
                             ImportedProgram->Name);
                         OslPrint("The boot process cannot continue.\r\n");
-                        return 0;
+                        return false;
                     }
                 }
 
@@ -304,7 +304,7 @@ int OslFixupImports(RtDList *LoadedPrograms) {
         }
     }
 
-    return 1;
+    return true;
 }
 
 /*-------------------------------------------------------------------------------------------------

@@ -15,9 +15,9 @@
  *     ContextRecord - Pointer where the unwind context is located.
  *
  * RETURN VALUE:
- *     1 if someone handled the exception (and we should continue), 0 otherwise.
+ *     true if someone handled the exception (and we should continue), false otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int RtDispatchException(RtExceptionRecord *ExceptionRecord, RtContext *ContextRecord) {
+bool RtDispatchException(RtExceptionRecord *ExceptionRecord, RtContext *ContextRecord) {
     RtContext UnwindContext;
     RtContext ActiveContext;
     memcpy(&ActiveContext, ContextRecord, sizeof(RtContext));
@@ -60,7 +60,7 @@ int RtDispatchException(RtExceptionRecord *ExceptionRecord, RtContext *ContextRe
         /* TODO: Raise a bad stack exception. */
         if ((EstablisherFrame & 7) || EstablisherFrame < StackBase ||
             EstablisherFrame >= StackLimit) {
-            while (1)
+            while (true)
                 ;
         }
 
@@ -86,7 +86,7 @@ int RtDispatchException(RtExceptionRecord *ExceptionRecord, RtContext *ContextRe
 
                 switch (Disposition) {
                     case RT_EXC_CONTINUE_EXECUTION: {
-                        return 1;
+                        return true;
                     }
 
                     case RT_EXC_CONTINUE_SEARCH: {
@@ -116,7 +116,7 @@ int RtDispatchException(RtExceptionRecord *ExceptionRecord, RtContext *ContextRe
 
                     default: {
                         /* TODO: Raise a bad disposition exception. */
-                        while (1)
+                        while (true)
                             ;
                     }
                 }
@@ -125,7 +125,7 @@ int RtDispatchException(RtExceptionRecord *ExceptionRecord, RtContext *ContextRe
             /* TODO: Raise a bad stack exception. */
             if ((EstablisherFrame & 7) || EstablisherFrame < StackBase ||
                 EstablisherFrame >= StackLimit) {
-                while (1)
+                while (true)
                     ;
             }
         }
@@ -136,7 +136,7 @@ int RtDispatchException(RtExceptionRecord *ExceptionRecord, RtContext *ContextRe
         ControlPc = ActiveContext.Rip;
     }
 
-    return 0;
+    return false;
 }
 
 /*-------------------------------------------------------------------------------------------------

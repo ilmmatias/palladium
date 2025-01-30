@@ -25,14 +25,14 @@ char *gets(char *str) {
         return NULL;
     }
 
-    int fail = 0;
+    bool fail = false;
     char *dest = str;
     stream->flags |= __STDIO_FLAGS_READING;
 
-    while (1) {
+    while (true) {
         int ch = fgetc(stream);
         if (ch == EOF) {
-            fail = 1;
+            fail = true;
             break;
         }
 

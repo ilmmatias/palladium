@@ -22,4 +22,9 @@ set(CMAKE_RC_FLAGS "--target=${TARGET_${ARCH}}-w64-mingw32")
 
 set(CMAKE_LINK_DEF_FILE_FLAG "")
 
+# Limit LTO to release builds.
+if(NOT (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo"))
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
+endif()
+
 add_link_options(-nostdlib -nodefaultlibs)

@@ -5,7 +5,7 @@
 #include <string.h>
 
 typedef struct allocator_entry_t {
-    int used;
+    bool used;
     size_t size;
     struct allocator_entry_t *prev, *next;
 } allocator_entry_t;
@@ -31,7 +31,7 @@ static void split_entry(allocator_entry_t *entry, size_t size) {
     allocator_entry_t *new_entry =
         (allocator_entry_t *)((uintptr_t)entry + sizeof(allocator_entry_t) + size);
 
-    new_entry->used = 0;
+    new_entry->used = false;
     new_entry->size = entry->size - (size + sizeof(allocator_entry_t));
     new_entry->prev = entry;
     new_entry->next = NULL;
@@ -118,7 +118,7 @@ static allocator_entry_t *find_free(size_t size) {
 
     while (entry) {
         if (!entry->used && entry->size >= size) {
-            entry->used = 1;
+            entry->used = true;
             return entry;
         }
 
@@ -132,7 +132,7 @@ static allocator_entry_t *find_free(size_t size) {
 
     size = ((size + sizeof(allocator_entry_t) + mask) & ~mask) - sizeof(allocator_entry_t);
 
-    entry->used = 1;
+    entry->used = true;
     entry->size = size;
     entry->prev = tail;
     entry->next = NULL;
@@ -207,7 +207,7 @@ void *calloc(size_t num, size_t size) {
  *-----------------------------------------------------------------------------------------------*/
 void free(void *ptr) {
     allocator_entry_t *entry = (allocator_entry_t *)ptr - 1;
-    entry->used = 0;
+    entry->used = false;
     merge_forward(entry);
     merge_backward(entry);
 }

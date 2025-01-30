@@ -35,7 +35,7 @@ void HalpInitializeBootStack(KiLoaderBlock *LoaderBlock) {
                        "r"(BootProcessor.SystemStack + sizeof(BootProcessor.SystemStack) - 8)
                      : "%rax", "%rcx", "%rdx");
 
-    while (1) {
+    while (true) {
         HalpStopProcessor();
     }
 }

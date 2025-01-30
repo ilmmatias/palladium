@@ -23,9 +23,9 @@
  *     DescriptorVersion - Output; Version of the memory map entry.
  *
  * RETURN VALUE:
- *     1 on success, 0 otherwise.
+ *     true on success, false otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int OslpCreateMemoryDescriptors(
+bool OslpCreateMemoryDescriptors(
     RtDList *LoadedPrograms,
     void *FrontBuffer,
     UINTN FrameBufferSize,
@@ -42,7 +42,7 @@ int OslpCreateMemoryDescriptors(
     if (Status != EFI_SUCCESS) {
         OslPrint("Failed to allocate space for the memory descriptor list head.\r\n");
         OslPrint("The boot process cannot continue.\r\n");
-        return 0;
+        return false;
     }
 
     OslpMemoryDescriptor *Descriptors = NULL;
@@ -51,7 +51,7 @@ int OslpCreateMemoryDescriptors(
     if (Status != EFI_SUCCESS) {
         OslPrint("Failed to allocate space for the memory descriptor list items.\r\n");
         OslPrint("The boot process cannot continue.\r\n");
-        return 0;
+        return false;
     }
 
     RtInitializeDList(*MemoryDescriptorListHead);
@@ -66,7 +66,7 @@ int OslpCreateMemoryDescriptors(
      * GetMemoryMap can allocate memory when you call it). */
     UINTN MapKey = 0;
 
-    while (1) {
+    while (true) {
         Status = gBS->GetMemoryMap(
             MemoryMapSize, *MemoryMap, &MapKey, DescriptorSize, DescriptorVersion);
         if (Status != EFI_BUFFER_TOO_SMALL) {
@@ -87,7 +87,7 @@ int OslpCreateMemoryDescriptors(
         OslPrint("Failed to obtain the memory map using gBS->GetMemoryMap().\r\n");
         OslPrint("There might be something wrong with your UEFI firmware.\r\n");
         OslPrint("The boot process cannot continue.\r\n");
-        return 0;
+        return false;
     }
 
     /* We cannot ignore the DescriptorSize, as sizeof(EFI_MEMORY_DESCRIPTOR) might not be the same
@@ -137,7 +137,7 @@ int OslpCreateMemoryDescriptors(
 
         if (!OslpUpdateMemoryDescriptors(
                 *MemoryDescriptorListHead, MemoryDescriptorStack, Type, BasePage, PageCount)) {
-            return 0;
+            return false;
         }
     }
 
@@ -151,7 +151,7 @@ int OslpCreateMemoryDescriptors(
                 PAGE_TYPE_LOADED_PROGRAM,
                 (uint64_t)Program->PhysicalAddress >> EFI_PAGE_SHIFT,
                 (Program->ImageSize + EFI_PAGE_SIZE - 1) >> EFI_PAGE_SHIFT)) {
-            return 0;
+            return false;
         }
     }
 
@@ -162,10 +162,10 @@ int OslpCreateMemoryDescriptors(
             PAGE_TYPE_GRAPHICS_BUFFER,
             (uint64_t)FrontBuffer >> EFI_PAGE_SHIFT,
             (FrameBufferSize + EFI_PAGE_SIZE - 1) >> EFI_PAGE_SHIFT)) {
-        return 0;
+        return false;
     }
 
-    return 1;
+    return true;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -180,9 +180,9 @@ int OslpCreateMemoryDescriptors(
  *     PageCount - How many pages this region has.
  *
  * RETURN VALUE:
- *     1 on success, 0 otherwise.
+ *     true on success, false otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int OslpUpdateMemoryDescriptors(
+bool OslpUpdateMemoryDescriptors(
     RtDList *MemoryDescriptorListHead,
     RtDList *MemoryDescriptorStack,
     uint8_t Type,
@@ -202,7 +202,7 @@ int OslpUpdateMemoryDescriptors(
              * the entry borders) of the same type, we can just return in those cases. */
             if (BasePage >= Entry->BasePage &&
                 BasePage + PageCount <= Entry->BasePage + Entry->PageCount) {
-                return 1;
+                return true;
             }
 
             ListHeader = ListHeader->Next;
@@ -225,7 +225,7 @@ int OslpUpdateMemoryDescriptors(
             if (LeftArea == MemoryDescriptorStack) {
                 OslPrint("Failed to fit all memory map entries into the available 256 slots.\r\n");
                 OslPrint("The boot process cannot continue.\r\n");
-                return 0;
+                return false;
             }
 
             OslpMemoryDescriptor *LeftEntry =
@@ -248,7 +248,7 @@ int OslpUpdateMemoryDescriptors(
             if (RightArea == MemoryDescriptorStack) {
                 OslPrint("Failed to fit all memory map entries into the available 256 slots.\r\n");
                 OslPrint("The boot process cannot continue.\r\n");
-                return 0;
+                return false;
             }
 
             OslpMemoryDescriptor *RightEntry =
@@ -271,14 +271,14 @@ int OslpUpdateMemoryDescriptors(
             if (LeftArea == MemoryDescriptorStack) {
                 OslPrint("Failed to fit all memory map entries into the available 256 slots.\r\n");
                 OslPrint("The boot process cannot continue.\r\n");
-                return 0;
+                return false;
             }
 
             RtDList *RightArea = RtPopDList(MemoryDescriptorStack);
             if (RightArea == MemoryDescriptorStack) {
                 OslPrint("Failed to fit all memory map entries into the available 256 slots.\r\n");
                 OslPrint("The boot process cannot continue.\r\n");
-                return 0;
+                return false;
             }
 
             OslpMemoryDescriptor *LeftEntry =
@@ -301,7 +301,7 @@ int OslpUpdateMemoryDescriptors(
 
             /* In this case we're just done, we know exactly what is around us (and it is not of the
              * same type), so there's no need to keep on going. */
-            return 1;
+            return true;
         }
 
         ListHeader = ListHeader->Next;
@@ -333,7 +333,7 @@ int OslpUpdateMemoryDescriptors(
      * around us (before returning). */
     if (ListHeader != MemoryDescriptorListHead) {
         /* Merge backwards. */
-        while (1) {
+        while (true) {
             OtherEntry = CONTAINING_RECORD(ListHeader->Prev, OslpMemoryDescriptor, ListHeader);
             if (OtherEntry->Type == Entry->Type &&
                 OtherEntry->BasePage + OtherEntry->PageCount == Entry->BasePage) {
@@ -346,7 +346,7 @@ int OslpUpdateMemoryDescriptors(
         }
 
         /* Merge forwards. */
-        while (1) {
+        while (true) {
             OtherEntry = CONTAINING_RECORD(ListHeader->Next, OslpMemoryDescriptor, ListHeader);
             if (Entry->Type == OtherEntry->Type &&
                 Entry->BasePage + Entry->PageCount == OtherEntry->BasePage) {
@@ -357,7 +357,7 @@ int OslpUpdateMemoryDescriptors(
             }
         }
 
-        return 1;
+        return true;
     }
 
     /* At last, if we failed to find an entry to mess with, we can just allocate a new descriptor
@@ -366,7 +366,7 @@ int OslpUpdateMemoryDescriptors(
     if (ListHeader == MemoryDescriptorStack) {
         OslPrint("Failed to fit all memory map entries into the available 256 slots.\r\n");
         OslPrint("The boot process cannot continue.\r\n");
-        return 0;
+        return false;
     }
 
     OslpMemoryDescriptor *Descriptor =
@@ -385,5 +385,5 @@ int OslpUpdateMemoryDescriptors(
     }
 
     RtAppendDList(ListHeader, &Descriptor->ListHeader);
-    return 1;
+    return true;
 }

@@ -23,7 +23,7 @@ typedef struct {
     uint32_t FramebufferPitch;
 } OslpBootBlock;
 
-int OslpCreateMemoryDescriptors(
+bool OslpCreateMemoryDescriptors(
     RtDList *LoadedPrograms,
     void *FrontBuffer,
     UINTN FrameBufferSize,
@@ -34,7 +34,7 @@ int OslpCreateMemoryDescriptors(
     UINTN *DescriptorSize,
     UINT32 *DescriptorVersion);
 
-int OslpUpdateMemoryDescriptors(
+bool OslpUpdateMemoryDescriptors(
     RtDList *MemoryDescriptorListHead,
     RtDList *MemoryDescriptorStack,
     uint8_t Type,

@@ -30,7 +30,7 @@ void setbuf(struct FILE *stream, char *buffer) {
     }
 
     if (buffer) {
-        stream->user_buffer = 1;
+        stream->user_buffer = true;
         stream->buffer_type = _IOFBF;
         stream->buffer_size = BUFSIZ;
         stream->buffer_read = 0;

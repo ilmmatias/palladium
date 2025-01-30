@@ -66,7 +66,7 @@ typedef struct {
     RtSList ListHeader;
     uint32_t ApicId;
     uint32_t AcpiId;
-    int IsX2Apic;
+    bool IsX2Apic;
 } LapicEntry;
 
 typedef struct {

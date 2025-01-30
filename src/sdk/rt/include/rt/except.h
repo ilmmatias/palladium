@@ -110,7 +110,7 @@ RtExceptionRoutine RtVirtualUnwind(
 [[noreturn]] void
 RtUnwind(void *TargetFrame, void *TargetIp, RtExceptionRecord *ExceptionRecord, void *ReturnValue);
 
-int RtDispatchException(RtExceptionRecord *ExceptionRecord, RtContext *ContextRecord);
+bool RtDispatchException(RtExceptionRecord *ExceptionRecord, RtContext *ContextRecord);
 
 #ifdef __cplusplus
 }

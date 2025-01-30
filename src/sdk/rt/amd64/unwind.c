@@ -60,9 +60,9 @@ static int GetUnwindOpSlots(RtUnwindCode *Code) {
  *     OpIndex - Where to start parsing the opcodes.
  *
  * RETURN VALUE:
- *     1 if we encountered a MACHFRAME, 0 otherwise.
+ *     true if we encountered a MACHFRAME, false otherwise.
  *-----------------------------------------------------------------------------------------------*/
-static int ProcessUnwindOps(
+static bool ProcessUnwindOps(
     RtContext *ContextRecord,
     RtUnwindInfo *UnwindInfo,
     uint64_t FrameBase,
@@ -135,11 +135,11 @@ static int ProcessUnwindOps(
                 ContextRecord->Rsp += Code->OpInfo * sizeof(uint64_t);
                 ContextRecord->Rip = *(uint64_t *)ContextRecord->Rsp;
                 ContextRecord->Rsp = *(uint64_t *)(ContextRecord->Rsp + 24);
-                return 1;
+                return true;
         }
     }
 
-    return 0;
+    return false;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -232,7 +232,7 @@ RtExceptionRoutine RtVirtualUnwind(
 
         /* FrameRegister existing means we have SET_FPREG somewhere in the prolog; If we went
            past it (or at least reached it), we're free to read the frame register. */
-        int HasSetFpreg =
+        bool HasSetFpreg =
             Offset >= UnwindInfo->SizeOfProlog || (UnwindInfo->Flags & RT_UNW_FLAG_CHAININFO);
 
         int OpIndex = 0;
@@ -244,7 +244,7 @@ RtExceptionRoutine RtVirtualUnwind(
                 continue;
             }
 
-            HasSetFpreg = 1;
+            HasSetFpreg = true;
         }
 
         if (HasSetFpreg) {
@@ -253,7 +253,7 @@ RtExceptionRoutine RtVirtualUnwind(
         } else {
             FrameBase = ContextRecord->Rsp;
         }
-    } while (0);
+    } while (false);
 
     if (EstablisherFrame) {
         *EstablisherFrame = FrameBase;
@@ -307,7 +307,7 @@ RtExceptionRoutine RtVirtualUnwind(
 
         /* Now, we should have N register pops, anything other than a pop (or a return/jump),
            means this isn't an epilog. */
-        while (1) {
+        while (true) {
             Instr = *(uint32_t *)InstrPtr;
             if ((Instr & 0xF8) == 0x58) {
                 /* POP REG */
@@ -367,13 +367,13 @@ RtExceptionRoutine RtVirtualUnwind(
 
         memcpy(ContextRecord, &LocalContext, sizeof(RtContext));
         return NULL;
-    } while (0);
+    } while (false);
 
     if (UnwindInfo->Version >= 2) {
         /* TODO: For versions>=2, we need to use UWOP_EPILOGUE. */
     }
 
-    while (1) {
+    while (true) {
         Offset = ControlPc - ImageBase - FunctionEntry->BeginAddress;
         UnwindInfo = (RtUnwindInfo *)(ImageBase + FunctionEntry->UnwindData);
 
@@ -386,7 +386,7 @@ RtExceptionRoutine RtVirtualUnwind(
         }
 
         /* Process any remaining unwind ops. */
-        int HasMachineFrame = ProcessUnwindOps(ContextRecord, UnwindInfo, FrameBase, OpIndex);
+        bool HasMachineFrame = ProcessUnwindOps(ContextRecord, UnwindInfo, FrameBase, OpIndex);
 
         /* And update the function entry if we have more chained info. */
         if (UnwindInfo->Flags & RT_UNW_FLAG_CHAININFO) {
@@ -461,7 +461,7 @@ RtUnwind(void *TargetFrame, void *TargetIp, RtExceptionRecord *ExceptionRecord, 
         if (!ImageBase) {
             /* We've unwound past the limit of the stack, this is bad (but at least we
                didn't access anything invalid). */
-            while (1)
+            while (true)
                 ;
         }
 
@@ -491,7 +491,7 @@ RtUnwind(void *TargetFrame, void *TargetIp, RtExceptionRecord *ExceptionRecord, 
         if ((EstablisherFrame & 7) || EstablisherFrame < StackBase ||
             EstablisherFrame >= StackLimit ||
             (TargetFrame && (uint64_t)TargetFrame < EstablisherFrame)) {
-            while (1)
+            while (true)
                 ;
         }
 
@@ -549,7 +549,7 @@ RtUnwind(void *TargetFrame, void *TargetIp, RtExceptionRecord *ExceptionRecord, 
 
                     default: {
                         /* TODO: Raise a bad disposition exception. */
-                        while (1)
+                        while (true)
                             ;
                     }
                 }
@@ -559,7 +559,7 @@ RtUnwind(void *TargetFrame, void *TargetIp, RtExceptionRecord *ExceptionRecord, 
             if ((EstablisherFrame & 7) || EstablisherFrame < StackBase ||
                 EstablisherFrame >= StackLimit ||
                 (TargetFrame && (uint64_t)TargetFrame < EstablisherFrame)) {
-                while (1)
+                while (true)
                     ;
             }
         }
@@ -575,7 +575,7 @@ RtUnwind(void *TargetFrame, void *TargetIp, RtExceptionRecord *ExceptionRecord, 
 
     if (EstablisherFrame != (uint64_t)TargetFrame) {
         /* TODO: Raise an exception here. */
-        while (1)
+        while (true)
             ;
     }
 
