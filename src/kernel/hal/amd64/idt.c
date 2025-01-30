@@ -6,8 +6,7 @@
 #include <string.h>
 
 extern struct __attribute__((packed)) {
-    char PushOp[2];
-    char JumpOp[5];
+    char Code[16];
 } HalpDefaultInterruptHandlers[224];
 
 extern void HalpDivisionTrapEntry(void);

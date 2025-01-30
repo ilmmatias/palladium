@@ -24,6 +24,7 @@ HalpDefaultInterruptHandlers:
 .rept 224
     push $i
     jmp HalpDefaultInterruptEntry
+    .align 16
     .set i, i + 1
 .endr
 
