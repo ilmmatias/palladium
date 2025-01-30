@@ -23,8 +23,9 @@ bool RtDispatchException(RtExceptionRecord *ExceptionRecord, RtContext *ContextR
     memcpy(&ActiveContext, ContextRecord, sizeof(RtContext));
 
     /* We need this to validate the establisher frame. */
-    uint64_t StackBase = (uint64_t)HalGetCurrentProcessor()->CurrentThread->Stack;
-    uint64_t StackLimit = StackBase + KE_STACK_SIZE;
+    KeProcessor *Processor = KeGetCurrentProcessor();
+    uint64_t StackBase = (uint64_t)Processor->StackBase;
+    uint64_t StackLimit = (uint64_t)Processor->StackLimit;
     uint64_t ControlPc = (uint64_t)ExceptionRecord->ExceptionAddress;
 
     while (ActiveContext.Rsp >= StackBase && ActiveContext.Rsp < StackLimit) {

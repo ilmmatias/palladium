@@ -1,7 +1,20 @@
-/* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
+/* SPDX-FileCopyrightText: (C) 2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#include <halp.h>
+#ifndef _AMD64_IRQL_H_
+#define _AMD64_IRQL_H_
+
+#include <generic/panic.h>
+#include <stdint.h>
+
+#define KE_IRQL_PASSIVE 0
+#define KE_IRQL_DISPATCH 2
+#define KE_IRQL_DEVICE 3
+#define KE_IRQL_SYNCH 13
+#define KE_IRQL_IPI 14
+#define KE_IRQL_MAX 15
+
+typedef volatile uint64_t KeIrql;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -13,8 +26,25 @@
  * RETURN VALUE:
  *     Current IRQL level.
  *-----------------------------------------------------------------------------------------------*/
-KeIrql KeGetIrql(void) {
-    return HalpGetIrql();
+static inline KeIrql KeGetIrql(void) {
+    KeIrql Irql;
+    __asm__ volatile("mov %%cr8, %0" : "=r"(Irql) : : "memory");
+    return Irql;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function forcefully sets the current IRQL level, you should only use this if you
+ *     REALLY know what you're doing, or you WILL break something.
+ *
+ * PARAMETERS:
+ *     NewIrql - Target IRQL level.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+static inline void KeSetIrql(KeIrql NewIrql) {
+    __asm__ volatile("mov %0, %%cr8" : : "r"(NewIrql) : "memory");
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -28,13 +58,13 @@ KeIrql KeGetIrql(void) {
  * RETURN VALUE:
  *     Old IRQL level.
  *-----------------------------------------------------------------------------------------------*/
-KeIrql KeRaiseIrql(KeIrql NewIrql) {
-    KeIrql OldIrql = HalpGetIrql();
+static inline KeIrql KeRaiseIrql(KeIrql NewIrql) {
+    KeIrql OldIrql = KeGetIrql();
     if (NewIrql < OldIrql) {
         KeFatalError(KE_PANIC_IRQL_NOT_GREATER_OR_EQUAL, OldIrql, NewIrql, 0, 0);
     }
 
-    HalpSetIrql(NewIrql);
+    KeSetIrql(NewIrql);
     return OldIrql;
 }
 
@@ -49,11 +79,13 @@ KeIrql KeRaiseIrql(KeIrql NewIrql) {
  * RETURN VALUE:
  *     Old IRQL level.
  *-----------------------------------------------------------------------------------------------*/
-void KeLowerIrql(KeIrql NewIrql) {
-    KeIrql OldIrql = HalpGetIrql();
+static inline void KeLowerIrql(KeIrql NewIrql) {
+    KeIrql OldIrql = KeGetIrql();
     if (OldIrql < NewIrql) {
         KeFatalError(KE_PANIC_IRQL_NOT_LESS_OR_EQUAL, OldIrql, NewIrql, 0, 0);
     }
 
-    HalpSetIrql(NewIrql);
+    KeSetIrql(NewIrql);
 }
+
+#endif /* _AMD64_IRQL_H_ */

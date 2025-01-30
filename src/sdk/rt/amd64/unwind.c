@@ -434,8 +434,9 @@ RtUnwind(void *TargetFrame, void *TargetIp, RtExceptionRecord *ExceptionRecord, 
     RtSaveContext(&ActiveContext);
 
     /* We need this to validate the establisher frame. */
-    uint64_t StackBase = (uint64_t)HalGetCurrentProcessor()->CurrentThread->Stack;
-    uint64_t StackLimit = StackBase + KE_STACK_SIZE;
+    KeProcessor *Processor = KeGetCurrentProcessor();
+    uint64_t StackBase = (uint64_t)Processor->StackBase;
+    uint64_t StackLimit = (uint64_t)Processor->StackLimit;
 
     RtExceptionRecord DefaultExceptionRecord;
     if (!ExceptionRecord) {

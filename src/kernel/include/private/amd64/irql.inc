@@ -8,6 +8,11 @@
 #define KE_IRQL_PASSIVE 0
 #define KE_IRQL_DISPATCH 2
 #define KE_IRQL_DEVICE 3
-#define KE_IRQL_MASK 15
+#define KE_IRQL_SYNCH 13
+#define KE_IRQL_IPI 14
+#define KE_IRQL_MAX 15
+
+/* And these with the values in halp.h. */
+#define HAL_INT_TIMER_IRQL (KE_IRQL_DEVICE + 10)
 
 #endif /* _AMD64_IRQL_INC_ */

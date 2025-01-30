@@ -87,13 +87,28 @@ static struct {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void HalpDispatchNmi(HalInterruptFrame *) {
-    if (HalGetCurrentProcessor()->EventStatus == KE_EVENT_FREEZE) {
-        while (1) {
-            HalpStopProcessor();
+    if (KeGetCurrentProcessor()->EventType == KE_EVENT_TYPE_FREEZE) {
+        while (true) {
+            StopProcessor();
         }
     }
 
     KeFatalError(KE_PANIC_NMI_HARDWARE_FAILURE, 0, 0, 0, 0);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function halts the system because of an unhandled trap.
+ *
+ * PARAMETERS:
+ *     InterruptFrame - Current interrupt data.
+ *     ExceptionCode - Which exception happened.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void HalpDispatchTrap(HalInterruptFrame *InterruptFrame, uint64_t ExceptionCode) {
+    KeFatalError(KE_PANIC_TRAP_NOT_HANDLED, ExceptionCode, InterruptFrame->ErrorCode, 0, 0);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -248,19 +263,19 @@ void HalpDispatchException(
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void HalpDispatchInterrupt(HalInterruptFrame *InterruptFrame) {
-    KeProcessor *Processor = HalGetCurrentProcessor();
+    KeProcessor *Processor = KeGetCurrentProcessor();
     RtDList *HandlerList = &Processor->InterruptList[InterruptFrame->InterruptNumber];
 
     for (RtDList *ListHeader = HandlerList->Next; ListHeader != HandlerList;
          ListHeader = ListHeader->Next) {
         HalInterrupt *Interrupt = CONTAINING_RECORD(ListHeader, HalInterrupt, ListHeader);
-        HalpSetIrql(Interrupt->Irql);
+        KeSetIrql(Interrupt->Irql);
         __asm__ volatile("sti");
-        KeAcquireSpinLockHighIrql(&Interrupt->Lock);
+        KeAcquireSpinLockAtCurrentIrql(&Interrupt->Lock);
         Interrupt->Handler(InterruptFrame, Interrupt->HandlerContext);
-        KeReleaseSpinLockHighIrql(&Interrupt->Lock);
+        KeReleaseSpinLockAtCurrentIrql(&Interrupt->Lock);
         __asm__ volatile("cli");
-        HalpSetIrql(InterruptFrame->Irql);
+        KeSetIrql(InterruptFrame->Irql);
     }
 
     HalpSendEoi();
@@ -386,8 +401,8 @@ bool HalEnableInterrupt(HalInterrupt *Interrupt) {
         return false;
     }
 
-    KeProcessor *Processor = HalGetCurrentProcessor();
-    KeIrql OldIrql = KeAcquireSpinLock(&Processor->InterruptListLock);
+    KeProcessor *Processor = KeGetCurrentProcessor();
+    KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Processor->Lock, KE_IRQL_DISPATCH);
     RtDList *Handlers = &Processor->InterruptList[Interrupt->Vector];
 
     if (Handlers->Next != Handlers) {
@@ -395,13 +410,13 @@ bool HalEnableInterrupt(HalInterrupt *Interrupt) {
          * compatible with the already installed handlers (one single vector can only be level or
          * edge triggered, not both). */
         if (CONTAINING_RECORD(Handlers->Next, HalInterrupt, ListHeader)->Type != Interrupt->Type) {
-            KeReleaseSpinLock(&Processor->InterruptListLock, OldIrql);
+            KeReleaseSpinLockAndLowerIrql(&Processor->Lock, OldIrql);
             return false;
         }
     }
 
     RtAppendDList(Handlers, &Interrupt->ListHeader);
-    KeReleaseSpinLock(&Processor->InterruptListLock, OldIrql);
+    KeReleaseSpinLockAndLowerIrql(&Processor->Lock, OldIrql);
     Interrupt->Enabled = true;
 
     return true;
@@ -424,11 +439,11 @@ void HalDisableInterrupt(HalInterrupt *Interrupt) {
 
     /* Should be as simple as marking us as not enabled + unlinking from the interrupt handler
      * list. */
-    KeProcessor *Processor = HalGetCurrentProcessor();
-    KeIrql OldIrql = KeAcquireSpinLock(&Processor->InterruptListLock);
+    KeProcessor *Processor = KeGetCurrentProcessor();
+    KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Processor->Lock, KE_IRQL_DISPATCH);
     RtUnlinkDList(&Interrupt->ListHeader);
-    KeReleaseSpinLock(&Processor->InterruptListLock, OldIrql);
-    Interrupt->Enabled = 0;
+    KeReleaseSpinLockAndLowerIrql(&Processor->Lock, OldIrql);
+    Interrupt->Enabled = false;
 }
 
 /*-------------------------------------------------------------------------------------------------

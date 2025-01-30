@@ -5,20 +5,19 @@
 #define _AMD64_PROCESSOR_H_
 
 #include <amd64/descr.h>
-#include <ps.h>
-#include <rt/list.h>
+#include <amd64/msr.h>
 
 typedef struct {
+    KeSpinLock Lock;
     uint32_t ApicId;
-    uint64_t ThreadQueueLock;
+    RtDList WaitQueue;
     RtDList ThreadQueue;
-    uint32_t ThreadQueueSize;
-    PsThread *InitialThread;
+    RtDList TerminationQueue;
     PsThread *CurrentThread;
     PsThread *IdleThread;
-    int EventStatus;
-    RtDList DpcQueue;
-    RtDList EventQueue;
+    int EventType;
+    char *StackBase;
+    char *StackLimit;
     char SystemStack[8192] __attribute__((aligned(4096)));
     char NmiStack[8192] __attribute__((aligned(4096)));
     char DoubleFaultStack[8192] __attribute__((aligned(4096)));
@@ -26,8 +25,21 @@ typedef struct {
     char GdtEntries[56];
     HalpTssEntry TssEntry;
     HalpIdtEntry IdtEntries[256];
-    uint64_t InterruptListLock;
     RtDList InterruptList[256];
 } KeProcessor;
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function gets a pointer to the processor-specific structure of the current processor.
+ *
+ * PARAMETERS:
+ *     None.
+ *
+ * RETURN VALUE:
+ *     Pointer to the processor struct.
+ *-----------------------------------------------------------------------------------------------*/
+static inline KeProcessor *KeGetCurrentProcessor(void) {
+    return (KeProcessor *)ReadMsr(0xC0000102);
+}
 
 #endif /* _AMD64_PROCESSOR_H_ */

@@ -13,8 +13,6 @@ static const char *Messages[] = {
     "IRQL_NOT_LESS_OR_EQUAL",
     "IRQL_NOT_GREATER_OR_EQUAL",
     "IRQL_NOT_DISPATCH",
-    "SPIN_LOCK_ALREADY_OWNED",
-    "SPIN_LOCK_NOT_OWNED",
     "TRAP_NOT_HANDLED",
     "EXCEPTION_NOT_HANDLED",
     "PAGE_FAULT_NOT_HANDLED",
@@ -25,7 +23,7 @@ static const char *Messages[] = {
     "BAD_POOL_HEADER",
 };
 
-static uint64_t Lock = 0;
+static KeSpinLock Lock = {0};
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -48,7 +46,7 @@ static uint64_t Lock = 0;
     uint64_t Parameter2,
     uint64_t Parameter3,
     uint64_t Parameter4) {
-    KeProcessor *Processor = HalGetCurrentProcessor();
+    KeProcessor *Processor = KeGetCurrentProcessor();
 
     /* Let's prevent a possible exception/crash inside our crash handler. */
     if (Message >= KE_PANIC_COUNT) {
@@ -58,13 +56,13 @@ static uint64_t Lock = 0;
     /* Disable maskable interrupts, and raise the IRQL to the max (so we can be sure nothing
      * will interrupts us). */
     HalpEnterCriticalSection();
-    HalpSetIrql(KE_IRQL_MAX);
+    KeSetIrql(KE_IRQL_MAX);
 
     /* Someone might have reached this handler before us (while we reached here before they sent
      * the panic event), hang ourselves if that't the case. */
-    if (__atomic_fetch_add(&Lock, 1, __ATOMIC_SEQ_CST)) {
-        while (1) {
-            HalpStopProcessor();
+    if (__atomic_fetch_or(&Lock, 0x01, __ATOMIC_ACQUIRE) & 0x01) {
+        while (true) {
+            StopProcessor();
         }
     }
 
@@ -105,29 +103,8 @@ static uint64_t Lock = 0;
     RtContext Context;
     RtSaveContext(&Context);
 
-    /* Get the stack limits (without them we'll probably crash). */
-    uint64_t StackBase = 0;
-    uint64_t StackLimit = 0;
-    if (Processor->CurrentThread) {
-        /* TODO: We should probably handle the DPC stack and any other kernel stack). */
-        StackBase = (uint64_t)Processor->CurrentThread->Stack;
-        StackLimit = StackBase + KE_STACK_SIZE;
-    } else if (Processor) {
-        StackBase = (uint64_t)Processor->SystemStack;
-        StackLimit = StackBase + KE_STACK_SIZE;
-    } else {
-        StackBase = 0;
-        StackLimit = UINT64_MAX;
-    }
-
-    if (Context.Rsp < StackBase || Context.Rsp >= StackLimit) {
-        StackBase = 0;
-        StackLimit = UINT64_MAX;
-    }
-
-    /* And start walking the unwind data (until we either leave the kernel space, or leave the
-     * kernel stack). */
-    while (1) {
+    /* And start walking the unwind data (until we leave the kernel space). */
+    while (true) {
         KiDumpSymbol((void *)Context.Rip);
 
         uint64_t ImageBase = RtLookupImageBase(Context.Rip);
@@ -144,13 +121,12 @@ static uint64_t Lock = 0;
             Context.Rsp += sizeof(uint64_t);
         }
 
-        if (Context.Rip < 0xFFFF800000000000 || Context.Rsp < StackBase ||
-            Context.Rsp >= StackLimit) {
+        if (Context.Rip < 0xFFFF800000000000 || Context.Rsp < 0xFFFF800000000000) {
             break;
         }
     }
 
-    while (1) {
-        HalpStopProcessor();
+    while (true) {
+        StopProcessor();
     }
 }

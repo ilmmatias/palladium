@@ -4,8 +4,10 @@
 #ifndef _HAL_H_
 #define _HAL_H_
 
+#include <ev.h>
+#include <generic/context.h>
+#include <generic/pause.h>
 #include <ke.h>
-#include <ps.h>
 
 #define HAL_NO_EVENT 0
 #define HAL_PANIC_EVENT 1
@@ -30,8 +32,6 @@ typedef struct {
     void (*Handler)(HalInterruptFrame *, void *);
     void *HandlerContext;
 } HalInterrupt;
-
-KeProcessor *HalGetCurrentProcessor(void);
 
 int HalGetTimerWidth(void);
 uint64_t HalGetTimerPeriod(void);

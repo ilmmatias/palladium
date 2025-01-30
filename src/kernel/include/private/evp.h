@@ -6,11 +6,11 @@
 
 #include <ev.h>
 
+#define EVP_TICK_PERIOD (1 * EV_MILLISECS)
+
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
-
-void EvpDispatchObject(void *Object, uint64_t Timeout, int Yield);
 
 #ifdef __cplusplus
 }

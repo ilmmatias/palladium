@@ -18,21 +18,16 @@ extern KeProcessor **HalpProcessorList;
 void HalpInitializeBootStack(KiLoaderBlock *LoaderBlock);
 void HalpInitializeBootProcessor(void);
 void HalpInitializeApplicationProcessor(KeProcessor *Processor);
-void HalpStopProcessor(void);
-void HalpPauseProcessor(void);
 
 uint64_t HalpGetPhysicalAddress(void *VirtualAddress);
-int HalpMapPage(void *VirtualAddress, uint64_t PhysicalAddress, int Flags);
+bool HalpMapPage(void *VirtualAddress, uint64_t PhysicalAddress, int Flags);
 void HalpUnmapPage(void *VirtualAddress);
 
-void HalpNotifyProcessor(KeProcessor *Processor, int WaitDelivery);
+void HalpNotifyProcessor(KeProcessor *Processor, bool WaitDelivery);
 void HalpFreezeProcessor(KeProcessor *Processor);
 
 void *HalpEnterCriticalSection(void);
 void HalpLeaveCriticalSection(void *Context);
-
-KeIrql HalpGetIrql(void);
-void HalpSetIrql(KeIrql NewIrql);
 
 void HalpInitializeContext(
     HalContextFrame *Context,
@@ -40,7 +35,7 @@ void HalpInitializeContext(
     uint64_t StackSize,
     void (*EntryPoint)(void *),
     void *Parameter);
-void HalpSwitchContext(HalContextFrame *CurrentThread, HalContextFrame *TargetThread);
+void HalpSwitchContext(HalContextFrame *CurrentContext, HalContextFrame *TargetContext);
 
 #ifdef __cplusplus
 }

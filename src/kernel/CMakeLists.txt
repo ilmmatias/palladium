@@ -14,7 +14,6 @@ if(ARCH STREQUAL "amd64")
         hal/${ARCH}/idt.c
         hal/${ARCH}/idt.S
         hal/${ARCH}/ioapic.c
-        hal/${ARCH}/irql.c
         hal/${ARCH}/map.c
         hal/${ARCH}/platform.c
         hal/${ARCH}/smp.c
@@ -26,20 +25,14 @@ endif()
 add_executable(kernel "kernel" YES
     ${SOURCES}
 
-    ev/dpc.c
-    ev/object.c
     ev/timer.c
 
     hal/interrupt.c
     hal/timer.c
 
-    io/device.c
-
     ke/acpi.c
     ke/driver.c
     ke/entry.c
-    ke/irql.c
-    ke/lock.c
     ke/panic.c
 
     mm/initialize.c

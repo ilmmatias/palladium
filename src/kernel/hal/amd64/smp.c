@@ -27,7 +27,7 @@ uint32_t HalpOnlineProcessorCount = 1;
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void HalpInitializeSmp(void) {
-    uint32_t ApicId = HalGetCurrentProcessor()->ApicId;
+    uint32_t ApicId = KeGetCurrentProcessor()->ApicId;
 
     /* Map the AP startup code (0x8000), and copy all the trampoline data to it. */
     HalpMapPage((void *)0x8000, 0x8000, MI_MAP_WRITE | MI_MAP_EXEC);
@@ -53,7 +53,7 @@ void HalpInitializeSmp(void) {
 
     for (uint32_t i = 0; i < HalpProcessorCount; i++) {
         if (!i) {
-            HalpProcessorList[i] = HalGetCurrentProcessor();
+            HalpProcessorList[i] = KeGetCurrentProcessor();
         } else {
             HalpProcessorList[i] = MmAllocatePool(sizeof(KeProcessor), "Halp");
         }
@@ -67,9 +67,9 @@ void HalpInitializeSmp(void) {
                 0);
         }
 
+        RtInitializeDList(&HalpProcessorList[i]->WaitQueue);
         RtInitializeDList(&HalpProcessorList[i]->ThreadQueue);
-        RtInitializeDList(&HalpProcessorList[i]->DpcQueue);
-        RtInitializeDList(&HalpProcessorList[i]->EventQueue);
+        RtInitializeDList(&HalpProcessorList[i]->TerminationQueue);
     }
 
     RtSList *ListHeader = HalpLapicListHead.Next;
@@ -108,27 +108,12 @@ void HalpInitializeSmp(void) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function gets a pointer to the processor-specific structure of the current processor.
- *     The result of this will always be NULL before HalpInitializePlatform().
- *
- * PARAMETERS:
- *     None.
- *
- * RETURN VALUE:
- *     Pointer to the processor struct.
- *-----------------------------------------------------------------------------------------------*/
-KeProcessor *HalGetCurrentProcessor(void) {
-    return (KeProcessor *)ReadMsr(0xC0000102);
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
  *     This function notifies another processor that some (probably significant) event has
  *     happend.
  *
  * PARAMETERS:
  *     Processor - Which processor to notify.
- *     WaitDelivery - Set this to 1 if we should wait for delivery (important for events!)
+ *     WaitDelivery - Set this to true if we should wait for delivery (important for events!)
  *
  * RETURN VALUE:
  *     None.
@@ -153,6 +138,6 @@ void HalpNotifyProcessor(KeProcessor *Processor, bool WaitDelivery) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void HalpFreezeProcessor(KeProcessor *Processor) {
-    Processor->EventStatus = KE_EVENT_FREEZE;
+    Processor->EventType = KE_EVENT_TYPE_FREEZE;
     HalpSendNmi(Processor->ApicId);
 }

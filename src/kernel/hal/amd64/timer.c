@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <amd64/halp.h>
+#include <evp.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -19,7 +20,7 @@ void HalpInitializeApicTimer(void) {
 
     /* We'll be taking the average over 4 runs. */
     uint64_t Accum = 0;
-    uint64_t Ticks = (1 * EV_MILLISECS) / HalGetTimerPeriod();
+    uint64_t Ticks = EVP_TICK_PERIOD / HalGetTimerPeriod();
     for (int i = 0; i < 4; i++) {
         uint64_t End = HalGetTimerTicks() + Ticks;
         HalpWriteLapicRegister(0x380, UINT32_MAX);

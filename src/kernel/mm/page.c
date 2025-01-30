@@ -19,9 +19,9 @@ KeSpinLock MiPageListLock = {0};
  *     Physical address of the allocated page, or 0 on failure.
  *-----------------------------------------------------------------------------------------------*/
 uint64_t MmAllocateSinglePage() {
-    KeIrql OldIrql = KeAcquireSpinLock(&MiPageListLock);
+    KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&MiPageListLock, KE_IRQL_DISPATCH);
     RtDList *ListHeader = RtPopDList(&MiFreePageListHead);
-    KeReleaseSpinLock(&MiPageListLock, OldIrql);
+    KeReleaseSpinLockAndLowerIrql(&MiPageListLock, OldIrql);
 
     if (ListHeader == &MiFreePageListHead) {
         return 0;
@@ -47,7 +47,7 @@ uint64_t MmAllocateSinglePage() {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void MmFreeSinglePage(uint64_t PhysicalAddress) {
-    KeIrql OldIrql = KeAcquireSpinLock(&MiPageListLock);
+    KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&MiPageListLock, KE_IRQL_DISPATCH);
     MiPageEntry *Entry = &MI_PAGE_ENTRY(PhysicalAddress);
 
     if (!(Entry->Flags & MI_PAGE_FLAGS_USED) ||
@@ -58,5 +58,5 @@ void MmFreeSinglePage(uint64_t PhysicalAddress) {
     Entry->Flags = 0;
 
     RtPushDList(&MiFreePageListHead, &Entry->ListHeader);
-    KeReleaseSpinLock(&MiPageListLock, OldIrql);
+    KeReleaseSpinLockAndLowerIrql(&MiPageListLock, OldIrql);
 }

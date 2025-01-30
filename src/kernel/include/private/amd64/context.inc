@@ -61,7 +61,8 @@
 #define START_FRAME_SIZE 0x10
 
 /* Keep these in sync with the HalContextFrame in context.h. */
-#define CONTEXT_FRAME_RSP 0x00
+#define CONTEXT_FRAME_BUSY 0x00
+#define CONTEXT_FRAME_RSP 0x08
 
 /* Flags for the ENTER_INTERRUPT macro. */
 #define INTERRUPT_FLAGS_HAS_ERROR_CODE 0x01

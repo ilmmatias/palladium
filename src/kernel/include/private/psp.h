@@ -4,18 +4,20 @@
 #ifndef _PSP_H_
 #define _PSP_H_
 
-#include <hal.h>
+#include <evp.h>
 #include <ps.h>
 
-#define PSP_THREAD_QUANTUM (10 * EV_MILLISECS)
-#define PSP_THREAD_MIN_QUANTUM (1 * EV_MILLISECS)
+#define PSP_DEFAULT_TICKS ((10 * EV_MILLISECS) / EVP_TICK_PERIOD)
 
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
 
-void PspCreateSystemThread(void);
+[[noreturn]] void PspInitializeScheduler(void);
 void PspCreateIdleThread(void);
+void PspCreateSystemThread(void);
+
+void PspQueueThread(PsThread *Thread, bool EventQueue);
 
 #ifdef __cplusplus
 }

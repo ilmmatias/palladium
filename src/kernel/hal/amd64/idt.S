@@ -7,15 +7,14 @@
 #include <amd64/context.inc>
 #include <amd64/except.inc>
 #include <amd64/irql.inc>
-#include <amd64/panic.inc>
 
 .extern EvpProcessQueue
 .extern EvpHandleTimer
 .extern HalpDispatchException
-.extern HalpDispatchInterrupt
+.extern HalpDispatchInterrup
+.extern HalpDispatchTrap
 .extern HalpDispatchNmi
 .extern HalpSendEoi
-.extern KeFatalError
 .extern PspProcessQueue
 
 .global HalpDefaultInterruptHandlers
@@ -109,8 +108,9 @@ HalpInvalidOpcodeTrapEntry:
 .global HalpNumericCoprocessorTrapEntry
 HalpNumericCoprocessorTrapEntry:
     ENTER_INTERRUPT
-    mov $KE_PANIC_TRAP_NOT_HANDLED, %rcx
-    call KeFatalError
+    mov %rsp, %rcx
+    mov $RT_EXC_NUMERIC_COPROCESSOR, %rdx
+    call HalpDispatchTrap
 1:  jmp 1b
 .seh_endproc
 
@@ -118,8 +118,9 @@ HalpNumericCoprocessorTrapEntry:
 .global HalpDoubleFaultTrapEntry
 HalpDoubleFaultTrapEntry:
     ENTER_INTERRUPT (INTERRUPT_FLAGS_HAS_ERROR_CODE)
-    mov $KE_PANIC_TRAP_NOT_HANDLED, %rcx
-    call KeFatalError
+    mov %rsp, %rcx
+    mov $RT_EXC_DOUBLE_FAULT, %rdx
+    call HalpDispatchTrap
 1:  jmp 1b
 .seh_endproc
 
@@ -127,8 +128,9 @@ HalpDoubleFaultTrapEntry:
 .global HalpSegmentOverrunTrapEntry
 HalpSegmentOverrunTrapEntry:
     ENTER_INTERRUPT
-    mov $KE_PANIC_TRAP_NOT_HANDLED, %rcx
-    call KeFatalError
+    mov %rsp, %rcx
+    mov $RT_EXC_SEGMENT_OVERRUN, %rdx
+    call HalpDispatchTrap
 1:  jmp 1b
 .seh_endproc
 
@@ -136,8 +138,9 @@ HalpSegmentOverrunTrapEntry:
 .global HalpInvalidTssTrapEntry
 HalpInvalidTssTrapEntry:
     ENTER_INTERRUPT (INTERRUPT_FLAGS_HAS_ERROR_CODE)
-    mov $KE_PANIC_TRAP_NOT_HANDLED, %rcx
-    call KeFatalError
+    mov %rsp, %rcx
+    mov $RT_EXC_INVALID_TSS, %rdx
+    call HalpDispatchTrap
 1:  jmp 1b
 .seh_endproc
 
@@ -145,8 +148,9 @@ HalpInvalidTssTrapEntry:
 .global HalpSegmentNotPresentTrapEntry
 HalpSegmentNotPresentTrapEntry:
     ENTER_INTERRUPT (INTERRUPT_FLAGS_HAS_ERROR_CODE)
-    mov $KE_PANIC_TRAP_NOT_HANDLED, %rcx
-    call KeFatalError
+    mov %rsp, %rcx
+    mov $RT_EXC_SEGMENT_NOT_PRESENT, %rdx
+    call HalpDispatchTrap
 1:  jmp 1b
 .seh_endproc
 
@@ -154,8 +158,9 @@ HalpSegmentNotPresentTrapEntry:
 .global HalpStackSegmentTrapEntry
 HalpStackSegmentTrapEntry:
     ENTER_INTERRUPT (INTERRUPT_FLAGS_HAS_ERROR_CODE)
-    mov $KE_PANIC_TRAP_NOT_HANDLED, %rcx
-    call KeFatalError
+    mov %rsp, %rcx
+    mov $RT_EXC_STACK_SEGMENT, %rdx
+    call HalpDispatchTrap
 1:  jmp 1b
 .seh_endproc
 
@@ -183,8 +188,9 @@ HalpPageFaultTrapEntry:
 .global HalpReservedTrapEntry
 HalpReservedTrapEntry:
     ENTER_INTERRUPT
-    mov $KE_PANIC_TRAP_NOT_HANDLED, %rcx
-    call KeFatalError
+    mov %rsp, %rcx
+    mov $RT_EXC_RESERVED, %rdx
+    call HalpDispatchTrap
 1:  jmp 1b
 .seh_endproc
 
@@ -212,8 +218,9 @@ HalpAlignmentCheckTrapEntry:
 .global HalpMachineCheckTrapEntry
 HalpMachineCheckTrapEntry:
     ENTER_INTERRUPT
-    mov $KE_PANIC_TRAP_NOT_HANDLED, %rcx
-    call KeFatalError
+    mov %rsp, %rcx
+    mov $RT_EXC_MACHINE_CHECK, %rdx
+    call HalpDispatchTrap
 1:  jmp 1b
 .seh_endproc
 
@@ -231,8 +238,9 @@ HalpSimdFloatingPointTrapEntry:
 .global HalpVirtualizationTrapEntry
 HalpVirtualizationTrapEntry:
     ENTER_INTERRUPT
-    mov $KE_PANIC_TRAP_NOT_HANDLED, %rcx
-    call KeFatalError
+    mov %rsp, %rcx
+    mov $RT_EXC_VIRTUALIZATION, %rdx
+    call HalpDispatchTrap
 1:  jmp 1b
 .seh_endproc
 
@@ -240,8 +248,9 @@ HalpVirtualizationTrapEntry:
 .global HalpControlProtectionTrapEntry
 HalpControlProtectionTrapEntry:
     ENTER_INTERRUPT (INTERRUPT_FLAGS_HAS_ERROR_CODE)
-    mov $KE_PANIC_TRAP_NOT_HANDLED, %rcx
-    call KeFatalError
+    mov %rsp, %rcx
+    mov $RT_EXC_CONTROL_PROTECTION, %rdx
+    call HalpDispatchTrap
 1:  jmp 1b
 .seh_endproc
 
@@ -249,8 +258,9 @@ HalpControlProtectionTrapEntry:
 .global HalpHypervisorInjectionTrapEntry
 HalpHypervisorInjectionTrapEntry:
     ENTER_INTERRUPT
-    mov $KE_PANIC_TRAP_NOT_HANDLED, %rcx
-    call KeFatalError
+    mov %rsp, %rcx
+    mov $RT_EXC_HYPERVISOR_INJECTION, %rdx
+    call HalpDispatchTrap
 1:  jmp 1b
 .seh_endproc
 
@@ -258,8 +268,9 @@ HalpHypervisorInjectionTrapEntry:
 .global HalpVmmCommunicationTrapEntry
 HalpVmmCommunicationTrapEntry:
     ENTER_INTERRUPT (INTERRUPT_FLAGS_HAS_ERROR_CODE)
-    mov $KE_PANIC_TRAP_NOT_HANDLED, %rcx
-    call KeFatalError
+    mov %rsp, %rcx
+    mov $RT_EXC_VMM_COMMUNICATION, %rdx
+    call HalpDispatchTrap
 1:  jmp 1b
 .seh_endproc
 
@@ -267,8 +278,9 @@ HalpVmmCommunicationTrapEntry:
 .global HalpSecurityTrapEntry
 HalpSecurityTrapEntry:
     ENTER_INTERRUPT (INTERRUPT_FLAGS_HAS_ERROR_CODE)
-    mov $KE_PANIC_TRAP_NOT_HANDLED, %rcx
-    call KeFatalError
+    mov %rsp, %rcx
+    mov $RT_EXC_SECURITY, %rdx
+    call HalpDispatchTrap
 1:  jmp 1b
 .seh_endproc
 
@@ -279,8 +291,6 @@ HalpDispatchEntry:
     mov $KE_IRQL_DISPATCH, %rcx
     mov %rcx, %cr8
     call HalpSendEoi
-    mov %rsp, %rcx
-    call EvpProcessQueue
     sti
     mov %rsp, %rcx
     call PspProcessQueue
@@ -292,6 +302,8 @@ HalpDispatchEntry:
 .global HalpTimerEntry
 HalpTimerEntry:
     ENTER_INTERRUPT
+    mov $HAL_INT_TIMER_IRQL, %rax
+    mov %rax, %cr8
     mov %rsp, %rcx
     call EvpHandleTimer
     call HalpSendEoi

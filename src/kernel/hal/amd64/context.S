@@ -75,10 +75,26 @@ HalpThreadEntry:
 .global HalpSwitchContext
 HalpSwitchContext:
     ENTER_EXCEPTION
+
+    /* Skip saving the current stack on scheduler initialization. */
     test %rcx, %rcx
     jz 1f
+
+    /* Save the current thread's stack pointer and notify other processors that we did so. */
     mov %rsp, CONTEXT_FRAME_RSP(%rcx)
-1:  mov CONTEXT_FRAME_RSP(%rdx), %rsp
+    movq $0, CONTEXT_FRAME_BUSY(%rcx)
+
+    /* And now we can wait until our any other processor that maybe still in the new thread exits
+     * it, and setup the new stack. */
+1:  mov CONTEXT_FRAME_BUSY(%rdx), %rax
+    test %rax, %rax
+    jz 3f
+2:  pause
+    mov CONTEXT_FRAME_BUSY(%rdx), %rax
+    test %rax, %rax
+    jnz 2b
+3:  mov CONTEXT_FRAME_RSP(%rdx), %rsp
     call HalpUpdateTss
+
     LEAVE_EXCEPTION
 .seh_endproc

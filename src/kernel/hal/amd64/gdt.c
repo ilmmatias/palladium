@@ -82,7 +82,7 @@ void HalpInitializeGdt(KeProcessor *Processor) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function updates the TSS Rsp0 field using the current thread.
+ *     This function updates the TSS Rsp0 using the current thread stack.
  *
  * PARAMETERS:
  *     None.
@@ -91,6 +91,6 @@ void HalpInitializeGdt(KeProcessor *Processor) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void HalpUpdateTss(void) {
-    KeProcessor *Processor = HalGetCurrentProcessor();
-    Processor->TssEntry.Rsp0 = (uint64_t)Processor->CurrentThread->Stack;
+    KeProcessor *Processor = KeGetCurrentProcessor();
+    Processor->TssEntry.Rsp0 = (uint64_t)Processor->StackBase;
 }

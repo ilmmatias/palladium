@@ -9,7 +9,7 @@ extern char *VidpFrontBuffer;
 extern uint16_t VidpWidth;
 extern uint16_t VidpHeight;
 extern uint16_t VidpPitch;
-extern int VidpUseLock;
+extern bool VidpUseLock;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -34,7 +34,7 @@ void VidpInitialize(KiLoaderBlock *LoaderBlock) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function disables the KeAcquireSpinLock()s inside the Vid* functions.
+ *     This function disables the KeAcquireSpinLocks inside the Vid* functions.
  *
  * PARAMETERS:
  *     None.
@@ -43,5 +43,5 @@ void VidpInitialize(KiLoaderBlock *LoaderBlock) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void VidpAcquireOwnership(void) {
-    VidpUseLock = 0;
+    VidpUseLock = false;
 }

@@ -4,20 +4,19 @@
 #ifndef _PS_H_
 #define _PS_H_
 
-#include <ev.h>
 #include <generic/context.h>
+#include <rt/list.h>
 
-#define PS_YIELD_NORMAL 0x00
-#define PS_YIELD_WAITING 0x01
+#define PS_YIELD_TYPE_QUEUE 0x00
+#define PS_YIELD_TYPE_UNQUEUE 0x01
 
-typedef struct PsThread {
+typedef struct {
     RtDList ListHeader;
-    uint64_t ExpirationReference;
     uint64_t ExpirationTicks;
-    int Terminated;
-    EvDpc TerminationDpc;
-    HalContextFrame Context;
+    uint64_t WaitTicks;
     char *Stack;
+    char *StackLimit;
+    HalContextFrame ContextFrame;
 } PsThread;
 
 #ifdef __cplusplus
@@ -25,9 +24,10 @@ extern "C" {
 #endif /* __cplusplus */
 
 PsThread *PsCreateThread(void (*EntryPoint)(void *), void *Parameter);
-void PsReadyThread(PsThread *Thread);
+void PsQueueThread(PsThread *Thread);
 [[noreturn]] void PsTerminateThread(void);
-void PsYieldExecution(int Type);
+void PsYieldThread(int Type);
+void PsDelayThread(uint64_t Time);
 
 #ifdef __cplusplus
 }

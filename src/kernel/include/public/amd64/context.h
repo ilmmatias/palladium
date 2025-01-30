@@ -65,7 +65,8 @@ typedef struct __attribute__((packed)) {
     void *Parameter;
 } HalStartFrame;
 
-typedef struct __attribute__((packed)) {
+typedef struct {
+    volatile uint64_t Busy;
     uint64_t Rsp;
 } HalContextFrame;
 

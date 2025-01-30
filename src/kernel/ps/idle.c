@@ -14,7 +14,7 @@
  *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
 [[noreturn]] void PspIdleThread(void *) {
-    while (1) {
-        HalpStopProcessor();
+    while (true) {
+        StopProcessor();
     }
 }

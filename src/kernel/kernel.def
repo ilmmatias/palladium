@@ -1,31 +1,12 @@
 LIBRARY kernel.exe
 EXPORTS
-    EvCancelObject
-    EvDispatchDpc
-    EvInitializeDpc
-    EvInitializeTimer
-    EvWaitObject
-
     HalCheckTimerExpiration
-    HalGetCurrentProcessor
     HalGetTimerPeriod
     HalGetTimerTicks
     HalGetTimerWidth
     HalWaitTimer
 
-    IoCreateDevice
-    IoOpenDevice
-
-    KeAcquireSpinLock
-    KeAcquireSpinLockHighIrql
     KeFatalError
-    KeGetIrql
-    KeLowerIrql
-    KeRaiseIrql
-    KeReleaseSpinLock
-    KeReleaseSpinLockHighIrql
-    KeTestSpinLock
-    KeTryAcquireSpinLockHighIrql
     KiFindAcpiTable
 
     MmAllocatePool
@@ -36,8 +17,9 @@ EXPORTS
     MmUnmapSpace
 
     PsCreateThread
-    PsReadyThread
-    PsYieldExecution
+    PsDelayThread
+    PsQueueThread
+    PsYieldThread
 
     VidGetColor
     VidGetCursor

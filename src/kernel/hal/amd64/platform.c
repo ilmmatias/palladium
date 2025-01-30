@@ -23,6 +23,13 @@ static KeProcessor BootProcessor __attribute__((aligned(4096))) = {};
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void HalpInitializeBootStack(KiLoaderBlock *LoaderBlock) {
+    /* The BSP gets its KeGetCurrentProcessor() initialized here instead of
+     * HalpInitializeXProcessor (because we need it for early KeFatalError).
+     * Maybe we should create a function specifically for this? */
+    WriteMsr(0xC0000102, (uint64_t)&BootProcessor);
+    BootProcessor.StackBase = BootProcessor.SystemStack;
+    BootProcessor.StackLimit = BootProcessor.SystemStack + sizeof(BootProcessor.SystemStack);
+
     __asm__ volatile("mov %0, %%rax\n"
                      "mov %1, %%rcx\n"
                      "mov %2, %%rdx\n"
@@ -36,7 +43,7 @@ void HalpInitializeBootStack(KiLoaderBlock *LoaderBlock) {
                      : "%rax", "%rcx", "%rdx");
 
     while (true) {
-        HalpStopProcessor();
+        StopProcessor();
     }
 }
 
@@ -52,8 +59,6 @@ void HalpInitializeBootStack(KiLoaderBlock *LoaderBlock) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void HalpInitializeBootProcessor(void) {
-    /* This should always go well (if it doesn't, KeFatalError is called outside of us). */
-    WriteMsr(0xC0000102, (uint64_t)&BootProcessor);
     HalpInitializeGdt(&BootProcessor);
     HalpInitializeIdt(&BootProcessor);
     HalpInitializeIoapic();
@@ -63,7 +68,7 @@ void HalpInitializeBootProcessor(void) {
     HalpInitializeHpet();
     HalpInitializeSmp();
     HalpInitializeApicTimer();
-    HalpSetIrql(KE_IRQL_PASSIVE);
+    KeSetIrql(KE_IRQL_PASSIVE);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -79,40 +84,12 @@ void HalpInitializeBootProcessor(void) {
  *-----------------------------------------------------------------------------------------------*/
 void HalpInitializeApplicationProcessor(KeProcessor *Processor) {
     WriteMsr(0xC0000102, (uint64_t)Processor);
+    Processor->StackBase = Processor->SystemStack;
+    Processor->StackLimit = Processor->SystemStack + sizeof(Processor->SystemStack);
     HalpInitializeGdt(Processor);
     HalpInitializeIdt(Processor);
     HalpEnableApic();
     Processor->ApicId = HalpReadLapicId();
     HalpInitializeApicTimer();
-    HalpSetIrql(KE_IRQL_PASSIVE);
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function signals the CPU we're in a busy loop (waiting for a spin lock probably), and
- *     we are safe to drop the CPU state into power saving.
- *
- * PARAMETERS:
- *     None.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-void HalpPauseProcessor(void) {
-    __asm__ volatile("pause");
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function signals the CPU we're either fully done with any work this CPU will ever do
- *     (aka, panic), or that we're waiting some interrupt/external event.
- *
- * PARAMETERS:
- *     None.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-void HalpStopProcessor(void) {
-    __asm__ volatile("hlt");
+    KeSetIrql(KE_IRQL_PASSIVE);
 }

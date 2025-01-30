@@ -110,11 +110,8 @@ static void InitializeApplicationProcessor(KeProcessor *Processor) {
         InitializeApplicationProcessor(Processor);
     }
 
-    /* Yield into the initial thread (PsYieldExecution should never return for us). */
-    PsYieldExecution(PS_YIELD_WAITING);
-    while (1) {
-        HalpStopProcessor();
-    }
+    /* Switch into the initial thread (this should finish up the scheduler initialization). */
+    PspInitializeScheduler();
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -133,7 +130,7 @@ static void InitializeApplicationProcessor(KeProcessor *Processor) {
        them. */
     KiRunBootStartDrivers();
 
-    while (1) {
-        HalpStopProcessor();
+    while (true) {
+        StopProcessor();
     }
 }
