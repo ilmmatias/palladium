@@ -90,12 +90,12 @@ jobs:
         cp palladium/build.target/fat.img _root/fat.img
         mkisofs -R -f -eltorito-boot fat.img -no-emul-boot -o palladium/build.target/iso9660.iso _root
 
-    - uses: actions/upload-artifact@v3
+    - uses: actions/upload-artifact@v4
       with:
         name: fat.img
         path: palladium/build.target/fat.img
 
-    - uses: actions/upload-artifact@v3
+    - uses: actions/upload-artifact@v4
       with:
         name: iso9660.iso
         path: palladium/build.target/iso9660.iso
