@@ -8,7 +8,7 @@
 #include <string.h>
 #include <vid.h>
 
-RtDList KeModuleListHead;
+RtDList KiModuleListHead;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -33,7 +33,7 @@ void KiSaveBootStartDrivers(KiLoaderBlock *LoaderBlock) {
             0);
     }
 
-    RtInitializeDList(&KeModuleListHead);
+    RtInitializeDList(&KiModuleListHead);
     RtDList *ListHeader = LoaderModuleListHead->Next;
 
     while (ListHeader != LoaderBlock->BootDriverListHead) {
@@ -83,7 +83,7 @@ void KiSaveBootStartDrivers(KiLoaderBlock *LoaderBlock) {
         memcpy(TargetModule, SourceModule, sizeof(KeModule));
         strcpy(TargetImageName, SourceImageName);
         TargetModule->ImageName = TargetImageName;
-        RtAppendDList(&KeModuleListHead, &TargetModule->ListHeader);
+        RtAppendDList(&KiModuleListHead, &TargetModule->ListHeader);
 
         RtDList *Next = ListHeader->Next;
         MmUnmapSpace(SourceImageName);
@@ -108,8 +108,8 @@ void KiSaveBootStartDrivers(KiLoaderBlock *LoaderBlock) {
  *-----------------------------------------------------------------------------------------------*/
 void KiRunBootStartDrivers(void) {
     /* The kernel should be the first image, and the drivers start from there onwards. */
-    RtDList *ListHeader = KeModuleListHead.Next->Next;
-    while (ListHeader != &KeModuleListHead) {
+    RtDList *ListHeader = KiModuleListHead.Next->Next;
+    while (ListHeader != &KiModuleListHead) {
         KeModule *Module = CONTAINING_RECORD(ListHeader, KeModule, ListHeader);
         ((void (*)(void))Module->EntryPoint)();
         ListHeader = ListHeader->Next;
@@ -132,10 +132,10 @@ void KiDumpSymbol(void *Address) {
     uint64_t Offset = (uint64_t)Address;
     char OffsetString[128];
 
-    RtDList *ListHeader = KeModuleListHead.Next;
+    RtDList *ListHeader = KiModuleListHead.Next;
     KeModule *Image = NULL;
 
-    while (ListHeader != &KeModuleListHead) {
+    while (ListHeader != &KiModuleListHead) {
         Image = CONTAINING_RECORD(ListHeader, KeModule, ListHeader);
 
         if (Offset < (uint64_t)Image->ImageBase ||
@@ -147,7 +147,7 @@ void KiDumpSymbol(void *Address) {
         break;
     }
 
-    if (ListHeader == &KeModuleListHead) {
+    if (ListHeader == &KiModuleListHead) {
         snprintf(OffsetString, sizeof(OffsetString), "0x%016llx - ??\n", Offset);
         VidPutString(OffsetString);
         return;
