@@ -6,6 +6,6 @@
 
 void OslPutChar(char Character);
 void OslPutString(const char *String);
-void OslPrint(const char *Format, ...);
+__attribute__((format(printf, 1, 2))) void OslPrint(const char *Format, ...);
 
 #endif /* _CONSOLE_H_ */
