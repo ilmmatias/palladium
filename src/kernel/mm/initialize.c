@@ -108,7 +108,7 @@ void MiInitializePageAllocator(KiLoaderBlock *LoaderBlock) {
             Entry->BasePage += 0x10 - Entry->BasePage;
         }
 
-        if (Entry->Type <= MI_DESCR_FIRMWARE_TEMPORARY) {
+        if (Entry->Type <= MI_DESCR_FIRMWARE_PERMANENT) {
             MaxAddressablePage = Entry->BasePage + Entry->PageCount;
         }
     }
@@ -134,6 +134,9 @@ void MiInitializePageAllocator(KiLoaderBlock *LoaderBlock) {
          ListHeader != MemoryDescriptorListHead;
          ListHeader = MiEnsureEarlySpace((uint64_t)ListHeader->Next, sizeof(MiMemoryDescriptor))) {
         MiMemoryDescriptor *Entry = CONTAINING_RECORD(ListHeader, MiMemoryDescriptor, ListHeader);
+        if (Entry->Type > MI_DESCR_FIRMWARE_PERMANENT) {
+            continue;
+        }
 
         MiPageEntry *Group = &MiPageList[Entry->BasePage];
 

@@ -46,13 +46,13 @@ static void InitializeBootProcessor(KiLoaderBlock *LoaderBlock) {
     KiSaveAcpiData(LoaderBlock);
     KiSaveBootStartDrivers(LoaderBlock);
 
-    /* Stage 3 (BSP): Early platform/arch initialization. */
-    HalpInitializeBootProcessor();
-    VidPrint(VID_MESSAGE_INFO, "Kernel", "%u processors online\n", HalpProcessorCount);
-
-    /* Stage 4 (BSP): Release and unmap all OSLOADER memory regions; Everything we need should have
+    /* Stage 3 (BSP): Release and unmap all OSLOADER memory regions; Everything we need should have
      * already been copied to kernel land, so this should be safe. */
     MiReleaseBootRegions();
+
+    /* Stage 4 (BSP): Early platform/arch initialization. */
+    HalpInitializeBootProcessor();
+    VidPrint(VID_MESSAGE_INFO, "Kernel", "%u processors online\n", HalpProcessorCount);
 
     /* Stage 5 (BSP): Scheduler initialization. */
     PspCreateIdleThread();
