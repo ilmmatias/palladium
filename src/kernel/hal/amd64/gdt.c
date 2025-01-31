@@ -1,7 +1,8 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#include <amd64/halp.h>
+#include <kernel/halp.h>
+#include <kernel/ke.h>
 
 extern void HalpFlushGdt(void);
 

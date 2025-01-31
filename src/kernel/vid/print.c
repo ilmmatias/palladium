@@ -2,9 +2,9 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <crt_impl.h>
-#include <ke.h>
+#include <kernel/ke.h>
+#include <kernel/vidp.h>
 #include <string.h>
-#include <vidp.h>
 
 extern const VidpFontData VidpFont;
 

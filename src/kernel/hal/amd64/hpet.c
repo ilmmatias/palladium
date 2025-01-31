@@ -1,11 +1,11 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#include <amd64/hpet.h>
-#include <halp.h>
-#include <ke.h>
-#include <mi.h>
-#include <vid.h>
+#include <kernel/detail/amd64/hpet.h>
+#include <kernel/hal.h>
+#include <kernel/ke.h>
+#include <kernel/mm.h>
+#include <kernel/vid.h>
 
 static void *HpetAddress = NULL;
 static uint64_t Period = 1;

@@ -1,10 +1,10 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#include <amd64/apic.h>
-#include <amd64/halp.h>
-#include <mi.h>
-#include <vid.h>
+#include <kernel/detail/amd64/apic.h>
+#include <kernel/ke.h>
+#include <kernel/mm.h>
+#include <kernel/vid.h>
 
 static RtSList IoapicListHead = {};
 static RtSList IoapicOverrideListHead = {};

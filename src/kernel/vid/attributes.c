@@ -1,7 +1,7 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#include <ke.h>
+#include <kernel/ke.h>
 
 extern uint16_t VidpWidth;
 extern uint16_t VidpHeight;

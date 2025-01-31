@@ -1,8 +1,8 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#include <ke.h>
-#include <mi.h>
+#include <kernel/ke.h>
+#include <kernel/mi.h>
 
 MiPageEntry *MiPageList = NULL;
 RtDList MiFreePageListHead;

@@ -1,9 +1,10 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#include <halp.h>
-#include <mm.h>
-#include <psp.h>
+#include <kernel/halp.h>
+#include <kernel/ke.h>
+#include <kernel/mm.h>
+#include <kernel/psp.h>
 
 [[noreturn]] extern void PspIdleThread(void *);
 [[noreturn]] extern void KiContinueSystemStartup(void *);

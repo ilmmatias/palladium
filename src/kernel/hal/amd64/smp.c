@@ -1,11 +1,12 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#include <amd64/apic.h>
-#include <amd64/halp.h>
-#include <amd64/msr.h>
-#include <ke.h>
-#include <mi.h>
+#include <kernel/detail/amd64/apic.h>
+#include <kernel/ev.h>
+#include <kernel/halp.h>
+#include <kernel/intrin.h>
+#include <kernel/ke.h>
+#include <kernel/mi.h>
 #include <string.h>
 
 extern void HalpApplicationProcessorEntry(void);

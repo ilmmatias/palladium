@@ -1,9 +1,8 @@
 /* SPDX-FileCopyrightText: (C) 2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#include <evp.h>
-#include <halp.h>
-#include <psp.h>
+#include <kernel/halp.h>
+#include <kernel/ke.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:

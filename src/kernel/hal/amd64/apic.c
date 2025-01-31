@@ -1,14 +1,12 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#include <amd64/apic.h>
-#include <amd64/msr.h>
-#include <amd64/port.h>
 #include <cpuid.h>
-#include <hal.h>
-#include <ke.h>
-#include <mm.h>
-#include <vid.h>
+#include <kernel/detail/amd64/apic.h>
+#include <kernel/intrin.h>
+#include <kernel/ke.h>
+#include <kernel/mm.h>
+#include <kernel/vid.h>
 
 RtSList HalpLapicListHead = {};
 uint32_t HalpProcessorCount = 0;

@@ -31,6 +31,7 @@ function(add_executable target type has_lib)
         PRIVATE
         --target=${TARGET_${ARCH}}-w64-mingw32
         -DARCH_${ARCH}
+        -DARCH_MAKE_INCLUDE_PATH\(PREFIX,SUFFIX\)=<PREFIX/${ARCH}/SUFFIX>
         -fno-stack-protector
         -mno-stack-arg-probe
         -fexceptions
@@ -80,6 +81,7 @@ function(add_library target type)
         PRIVATE
         --target=${TARGET_${ARCH}}-w64-mingw32
         -DARCH_${ARCH}
+        -DARCH_MAKE_INCLUDE_PATH\(PREFIX,SUFFIX\)=<PREFIX/${ARCH}/SUFFIX>
         -fno-stack-protector
         -mno-stack-arg-probe
         -fexceptions

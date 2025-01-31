@@ -1,12 +1,12 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#include <halp.h>
-#include <ki.h>
-#include <mm.h>
+#include <kernel/halp.h>
+#include <kernel/ki.h>
+#include <kernel/mm.h>
+#include <kernel/vidp.h>
 #include <rt/except.h>
 #include <stdio.h>
-#include <vidp.h>
 
 static const char *Messages[] = {
     "MANUALLY_INITIATED_CRASH",

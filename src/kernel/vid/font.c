@@ -1,7 +1,7 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#include <vidp.h>
+#include <kernel/vidp.h>
 
 /* This font data was extracted from the Hack font (https://github.com/source-foundry/Hack). */
 

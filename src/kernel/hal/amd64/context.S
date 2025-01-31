@@ -3,8 +3,8 @@
 
 .text
 
-#include <amd64/context.inc>
-#include <amd64/irql.inc>
+#include <kernel/detail/amd64/context.inc>
+#include <kernel/detail/amd64/irql.inc>
 
 .extern HalpUpdateTss
 

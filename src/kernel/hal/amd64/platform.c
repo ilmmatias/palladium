@@ -1,9 +1,9 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#include <amd64/halp.h>
-#include <amd64/msr.h>
-#include <mm.h>
+#include <kernel/halp.h>
+#include <kernel/intrin.h>
+#include <kernel/ke.h>
 
 [[noreturn]] extern void KiSystemStartup(KiLoaderBlock *LoaderBlock, KeProcessor *Processor);
 

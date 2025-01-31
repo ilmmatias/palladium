@@ -1,0 +1,29 @@
+/* SPDX-FileCopyrightText: (C) 2025 ilmmatias
+ * SPDX-License-Identifier: GPL-3.0-or-later */
+
+#ifndef _KERNEL_DETAIL_AMD64_HALDEFS_H_
+#define _KERNEL_DETAIL_AMD64_HALDEFS_H_
+
+#define DESCR_SEG_NULL 0x00
+#define DESCR_SEG_KCODE 0x08
+#define DESCR_SEG_KDATA 0x10
+#define DESCR_SEG_UCODE 0x18
+#define DESCR_SEG_UDATA 0x20
+#define DESCR_SEG_TSS 0x28
+
+#define DESCR_DPL_KERNEL 0x00
+#define DESCR_DPL_USER 0x03
+
+#define DESCR_IST_NONE 0
+#define DESCR_IST_NMI 1
+#define DESCR_IST_DOUBLE_FAULT 2
+#define DESCR_IST_MACHINE_CHECK 3
+
+#define GDT_TYPE_TSS 0x09
+#define GDT_TYPE_CODE 0x1A
+#define GDT_TYPE_DATA 0x12
+
+#define IDT_TYPE_INT 0x0E
+#define IDT_TYPE_TRAP 0x0F
+
+#endif /* _KERNEL_DETAIL_AMD64_HALDEFS_H_ */

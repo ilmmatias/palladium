@@ -1,8 +1,8 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#include <mi.h>
-#include <vidp.h>
+#include <kernel/mi.h>
+#include <kernel/vidp.h>
 
 extern char *VidpBackBuffer;
 extern char *VidpFrontBuffer;
