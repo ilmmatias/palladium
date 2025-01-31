@@ -40,7 +40,8 @@ PsThread *PsCreateThread(void (*EntryPoint)(void *), void *Parameter) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function finds a target processor and adds a thread to its queue.
+ *     This function finds a target processor and adds a thread to its queue; We expect to be at
+ *     least raised to DISPATCH, and with no processor locks acquired.
  *
  * PARAMETERS:
  *     Thread - Which thread to add.
@@ -51,19 +52,18 @@ PsThread *PsCreateThread(void (*EntryPoint)(void *), void *Parameter) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void PspQueueThread(PsThread *Thread, bool EventQueue) {
-    KeProcessor *CurrentProcessor = KeGetCurrentProcessor();
-    KeProcessor *TargetProcessor = CurrentProcessor;
+    KeProcessor *TargetProcessor = KeGetCurrentProcessor();
     bool NotifyProcessor = false;
 
     do {
         /* BSP always gets the KiContinueSystemStartup thread. */
-        if (!CurrentProcessor->CurrentThread) {
+        if (!TargetProcessor->CurrentThread) {
             break;
         }
 
         /* We prefer to stay in the current processor if possible. */
-        if (CurrentProcessor->CurrentThread && !CurrentProcessor->CurrentThread->ExpirationTicks &&
-            CurrentProcessor->ThreadQueue.Next == &CurrentProcessor->ThreadQueue) {
+        if (TargetProcessor->CurrentThread && !TargetProcessor->CurrentThread->ExpirationTicks &&
+            TargetProcessor->ThreadQueue.Next == &TargetProcessor->ThreadQueue) {
             NotifyProcessor = true;
             break;
         }
@@ -82,9 +82,7 @@ void PspQueueThread(PsThread *Thread, bool EventQueue) {
         /* Fallback to inserting in the current processor if no one was idle. */
     } while (false);
 
-    if (CurrentProcessor != TargetProcessor) {
-        KeAcquireSpinLockAtCurrentIrql(&TargetProcessor->Lock);
-    }
+    KeAcquireSpinLockAtCurrentIrql(&TargetProcessor->Lock);
 
     if (EventQueue) {
         RtPushDList(&TargetProcessor->ThreadQueue, &Thread->ListHeader);
@@ -92,10 +90,9 @@ void PspQueueThread(PsThread *Thread, bool EventQueue) {
         RtAppendDList(&TargetProcessor->ThreadQueue, &Thread->ListHeader);
     }
 
-    if (CurrentProcessor != TargetProcessor) {
-        KeReleaseSpinLockAtCurrentIrql(&TargetProcessor->Lock);
-    }
+    KeReleaseSpinLockAtCurrentIrql(&TargetProcessor->Lock);
 
+    /* Finally, wake up the target if it was idle. */
     if (NotifyProcessor) {
         HalpNotifyProcessor(TargetProcessor, false);
     }
@@ -112,10 +109,10 @@ void PspQueueThread(PsThread *Thread, bool EventQueue) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void PsQueueThread(PsThread *Thread) {
-    KeProcessor *Processor = KeGetCurrentProcessor();
-    KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Processor->Lock, KE_IRQL_SYNCH);
+    /* DISPATCH should be enough? */
+    KeIrql OldIrql = KeRaiseIrql(KE_IRQL_DISPATCH);
     PspQueueThread(Thread, false);
-    KeReleaseSpinLockAndLowerIrql(&Processor->Lock, OldIrql);
+    KeLowerIrql(OldIrql);
 }
 
 /*-------------------------------------------------------------------------------------------------

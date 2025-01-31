@@ -34,19 +34,20 @@ static void SwitchExecution(
      * finishes its setup!). */
     if (CurrentThread) {
         __atomic_store_n(&CurrentThreadFrame->Busy, 0x01, __ATOMIC_SEQ_CST);
-        if (RequeueThread) {
-            PspQueueThread(CurrentThread, false);
-        }
     }
 
-    /* Finally, it should be safe to release the processor lock now. */
-    KeReleaseSpinLockAtCurrentIrql(&Processor->Lock);
+    /* Requeue the current thread if necessary; We'll just assume CurrentThread points to valid
+     * memory if we were asked to requeue it. */
+    if (RequeueThread) {
+        PspQueueThread(CurrentThread, false);
+    }
+
+    /* And switch away (we should be back to lower the IRQL once another thread switches
+     * into us). */
     Processor->StackBase = TargetThread->Stack;
     Processor->StackLimit = TargetThread->StackLimit;
     Processor->CurrentThread = TargetThread;
     HalpSwitchContext(CurrentThreadFrame, TargetThreadFrame);
-
-    /* And now we should be back from the thread we yielded into. */
     KeLowerIrql(OldIrql);
 }
 
@@ -66,8 +67,10 @@ static void SwitchExecution(
 
     /* The BSP should have queued its initial thread. */
     KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Processor->Lock, KE_IRQL_SYNCH);
-    PsThread *Thread = Processor->IdleThread;
     RtDList *ListHeader = RtPopDList(&Processor->ThreadQueue);
+    KeReleaseSpinLockAtCurrentIrql(&Processor->Lock);
+
+    PsThread *Thread = Processor->IdleThread;
     if (ListHeader != &Processor->ThreadQueue) {
         Thread = CONTAINING_RECORD(ListHeader, PsThread, ListHeader);
     }
@@ -91,18 +94,18 @@ static void SwitchExecution(
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void PsYieldThread(int Type) {
-    /* Raise to SYNCH and acquire the processor lock, simulating the environment of
-     * the scheduler. */
+    /* Raise to SYNCH (block device interrupts) and acquire the processor lock (to access the
+     * queue). */
     KeProcessor *Processor = KeGetCurrentProcessor();
     KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Processor->Lock, KE_IRQL_SYNCH);
-
-    /* If the yield is putting us in a waiting state, we actually want to switch into idle once we
-     * have nothing left to do; Otherwise, same as PspProcessQueue (don't switch into idle, stay on
-     * the current task). */
-    PsThread *TargetThread = Processor->IdleThread;
     RtDList *ListHeader = RtPopDList(&Processor->ThreadQueue);
+    KeReleaseSpinLockAtCurrentIrql(&Processor->Lock);
+
+    /* If the yield is putting us in a waiting state, we actually want to switch into idle once
+     * we have nothing left to do; Otherwise, same as PspProcessQueue (don't switch into idle,
+     * stay on the current task). */
+    PsThread *TargetThread = Processor->IdleThread;
     if (ListHeader == &Processor->ThreadQueue && Type == PS_YIELD_TYPE_QUEUE) {
-        KeReleaseSpinLockAndLowerIrql(&Processor->Lock, OldIrql);
         return;
     } else if (ListHeader != &Processor->ThreadQueue) {
         TargetThread = CONTAINING_RECORD(ListHeader, PsThread, ListHeader);
@@ -155,10 +158,6 @@ void PspProcessQueue(HalInterruptFrame *) {
         MmFreePool(Thread, "PsTh");
     }
 
-    /* Now we can raise to SYNCH (block device interrupts) and acquire the processor lock (don't let
-     * any other processors mess with us while we mess with the thread queue). */
-    KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Processor->Lock, KE_IRQL_SYNCH);
-
     /* Requeue any waiting threads that have expired. */
     for (RtDList *ListHeader = Processor->WaitQueue.Next; ListHeader != &Processor->WaitQueue;) {
         PsThread *Thread = CONTAINING_RECORD(ListHeader, PsThread, ListHeader);
@@ -174,15 +173,18 @@ void PspProcessQueue(HalInterruptFrame *) {
      * into). */
     if (Processor->CurrentThread->ExpirationTicks ||
         Processor->ThreadQueue.Next == &Processor->ThreadQueue) {
-        KeReleaseSpinLockAndLowerIrql(&Processor->Lock, OldIrql);
         return;
     }
 
-    /* Attempt to grab the next thread; We won't enter idle through here (as we're not forced to),
-     * so if there was nothing, just keep on executing the current thread. */
+    /* Now we can raise to SYNCH (block device interrupts) and acquire the processor lock (don't let
+     * any other processors mess with us while we mess with the thread queue). */
+    KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Processor->Lock, KE_IRQL_SYNCH);
     RtDList *ListHeader = RtPopDList(&Processor->ThreadQueue);
+    KeReleaseSpinLockAtCurrentIrql(&Processor->Lock);
+
+    /* We won't enter idle through here (as we're not forced to), so if there was nothing, just keep
+     * on executing the current thread. */
     if (ListHeader == &Processor->ThreadQueue) {
-        KeReleaseSpinLockAndLowerIrql(&Processor->Lock, OldIrql);
         return;
     }
 
