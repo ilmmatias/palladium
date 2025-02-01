@@ -15,22 +15,13 @@
  * RETURN VALUE:
  *     Start of the destination buffer.
  *-----------------------------------------------------------------------------------------------*/
-void *memcpy(void *dest, const void *src, size_t count) {
-#ifdef ARCH_amd64
-    void *res = dest;
-    __asm__ volatile("cld; rep movsb"
-                     : "=D"(dest), "=S"(src), "=c"(count)
-                     : "0"(dest), "1"(src), "c"(count)
-                     : "flags", "memory");
-    return res;
-#else
-    char *Destination = dest;
-    const char *Source = src;
+void *memcpy(void *restrict dest, const void *restrict src, size_t count) {
+    char *restrict Destination = dest;
+    const char *restrict Source = src;
 
     while (count--) {
         *(Destination++) = *(Source++);
     }
 
     return dest;
-#endif
 }

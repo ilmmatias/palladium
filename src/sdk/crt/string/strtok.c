@@ -15,7 +15,7 @@
  * RETURN VALUE:
  *     Position of the next token, or NULL if there are no more tokens.
  *-----------------------------------------------------------------------------------------------*/
-char *strtok(char *str, const char *delim) {
+char *strtok(char *restrict str, const char *restrict delim) {
     static char *Context = NULL;
 
     if (!Context || str) {

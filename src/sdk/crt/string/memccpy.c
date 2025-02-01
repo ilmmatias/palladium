@@ -17,7 +17,7 @@
  * RETURN VALUE:
  *     Pointer to the byte after the marker, or NULL if the marker wasn't found.
  *-----------------------------------------------------------------------------------------------*/
-void *memccpy(void *dest, const void *src, int c, size_t count) {
+void *memccpy(void *restrict dest, const void *restrict src, int c, size_t count) {
     char *Destination = dest;
     const char *Source = src;
 

@@ -3,7 +3,21 @@
 
 project(os/sdk/crt)
 
+if(ARCH STREQUAL "amd64")
+    set(SOURCES
+        amd64/memcpy.S
+        amd64/memset.S
+    )
+else()
+    set(SOURCES
+        string/memcpy.c
+        string/memset.c
+    )
+endif()
+
 set(SOURCES
+    ${SOURCES}
+
     placeholder.c
 
     ctype/isalnum.c
@@ -49,9 +63,7 @@ set(SOURCES
     string/memccpy.c
     string/memchr.c
     string/memcmp.c
-    string/memcpy.c
     string/memmove.c
-    string/memset.c
     string/strcat.c
     string/strchr.c
     string/strcmp.c
