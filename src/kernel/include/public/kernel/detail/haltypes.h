@@ -12,7 +12,7 @@
 #endif /* __has__include */
 /* clang-format on */
 
-typedef struct HalInterrupt {
+typedef struct {
     RtDList ListHeader;
     bool Enabled;
     KeSpinLock Lock;

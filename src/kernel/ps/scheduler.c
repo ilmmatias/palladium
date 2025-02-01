@@ -108,6 +108,7 @@ void PsYieldThread(int Type) {
      * stay on the current task). */
     PsThread *TargetThread = Processor->IdleThread;
     if (ListHeader == &Processor->ThreadQueue && Type == PS_YIELD_TYPE_QUEUE) {
+        KeLowerIrql(OldIrql);
         return;
     } else if (ListHeader != &Processor->ThreadQueue) {
         TargetThread = CONTAINING_RECORD(ListHeader, PsThread, ListHeader);

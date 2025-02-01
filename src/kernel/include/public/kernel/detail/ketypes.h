@@ -12,7 +12,7 @@
 #endif /* __has__include */
 /* clang-format on */
 
-typedef struct KeModule {
+typedef struct {
     RtDList ListHeader;
     void *ImageBase;
     void *EntryPoint;

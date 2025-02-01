@@ -10,7 +10,7 @@
 #endif /* __has__include */
 /* clang-format on */
 
-#define KE_STACK_SIZE 8192
+#define KE_STACK_SIZE 16384
 
 #define KE_EVENT_TYPE_NONE 0
 #define KE_EVENT_TYPE_FREEZE 1

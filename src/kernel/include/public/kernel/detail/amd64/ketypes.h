@@ -7,8 +7,11 @@
 /* We need to define these beforehand (because pstypes.h uses them). */
 typedef uint64_t KeIrql;
 typedef uint64_t KeSpinLock;
+struct PsThread;
 
 #include <kernel/detail/amd64/haltypes.h>
+#include <kernel/detail/kedefs.h>
+#include <kernel/detail/mmdefs.h>
 #include <kernel/detail/pstypes.h>
 
 typedef struct {
@@ -17,8 +20,8 @@ typedef struct {
     RtDList WaitQueue;
     RtDList ThreadQueue;
     RtDList TerminationQueue;
-    PsThread *CurrentThread;
-    PsThread *IdleThread;
+    struct PsThread *CurrentThread;
+    struct PsThread *IdleThread;
     int EventType;
     char *StackBase;
     char *StackLimit;
