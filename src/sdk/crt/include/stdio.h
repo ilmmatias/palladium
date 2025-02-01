@@ -63,18 +63,19 @@ int putchar(int ch);
 int puts(const char *str);
 int ungetc(int ch, FILE *stream);
 
-int scanf(const char *format, ...);
-int fscanf(FILE *stream, const char *format, ...);
-int sscanf(const char *buffer, const char *format, ...);
+__attribute__((format(scanf, 1, 2))) int scanf(const char *format, ...);
+__attribute__((format(scanf, 2, 3))) int fscanf(FILE *stream, const char *format, ...);
+__attribute__((format(scanf, 2, 3))) int sscanf(const char *buffer, const char *format, ...);
 
 int vscanf(const char *format, va_list vlist);
 int vfscanf(FILE *stream, const char *format, va_list vlist);
 int vsscanf(const char *buffer, const char *format, va_list vlist);
 
-int printf(const char *format, ...);
-int fprintf(FILE *stream, const char *format, ...);
-int sprintf(char *buffer, const char *format, ...);
-int snprintf(char *buffer, size_t bufsz, const char *format, ...);
+__attribute__((format(printf, 1, 2))) int printf(const char *format, ...);
+__attribute__((format(printf, 2, 3))) int fprintf(FILE *stream, const char *format, ...);
+__attribute__((format(printf, 2, 3))) int sprintf(char *buffer, const char *format, ...);
+__attribute__((format(printf, 3, 4))) int
+snprintf(char *buffer, size_t bufsz, const char *format, ...);
 
 int vprintf(const char *format, va_list vlist);
 int vfprintf(FILE *stream, const char *format, va_list vlist);
