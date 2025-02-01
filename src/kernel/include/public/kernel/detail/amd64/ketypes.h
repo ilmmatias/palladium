@@ -25,10 +25,10 @@ typedef struct {
     int EventType;
     char *StackBase;
     char *StackLimit;
-    char SystemStack[8192] __attribute__((aligned(4096)));
-    char NmiStack[8192] __attribute__((aligned(4096)));
-    char DoubleFaultStack[8192] __attribute__((aligned(4096)));
-    char MachineCheckStack[8192] __attribute__((aligned(4096)));
+    char SystemStack[KE_STACK_SIZE] __attribute__((aligned(MM_PAGE_SIZE)));
+    char NmiStack[KE_STACK_SIZE] __attribute__((aligned(MM_PAGE_SIZE)));
+    char DoubleFaultStack[KE_STACK_SIZE] __attribute__((aligned(MM_PAGE_SIZE)));
+    char MachineCheckStack[KE_STACK_SIZE] __attribute__((aligned(MM_PAGE_SIZE)));
     char GdtEntries[56];
     HalpTssEntry TssEntry;
     HalpIdtEntry IdtEntries[256];
