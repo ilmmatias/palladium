@@ -93,7 +93,6 @@ static inline void SwitchExecution(
     /* SwitchExecution() should never return (as the current thread frame is NULL). */
     SwitchExecution(
         Processor, NULL, NULL, TargetThread, &TargetThread->ContextFrame, false, false, OldIrql);
-    HalpSwitchContext(NULL, &TargetThread->ContextFrame);
     while (true) {
         StopProcessor();
     }

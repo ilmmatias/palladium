@@ -139,8 +139,8 @@ void PsQueueThread(PsThread *Thread) {
  *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
 [[noreturn]] void PsTerminateThread(void) {
-    KeProcessor *Processor = KeGetCurrentProcessor();
     KeRaiseIrql(KE_IRQL_SYNCH);
+    KeProcessor *Processor = KeGetCurrentProcessor();
     RtAppendDList(&Processor->TerminationQueue, &Processor->CurrentThread->ListHeader);
     PsYieldThread(PS_YIELD_TYPE_UNQUEUE);
     while (true) {
@@ -163,8 +163,8 @@ void PsQueueThread(PsThread *Thread) {
 void PsDelayThread(uint64_t Time) {
     /* Don't bother adding to the wait list for any value that is too low. */
     if (Time >= EVP_TICK_PERIOD) {
-        KeProcessor *Processor = KeGetCurrentProcessor();
         KeIrql OldIrql = KeRaiseIrql(KE_IRQL_SYNCH);
+        KeProcessor *Processor = KeGetCurrentProcessor();
         Processor->CurrentThread->WaitTicks =
             Processor->Ticks + (Time + EVP_TICK_PERIOD - 1) / EVP_TICK_PERIOD;
         RtAppendDList(&Processor->WaitQueue, &Processor->CurrentThread->ListHeader);
