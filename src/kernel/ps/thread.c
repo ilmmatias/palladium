@@ -153,7 +153,8 @@ void PsDelayThread(uint64_t Time) {
     if (Time >= EVP_TICK_PERIOD) {
         KeProcessor *Processor = KeGetCurrentProcessor();
         KeIrql OldIrql = KeRaiseIrql(KE_IRQL_SYNCH);
-        Processor->CurrentThread->WaitTicks = (Time + EVP_TICK_PERIOD - 1) / EVP_TICK_PERIOD;
+        Processor->CurrentThread->WaitTicks =
+            Processor->Ticks + (Time + EVP_TICK_PERIOD - 1) / EVP_TICK_PERIOD;
         RtAppendDList(&Processor->WaitQueue, &Processor->CurrentThread->ListHeader);
         PsYieldThread(PS_YIELD_TYPE_UNQUEUE);
         KeLowerIrql(OldIrql);

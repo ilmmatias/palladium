@@ -32,6 +32,11 @@ void EvpHandleTimer(HalInterruptFrame *InterruptFrame) {
         HalpNotifyProcessor(Processor, false);
     }
 
+    /* Check if we have any waiting threads to check under DISPATCH. */
+    if (Processor->WaitQueue.Next != &Processor->WaitQueue) {
+        HalpNotifyProcessor(Processor, false);
+    }
+
     /* Update the quantum (if required). */
     PsThread *CurrentThread = Processor->CurrentThread;
     if (CurrentThread && CurrentThread->ExpirationTicks && !--CurrentThread->ExpirationTicks) {

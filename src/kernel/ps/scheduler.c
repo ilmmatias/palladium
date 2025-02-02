@@ -17,38 +17,43 @@
  *     CurrentThreadFrame - Current thread frame (if we were executing any thread beforehand).
  *     TargetThread - Target thread to execute.
  *     TargetThreadFrame - Target thread frame.
- *     RequeueThread - Set to 0 if the current thread is entering a waiting or terminated state (and
- *                     shouldn't be requeued).
+ *     HasCurrentThread - Set to true if CurrentThread!=null; This is used so that the compiler can
+ *                        assume the value of CurrentThread when doing the busy flag set (and not
+ *                        need a branch for it).
+ *     RequeueThread - Set to false if the current thread is entering a waiting or terminated state
+ *                     (shouldn't be requeued).
  *     OldIrql - IRQL before we raised to SYNCH.
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-static void SwitchExecution(
+static inline void SwitchExecution(
     KeProcessor *Processor,
     PsThread *CurrentThread,
     HalContextFrame *CurrentThreadFrame,
     PsThread *TargetThread,
     HalContextFrame *TargetThreadFrame,
+    bool HasCurrentThread,
     bool RequeueThread,
     KeIrql OldIrql) {
+    /* Update the current thread (and the current stack limits). */
+    Processor->CurrentThread = TargetThread;
+    Processor->StackBase = TargetThread->Stack;
+    Processor->StackLimit = TargetThread->StackLimit;
+
     /* Set ourselves as busy (no one should try using our context frame until HalpSwitchContext
-     * finishes its setup!). */
-    if (CurrentThread) {
-        __atomic_store_n(&CurrentThreadFrame->Busy, 0x01, __ATOMIC_SEQ_CST);
+     * finishes its setup). */
+    if (HasCurrentThread) {
+        __atomic_store_n(&CurrentThread->ContextFrame.Busy, 0x01, __ATOMIC_SEQ_CST);
     }
 
-    /* Requeue the current thread if necessary; We'll just assume CurrentThread points to valid
-     * memory if we were asked to requeue it. */
+    /* Now we should be safe to release the lock (PspQueueThread expects us to do that before
+     * calling it) and switch away (once we return, we should be back into the previous thread). */
+    KeReleaseSpinLockAtCurrentIrql(&Processor->Lock);
     if (RequeueThread) {
         PspQueueThread(CurrentThread, false);
     }
 
-    /* And switch away (we should be back to lower the IRQL once another thread switches
-     * into us). */
-    Processor->StackBase = TargetThread->Stack;
-    Processor->StackLimit = TargetThread->StackLimit;
-    Processor->CurrentThread = TargetThread;
     HalpSwitchContext(CurrentThreadFrame, TargetThreadFrame);
     KeLowerIrql(OldIrql);
 }
@@ -70,15 +75,15 @@ static void SwitchExecution(
     /* The BSP should have queued its initial thread. */
     KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Processor->Lock, KE_IRQL_SYNCH);
     RtDList *ListHeader = RtPopDList(&Processor->ThreadQueue);
-    KeReleaseSpinLockAtCurrentIrql(&Processor->Lock);
-
-    PsThread *Thread = Processor->IdleThread;
+    PsThread *TargetThread = Processor->IdleThread;
     if (ListHeader != &Processor->ThreadQueue) {
-        Thread = CONTAINING_RECORD(ListHeader, PsThread, ListHeader);
+        TargetThread = CONTAINING_RECORD(ListHeader, PsThread, ListHeader);
     }
 
-    /* SwitchContext() should never return (as the current thread frame is NULL). */
-    SwitchExecution(Processor, NULL, NULL, Thread, &Thread->ContextFrame, false, OldIrql);
+    /* SwitchExecution() should never return (as the current thread frame is NULL). */
+    SwitchExecution(
+        Processor, NULL, NULL, TargetThread, &TargetThread->ContextFrame, false, false, OldIrql);
+    HalpSwitchContext(NULL, &TargetThread->ContextFrame);
     while (true) {
         StopProcessor();
     }
@@ -100,17 +105,18 @@ void PsYieldThread(int Type) {
      * queue). */
     KeProcessor *Processor = KeGetCurrentProcessor();
     KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Processor->Lock, KE_IRQL_SYNCH);
-    RtDList *ListHeader = RtPopDList(&Processor->ThreadQueue);
-    KeReleaseSpinLockAtCurrentIrql(&Processor->Lock);
 
     /* If the yield is putting us in a waiting state, we actually want to switch into idle once
      * we have nothing left to do; Otherwise, same as PspProcessQueue (don't switch into idle,
      * stay on the current task). */
-    PsThread *TargetThread = Processor->IdleThread;
+    RtDList *ListHeader = RtPopDList(&Processor->ThreadQueue);
     if (ListHeader == &Processor->ThreadQueue && Type == PS_YIELD_TYPE_QUEUE) {
-        KeLowerIrql(OldIrql);
+        KeReleaseSpinLockAndLowerIrql(&Processor->Lock, OldIrql);
         return;
-    } else if (ListHeader != &Processor->ThreadQueue) {
+    }
+
+    PsThread *TargetThread = Processor->IdleThread;
+    if (ListHeader != &Processor->ThreadQueue) {
         TargetThread = CONTAINING_RECORD(ListHeader, PsThread, ListHeader);
         TargetThread->ExpirationTicks = PSP_DEFAULT_TICKS;
     }
@@ -121,7 +127,8 @@ void PsYieldThread(int Type) {
         &Processor->CurrentThread->ContextFrame,
         TargetThread,
         &TargetThread->ContextFrame,
-        Processor->CurrentThread != Processor->IdleThread && Type == PS_YIELD_TYPE_QUEUE,
+        true,
+        Type == PS_YIELD_TYPE_QUEUE && Processor->CurrentThread != Processor->IdleThread,
         OldIrql);
 }
 
@@ -161,21 +168,18 @@ void PspProcessQueue(HalInterruptFrame *) {
         MmFreePool(Thread, "PsTh");
     }
 
-    /* Requeue any waiting threads that have expired. */
+    /* Requeue any waiting threads that have expired (this too can be done at DISPATCH). */
     for (RtDList *ListHeader = Processor->WaitQueue.Next; ListHeader != &Processor->WaitQueue;) {
         PsThread *Thread = CONTAINING_RECORD(ListHeader, PsThread, ListHeader);
         ListHeader = ListHeader->Next;
-        if (!Thread->WaitTicks) {
+        if (Processor->Ticks >= Thread->WaitTicks) {
             RtUnlinkDList(&Thread->ListHeader);
             PspQueueThread(Thread, true);
         }
     }
 
-    /* We shouldn't have anything left to do if we haven't expired yet; Neither if the main thread
-     * queue seems empty (in that case, we should get here again once we have sonething to switch
-     * into). */
-    if (Processor->CurrentThread->ExpirationTicks ||
-        Processor->ThreadQueue.Next == &Processor->ThreadQueue) {
+    /* We shouldn't have anything left to do if we haven't expired yet. */
+    if (Processor->CurrentThread->ExpirationTicks) {
         return;
     }
 
@@ -183,22 +187,22 @@ void PspProcessQueue(HalInterruptFrame *) {
      * any other processors mess with us while we mess with the thread queue). */
     KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Processor->Lock, KE_IRQL_SYNCH);
     RtDList *ListHeader = RtPopDList(&Processor->ThreadQueue);
-    KeReleaseSpinLockAtCurrentIrql(&Processor->Lock);
 
     /* We won't enter idle through here (as we're not forced to), so if there was nothing, just keep
      * on executing the current thread. */
     if (ListHeader == &Processor->ThreadQueue) {
+        KeReleaseSpinLockAndLowerIrql(&Processor->Lock, OldIrql);
         return;
     }
 
     PsThread *TargetThread = CONTAINING_RECORD(ListHeader, PsThread, ListHeader);
-    TargetThread->ExpirationTicks = PSP_DEFAULT_TICKS;
     SwitchExecution(
         Processor,
         Processor->CurrentThread,
         &Processor->CurrentThread->ContextFrame,
         TargetThread,
         &TargetThread->ContextFrame,
+        true,
         Processor->CurrentThread != Processor->IdleThread,
         OldIrql);
 }
