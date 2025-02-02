@@ -22,6 +22,10 @@ typedef struct {
     RtDList TerminationQueue;
     struct PsThread *CurrentThread;
     struct PsThread *IdleThread;
+    uint64_t Ticks;
+    uint64_t HighIrqlTicks;
+    uint64_t LowIrqlTicks;
+    uint64_t IdleTicks;
     int EventType;
     char *StackBase;
     char *StackLimit;
