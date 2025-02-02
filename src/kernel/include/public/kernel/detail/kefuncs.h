@@ -18,6 +18,13 @@ extern "C" {
 
 void *KiFindAcpiTable(const char Signature[4], int Index);
 
+void KeInitializeAffinity(KeAffinity *Mask);
+bool KeGetAffinityBit(KeAffinity *Mask, uint32_t Index);
+void KeSetAffinityBit(KeAffinity *Mask, uint32_t Index);
+void KeClearAffinityBit(KeAffinity *Mask, uint32_t Index);
+uint32_t KeGetFirstAffinitySetBit(KeAffinity *Mask);
+uint32_t KeGetFirstAffinityClearBit(KeAffinity *Mask);
+
 [[noreturn]] void KeFatalError(
     uint32_t Message,
     uint64_t Parameter1,

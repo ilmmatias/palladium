@@ -4,6 +4,7 @@
 #ifndef _KERNEL_DETAIL_KETYPES_H_
 #define _KERNEL_DETAIL_KETYPES_H_
 
+#include <kernel/detail/kedefs.h>
 #include <rt/list.h>
 
 /* clang-format off */
@@ -19,5 +20,10 @@ typedef struct {
     uint32_t SizeOfImage;
     const char *ImageName;
 } KeModule;
+
+typedef struct {
+    uint64_t Size;
+    volatile uint64_t Bits[KE_MAX_PROCESSORS / 64];
+} KeAffinity;
 
 #endif /* _KERNEL_DETAIL_KETYPES_H_ */

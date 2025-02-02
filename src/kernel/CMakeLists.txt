@@ -31,6 +31,7 @@ add_executable(kernel "kernel" YES
     hal/timer.c
 
     ke/acpi.c
+    ke/affinity.c
     ke/driver.c
     ke/entry.c
     ke/panic.c

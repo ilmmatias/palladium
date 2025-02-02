@@ -6,7 +6,8 @@
 
 /* We need to define these beforehand (because pstypes.h uses them). */
 typedef uint64_t KeIrql;
-typedef uint64_t KeSpinLock;
+typedef volatile uint64_t KeSpinLock;
+
 struct PsThread;
 
 #include <kernel/detail/amd64/haltypes.h>
@@ -16,6 +17,7 @@ struct PsThread;
 
 typedef struct {
     KeSpinLock Lock;
+    uint32_t Number;
     uint32_t ApicId;
     RtDList WaitQueue;
     RtDList ThreadQueue;

@@ -7,6 +7,8 @@
 #include <kernel/mm.h>
 #include <kernel/psp.h>
 
+KeAffinity KiIdleProcessors;
+
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function switches the execution context between the two given threads.
@@ -40,6 +42,14 @@ static inline void SwitchExecution(
     Processor->CurrentThread = TargetThread;
     Processor->StackBase = TargetThread->Stack;
     Processor->StackLimit = TargetThread->StackLimit;
+
+    /* Update the idle processor mask (and the expiration ticks). */
+    if (TargetThread == Processor->IdleThread) {
+        KeSetAffinityBit(&KiIdleProcessors, Processor->Number);
+    } else {
+        TargetThread->ExpirationTicks = PSP_DEFAULT_TICKS;
+        KeClearAffinityBit(&KiIdleProcessors, Processor->Number);
+    }
 
     /* Set ourselves as busy (no one should try using our context frame until HalpSwitchContext
      * finishes its setup). */
@@ -111,6 +121,7 @@ void PsYieldThread(int Type) {
      * stay on the current task). */
     RtDList *ListHeader = RtPopDList(&Processor->ThreadQueue);
     if (ListHeader == &Processor->ThreadQueue && Type == PS_YIELD_TYPE_QUEUE) {
+        KeSetAffinityBit(&KiIdleProcessors, Processor->Number);
         KeReleaseSpinLockAndLowerIrql(&Processor->Lock, OldIrql);
         return;
     }
@@ -118,7 +129,6 @@ void PsYieldThread(int Type) {
     PsThread *TargetThread = Processor->IdleThread;
     if (ListHeader != &Processor->ThreadQueue) {
         TargetThread = CONTAINING_RECORD(ListHeader, PsThread, ListHeader);
-        TargetThread->ExpirationTicks = PSP_DEFAULT_TICKS;
     }
 
     SwitchExecution(
@@ -191,6 +201,7 @@ void PspProcessQueue(HalInterruptFrame *) {
     /* We won't enter idle through here (as we're not forced to), so if there was nothing, just keep
      * on executing the current thread. */
     if (ListHeader == &Processor->ThreadQueue) {
+        KeSetAffinityBit(&KiIdleProcessors, Processor->Number);
         KeReleaseSpinLockAndLowerIrql(&Processor->Lock, OldIrql);
         return;
     }

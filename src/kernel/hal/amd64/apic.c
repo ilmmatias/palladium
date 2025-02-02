@@ -198,6 +198,10 @@ void HalpInitializeApic(void) {
 
     if (HalpProcessorCount < 1) {
         HalpProcessorCount = 1;
+    } else if (HalpProcessorCount >= KE_MAX_PROCESSORS) {
+        /* Over the processor mask bits limit, we'll just panic here. */
+        KeFatalError(
+            KE_PANIC_PROCESSOR_LIMIT_EXCEEDED, HalpProcessorCount, KE_MAX_PROCESSORS, 0, 0);
     }
 
     /* Default to the LAPIC address given in the MSR (if we're not using x2APIC). */

@@ -6,6 +6,8 @@
 #include <kernel/mm.h>
 #include <kernel/psp.h>
 
+extern KeAffinity KiIdleProcessors;
+
 [[noreturn]] extern void PspIdleThread(void *);
 [[noreturn]] extern void KiContinueSystemStartup(void *);
 
@@ -41,6 +43,40 @@ PsThread *PsCreateThread(void (*EntryPoint)(void *), void *Parameter) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
+ *     This function tries to queue the specified thread under the specified processor.
+ *
+ * PARAMETERS:
+ *     Thread - Which thread to add.
+ *     Processor - Which processor to add the thread to.
+ *     EventQueue - Set this to true if this thread was waiting for an event that expired or was
+ *                  signaled.
+ *     ForceIdle - Set this to true if we should bail out in case the thread got out of idle
+ *                 before we queued the thread to it.
+ *
+ * RETURN VALUE:
+ *     true if the thread was queued, false otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+static bool
+TryQueueThreadIn(PsThread *Thread, KeProcessor *Processor, bool EventQueue, bool ForceIdle) {
+    KeAcquireSpinLockAtCurrentIrql(&Processor->Lock);
+
+    if (ForceIdle && !KeGetAffinityBit(&KiIdleProcessors, Processor->Number)) {
+        KeReleaseSpinLockAtCurrentIrql(&Processor->Lock);
+        return false;
+    }
+
+    if (EventQueue) {
+        RtPushDList(&Processor->ThreadQueue, &Thread->ListHeader);
+    } else {
+        RtAppendDList(&Processor->ThreadQueue, &Thread->ListHeader);
+    }
+
+    KeReleaseSpinLockAtCurrentIrql(&Processor->Lock);
+    return true;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
  *     This function finds a target processor and adds a thread to its queue; We expect to be at
  *     least raised to DISPATCH, and with no processor locks acquired.
  *
@@ -53,50 +89,26 @@ PsThread *PsCreateThread(void (*EntryPoint)(void *), void *Parameter) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void PspQueueThread(PsThread *Thread, bool EventQueue) {
-    KeProcessor *TargetProcessor = KeGetCurrentProcessor();
-    bool NotifyProcessor = false;
-
-    do {
-        /* BSP always gets the KiContinueSystemStartup thread. */
-        if (!TargetProcessor->CurrentThread) {
-            break;
-        }
-
-        /* We prefer to stay in the current processor if possible. */
-        if (TargetProcessor->CurrentThread && !TargetProcessor->CurrentThread->ExpirationTicks &&
-            TargetProcessor->ThreadQueue.Next == &TargetProcessor->ThreadQueue) {
-            NotifyProcessor = true;
-            break;
-        }
-
-        /* If not possible, then we prefer any other processor that is idle. */
-        for (uint32_t i = 0; i < HalpProcessorCount; i++) {
-            KeProcessor *Processor = HalpProcessorList[i];
-            if (Processor->CurrentThread && !Processor->CurrentThread->ExpirationTicks &&
-                Processor->ThreadQueue.Next == &Processor->ThreadQueue) {
-                TargetProcessor = Processor;
-                NotifyProcessor = true;
-                break;
-            }
-        }
-
-        /* Fallback to inserting in the current processor if no one was idle. */
-    } while (false);
-
-    KeAcquireSpinLockAtCurrentIrql(&TargetProcessor->Lock);
-
-    if (EventQueue) {
-        RtPushDList(&TargetProcessor->ThreadQueue, &Thread->ListHeader);
-    } else {
-        RtAppendDList(&TargetProcessor->ThreadQueue, &Thread->ListHeader);
+    /* We prefer to stay on the current processor. */
+    if (TryQueueThreadIn(Thread, KeGetCurrentProcessor(), EventQueue, true)) {
+        HalpNotifyProcessor(KeGetCurrentProcessor(), false);
+        return;
     }
 
-    KeReleaseSpinLockAtCurrentIrql(&TargetProcessor->Lock);
-
-    /* Finally, wake up the target if it was idle. */
-    if (NotifyProcessor) {
-        HalpNotifyProcessor(TargetProcessor, false);
+    /* Otherwise, we try to queue in the left most thread that is idle (empty queue and/or running
+     * the idle thread). */
+    while (true) {
+        uint32_t Index = KeGetFirstAffinitySetBit(&KiIdleProcessors);
+        if (Index == (uint32_t)-1) {
+            break;
+        } else if (TryQueueThreadIn(Thread, HalpProcessorList[Index], EventQueue, true)) {
+            HalpNotifyProcessor(HalpProcessorList[Index], false);
+            return;
+        }
     }
+
+    /* If all fails, we just assign the thread to the current processor. */
+    TryQueueThreadIn(Thread, KeGetCurrentProcessor(), EventQueue, false);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -187,6 +199,7 @@ void PspCreateSystemThread(void) {
 
     /* As the scheduler is still under initialization, this should enqueue the thread in the current
      * (boot) processor. */
+    KeInitializeAffinity(&KiIdleProcessors);
     PsQueueThread(Thread);
 }
 

@@ -21,6 +21,7 @@ static const char *Messages[] = {
     "DRIVER_INITIALIZATION_FAILURE",
     "BAD_PFN_HEADER",
     "BAD_POOL_HEADER",
+    "PROCESSOR_LIMIT_EXCEEDED",
 };
 
 static KeSpinLock Lock = {0};
