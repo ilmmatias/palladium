@@ -51,6 +51,7 @@
  *-----------------------------------------------------------------------------------------------*/
  .seh_proc RtSaveContext
 .global RtSaveContext
+.align 16
 RtSaveContext:
     /* Only way to get the flags is by pushfq'ing them, warn the compiler we're doing that. */ 
     pushfq
@@ -121,6 +122,7 @@ RtSaveContext:
  *-----------------------------------------------------------------------------------------------*/
  .seh_proc RtRestoreContext
 .global RtRestoreContext
+.align 16
 RtRestoreContext:
     .seh_endprologue
 

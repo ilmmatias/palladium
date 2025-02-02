@@ -29,6 +29,7 @@ HalpDefaultInterruptHandlers:
 
 .seh_proc HalpDefaultInterruptEntry
 .global HalpDefaultInterruptEntry
+.align 16
 HalpDefaultInterruptEntry:
     ENTER_INTERRUPT (INTERRUPT_FLAGS_HAS_ERROR_CODE)
     mov %rsp, %rcx
@@ -38,6 +39,7 @@ HalpDefaultInterruptEntry:
 
 .seh_proc HalpDivisionTrapEntry
 .global HalpDivisionTrapEntry
+.align 16
 HalpDivisionTrapEntry:
     ENTER_INTERRUPT
     mov $RT_EXC_INT_DIVIDE_BY_ZERO, %rcx
@@ -48,6 +50,7 @@ HalpDivisionTrapEntry:
 
 .seh_proc HalpDebugTrapEntry
 .global HalpDebugTrapEntry
+.align 16
 HalpDebugTrapEntry:
     ENTER_INTERRUPT
     mov $RT_EXC_SINGLE_STEP, %rcx
@@ -58,6 +61,7 @@ HalpDebugTrapEntry:
 
 .seh_proc HalpNmiTrapEntry
 .global HalpNmiTrapEntry
+.align 16
 HalpNmiTrapEntry:
     ENTER_INTERRUPT
     call HalpDispatchNmi
@@ -66,6 +70,7 @@ HalpNmiTrapEntry:
 
 .seh_proc HalpBreakpointTrapEntry
 .global HalpBreakpointTrapEntry
+.align 16
 HalpBreakpointTrapEntry:
     ENTER_INTERRUPT
     mov $RT_EXC_BREAKPOINT, %rcx
@@ -76,6 +81,7 @@ HalpBreakpointTrapEntry:
 
 .seh_proc HalpOverflowTrapEntry
 .global HalpOverflowTrapEntry
+.align 16
 HalpOverflowTrapEntry:
     ENTER_INTERRUPT
     mov $RT_EXC_INT_OVERFLOW, %rcx
@@ -86,6 +92,7 @@ HalpOverflowTrapEntry:
 
 .seh_proc HalpBoundRangeTrapEntry
 .global HalpBoundRangeTrapEntry
+.align 16
 HalpBoundRangeTrapEntry:
     ENTER_INTERRUPT
     mov $RT_EXC_ARRAY_BOUNDS_EXCEEDED, %rcx
@@ -96,6 +103,7 @@ HalpBoundRangeTrapEntry:
 
 .seh_proc HalpInvalidOpcodeTrapEntry
 .global HalpInvalidOpcodeTrapEntry
+.align 16
 HalpInvalidOpcodeTrapEntry:
     ENTER_INTERRUPT
     mov $RT_EXC_ILLEGAL_INSTRUCTION, %rcx
@@ -106,6 +114,7 @@ HalpInvalidOpcodeTrapEntry:
 
 .seh_proc HalpNumericCoprocessorTrapEntry
 .global HalpNumericCoprocessorTrapEntry
+.align 16
 HalpNumericCoprocessorTrapEntry:
     ENTER_INTERRUPT
     mov %rsp, %rcx
@@ -116,6 +125,7 @@ HalpNumericCoprocessorTrapEntry:
 
 .seh_proc HalpDoubleFaultTrapEntry
 .global HalpDoubleFaultTrapEntry
+.align 16
 HalpDoubleFaultTrapEntry:
     ENTER_INTERRUPT (INTERRUPT_FLAGS_HAS_ERROR_CODE)
     mov %rsp, %rcx
@@ -126,6 +136,7 @@ HalpDoubleFaultTrapEntry:
 
 .seh_proc HalpSegmentOverrunTrapEntry
 .global HalpSegmentOverrunTrapEntry
+.align 16
 HalpSegmentOverrunTrapEntry:
     ENTER_INTERRUPT
     mov %rsp, %rcx
@@ -136,6 +147,7 @@ HalpSegmentOverrunTrapEntry:
 
 .seh_proc HalpInvalidTssTrapEntry
 .global HalpInvalidTssTrapEntry
+.align 16
 HalpInvalidTssTrapEntry:
     ENTER_INTERRUPT (INTERRUPT_FLAGS_HAS_ERROR_CODE)
     mov %rsp, %rcx
@@ -146,6 +158,7 @@ HalpInvalidTssTrapEntry:
 
 .seh_proc HalpSegmentNotPresentTrapEntry
 .global HalpSegmentNotPresentTrapEntry
+.align 16
 HalpSegmentNotPresentTrapEntry:
     ENTER_INTERRUPT (INTERRUPT_FLAGS_HAS_ERROR_CODE)
     mov %rsp, %rcx
@@ -156,6 +169,7 @@ HalpSegmentNotPresentTrapEntry:
 
 .seh_proc HalpStackSegmentTrapEntry
 .global HalpStackSegmentTrapEntry
+.align 16
 HalpStackSegmentTrapEntry:
     ENTER_INTERRUPT (INTERRUPT_FLAGS_HAS_ERROR_CODE)
     mov %rsp, %rcx
@@ -166,6 +180,7 @@ HalpStackSegmentTrapEntry:
 
 .seh_proc HalpGeneralProtectionTrapEntry
 .global HalpGeneralProtectionTrapEntry
+.align 16
 HalpGeneralProtectionTrapEntry:
     ENTER_INTERRUPT (INTERRUPT_FLAGS_HAS_ERROR_CODE)
     mov $RT_EXC_GENERAL_PROTECTION_FAULT, %rcx
@@ -176,6 +191,7 @@ HalpGeneralProtectionTrapEntry:
 
 .seh_proc HalpPageFaultTrapEntry
 .global HalpPageFaultTrapEntry
+.align 16
 HalpPageFaultTrapEntry:
     ENTER_INTERRUPT (INTERRUPT_FLAGS_HAS_ERROR_CODE)
     mov $RT_EXC_PAGE_FAULT, %rcx
@@ -186,6 +202,7 @@ HalpPageFaultTrapEntry:
 
 .seh_proc HalpReservedTrapEntry
 .global HalpReservedTrapEntry
+.align 16
 HalpReservedTrapEntry:
     ENTER_INTERRUPT
     mov %rsp, %rcx
@@ -196,6 +213,7 @@ HalpReservedTrapEntry:
 
 .seh_proc HalpX87FloatingPointTrapEntry
 .global HalpX87FloatingPointTrapEntry
+.align 16
 HalpX87FloatingPointTrapEntry:
     ENTER_INTERRUPT
     mov $RT_EXC_FLT_INVALID_OPERATION, %rcx
@@ -206,6 +224,7 @@ HalpX87FloatingPointTrapEntry:
 
 .seh_proc HalpAlignmentCheckTrapEntry
 .global HalpAlignmentCheckTrapEntry
+.align 16
 HalpAlignmentCheckTrapEntry:
     ENTER_INTERRUPT (INTERRUPT_FLAGS_HAS_ERROR_CODE)
     mov $RT_EXC_DATATYPE_MISALIGNMENT, %rcx
@@ -216,6 +235,7 @@ HalpAlignmentCheckTrapEntry:
 
 .seh_proc HalpMachineCheckTrapEntry
 .global HalpMachineCheckTrapEntry
+.align 16
 HalpMachineCheckTrapEntry:
     ENTER_INTERRUPT
     mov %rsp, %rcx
@@ -226,6 +246,7 @@ HalpMachineCheckTrapEntry:
 
 .seh_proc HalpSimdFloatingPointTrapEntry
 .global HalpSimdFloatingPointTrapEntry
+.align 16
 HalpSimdFloatingPointTrapEntry:
     ENTER_INTERRUPT
     mov $RT_EXC_FLT_INVALID_OPERATION, %rcx
@@ -236,6 +257,7 @@ HalpSimdFloatingPointTrapEntry:
 
 .seh_proc HalpVirtualizationTrapEntry
 .global HalpVirtualizationTrapEntry
+.align 16
 HalpVirtualizationTrapEntry:
     ENTER_INTERRUPT
     mov %rsp, %rcx
@@ -246,6 +268,7 @@ HalpVirtualizationTrapEntry:
 
 .seh_proc HalpControlProtectionTrapEntry
 .global HalpControlProtectionTrapEntry
+.align 16
 HalpControlProtectionTrapEntry:
     ENTER_INTERRUPT (INTERRUPT_FLAGS_HAS_ERROR_CODE)
     mov %rsp, %rcx
@@ -256,6 +279,7 @@ HalpControlProtectionTrapEntry:
 
 .seh_proc HalpHypervisorInjectionTrapEntry
 .global HalpHypervisorInjectionTrapEntry
+.align 16
 HalpHypervisorInjectionTrapEntry:
     ENTER_INTERRUPT
     mov %rsp, %rcx
@@ -266,6 +290,7 @@ HalpHypervisorInjectionTrapEntry:
 
 .seh_proc HalpVmmCommunicationTrapEntry
 .global HalpVmmCommunicationTrapEntry
+.align 16
 HalpVmmCommunicationTrapEntry:
     ENTER_INTERRUPT (INTERRUPT_FLAGS_HAS_ERROR_CODE)
     mov %rsp, %rcx
@@ -276,6 +301,7 @@ HalpVmmCommunicationTrapEntry:
 
 .seh_proc HalpSecurityTrapEntry
 .global HalpSecurityTrapEntry
+.align 16
 HalpSecurityTrapEntry:
     ENTER_INTERRUPT (INTERRUPT_FLAGS_HAS_ERROR_CODE)
     mov %rsp, %rcx
@@ -286,6 +312,7 @@ HalpSecurityTrapEntry:
 
 .seh_proc HalpDispatchEntry
 .global HalpDispatchEntry
+.align 16
 HalpDispatchEntry:
     ENTER_INTERRUPT
     mov $KE_IRQL_DISPATCH, %rcx
@@ -300,6 +327,7 @@ HalpDispatchEntry:
 
 .seh_proc HalpTimerEntry
 .global HalpTimerEntry
+.align 16
 HalpTimerEntry:
     ENTER_INTERRUPT
     mov $HAL_INT_TIMER_IRQL, %rax
@@ -312,6 +340,7 @@ HalpTimerEntry:
 
 .seh_proc HalpExceptionEntry
 .global HalpExceptionEntry
+.align 16
 HalpExceptionEntry:
     ENTER_EXCEPTION
     mov %rsp, %r8

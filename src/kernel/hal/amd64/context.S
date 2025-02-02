@@ -20,6 +20,7 @@
  *-----------------------------------------------------------------------------------------------*/
 .seh_proc HalpThreadEntry
 .global HalpThreadEntry
+.align 16
 HalpThreadEntry:
     /* There should be a HalStartFrame in the stack at the moment. Let's make SEH treat it like a
      * stack allocation. */
@@ -73,6 +74,7 @@ HalpThreadEntry:
  *-----------------------------------------------------------------------------------------------*/
 .seh_proc HalpSwitchContext
 .global HalpSwitchContext
+.align 16
 HalpSwitchContext:
     ENTER_EXCEPTION
 
