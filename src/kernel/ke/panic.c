@@ -47,8 +47,6 @@ static KeSpinLock Lock = {0};
     uint64_t Parameter2,
     uint64_t Parameter3,
     uint64_t Parameter4) {
-    KeProcessor *Processor = KeGetCurrentProcessor();
-
     /* Let's prevent a possible exception/crash inside our crash handler. */
     if (Message >= KE_PANIC_COUNT) {
         Message = KE_PANIC_MANUALLY_INITIATED_CRASH;
@@ -68,7 +66,8 @@ static KeSpinLock Lock = {0};
     }
 
     /* We're the first to get here, freeze everyone else before continuing. */
-    for (uint32_t i = 0; i < HalpProcessorCount; i++) {
+    KeProcessor *Processor = KeGetCurrentProcessor();
+    for (uint32_t i = 0; i < HalpOnlineProcessorCount; i++) {
         if (HalpProcessorList[i] != Processor) {
             HalpFreezeProcessor(HalpProcessorList[i]);
         }

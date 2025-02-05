@@ -6,6 +6,7 @@
 
 #include <kernel/detail/halfuncs.h>
 #include <kernel/detail/kitypes.h>
+#include <kernel/detail/midefs.h>
 
 /* clang-format off */
 #if __has_include(ARCH_MAKE_INCLUDE_PATH(kernel/detail, halpfuncs.h))
@@ -18,6 +19,7 @@ extern "C" {
 #endif /* __cplusplus */
 
 extern uint32_t HalpProcessorCount;
+extern uint32_t HalpOnlineProcessorCount;
 extern KeProcessor **HalpProcessorList;
 
 void HalpInitializeBootStack(KiLoaderBlock *LoaderBlock);
@@ -25,8 +27,8 @@ void HalpInitializeBootProcessor(void);
 void HalpInitializeApplicationProcessor(KeProcessor *Processor);
 
 uint64_t HalpGetPhysicalAddress(void *VirtualAddress);
-bool HalpMapPage(void *VirtualAddress, uint64_t PhysicalAddress, int Flags);
-void HalpUnmapPage(void *VirtualAddress);
+bool HalpMapPages(void *VirtualAddress, uint64_t PhysicalAddress, uint64_t Size, int Flags);
+void HalpUnmapPages(void *VirtualAddress, uint64_t Size);
 
 void HalpNotifyProcessor(KeProcessor *Processor, bool WaitDelivery);
 void HalpFreezeProcessor(KeProcessor *Processor);

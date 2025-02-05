@@ -90,8 +90,9 @@ static void CacheTable(void) {
     }
 
     if (RootSdt->Length > MM_PAGE_SIZE) {
+        uint64_t Length = RootSdt->Length;
         MmUnmapSpace(RootSdt);
-        RootSdt = MmMapSpace(BaseAddress, RootSdt->Length);
+        RootSdt = MmMapSpace(BaseAddress, Length);
         if (!RootSdt) {
             KeFatalError(
                 KE_PANIC_KERNEL_INITIALIZATION_FAILURE,

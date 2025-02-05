@@ -13,6 +13,8 @@ extern RtDList MiFreePageListHead;
 extern uint64_t MiPoolStart;
 extern RtBitmap MiPoolBitmap;
 
+static RtDList *LoaderDescriptors = NULL;
+
 RtDList MiMemoryDescriptorListHead;
 
 /*-------------------------------------------------------------------------------------------------
@@ -21,24 +23,20 @@ RtDList MiMemoryDescriptorListHead;
  *     memory map; This should only be used before the initialization of the pool and the PFN.
  *
  * PARAMETERS:
- *     LoaderBlock - Data prepared by the boot loader for us.
  *     Pages - How many contiguous pages we need.
  *
  * RETURN VALUE:
- *     Virtual address of the allocated area, or NULL on failure.
+ *     Physical address of the contigous pages, or 0 on failure.
  *-----------------------------------------------------------------------------------------------*/
-static void *EarlyAllocatePages(KiLoaderBlock *LoaderBlock, uint64_t Pages) {
-    RtDList *MemoryDescriptorListHead =
-        MiEnsureEarlySpace((uint64_t)LoaderBlock->MemoryDescriptorListHead, sizeof(RtDList));
+uint64_t MiAllocateEarlyPages(uint64_t Pages) {
+    if (!LoaderDescriptors) {
+        return 0;
+    }
 
-    for (RtDList *ListHeader = MiEnsureEarlySpace(
-             (uint64_t)MemoryDescriptorListHead->Next, sizeof(MiMemoryDescriptor));
-         ListHeader != MemoryDescriptorListHead;
-         ListHeader = MiEnsureEarlySpace((uint64_t)ListHeader->Next, sizeof(MiMemoryDescriptor))) {
+    for (RtDList *ListHeader = LoaderDescriptors->Next; ListHeader != LoaderDescriptors;
+         ListHeader = ListHeader->Next) {
         MiMemoryDescriptor *Entry = CONTAINING_RECORD(ListHeader, MiMemoryDescriptor, ListHeader);
-
-        if (Entry->PageCount < Pages ||
-            (Entry->Type != MI_DESCR_FREE && Entry->Type != MI_DESCR_FIRMWARE_TEMPORARY)) {
+        if (Entry->PageCount < Pages || Entry->Type != MI_DESCR_FREE) {
             continue;
         }
 
@@ -53,14 +51,29 @@ static void *EarlyAllocatePages(KiLoaderBlock *LoaderBlock, uint64_t Pages) {
             Entry->BasePage += 0x10 - Entry->BasePage;
         }
 
-        void *Result =
-            MiEnsureEarlySpace((uint64_t)Entry->BasePage << MM_PAGE_SHIFT, Pages << MM_PAGE_SHIFT);
+        uint64_t Result = Entry->BasePage << MM_PAGE_SHIFT;
         Entry->BasePage += Pages;
         Entry->PageCount -= Pages;
         return Result;
     }
 
-    return NULL;
+    return 0;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function prepares for the memory manager initialization by setting up a really dummy
+ *     page allocator that uses the osloader memory map directly. HalpMapPages should automatically
+ *     use this during early boot (as needed).
+ *
+ * PARAMETERS:
+ *     LoaderBlock - Data prepared by the boot loader for us.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void MiInitializeEarlyPageAllocator(KiLoaderBlock *LoaderBlock) {
+    LoaderDescriptors = LoaderBlock->MemoryDescriptorListHead;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -69,23 +82,18 @@ static void *EarlyAllocatePages(KiLoaderBlock *LoaderBlock, uint64_t Pages) {
  *     page allocator (and the page database).
  *
  * PARAMETERS:
- *     LoaderBlock - Data prepared by the boot loader for us.
+ *     None.
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void MiInitializePageAllocator(KiLoaderBlock *LoaderBlock) {
-    RtDList *MemoryDescriptorListHead =
-        MiEnsureEarlySpace((uint64_t)LoaderBlock->MemoryDescriptorListHead, sizeof(RtDList));
-
+void MiInitializePageAllocator(void) {
     /* The PFN database only tracks pages we might allocate, find the max addressable FREE
      * page. */
     uint64_t MaxAddressablePage = 0;
     uint64_t MemoryDescriptorListSize = 0;
-    for (RtDList *ListHeader = MiEnsureEarlySpace(
-             (uint64_t)MemoryDescriptorListHead->Next, sizeof(MiMemoryDescriptor));
-         ListHeader != MemoryDescriptorListHead;
-         ListHeader = MiEnsureEarlySpace((uint64_t)ListHeader->Next, sizeof(MiMemoryDescriptor))) {
+    for (RtDList *ListHeader = LoaderDescriptors->Next; ListHeader != LoaderDescriptors;
+         ListHeader = ListHeader->Next) {
         MiMemoryDescriptor *Entry = CONTAINING_RECORD(ListHeader, MiMemoryDescriptor, ListHeader);
 
         /* Let's use the fact we're iterating through the list and already save its size (for
@@ -95,9 +103,8 @@ void MiInitializePageAllocator(KiLoaderBlock *LoaderBlock) {
         /* Unmapping the 1:1 firware temp regions should be already okay to do. */
         if (Entry->Type == MI_DESCR_FIRMWARE_TEMPORARY ||
             Entry->Type == MI_DESCR_FIRMWARE_PERMANENT) {
-            for (uint32_t i = 0; i < Entry->PageCount; i++) {
-                HalpUnmapPage((void *)((uint64_t)(Entry->BasePage + i) << MM_PAGE_SHIFT));
-            }
+            HalpUnmapPages(
+                (void *)(Entry->BasePage << MM_PAGE_SHIFT), Entry->PageCount << MM_PAGE_SHIFT);
         }
 
         if (Entry->BasePage < 0x10) {
@@ -114,12 +121,11 @@ void MiInitializePageAllocator(KiLoaderBlock *LoaderBlock) {
         }
     }
 
-    /* Find a memory map entry with enough space for the PFN database. This is the last place we
-     * should need to use EarlyAllocatePages. */
-    MiPageList = EarlyAllocatePages(
-        LoaderBlock,
-        (MaxAddressablePage * sizeof(MiPageEntry) + MM_PAGE_SIZE - 1) >> MM_PAGE_SHIFT);
-    if (!MiPageList) {
+    /* Grab some physical memory and map it for the PFN database. This should be the last place we
+     * need EarlyAllocatePages. */
+    uint64_t Size = MaxAddressablePage * sizeof(MiPageEntry);
+    uint64_t PhysicalAddress = MiAllocateEarlyPages((Size + MM_PAGE_SIZE - 1) >> MM_PAGE_SHIFT);
+    if (!PhysicalAddress) {
         KeFatalError(
             KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
             KE_PANIC_PARAMETER_PFN_INITIALIZATION_FAILURE,
@@ -128,12 +134,22 @@ void MiInitializePageAllocator(KiLoaderBlock *LoaderBlock) {
             0);
     }
 
+    void *PageListBase = (void *)(MI_VIRTUAL_OFFSET + PhysicalAddress);
+    if (!HalpMapPages(PageListBase, PhysicalAddress, Size, MI_MAP_WRITE)) {
+        KeFatalError(
+            KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+            KE_PANIC_PARAMETER_PFN_INITIALIZATION_FAILURE,
+            KE_PANIC_PARAMETER_OUT_OF_RESOURCES,
+            0,
+            0);
+    }
+
+    MiPageList = PageListBase;
+
     /* Setup the page allocator (marking the free pages as free). */
     RtInitializeDList(&MiFreePageListHead);
-    for (RtDList *ListHeader = MiEnsureEarlySpace(
-             (uint64_t)MemoryDescriptorListHead->Next, sizeof(MiMemoryDescriptor));
-         ListHeader != MemoryDescriptorListHead;
-         ListHeader = MiEnsureEarlySpace((uint64_t)ListHeader->Next, sizeof(MiMemoryDescriptor))) {
+    for (RtDList *ListHeader = LoaderDescriptors->Next; ListHeader != LoaderDescriptors;
+         ListHeader = ListHeader->Next) {
         MiMemoryDescriptor *Entry = CONTAINING_RECORD(ListHeader, MiMemoryDescriptor, ListHeader);
         if (Entry->Type > MI_DESCR_FIRMWARE_PERMANENT) {
             continue;
@@ -166,15 +182,16 @@ void MiInitializePageAllocator(KiLoaderBlock *LoaderBlock) {
     }
 
     RtInitializeDList(&MiMemoryDescriptorListHead);
-    for (RtDList *ListHeader = MiEnsureEarlySpace(
-             (uint64_t)MemoryDescriptorListHead->Next, sizeof(MiMemoryDescriptor));
-         ListHeader != MemoryDescriptorListHead;
-         ListHeader = MiEnsureEarlySpace((uint64_t)ListHeader->Next, sizeof(MiMemoryDescriptor))) {
+    for (RtDList *ListHeader = LoaderDescriptors->Next; ListHeader != LoaderDescriptors;
+         ListHeader = ListHeader->Next) {
         MiMemoryDescriptor *Entry = CONTAINING_RECORD(ListHeader, MiMemoryDescriptor, ListHeader);
         memcpy(Descriptor, Entry, sizeof(MiMemoryDescriptor));
         RtAppendDList(&MiMemoryDescriptorListHead, &Descriptor->ListHeader);
         Descriptor++;
     }
+
+    /* Marking the pointer as NULL should disable EarlyAllocatePages. */
+    LoaderDescriptors = NULL;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -182,18 +199,28 @@ void MiInitializePageAllocator(KiLoaderBlock *LoaderBlock) {
  *     This function sets up the kernel pool allocator.
  *
  * PARAMETERS:
- *     LoaderBlock - Data prepared by the boot loader for us.
+ *     None.
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void MiInitializePool(KiLoaderBlock *LoaderBlock) {
+void MiInitializePool(void) {
     MiPoolStart = MI_POOL_START;
 
     uint64_t SizeInBits = (MI_POOL_SIZE + MM_PAGE_SIZE - 1) >> MM_PAGE_SHIFT;
     uint64_t SizeInPages = ((SizeInBits >> 3) + MM_PAGE_SIZE - 1) >> MM_PAGE_SHIFT;
-    void *PoolBitmapBase = EarlyAllocatePages(LoaderBlock, SizeInPages);
-    if (!PoolBitmapBase) {
+    uint64_t PhysicalAddress = MiAllocateEarlyPages(SizeInPages);
+    if (!PhysicalAddress) {
+        KeFatalError(
+            KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+            KE_PANIC_PARAMETER_POOL_INITIALIZATION_FAILURE,
+            KE_PANIC_PARAMETER_OUT_OF_RESOURCES,
+            0,
+            0);
+    }
+
+    void *PoolBitmapBase = (void *)(MI_VIRTUAL_OFFSET + PhysicalAddress);
+    if (!HalpMapPages(PoolBitmapBase, PhysicalAddress, SizeInBits >> 3, MI_MAP_WRITE)) {
         KeFatalError(
             KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
             KE_PANIC_PARAMETER_POOL_INITIALIZATION_FAILURE,
@@ -209,8 +236,8 @@ void MiInitializePool(KiLoaderBlock *LoaderBlock) {
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function wraps up the memory manager initialization by freeing and unmapping the
- *     OSLOADER regions. This should only be called after LoaderBlock (and anything else from
- *     OSLOADER) has already been used and saved somewhere else.
+ *     OSLOADER/1-to-1 mapping regions. This should only be called after LoaderBlock (and anything
+ *     else from OSLOADER) has already been used and saved somewhere else.
  *
  * PARAMETERS:
  *     None.
@@ -231,7 +258,9 @@ void MiReleaseBootRegions(void) {
         for (uint64_t i = 0; i < (uint64_t)Entry->PageCount; i++) {
             Group[i].Flags = 0;
             RtPushDList(&MiFreePageListHead, &Group[i].ListHeader);
-            HalpUnmapPage((void *)((uint64_t)(Entry->BasePage + i) << MM_PAGE_SHIFT));
         }
+
+        HalpUnmapPages(
+            (void *)(Entry->BasePage << MM_PAGE_SHIFT), Entry->PageCount << MM_PAGE_SHIFT);
     }
 }

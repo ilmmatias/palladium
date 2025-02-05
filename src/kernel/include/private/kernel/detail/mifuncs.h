@@ -17,11 +17,12 @@
 extern "C" {
 #endif /* __cplusplus */
 
-void MiInitializePageAllocator(KiLoaderBlock *LoaderBlock);
-void MiInitializePool(KiLoaderBlock *LoaderBlock);
-void MiReleaseBootRegions(void);
+void MiInitializeEarlyPageAllocator(KiLoaderBlock *LoaderBlock);
+uint64_t MiAllocateEarlyPages(uint64_t Pages);
 
-void *MiEnsureEarlySpace(uint64_t PhysicalAddress, size_t Size);
+void MiInitializePageAllocator(void);
+void MiInitializePool(void);
+void MiReleaseBootRegions(void);
 
 #ifdef __cplusplus
 }

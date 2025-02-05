@@ -28,13 +28,16 @@ static void SetupFrame(PageFrame *Frame, uint64_t Address, int Flags, bool Large
     Frame->Address = Address >> 12;
 
     /* The "PageSize" bit becomes the PAT bit on the PT (last) level. */
-    if (LargeLevel || (Flags & PAGE_FLAGS_DEVICE)) {
+    if (LargeLevel || (Flags & PAGE_FLAGS_WC)) {
         Frame->PageSize = 1;
     }
 
     /* And bit 12 (which is available on the PT level) becomes the PAT bit on the other levels. */
-    if (LargeLevel && (Flags & PAGE_FLAGS_DEVICE)) {
+    if (LargeLevel && (Flags & PAGE_FLAGS_WC)) {
         Frame->Pat = 1;
+    } else if (Flags & PAGE_FLAGS_UC) {
+        Frame->CacheDisable = 1;
+        Frame->WriteThrough = 1;
     }
 
     /* W^X needs to be enforced on the caller, as we don't handle that here! */
@@ -376,14 +379,15 @@ void *OslpCreatePageMap(
         }
     }
 
-    /* And map all other memory descriptor/physical memory areas, but as read+write-only. */
+    /* Map all entries related to the boot block into the high area as well. */
     for (RtDList *ListHeader = MemoryDescriptorListHead->Next;
          ListHeader != MemoryDescriptorListHead;
          ListHeader = ListHeader->Next) {
         OslpMemoryDescriptor *Descriptor =
             CONTAINING_RECORD(ListHeader, OslpMemoryDescriptor, ListHeader);
 
-        if (Descriptor->Type == PAGE_TYPE_FIRMWARE_PERMANENT) {
+        if (Descriptor->Type != PAGE_TYPE_GRAPHICS_BUFFER &&
+            Descriptor->Type != PAGE_TYPE_OSLOADER_TEMPORARY) {
             continue;
         }
 
@@ -447,7 +451,6 @@ void *OslpCreatePageMap(
      * if huge pages are available). */
     uint64_t BackBufferSize = HasHugePages ? (FrameBufferSize + SIZE_1GB - 1) & ~(SIZE_1GB - 1)
                                            : (FrameBufferSize + SIZE_2MB - 1) & ~(SIZE_2MB - 1);
-
     if (!MapRange(
             MemoryDescriptorListHead,
             MemoryDescriptorStack,
@@ -455,7 +458,7 @@ void *OslpCreatePageMap(
             0xFFFF800000000000 + (uint64_t)BackBuffer,
             (uint64_t)BackBuffer,
             BackBufferSize,
-            PAGE_FLAGS_WRITE | PAGE_FLAGS_DEVICE)) {
+            PAGE_FLAGS_WRITE | PAGE_FLAGS_WC)) {
         OslPrint("The system ran out of memory while creating the boot page map.\r\n");
         OslPrint("The boot process cannot continue.\r\n");
         return NULL;

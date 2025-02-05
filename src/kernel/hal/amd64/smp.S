@@ -58,11 +58,13 @@ HalpApplicationProcessorEntry:
     mov %eax, %cr4
 
     /* Setup our WC PAT entry. */
+    wbinvd
     mov $0x277, %ecx
     rdmsr
     and $0xFFFFFF00, %edx
     or $0x01, %edx
     wrmsr
+    wbinvd
 
     /* Install the kernel page map, and enable paging. */
     mov (HalpKernelPageMap - HalpApplicationProcessorEntry)(%ebp), %eax

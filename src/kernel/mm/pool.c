@@ -47,8 +47,13 @@ static void *AllocatePoolPages(uint64_t Pages) {
     char *VirtualAddress = (char *)MiPoolStart + (Offset << MM_PAGE_SHIFT);
     for (uint64_t i = 0; i < Pages; i++) {
         uint64_t PhysicalAddress = MmAllocateSinglePage();
-        if (!PhysicalAddress ||
-            !HalpMapPage(VirtualAddress + (i << MM_PAGE_SHIFT), PhysicalAddress, MI_MAP_WRITE)) {
+        if (!PhysicalAddress) {
+            return NULL;
+        } else if (!HalpMapPages(
+                       VirtualAddress + (i << MM_PAGE_SHIFT),
+                       PhysicalAddress,
+                       MM_PAGE_SIZE,
+                       MI_MAP_WRITE)) {
             return NULL;
         }
 

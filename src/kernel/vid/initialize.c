@@ -23,9 +23,8 @@ extern bool VidpUseLock;
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void VidpInitialize(KiLoaderBlock *LoaderBlock) {
-    uint64_t FrameBufferSize = VidpHeight * VidpPitch * 4;
-    VidpBackBuffer = MiEnsureEarlySpace((uint64_t)LoaderBlock->BackBuffer, FrameBufferSize);
-    VidpFrontBuffer = MiEnsureEarlySpace((uint64_t)LoaderBlock->FrontBuffer, FrameBufferSize);
+    VidpBackBuffer = LoaderBlock->BackBuffer;
+    VidpFrontBuffer = LoaderBlock->FrontBuffer;
     VidpWidth = LoaderBlock->FramebufferWidth;
     VidpHeight = LoaderBlock->FramebufferHeight;
     VidpPitch = LoaderBlock->FramebufferPitch;

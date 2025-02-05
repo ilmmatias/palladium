@@ -16,7 +16,7 @@
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void KeInitializeAffinity(KeAffinity *Mask) {
-    Mask->Size = HalpProcessorCount;
+    Mask->Size = HalpOnlineProcessorCount;
     memset((void *)Mask->Bits, 0xFF, (Mask->Size + 7) >> 3);
 }
 

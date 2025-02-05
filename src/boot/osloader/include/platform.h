@@ -7,7 +7,7 @@
 #include <memory.h>
 
 #define OSLP_BOOT_MAGIC "OLDR"
-#define OSLP_BOOT_VERSION 0x0000'0000'00000002
+#define OSLP_BOOT_VERSION 0x0000'0000'00000003
 
 typedef struct {
     char Magic[4];

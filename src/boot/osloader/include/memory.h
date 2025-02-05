@@ -27,7 +27,8 @@
 
 #define PAGE_FLAGS_WRITE 0x01
 #define PAGE_FLAGS_EXEC 0x02
-#define PAGE_FLAGS_DEVICE 0x04
+#define PAGE_FLAGS_WC 0x04
+#define PAGE_FLAGS_UC 0x08
 
 typedef struct {
     RtDList ListHeader;

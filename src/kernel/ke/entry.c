@@ -39,8 +39,9 @@ static void InitializeBootProcessor(KiLoaderBlock *LoaderBlock) {
 
     /* Stage 1 (BSP): Memory manager initialization; This won't mark the OSLOADER pages as free
      * just yet. */
-    MiInitializePool(LoaderBlock);
-    MiInitializePageAllocator(LoaderBlock);
+    MiInitializeEarlyPageAllocator(LoaderBlock);
+    MiInitializePool();
+    MiInitializePageAllocator();
 
     /* Stage 2 (BSP): Save all the remaining data that we care about from the loader block. */
     KiSaveAcpiData(LoaderBlock);
@@ -52,7 +53,7 @@ static void InitializeBootProcessor(KiLoaderBlock *LoaderBlock) {
 
     /* Stage 4 (BSP): Early platform/arch initialization. */
     HalpInitializeBootProcessor();
-    VidPrint(VID_MESSAGE_INFO, "Kernel", "%u processors online\n", HalpProcessorCount);
+    VidPrint(VID_MESSAGE_INFO, "Kernel", "%u processors online\n", HalpOnlineProcessorCount);
 
     /* Stage 5 (BSP): Scheduler initialization. */
     PspCreateIdleThread();
@@ -85,9 +86,7 @@ static void InitializeApplicationProcessor(KeProcessor *Processor) {
  *     here from the SMP initialization code.
  *
  * PARAMETERS:
- *     LoaderBlock - Data prepared by the boot loader for us. Should be a physical address if we
- *                   directly got here from osloader, a virtual address if we did a reentry, or NULL
- *                   if we got here from the AP startup process.
+ *     LoaderBlock - Data prepared by the boot loader for us.
  *     Processor - Processor block pointer. This should be NULL if we need to trigger a stack change
  *                 on the BSP.
  *
@@ -99,7 +98,6 @@ static void InitializeApplicationProcessor(KeProcessor *Processor) {
      * need this, then feel free to return from HalpInitializeBootStack, and the boot process will
      * continue as usual. */
     if (LoaderBlock && !Processor) {
-        LoaderBlock = MiEnsureEarlySpace((uint64_t)LoaderBlock, sizeof(KiLoaderBlock));
         HalpInitializeBootStack(LoaderBlock);
     }
 

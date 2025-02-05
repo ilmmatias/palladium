@@ -2,7 +2,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <kernel/ki.h>
-#include <kernel/mm.h>
+#include <kernel/mi.h>
 #include <kernel/vid.h>
 #include <pe.h>
 #include <stdio.h>
@@ -22,31 +22,10 @@ RtDList KiModuleListHead;
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void KiSaveBootStartDrivers(KiLoaderBlock *LoaderBlock) {
-    RtDList *LoaderModuleListHead =
-        MmMapSpace((uint64_t)LoaderBlock->BootDriverListHead, sizeof(RtDList));
-    if (!LoaderModuleListHead) {
-        KeFatalError(
-            KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
-            KE_PANIC_PARAMETER_DRIVER_INITIALIZATION_FAILURE,
-            KE_PANIC_PARAMETER_OUT_OF_RESOURCES,
-            0,
-            0);
-    }
-
     RtInitializeDList(&KiModuleListHead);
-    RtDList *ListHeader = LoaderModuleListHead->Next;
-
-    while (ListHeader != LoaderBlock->BootDriverListHead) {
-        ListHeader = MmMapSpace((uint64_t)ListHeader, sizeof(KeModule));
-        if (!ListHeader) {
-            KeFatalError(
-                KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
-                KE_PANIC_PARAMETER_DRIVER_INITIALIZATION_FAILURE,
-                KE_PANIC_PARAMETER_OUT_OF_RESOURCES,
-                0,
-                0);
-        }
-
+    for (RtDList *ListHeader = LoaderBlock->BootDriverListHead->Next;
+         ListHeader != LoaderBlock->BootDriverListHead;
+         ListHeader = ListHeader->Next) {
         KeModule *SourceModule = CONTAINING_RECORD(ListHeader, KeModule, ListHeader);
         KeModule *TargetModule = MmAllocatePool(sizeof(KeModule), "KeLd");
         if (!TargetModule) {
@@ -58,19 +37,7 @@ void KiSaveBootStartDrivers(KiLoaderBlock *LoaderBlock) {
                 0);
         }
 
-        /* Is it safe to assume this is never going to be >1 page long? I hope so, make this
-         * a bit more dynamic if we ever start encountering such cases. */
-        char *SourceImageName = MmMapSpace((uint64_t)SourceModule->ImageName, MM_PAGE_SIZE);
-        if (!SourceImageName) {
-            KeFatalError(
-                KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
-                KE_PANIC_PARAMETER_DRIVER_INITIALIZATION_FAILURE,
-                KE_PANIC_PARAMETER_OUT_OF_RESOURCES,
-                0,
-                0);
-        }
-
-        char *TargetImageName = MmAllocatePool(strlen(SourceImageName) + 1, "KeLd");
+        char *TargetImageName = MmAllocatePool(strlen(SourceModule->ImageName) + 1, "KeLd");
         if (!TargetImageName) {
             KeFatalError(
                 KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
@@ -81,18 +48,10 @@ void KiSaveBootStartDrivers(KiLoaderBlock *LoaderBlock) {
         }
 
         memcpy(TargetModule, SourceModule, sizeof(KeModule));
-        strcpy(TargetImageName, SourceImageName);
+        strcpy(TargetImageName, SourceModule->ImageName);
         TargetModule->ImageName = TargetImageName;
         RtAppendDList(&KiModuleListHead, &TargetModule->ListHeader);
-
-        RtDList *Next = ListHeader->Next;
-        MmUnmapSpace(SourceImageName);
-        MmUnmapSpace(ListHeader);
-
-        ListHeader = Next;
     }
-
-    MmUnmapSpace(LoaderModuleListHead);
 }
 
 /*-------------------------------------------------------------------------------------------------

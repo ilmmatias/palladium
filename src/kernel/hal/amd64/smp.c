@@ -6,7 +6,7 @@
 #include <kernel/halp.h>
 #include <kernel/intrin.h>
 #include <kernel/ke.h>
-#include <kernel/mi.h>
+#include <kernel/mm.h>
 #include <string.h>
 
 extern void HalpApplicationProcessorEntry(void);
@@ -14,7 +14,8 @@ extern uint64_t HalpKernelPageMap;
 extern RtSList HalpLapicListHead;
 
 KeProcessor **HalpProcessorList = NULL;
-uint32_t HalpOnlineProcessorCount = 1;
+uint32_t HalpOnlineProcessorCount = 0;
+uint32_t HalpProcessorCount = 0;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -31,7 +32,7 @@ void HalpInitializeSmp(void) {
     uint32_t ApicId = KeGetCurrentProcessor()->ApicId;
 
     /* Map the AP startup code (0x8000), and copy all the trampoline data to it. */
-    HalpMapPage((void *)0x8000, 0x8000, MI_MAP_WRITE | MI_MAP_EXEC);
+    HalpMapPages((void *)0x8000, 0x8000, MM_PAGE_SIZE, MI_MAP_WRITE | MI_MAP_EXEC);
     memcpy((void *)0x8000, HalpApplicationProcessorEntry, MM_PAGE_SIZE);
 
     /* Save the kernel page map (shared between all processors).
@@ -75,6 +76,9 @@ void HalpInitializeSmp(void) {
         RtInitializeDList(&HalpProcessorList[i]->TerminationQueue);
     }
 
+    /* Now, we can start waking up everyone. */
+    HalpOnlineProcessorCount = 1;
+
     RtSList *ListHeader = HalpLapicListHead.Next;
     while (ListHeader) {
         LapicEntry *Entry = CONTAINING_RECORD(ListHeader, LapicEntry, ListHeader);
@@ -106,7 +110,7 @@ void HalpInitializeSmp(void) {
         HalWaitTimer(100 * EV_MICROSECS);
     }
 
-    HalpUnmapPage((void *)0x8000);
+    HalpUnmapPages((void *)0x8000, MM_PAGE_SIZE);
 }
 
 /*-------------------------------------------------------------------------------------------------

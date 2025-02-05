@@ -29,6 +29,41 @@
     EFI_MEMORY_DESCRIPTOR *MemoryMap,
     UINTN DescriptorSize,
     UINT32 DescriptorVersion) {
+    /* Before doing anything, let's fix all pointers inside the boot block (they are all physical,
+     * but the kernel expects valid virtual addresses). */
+    RtDList *ListHead = BootBlock->MemoryDescriptorListHead;
+    RtDList *ListHeader = ListHead->Next;
+    BootBlock->MemoryDescriptorListHead = (RtDList *)((uint64_t)ListHead + 0xFFFF800000000000);
+    ListHead->Prev = (RtDList *)((uint64_t)ListHead->Prev + 0xFFFF800000000000);
+    ListHead->Next = (RtDList *)((uint64_t)ListHead->Next + 0xFFFF800000000000);
+    while (ListHeader != ListHead) {
+        RtDList *Next = ListHeader->Next;
+        ListHeader->Prev = (RtDList *)((uint64_t)ListHeader->Prev + 0xFFFF800000000000);
+        ListHeader->Next = (RtDList *)((uint64_t)ListHeader->Next + 0xFFFF800000000000);
+        ListHeader = Next;
+    }
+
+    /* We need to save the kernel module entry for ourselves as well (because we're about to lose
+     * access to it). */
+    ListHead = BootBlock->BootDriverListHead;
+    ListHeader = ListHead->Next;
+    void *EntryPoint = CONTAINING_RECORD(ListHeader, OslpModuleEntry, ListHeader)->EntryPoint;
+    BootBlock->BootDriverListHead = (RtDList *)((uint64_t)ListHead + 0xFFFF800000000000);
+    ListHead->Prev = (RtDList *)((uint64_t)ListHead->Prev + 0xFFFF800000000000);
+    ListHead->Next = (RtDList *)((uint64_t)ListHead->Next + 0xFFFF800000000000);
+    while (ListHeader != ListHead) {
+        RtDList *Next = ListHeader->Next;
+        ListHeader->Prev = (RtDList *)((uint64_t)ListHeader->Prev + 0xFFFF800000000000);
+        ListHeader->Next = (RtDList *)((uint64_t)ListHeader->Next + 0xFFFF800000000000);
+        OslpModuleEntry *Module = CONTAINING_RECORD(ListHeader, OslpModuleEntry, ListHeader);
+        Module->ImageName = (char *)((uint64_t)Module->ImageName + 0xFFFF800000000000);
+        ListHeader = Next;
+    }
+
+    BootBlock->BackBuffer = (void *)((uint64_t)BootBlock->BackBuffer + 0xFFFF800000000000);
+    BootBlock->FrontBuffer = (void *)((uint64_t)BootBlock->FrontBuffer + 0xFFFF800000000000);
+    BootBlock = (OslpBootBlock *)((uint64_t)BootBlock + 0xFFFF800000000000);
+
     /* At some point or another, this should return EFI_SUCCESS, or so we hope. */
     EFI_STATUS Status;
     do {
@@ -75,16 +110,17 @@
                      :
                      : "%rax", "%rcx");
 
-    /* Set the 4th PAT entry to WC (we use that for devices+physical memory at
-     * 0xFFFF800000000000). */
-    __asm__ volatile("mov $0x277, %%rcx\n"
+    /* Set the 4th PAT entry to WC (for the graphics buffer). */
+    __asm__ volatile("wbinvd\n"
+                     "mov $0x277, %%rcx\n"
                      "rdmsr\n"
                      "and $0xFFFFFF00, %%edx\n"
                      "or $0x01, %%edx\n"
                      "wrmsr\n"
+                     "wbinvd\n"
                      :
                      :
-                     : "%rax", "%rcx");
+                     : "%rax", "%rcx", "%rdx");
 
     /* We can load up the new page table now. */
     __asm__ volatile("mov %0, %%cr3" : : "r"(PageMap));
@@ -108,10 +144,6 @@
 
     /* Load up all registers we need, and then load up the default SSE register configuration before
      * jumping. */
-    void *EntryPoint =
-        CONTAINING_RECORD(BootBlock->BootDriverListHead->Next, OslpModuleEntry, ListHeader)
-            ->EntryPoint;
-
     __asm__ volatile("mov %0, %%rax\n"
                      "mov %1, %%rcx\n"
                      "mov %2, %%rsp\n"

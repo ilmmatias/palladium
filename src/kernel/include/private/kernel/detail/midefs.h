@@ -14,7 +14,8 @@
 
 #define MI_MAP_WRITE 0x01
 #define MI_MAP_EXEC 0x02
-#define MI_MAP_DEVICE 0x04
+#define MI_MAP_WC 0x04
+#define MI_MAP_UC 0x08
 
 #define MI_DESCR_FREE 0x00
 #define MI_DESCR_PAGE_MAP 0x01
