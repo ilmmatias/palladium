@@ -12,6 +12,7 @@ extern void HalpApplicationProcessorEntry(void);
 extern uint64_t HalpKernelPageMap;
 extern RtSList HalpLapicListHead;
 
+bool HalpSmpInitializationComplete = false;
 KeProcessor **HalpProcessorList = NULL;
 uint32_t HalpOnlineProcessorCount = 0;
 uint32_t HalpProcessorCount = 0;
@@ -106,12 +107,52 @@ void HalpInitializeSmp(void) {
     }
 
     HalpUnmapPages((void *)EntryAddress, MM_PAGE_SIZE);
+    HalpSmpInitializationComplete = true;
 }
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function notifies another processor that some (probably significant) event has
- *     happend.
+ *     This function notifies all but the current processor that the IPI handler should run.
+ *
+ * PARAMETERS:
+ *     None.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void HalpBroadcastIpi(void) {
+    KeProcessor *CurrentProcessor = KeGetCurrentProcessor();
+    for (uint32_t i = 0; i < HalpOnlineProcessorCount; i++) {
+        if (i != CurrentProcessor->Number) {
+            HalpSendIpi(
+                HalpProcessorList[i]->ApicId, HALP_INT_IPI_VECTOR, HALP_APIC_ICR_DELIVERY_FIXED);
+        }
+    }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function notifies all but the current processor that they should stop running.
+ *
+ * PARAMETERS:
+ *     None.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void HalpBroadcastFreeze(void) {
+    KeProcessor *CurrentProcessor = KeGetCurrentProcessor();
+    for (uint32_t i = 0; i < HalpOnlineProcessorCount; i++) {
+        if (i != CurrentProcessor->Number) {
+            HalpProcessorList[i]->EventType = KE_EVENT_TYPE_FREEZE;
+            HalpSendIpi(HalpProcessorList[i]->ApicId, 0, HALP_APIC_ICR_DELIVERY_NMI);
+        }
+    }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function notifies another processor that a dispatch level event has happend.
  *
  * PARAMETERS:
  *     Processor - Which processor to notify.
@@ -121,22 +162,4 @@ void HalpInitializeSmp(void) {
  *-----------------------------------------------------------------------------------------------*/
 void HalpNotifyProcessor(KeProcessor *Processor) {
     HalpSendIpi(Processor->ApicId, HALP_INT_DISPATCH_VECTOR, HALP_APIC_ICR_DELIVERY_FIXED);
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function notifies another processor that it should stop running (permanently, as we
- *     don't have a way to specify it should start running again for now).
- *
- * PARAMETERS:
- *     Processor - Which processor to notify.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-void HalpFreezeProcessor(KeProcessor *Processor) {
-    void *Context = HalpEnterCriticalSection();
-    Processor->EventType = KE_EVENT_TYPE_FREEZE;
-    HalpSendIpi(Processor->ApicId, 0, HALP_APIC_ICR_DELIVERY_NMI);
-    HalpLeaveCriticalSection(Context);
 }

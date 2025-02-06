@@ -15,6 +15,7 @@
 .extern HalpDispatchTrap
 .extern HalpDispatchNmi
 .extern HalpSendEoi
+.extern KiHandleIpi
 .extern PspProcessQueue
 
 .global HalpDefaultInterruptHandlers
@@ -333,6 +334,18 @@ HalpTimerEntry:
     mov %rcx, %cr8
     mov %rsp, %rcx
     call EvpHandleTimer
+    call HalpSendEoi
+    LEAVE_INTERRUPT
+.seh_endproc
+
+.seh_proc HalpIpiEntry
+.global HalpIpiEntry
+.align 16
+HalpIpiEntry:
+    ENTER_INTERRUPT
+    mov $HALP_INT_IPI_IRQL, %rcx
+    mov %rcx, %cr8
+    call KiHandleIpi
     call HalpSendEoi
     LEAVE_INTERRUPT
 .seh_endproc

@@ -38,6 +38,7 @@ extern void HalpVmmCommunicationTrapEntry(void);
 extern void HalpSecurityTrapEntry(void);
 extern void HalpDispatchEntry(void);
 extern void HalpTimerEntry(void);
+extern void HalpIpiEntry(void);
 extern void HalpSpuriousEntry(void);
 
 static struct {
@@ -352,6 +353,8 @@ void HalpInitializeIdt(KeProcessor *Processor) {
             Base = (uint64_t)HalpDispatchEntry;
         } else if (i == HALP_INT_TIMER_VECTOR) {
             Base = (uint64_t)HalpTimerEntry;
+        } else if (i == HALP_INT_IPI_VECTOR) {
+            Base = (uint64_t)HalpIpiEntry;
         } else if (i == HALP_INT_SPURIOUS_VECTOR) {
             Base = (uint64_t)HalpSpuriousEntry;
         }

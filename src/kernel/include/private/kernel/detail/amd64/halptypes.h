@@ -72,6 +72,16 @@ typedef struct __attribute__((packed)) {
 typedef union {
     struct __attribute__((packed)) {
         uint32_t Vector : 8;
+        uint32_t Enable : 1;
+        uint32_t Reserved0 : 3;
+        uint32_t EoiBroadcastDisable : 1;
+    };
+    uint32_t RawData;
+} HalpApicSpivRegister;
+
+typedef union {
+    struct __attribute__((packed)) {
+        uint32_t Vector : 8;
         uint32_t DeliveryMode : 3;
         uint32_t DestinationMode : 1;
         uint32_t DeliveryStatus : 1;

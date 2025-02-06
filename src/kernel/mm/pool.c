@@ -54,9 +54,11 @@ static void *AllocatePoolPages(uint64_t Pages) {
                        PhysicalAddress,
                        MM_PAGE_SIZE,
                        MI_MAP_WRITE)) {
+            /* TODO: Free the memory we partially allocated, instead of leaking it. */
             return NULL;
         }
 
+        /* Mark the current page as part of the pool. */
         MiPageEntry *Entry = &MI_PAGE_ENTRY(PhysicalAddress);
         if (i) {
             Entry->Flags |= MI_PAGE_FLAGS_POOL_ITEM;
@@ -80,6 +82,8 @@ static void *AllocatePoolPages(uint64_t Pages) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 static void FreePoolPages(void *Base) {
+    /* Grab the lock so that we can mess with the page list (even with the pool lock, it should be
+     * okay to do it. */
     KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&MiPageListLock, KE_IRQL_DISPATCH);
     uint64_t PhysicalAddress = HalpGetPhysicalAddress(Base);
     MiPageEntry *BaseEntry = &MI_PAGE_ENTRY(PhysicalAddress);
@@ -87,10 +91,12 @@ static void FreePoolPages(void *Base) {
         KeFatalError(KE_PANIC_BAD_PFN_HEADER, PhysicalAddress, BaseEntry->Flags, 0, 0);
     }
 
+    /* Free up the base page. */
     uint32_t Pages = BaseEntry->Pages;
     BaseEntry->Flags = 0;
     RtPushDList(&MiFreePageListHead, &BaseEntry->ListHeader);
 
+    /* And validate+free all remaining pages. */
     for (uint32_t Offset = MM_PAGE_SIZE; Offset < Pages << MM_PAGE_SHIFT; Offset += MM_PAGE_SIZE) {
         uint64_t PhysicalAdddress = HalpGetPhysicalAddress((char *)Base + Offset);
         MiPageEntry *ItemEntry = &MI_PAGE_ENTRY(PhysicalAdddress);
@@ -104,7 +110,16 @@ static void FreePoolPages(void *Base) {
     }
 
     KeReleaseSpinLockAndLowerIrql(&MiPageListLock, OldIrql);
-    RtClearBits(&MiPoolBitmap, ((uint64_t)Base - MiPoolStart) >> MM_PAGE_SHIFT, Pages);
+
+    /* Return the pages to the bitmap (and update the hint if it's a "better" hint). */
+    uint64_t Offset = ((uint64_t)Base - MiPoolStart) >> MM_PAGE_SHIFT;
+    RtClearBits(&MiPoolBitmap, Offset, Pages);
+    if (Offset < MiPoolBitmapHint) {
+        MiPoolBitmapHint = Offset;
+    }
+
+    /* Now just unmap the whole range, and we should be done. */
+    HalpUnmapPages(Base, Pages << MM_PAGE_SHIFT);
 }
 
 /*-------------------------------------------------------------------------------------------------

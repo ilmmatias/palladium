@@ -2,10 +2,18 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <kernel/halp.h>
+#include <kernel/ke.h>
 #include <kernel/mi.h>
 #include <string.h>
 
 extern MiPageEntry *MiPageList;
+extern bool HalpSmpInitializationComplete;
+
+typedef struct {
+    bool ReloadCr3;
+    uint64_t Start;
+    uint64_t End;
+} IpiContext;
 
 /* Constants related to each page table level. */
 typedef struct {
@@ -193,6 +201,28 @@ static bool CleanFrame(uint64_t VirtualAddress, uint64_t TargetLevel) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
+ *     This function invalidates a range of pages (or the whole page directory) after something got
+ *     unmapped.
+ *
+ * PARAMETERS:
+ *     ContextPointer - Information about what to invalidate.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+static void IpiRoutine(void *ContextPointer) {
+    IpiContext *Context = ContextPointer;
+    if (Context->ReloadCr3) {
+        __asm__ volatile("mov %%cr3, %%rax; mov %%rax, %%cr3;" : : : "%rax", "memory");
+    } else {
+        for (uint64_t Address = Context->Start; Address < Context->End; Address += HALP_PT_SIZE) {
+            __asm__ volatile("invlpg (%0)" : : "r"(Address) : "memory");
+        }
+    }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
  *     This function grabs the physical address of the specified virtual address.
  *
  * PARAMETERS:
@@ -312,13 +342,16 @@ void HalpUnmapPages(void *VirtualAddress, uint64_t Size) {
         Size = Size > TargetSize ? Size - TargetSize : 0;
     }
 
-    /* TODO: Broadcast this to other CPUs. */
-    if (ReloadCr3) {
-        __asm__ volatile("mov %%cr3, %%rax; mov %%rax, %%cr3;" : : : "%rax", "memory");
+    IpiContext Context;
+    Context.ReloadCr3 = ReloadCr3;
+    Context.Start = (uint64_t)VirtualAddress;
+    Context.End = End;
+
+    /* No need for a broadcast if we're still too early in the initailization phase. */
+    if (HalpSmpInitializationComplete) {
+        KeRequestIpiRoutine(IpiRoutine, &Context);
     } else {
-        for (uint64_t Address = (uint64_t)VirtualAddress; Address < End; Address += HALP_PT_SIZE) {
-            __asm__ volatile("invlpg (%0)" : : "r"(Address) : "memory");
-        }
+        IpiRoutine(&Context);
     }
 }
 

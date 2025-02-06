@@ -7,6 +7,8 @@
 #include <kernel/mm.h>
 #include <kernel/psp.h>
 
+static volatile uint64_t InitialiazationBarrier = 0;
+
 KeAffinity KiIdleProcessors;
 
 /*-------------------------------------------------------------------------------------------------
@@ -80,7 +82,9 @@ static inline void SwitchExecution(
  *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
 [[noreturn]] void PspInitializeScheduler(void) {
+    /* Wait until all processors finished the early initialzation stage. */
     KeProcessor *Processor = KeGetCurrentProcessor();
+    KeSynchronizeProcessors(&InitialiazationBarrier);
 
     /* The BSP should have queued its initial thread. */
     KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Processor->Lock, KE_IRQL_SYNCH);

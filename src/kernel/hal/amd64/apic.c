@@ -238,7 +238,7 @@ void HalpEnableApic(void) {
     if (X2ApicEnabled) {
         WriteMsr(HALP_APIC_MSR, Value | HALP_APIC_MSR_X2APIC_ENABLE);
     } else {
-        WriteMsr(HALP_APIC_MSR, Value & ~HALP_APIC_MSR_X2APIC_ENABLE);
+        WriteMsr(HALP_APIC_MSR, Value);
     }
 
     /* Mask (disable) the legacy PIC. */
@@ -289,17 +289,18 @@ void HalpEnableApic(void) {
 
     /* Now we can setup the spurious interrupt vector, and the enable the local APIC (we're safe to
      * receive interrupts after this). */
-    Value = HalpReadLapicRegister(HALP_APIC_SPIV_REG);
-    HalpWriteLapicRegister(
-        HALP_APIC_SPIV_REG,
-        (Value & HALP_APIC_SPIV_MASK) | HALP_INT_SPURIOUS_VECTOR | HALP_APIC_SPIV_ENABLE);
+    HalpApicSpivRegister Register;
+    Register.RawData = HalpReadLapicRegister(HALP_APIC_SPIV_REG);
+    Register.Vector = HALP_INT_SPURIOUS_VECTOR;
+    Register.Enable = true;
+    HalpWriteLapicRegister(HALP_APIC_SPIV_REG, Register.RawData);
     HalpSendEoi();
     __asm__ volatile("sti");
 }
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function sends a interrupt to another processor.
+ *     This function sends an interrupt to another processor.
  *
  * PARAMETERS:
  *     Target - APIC ID of the target.

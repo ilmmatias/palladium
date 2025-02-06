@@ -66,12 +66,7 @@ static KeSpinLock Lock = {0};
     }
 
     /* We're the first to get here, freeze everyone else before continuing. */
-    KeProcessor *Processor = KeGetCurrentProcessor();
-    for (uint32_t i = 0; i < HalpOnlineProcessorCount; i++) {
-        if (HalpProcessorList[i] != Processor) {
-            HalpFreezeProcessor(HalpProcessorList[i]);
-        }
-    }
+    HalpBroadcastFreeze();
 
     /* Acquire "ownership" of the display (disable the lock checks), setup the panic screen, and
      * show the basic message + error code. */

@@ -34,6 +34,7 @@ add_executable(kernel "kernel" YES
     ke/affinity.c
     ke/driver.c
     ke/entry.c
+    ke/ipi.c
     ke/panic.c
 
     mm/initialize.c
