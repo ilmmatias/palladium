@@ -2,14 +2,13 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <cpuid.h>
-#include <kernel/detail/amd64/apic.h>
+#include <kernel/halp.h>
 #include <kernel/intrin.h>
 #include <kernel/ke.h>
 #include <kernel/mm.h>
 #include <kernel/vid.h>
 
 RtSList HalpLapicListHead = {};
-uint32_t HalpProcessorCount = 0;
 
 static void *LapicAddress = NULL;
 static bool X2ApicEnabled = false;
@@ -24,11 +23,11 @@ static bool X2ApicEnabled = false;
  * RETURN VALUE:
  *     Pointer to the LapicEntry struct, or NULL if we didn't find it.
  *-----------------------------------------------------------------------------------------------*/
-static LapicEntry *GetLapic(uint32_t Id) {
+static HalpLapicEntry *GetLapic(uint32_t Id) {
     RtSList *ListHeader = HalpLapicListHead.Next;
 
     while (ListHeader) {
-        LapicEntry *Entry = CONTAINING_RECORD(ListHeader, LapicEntry, ListHeader);
+        HalpLapicEntry *Entry = CONTAINING_RECORD(ListHeader, HalpLapicEntry, ListHeader);
 
         if (Entry->ApicId == Id) {
             return Entry;
@@ -52,7 +51,7 @@ static LapicEntry *GetLapic(uint32_t Id) {
  *-----------------------------------------------------------------------------------------------*/
 uint64_t HalpReadLapicRegister(uint32_t Number) {
     if (X2ApicEnabled) {
-        return ReadMsr(0x800 + (Number >> 4));
+        return ReadMsr(HALP_APIC_REG_MSR + (Number >> 4));
     } else {
         return *(volatile uint32_t *)((char *)LapicAddress + Number);
     }
@@ -71,7 +70,7 @@ uint64_t HalpReadLapicRegister(uint32_t Number) {
  *-----------------------------------------------------------------------------------------------*/
 void HalpWriteLapicRegister(uint32_t Number, uint64_t Data) {
     if (X2ApicEnabled) {
-        WriteMsr(0x800 + (Number >> 4), Data);
+        WriteMsr(HALP_APIC_REG_MSR + (Number >> 4), Data);
     } else {
         *(volatile uint32_t *)((char *)LapicAddress + Number) = Data;
     }
@@ -88,8 +87,8 @@ void HalpWriteLapicRegister(uint32_t Number, uint64_t Data) {
  *     APIC ID for the current processor.
  *-----------------------------------------------------------------------------------------------*/
 uint32_t HalpReadLapicId(void) {
-    uint32_t Register = HalpReadLapicRegister(0x20);
-    return X2ApicEnabled ? Register : (Register >> 24);
+    uint32_t Register = HalpReadLapicRegister(HALP_APIC_ID_REG);
+    return X2ApicEnabled ? Register : HALP_APIC_ID_VALUE(Register);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -105,7 +104,7 @@ uint32_t HalpReadLapicId(void) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void HalpInitializeApic(void) {
-    MadtHeader *Madt = KiFindAcpiTable("APIC", 0);
+    HalpMadtHeader *Madt = KiFindAcpiTable("APIC", 0);
     if (!Madt) {
         KeFatalError(
             KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
@@ -115,27 +114,31 @@ void HalpInitializeApic(void) {
             0);
     }
 
-    /* x2APIC uses MSRs instead of the LAPIC address, so Read/WriteRegister needs to know if we
-       enabled it. */
     uint32_t Eax, Ebx, Ecx, Edx;
     __cpuid(1, Eax, Ebx, Ecx, Edx);
     if (Ecx & 0x200000) {
+        /* x2APIC uses MSRs instead of the LAPIC address, so Read/WriteRegister needs to know if we
+           enabled it. */
         X2ApicEnabled = true;
+        VidPrint(VID_MESSAGE_INFO, "Kernel HAL", "using x2APIC mode\n");
+    } else {
+        /* We're assuming xAPIC is available, but we should probably check if so as well. */
+        VidPrint(VID_MESSAGE_INFO, "Kernel HAL", "using xAPIC mode\n");
     }
 
     char *Position = (char *)(Madt + 1);
     while (Position < (char *)Madt + Madt->Length) {
-        MadtRecord *Record = (MadtRecord *)Position;
+        HalpMadtRecord *Record = (HalpMadtRecord *)Position;
 
         switch (Record->Type) {
-            case LAPIC_RECORD: {
+            case HALP_LAPIC_RECORD: {
                 /* Prevent a bunch of entries with the same APIC ID (but probably different ACPI
                    IDs) filling our processor list. */
                 if (GetLapic(Record->Lapic.ApicId) || !(Record->Lapic.Flags & 1)) {
                     break;
                 }
 
-                LapicEntry *Entry = MmAllocatePool(sizeof(LapicEntry), "Apic");
+                HalpLapicEntry *Entry = MmAllocatePool(sizeof(HalpLapicEntry), "Apic");
                 if (!Entry) {
                     KeFatalError(
                         KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
@@ -160,14 +163,14 @@ void HalpInitializeApic(void) {
                 break;
             }
 
-            case X2APIC_RECORD: {
+            case HALP_X2APIC_RECORD: {
                 /* Prevent a bunch of entries with the same APIC ID (but probably different ACPI
                    IDs) filling our processor list. */
                 if (GetLapic(Record->X2Apic.X2ApicId) || !(Record->X2Apic.Flags & 1)) {
                     break;
                 }
 
-                LapicEntry *Entry = MmAllocatePool(sizeof(LapicEntry), "Apic");
+                HalpLapicEntry *Entry = MmAllocatePool(sizeof(HalpLapicEntry), "Apic");
                 if (!Entry) {
                     KeFatalError(
                         KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
@@ -206,7 +209,7 @@ void HalpInitializeApic(void) {
 
     /* Default to the LAPIC address given in the MSR (if we're not using x2APIC). */
     if (!X2ApicEnabled) {
-        LapicAddress = MmMapSpace(ReadMsr(0x1B) & ~0xFFF, MM_PAGE_SIZE);
+        LapicAddress = MmMapSpace(ReadMsr(HALP_APIC_MSR) & ~0xFFF, MM_PAGE_SIZE);
         if (!LapicAddress) {
             KeFatalError(
                 KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
@@ -229,76 +232,127 @@ void HalpInitializeApic(void) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void HalpEnableApic(void) {
+    /* More than likely APIC is already enabled in the MSR, but just in case, set it up (activating
+     * X2APIC if possible). */
+    uint64_t Value = ReadMsr(HALP_APIC_MSR) | HALP_APIC_MSR_ENABLE;
     if (X2ApicEnabled) {
-        WriteMsr(0x1B, (ReadMsr(0x1B) & ~0xFFF) | 0xC00);
+        WriteMsr(HALP_APIC_MSR, Value | HALP_APIC_MSR_X2APIC_ENABLE);
     } else {
-        WriteMsr(0x1B, (ReadMsr(0x1B) & ~0xFFF) | 0x800);
+        WriteMsr(HALP_APIC_MSR, Value & ~HALP_APIC_MSR_X2APIC_ENABLE);
     }
 
-    /* Reconfigure and mask the PIC (this seems to be necessary on all processors, or things can
-     * get a bit hairy). */
-    WritePortByte(0x21, 0xFF);
-    WritePortByte(0xA1, 0xFF);
+    /* Mask (disable) the legacy PIC. */
+    WritePortByte(HALP_PIC_CMD1, HALP_PIC_ICW1);
+    WritePortByte(HALP_PIC_CMD2, HALP_PIC_ICW1);
+    WritePortByte(HALP_PIC_DATA1, HALP_PIC_ICW2_MASTER);
+    WritePortByte(HALP_PIC_DATA2, HALP_PIC_ICW2_SLAVE);
+    WritePortByte(HALP_PIC_DATA1, HALP_PIC_ICW3_MASTER);
+    WritePortByte(HALP_PIC_DATA2, HALP_PIC_ICW3_SLAVE);
+    WritePortByte(HALP_PIC_DATA1, HALP_PIC_ICW4_MASTER);
+    WritePortByte(HALP_PIC_DATA2, HALP_PIC_ICW4_SLAVE);
+    WritePortByte(HALP_PIC_DATA1, HALP_PIC_MASK);
+    WritePortByte(HALP_PIC_DATA2, HALP_PIC_MASK);
 
-    /* And setup the remaining registers, this should finish enabling the LAPIC. */
-    HalpWriteLapicRegister(0x80, 0);
-    HalpWriteLapicRegister(0xF0, 0x1FF);
+    /* Mask out all LVT entries (the LAPIC timer will get unmasked later). */
+    HalpApicLvtRecord Record = {0};
+    Record.Masked = 1;
 
+    /* These should always exist no matter the processor. */
+    uint64_t MaxLvt = HALP_APIC_VER_MAX_LVT(HalpReadLapicRegister(HALP_APIC_VER_REG));
+    HalpWriteLapicRegister(HALP_APIC_LVTT_REG, Record.RawData);
+    HalpWriteLapicRegister(HALP_APIC_LVT0_REG, Record.RawData);
+    HalpWriteLapicRegister(HALP_APIC_LVT1_REG, Record.RawData);
+    HalpWriteLapicRegister(HALP_APIC_LVTERR_REG, Record.RawData);
+
+    /* PMC and its associated interrupt were introduced in the P6. */
+    if (MaxLvt >= 5) {
+        HalpWriteLapicRegister(HALP_APIC_LVTPC_REG, Record.RawData);
+    }
+
+    /* THMR and its associated interrupt were introduced in the Pentium 4. */
+    if (MaxLvt >= 6) {
+        HalpWriteLapicRegister(HALP_APIC_LVTTHMR_REG, Record.RawData);
+    }
+
+    /* CMCI and its associated interrupt were introduced in the Xeon 5500. */
+    if (MaxLvt >= 7) {
+        HalpWriteLapicRegister(HALP_APIC_LVTCMCI_REG, Record.RawData);
+    }
+
+    /* Back to back ESR writes to clear it (probably just a single write already does the trick on
+     * modern CPUs? but it doesn't hurt to do it). */
+    HalpWriteLapicRegister(HALP_APIC_ESR_REG, 0);
+    HalpWriteLapicRegister(HALP_APIC_ESR_REG, 0);
+
+    /* LDR/DFR setup isn't needed when using physical destination mode. */
+    HalpWriteLapicRegister(HALP_APIC_TPR_REG, KE_IRQL_PASSIVE);
+
+    /* Now we can setup the spurious interrupt vector, and the enable the local APIC (we're safe to
+     * receive interrupts after this). */
+    Value = HalpReadLapicRegister(HALP_APIC_SPIV_REG);
+    HalpWriteLapicRegister(
+        HALP_APIC_SPIV_REG,
+        (Value & HALP_APIC_SPIV_MASK) | HALP_INT_SPURIOUS_VECTOR | HALP_APIC_SPIV_ENABLE);
+    HalpSendEoi();
     __asm__ volatile("sti");
 }
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function sends an IPI to another processor.
+ *     This function sends a interrupt to another processor.
  *
  * PARAMETERS:
  *     Target - APIC ID of the target.
  *     Vector - Interrupt vector/action we want to trigger in the target.
+ *     DeliveryMode - Type of IPI to send (normal, SMI, NMI, etc).
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void HalpSendIpi(uint32_t Target, uint32_t Vector) {
+void HalpSendIpi(uint32_t Target, uint8_t Vector, uint8_t DeliveryMode) {
+    /* WRMSR into the X2APIC range is not a serializing instruction on Intel processors, so we
+     * need to lfence+mfence for those. */
     if (X2ApicEnabled) {
-        HalpWriteLapicRegister(0x300, ((uint64_t)Target << 32) | Vector);
-    } else {
-        HalpWriteLapicRegister(0x310, Target << 24);
-        HalpWriteLapicRegister(0x300, Vector);
+        __asm__ volatile("mfence; lfence" : : : "memory");
     }
-}
 
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function sends an non-maskable interrupt to another processor.
- *
- * PARAMETERS:
- *     Target - APIC ID of the target.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-void HalpSendNmi(uint32_t Target) {
+    /* We only support physical no-shorthand IPIs (in this function). */
+    HalpApicCommandRegister Register = {0};
+    Register.Vector = Vector;
+    Register.DestinationMode = HALP_APIC_ICR_DESTINATION_MODE_PHYSICAL;
+    Register.DestinationType = HALP_APIC_ICR_DESTINATION_TYPE_DEFAULT;
+
+    /* INIT de-assert is mostly the same as an INIT, but with level+trigger set differently. */
+    if (DeliveryMode == HALP_APIC_ICR_DELIVERY_INIT_DEASSERT) {
+        Register.DeliveryMode = HALP_APIC_ICR_DELIVERY_INIT;
+        Register.Level = HALP_APIC_ICR_LEVEL_DEASSERT;
+        Register.TriggerMode = HAL_INT_TRIGGER_LEVEL;
+    } else {
+        Register.DeliveryMode = DeliveryMode;
+        Register.Level = HALP_APIC_ICR_LEVEL_ASSERT;
+        Register.TriggerMode = HALP_APIC_ICR_TRIGGER_EDGE;
+    }
+
     if (X2ApicEnabled) {
-        HalpWriteLapicRegister(0x300, ((uint64_t)Target << 32) | 0x400);
+        Register.DestinationFull = Target;
+        HalpWriteLapicRegister(HALP_APIC_ICR_REG_LOW, Register.RawData);
     } else {
-        HalpWriteLapicRegister(0x310, Target << 24);
-        HalpWriteLapicRegister(0x300, 0x400);
+        Register.DestinationShort = Target;
+        HalpWriteLapicRegister(HALP_APIC_ICR_REG_HIGH, Register.HighData);
+        HalpWriteLapicRegister(HALP_APIC_ICR_REG_LOW, Register.LowData);
     }
-}
 
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function busy loops until the Local APIC says a previously sent IPI was delivered.
- *
- * PARAMETERS:
- *     None.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-void HalpWaitIpiDelivery(void) {
-    while (HalpReadLapicRegister(0x300) & 0x1000)
-        ;
+    /* x2APIC doesn't has the DeliveryStatus bit (so no need to pool anything on it). */
+    if (!X2ApicEnabled) {
+        while (true) {
+            PauseProcessor();
+            HalpApicCommandRegister Register = {0};
+            Register.LowData = HalpReadLapicRegister(HALP_APIC_ICR_REG_LOW);
+            if (!Register.DeliveryStatus) {
+                break;
+            }
+        }
+    }
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -312,5 +366,5 @@ void HalpWaitIpiDelivery(void) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void HalpSendEoi(void) {
-    HalpWriteLapicRegister(0xB0, 0);
+    HalpWriteLapicRegister(HALP_APIC_EOI_REG, 0);
 }

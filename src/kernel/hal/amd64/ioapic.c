@@ -1,7 +1,7 @@
 /* SPDX-FileCopyrightText: (C) 2023 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#include <kernel/detail/amd64/apic.h>
+#include <kernel/halp.h>
 #include <kernel/ke.h>
 #include <kernel/mm.h>
 #include <kernel/vid.h>
@@ -20,9 +20,9 @@ static RtSList IoapicOverrideListHead = {};
  * RETURN VALUE:
  *     What we've read.
  *-----------------------------------------------------------------------------------------------*/
-static uint32_t ReadIoapicRegister(IoapicEntry *Entry, uint8_t Number) {
-    *(volatile uint32_t *)(Entry->VirtualAddress + IOAPIC_INDEX) = Number;
-    return *(volatile uint32_t *)(Entry->VirtualAddress + IOAPIC_DATA);
+static uint32_t ReadIoapicRegister(HalpIoapicEntry *Entry, uint8_t Number) {
+    *(volatile uint32_t *)(Entry->VirtualAddress + HALP_IOAPIC_INDEX) = Number;
+    return *(volatile uint32_t *)(Entry->VirtualAddress + HALP_IOAPIC_DATA);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -37,9 +37,9 @@ static uint32_t ReadIoapicRegister(IoapicEntry *Entry, uint8_t Number) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-static void WriteIoapicRegister(IoapicEntry *Entry, uint8_t Number, uint32_t Data) {
-    *(volatile uint32_t *)(Entry->VirtualAddress + IOAPIC_INDEX) = Number;
-    *(volatile uint32_t *)(Entry->VirtualAddress + IOAPIC_DATA) = Data;
+static void WriteIoapicRegister(HalpIoapicEntry *Entry, uint8_t Number, uint32_t Data) {
+    *(volatile uint32_t *)(Entry->VirtualAddress + HALP_IOAPIC_INDEX) = Number;
+    *(volatile uint32_t *)(Entry->VirtualAddress + HALP_IOAPIC_DATA) = Data;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -65,14 +65,15 @@ static void UnmaskIoapicVector(
     RtSList *ListHeader = IoapicListHead.Next;
 
     while (ListHeader) {
-        IoapicEntry *Entry = CONTAINING_RECORD(ListHeader, IoapicEntry, ListHeader);
+        HalpIoapicEntry *Entry = CONTAINING_RECORD(ListHeader, HalpIoapicEntry, ListHeader);
 
         if (Entry->GsiBase <= Gsi && Gsi < Entry->GsiBase + Entry->Size) {
             WriteIoapicRegister(
                 Entry,
-                IOAPIC_REDIR_REG_LOW(Gsi - Entry->GsiBase),
+                HALP_IOAPIC_REDIR_REG_LOW(Gsi - Entry->GsiBase),
                 TargetVector | (PinPolarity << 13) | (TriggerMode << 15));
-            WriteIoapicRegister(Entry, IOAPIC_REDIR_REG_HIGH(Gsi - Entry->GsiBase), ApicId << 24);
+            WriteIoapicRegister(
+                Entry, HALP_IOAPIC_REDIR_REG_HIGH(Gsi - Entry->GsiBase), ApicId << 24);
             return;
         }
 
@@ -91,7 +92,7 @@ static void UnmaskIoapicVector(
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void HalpInitializeIoapic(void) {
-    MadtHeader *Madt = KiFindAcpiTable("APIC", 0);
+    HalpMadtHeader *Madt = KiFindAcpiTable("APIC", 0);
     if (!Madt) {
         KeFatalError(
             KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
@@ -103,11 +104,11 @@ void HalpInitializeIoapic(void) {
 
     char *Position = (char *)(Madt + 1);
     while (Position < (char *)Madt + Madt->Length) {
-        MadtRecord *Record = (MadtRecord *)Position;
+        HalpMadtRecord *Record = (HalpMadtRecord *)Position;
 
         switch (Record->Type) {
-            case IOAPIC_RECORD: {
-                IoapicEntry *Entry = MmAllocatePool(sizeof(IoapicEntry), "Apic");
+            case HALP_IOAPIC_RECORD: {
+                HalpIoapicEntry *Entry = MmAllocatePool(sizeof(HalpIoapicEntry), "Apic");
                 if (!Entry) {
                     KeFatalError(
                         KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
@@ -130,10 +131,10 @@ void HalpInitializeIoapic(void) {
                 }
 
                 /* Set some sane defaults for all IOAPICs we find. */
-                Entry->Size = (ReadIoapicRegister(Entry, IOAPIC_VER_REG) >> 16) + 1;
+                Entry->Size = (ReadIoapicRegister(Entry, HALP_IOAPIC_VER_REG) >> 16) + 1;
                 for (uint8_t i = 0; i < Entry->Size; i++) {
-                    WriteIoapicRegister(Entry, IOAPIC_REDIR_REG_LOW(i), 0x10000);
-                    WriteIoapicRegister(Entry, IOAPIC_REDIR_REG_HIGH(i), 0);
+                    WriteIoapicRegister(Entry, HALP_IOAPIC_REDIR_REG_LOW(i), 0x10000);
+                    WriteIoapicRegister(Entry, HALP_IOAPIC_REDIR_REG_HIGH(i), 0);
                 }
 
                 RtPushSList(&IoapicListHead, &Entry->ListHeader);
@@ -150,8 +151,9 @@ void HalpInitializeIoapic(void) {
 
             /* Legacy IRQ -> GSI mappings; We need this to handle any legacy device (such as a
                PIT). */
-            case IOAPIC_SOURCE_OVERRIDE_RECORD: {
-                IoapicOverrideEntry *Entry = MmAllocatePool(sizeof(IoapicOverrideEntry), "Apic");
+            case HALP_IOAPIC_SOURCE_OVERRIDE_RECORD: {
+                HalpIoapicOverrideEntry *Entry =
+                    MmAllocatePool(sizeof(HalpIoapicOverrideEntry), "Apic");
                 if (!Entry) {
                     KeFatalError(
                         KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
@@ -199,7 +201,8 @@ void HalpEnableIrq(uint8_t Irq, uint8_t Vector) {
     int TriggerMode = 0;
 
     while (ListHeader) {
-        IoapicOverrideEntry *Entry = CONTAINING_RECORD(ListHeader, IoapicOverrideEntry, ListHeader);
+        HalpIoapicOverrideEntry *Entry =
+            CONTAINING_RECORD(ListHeader, HalpIoapicOverrideEntry, ListHeader);
 
         if (Entry->Irq == Irq) {
             Gsi = Entry->Gsi;

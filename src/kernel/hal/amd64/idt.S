@@ -19,8 +19,8 @@
 
 .global HalpDefaultInterruptHandlers
 HalpDefaultInterruptHandlers:
-.set i, 32
-.rept 224
+.set i, 0
+.rept 256
     push $i
     jmp HalpDefaultInterruptEntry
     .align 16
@@ -321,7 +321,6 @@ HalpDispatchEntry:
     sti
     mov %rsp, %rcx
     call PspProcessQueue
-    cli
     LEAVE_INTERRUPT
 .seh_endproc
 
@@ -330,12 +329,21 @@ HalpDispatchEntry:
 .align 16
 HalpTimerEntry:
     ENTER_INTERRUPT
-    mov $HAL_INT_TIMER_IRQL, %rax
-    mov %rax, %cr8
+    mov $HALP_INT_TIMER_IRQL, %rcx
+    mov %rcx, %cr8
     mov %rsp, %rcx
     call EvpHandleTimer
     call HalpSendEoi
     LEAVE_INTERRUPT
+.seh_endproc
+
+.seh_proc HalpSpuriousEntry
+.global HalpSpuriousEntry
+.align 16
+HalpSpuriousEntry:
+    .seh_pushframe
+    .seh_endprologue
+    iretq
 .seh_endproc
 
 .seh_proc HalpExceptionEntry

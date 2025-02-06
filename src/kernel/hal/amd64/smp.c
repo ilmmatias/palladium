@@ -1,7 +1,6 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#include <kernel/detail/amd64/apic.h>
 #include <kernel/ev.h>
 #include <kernel/halp.h>
 #include <kernel/intrin.h>
@@ -32,14 +31,15 @@ void HalpInitializeSmp(void) {
     uint32_t ApicId = KeGetCurrentProcessor()->ApicId;
 
     /* Map the AP startup code (0x8000), and copy all the trampoline data to it. */
-    HalpMapPages((void *)0x8000, 0x8000, MM_PAGE_SIZE, MI_MAP_WRITE | MI_MAP_EXEC);
-    memcpy((void *)0x8000, HalpApplicationProcessorEntry, MM_PAGE_SIZE);
+    uint64_t EntryAddress = 0x8000;
+    HalpMapPages((void *)EntryAddress, EntryAddress, MM_PAGE_SIZE, MI_MAP_WRITE | MI_MAP_EXEC);
+    memcpy((void *)EntryAddress, HalpApplicationProcessorEntry, MM_PAGE_SIZE);
 
     /* Save the kernel page map (shared between all processors).
        The address is guaranteed to be on the low 4GiBs (because of bootmgr). */
     __asm__ volatile("mov %%cr3, %0"
                      : "=r"(*(uint64_t *)((uint64_t)&HalpKernelPageMap -
-                                          (uint64_t)HalpApplicationProcessorEntry + 0x8000)));
+                                          (uint64_t)HalpApplicationProcessorEntry + EntryAddress)));
 
     /* Allocate space for all the processors (this is just the pointer list, we'll be allocating
      * each processor after that). */
@@ -81,7 +81,7 @@ void HalpInitializeSmp(void) {
 
     RtSList *ListHeader = HalpLapicListHead.Next;
     while (ListHeader) {
-        LapicEntry *Entry = CONTAINING_RECORD(ListHeader, LapicEntry, ListHeader);
+        HalpLapicEntry *Entry = CONTAINING_RECORD(ListHeader, HalpLapicEntry, ListHeader);
         if (Entry->ApicId == ApicId) {
             ListHeader = ListHeader->Next;
             continue;
@@ -89,19 +89,14 @@ void HalpInitializeSmp(void) {
 
         /* Recommended/safe initialization process;
          * Send an INIT IPI, followed by deasserting it. */
-        HalpSendIpi(Entry->ApicId, 0xC500);
-        HalpWaitIpiDelivery();
+        HalpSendIpi(Entry->ApicId, 0, HALP_APIC_ICR_DELIVERY_INIT);
         HalWaitTimer(10 * EV_MICROSECS);
-        HalpSendIpi(Entry->ApicId, 0x8500);
-        HalpWaitIpiDelivery();
+        HalpSendIpi(Entry->ApicId, 0, HALP_APIC_ICR_DELIVERY_INIT_DEASSERT);
         HalWaitTimer(200 * EV_MICROSECS);
 
         /* Two attempts at sending a STARTUP IPI should be enough (according to spec). */
-        for (int i = 0; i < 2; i++) {
-            HalpSendIpi(Entry->ApicId, 0x608);
-            HalWaitTimer(200 * EV_MICROSECS);
-            HalpWaitIpiDelivery();
-        }
+        HalpSendIpi(Entry->ApicId, EntryAddress >> 12, HALP_APIC_ICR_DELIVERY_STARTUP);
+        HalpSendIpi(Entry->ApicId, EntryAddress >> 12, HALP_APIC_ICR_DELIVERY_STARTUP);
 
         ListHeader = ListHeader->Next;
     }
@@ -110,7 +105,7 @@ void HalpInitializeSmp(void) {
         HalWaitTimer(100 * EV_MICROSECS);
     }
 
-    HalpUnmapPages((void *)0x8000, MM_PAGE_SIZE);
+    HalpUnmapPages((void *)EntryAddress, MM_PAGE_SIZE);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -120,17 +115,12 @@ void HalpInitializeSmp(void) {
  *
  * PARAMETERS:
  *     Processor - Which processor to notify.
- *     WaitDelivery - Set this to true if we should wait for delivery (important for events!)
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void HalpNotifyProcessor(KeProcessor *Processor, bool WaitDelivery) {
-    HalpSendIpi(Processor->ApicId, HAL_INT_DISPATCH_VECTOR);
-
-    if (WaitDelivery) {
-        HalpWaitIpiDelivery();
-    }
+void HalpNotifyProcessor(KeProcessor *Processor) {
+    HalpSendIpi(Processor->ApicId, HALP_INT_DISPATCH_VECTOR, HALP_APIC_ICR_DELIVERY_FIXED);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -145,6 +135,8 @@ void HalpNotifyProcessor(KeProcessor *Processor, bool WaitDelivery) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void HalpFreezeProcessor(KeProcessor *Processor) {
+    void *Context = HalpEnterCriticalSection();
     Processor->EventType = KE_EVENT_TYPE_FREEZE;
-    HalpSendNmi(Processor->ApicId);
+    HalpSendIpi(Processor->ApicId, 0, HALP_APIC_ICR_DELIVERY_NMI);
+    HalpLeaveCriticalSection(Context);
 }

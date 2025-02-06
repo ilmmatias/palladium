@@ -3,6 +3,7 @@
 
 #include <kernel/evp.h>
 #include <kernel/halp.h>
+#include <kernel/intrin.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -16,23 +17,24 @@
  *-----------------------------------------------------------------------------------------------*/
 void HalpInitializeApicTimer(void) {
     /* Max out the divider. */
-    HalpWriteLapicRegister(0x3E0, 0);
+    HalpWriteLapicRegister(HALP_APIC_TIMER_DCR_REG, 0);
 
     /* We'll be taking the average over 4 runs. */
     uint64_t Accum = 0;
     uint64_t Ticks = EVP_TICK_PERIOD / HalGetTimerPeriod();
     for (int i = 0; i < 4; i++) {
         uint64_t End = HalGetTimerTicks() + Ticks;
-        HalpWriteLapicRegister(0x380, UINT32_MAX);
+        HalpWriteLapicRegister(HALP_APIC_TIMER_ICR_REG, UINT32_MAX);
         while (HalGetTimerTicks() < End)
             ;
-
-        HalpWriteLapicRegister(0x320, 0x10000);
-        Accum += UINT32_MAX - HalpReadLapicRegister(0x390);
+        Accum += UINT32_MAX - HalpReadLapicRegister(HALP_APIC_TIMER_CCR_REG);
     }
 
     /* Now we can enable the LAPIC in periodic mode. */
-    HalpWriteLapicRegister(0x320, 0x20000 | HAL_INT_TIMER_VECTOR);
-    HalpWriteLapicRegister(0x3E0, 0);
-    HalpWriteLapicRegister(0x380, Accum / 4);
+    HalpApicLvtRecord Record = {0};
+    Record.Vector = HALP_INT_TIMER_VECTOR;
+    Record.Periodic = 1;
+    HalpWriteLapicRegister(HALP_APIC_LVTT_REG, Record.RawData);
+    HalpWriteLapicRegister(HALP_APIC_TIMER_DCR_REG, 0);
+    HalpWriteLapicRegister(HALP_APIC_TIMER_ICR_REG, Accum / 4);
 }

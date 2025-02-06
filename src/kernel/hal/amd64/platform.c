@@ -68,7 +68,6 @@ void HalpInitializeBootProcessor(void) {
     HalpInitializeHpet();
     HalpInitializeSmp();
     HalpInitializeApicTimer();
-    KeSetIrql(KE_IRQL_PASSIVE);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -91,5 +90,4 @@ void HalpInitializeApplicationProcessor(KeProcessor *Processor) {
     HalpEnableApic();
     Processor->ApicId = HalpReadLapicId();
     HalpInitializeApicTimer();
-    KeSetIrql(KE_IRQL_PASSIVE);
 }

@@ -87,7 +87,7 @@ void HalpInitializeHpet(void) {
     Width = (Reg & HPET_CAP_64B) ? HAL_TIMER_WIDTH_64B : HAL_TIMER_WIDTH_32B;
     Period = (Reg >> HPET_CAP_FREQ_START) / 1000000;
     VidPrint(
-        VID_MESSAGE_DEBUG,
+        VID_MESSAGE_INFO,
         "Kernel HAL",
         "using HPET as timer tick source (%u-bits counter, period = %llu ns)\n",
         Width,

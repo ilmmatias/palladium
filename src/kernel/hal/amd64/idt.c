@@ -9,7 +9,7 @@
 
 extern struct __attribute__((packed)) {
     char Code[16];
-} HalpDefaultInterruptHandlers[224];
+} HalpDefaultInterruptHandlers[256];
 
 extern void HalpDivisionTrapEntry(void);
 extern void HalpDebugTrapEntry(void);
@@ -38,6 +38,7 @@ extern void HalpVmmCommunicationTrapEntry(void);
 extern void HalpSecurityTrapEntry(void);
 extern void HalpDispatchEntry(void);
 extern void HalpTimerEntry(void);
+extern void HalpSpuriousEntry(void);
 
 static struct {
     void (*Handler)(void);
@@ -347,15 +348,17 @@ void HalpInitializeIdt(KeProcessor *Processor) {
 
         /* Interrupt handlers with special conditions (reserved IRQL, or not following the standard
            rules like enabling interrupts before enabling). */
-        else if (i == HAL_INT_DISPATCH_VECTOR) {
+        else if (i == HALP_INT_DISPATCH_VECTOR) {
             Base = (uint64_t)HalpDispatchEntry;
-        } else if (i == HAL_INT_TIMER_VECTOR) {
+        } else if (i == HALP_INT_TIMER_VECTOR) {
             Base = (uint64_t)HalpTimerEntry;
+        } else if (i == HALP_INT_SPURIOUS_VECTOR) {
+            Base = (uint64_t)HalpSpuriousEntry;
         }
 
         /* Default IRQ handlers for everything else. */
         else {
-            Base = (uint64_t)&HalpDefaultInterruptHandlers[i - 32];
+            Base = (uint64_t)&HalpDefaultInterruptHandlers[i];
         }
 
         InitializeEntry(Processor, i, Base, DESCR_SEG_KCODE, Ist, IDT_TYPE_INT, Dpl);
@@ -379,38 +382,35 @@ void HalpInitializeIdt(KeProcessor *Processor) {
  *     false if the interrupt couldn't be registered, true otherwise.
  *-----------------------------------------------------------------------------------------------*/
 bool HalEnableInterrupt(HalInterrupt *Interrupt) {
-    /* We'll be assuming that if the interrupt is already enabled, the caller would rather receive a
-     * "success" than a failure (as a previous call with the exact same interrupt object did
-     * succeed). */
+    /* We'll be assuming that if the interrupt is already enabled, the caller would rather
+     * receive a "success" than a failure (as a previous call with the exact same interrupt
+     * object did succeed). */
     if (Interrupt->Enabled) {
         return true;
     }
 
     /* The IOAPIC uses the top 4 bits as the TPR (which is our IRQL); TPRs of 0 and 1 don't make
      * sense (they are traps/exceptions!), and we don't want anyone registering any interrupt
-     * directly at dispatch level (just register a DPC instead). */
-    if (Interrupt->Irql != (Interrupt->Vector >> 4) && Interrupt->Irql <= KE_IRQL_DISPATCH) {
+     * directly outside the device level range. */
+    if (Interrupt->Irql != (Interrupt->Vector >> 4) &&
+        (Interrupt->Irql <= KE_IRQL_DISPATCH || Interrupt->Irql >= KE_IRQL_TIMER)) {
         return false;
     }
 
-    /* Related to that, don't try using any reserved vector! */
-    if (Interrupt->Vector == HAL_INT_TIMER_VECTOR) {
-        return false;
-    }
-
-    /* Other than that, we also are limited by our IDT (only 256 vectors). */
+    /* The IRQL should have already told us about the vector, but let's validate it too just to
+     * be sure. */
     if (Interrupt->Vector > 255) {
         return false;
     }
 
     KeProcessor *Processor = KeGetCurrentProcessor();
-    KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Processor->Lock, KE_IRQL_DISPATCH);
+    KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Processor->Lock, KE_IRQL_SYNCH);
     RtDList *Handlers = &Processor->InterruptList[Interrupt->Vector];
 
     if (Handlers->Next != Handlers) {
         /* We already have one or more interrupt handlers on this vector, validate if we are
-         * compatible with the already installed handlers (one single vector can only be level or
-         * edge triggered, not both). */
+         * compatible with the already installed handlers (one single vector can only be level
+         * or edge triggered, not both). */
         if (CONTAINING_RECORD(Handlers->Next, HalInterrupt, ListHeader)->Type != Interrupt->Type) {
             KeReleaseSpinLockAndLowerIrql(&Processor->Lock, OldIrql);
             return false;
@@ -442,7 +442,7 @@ void HalDisableInterrupt(HalInterrupt *Interrupt) {
     /* Should be as simple as marking us as not enabled + unlinking from the interrupt handler
      * list. */
     KeProcessor *Processor = KeGetCurrentProcessor();
-    KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Processor->Lock, KE_IRQL_DISPATCH);
+    KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Processor->Lock, KE_IRQL_SYNCH);
     RtUnlinkDList(&Interrupt->ListHeader);
     KeReleaseSpinLockAndLowerIrql(&Processor->Lock, OldIrql);
     Interrupt->Enabled = false;

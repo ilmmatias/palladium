@@ -30,7 +30,7 @@ uint64_t HalpGetPhysicalAddress(void *VirtualAddress);
 bool HalpMapPages(void *VirtualAddress, uint64_t PhysicalAddress, uint64_t Size, int Flags);
 void HalpUnmapPages(void *VirtualAddress, uint64_t Size);
 
-void HalpNotifyProcessor(KeProcessor *Processor, bool WaitDelivery);
+void HalpNotifyProcessor(KeProcessor *Processor);
 void HalpFreezeProcessor(KeProcessor *Processor);
 
 void *HalpEnterCriticalSection(void);

@@ -7,6 +7,7 @@
 #define KE_IRQL_PASSIVE 0
 #define KE_IRQL_DISPATCH 2
 #define KE_IRQL_DEVICE 3
+#define KE_IRQL_TIMER 13
 #define KE_IRQL_SYNCH 13
 #define KE_IRQL_IPI 14
 #define KE_IRQL_MAX 15

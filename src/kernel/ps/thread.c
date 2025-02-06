@@ -91,7 +91,6 @@ TryQueueThreadIn(PsThread *Thread, KeProcessor *Processor, bool EventQueue, bool
 void PspQueueThread(PsThread *Thread, bool EventQueue) {
     /* We prefer to stay on the current processor. */
     if (TryQueueThreadIn(Thread, KeGetCurrentProcessor(), EventQueue, true)) {
-        HalpNotifyProcessor(KeGetCurrentProcessor(), false);
         return;
     }
 
@@ -102,7 +101,6 @@ void PspQueueThread(PsThread *Thread, bool EventQueue) {
         if (Index == (uint32_t)-1) {
             break;
         } else if (TryQueueThreadIn(Thread, HalpProcessorList[Index], EventQueue, true)) {
-            HalpNotifyProcessor(HalpProcessorList[Index], false);
             return;
         }
     }

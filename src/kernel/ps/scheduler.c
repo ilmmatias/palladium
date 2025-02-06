@@ -112,8 +112,9 @@ static inline void SwitchExecution(
 void PsYieldThread(int Type) {
     /* Raise to SYNCH (block device interrupts) and acquire the processor lock (to access the
      * queue). */
+    KeIrql OldIrql = KeRaiseIrql(KE_IRQL_SYNCH);
     KeProcessor *Processor = KeGetCurrentProcessor();
-    KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Processor->Lock, KE_IRQL_SYNCH);
+    KeAcquireSpinLockAtCurrentIrql(&Processor->Lock);
 
     /* If the yield is putting us in a waiting state, we actually want to switch into idle once
      * we have nothing left to do; Otherwise, same as PspProcessQueue (don't switch into idle,

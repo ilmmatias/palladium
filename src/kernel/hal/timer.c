@@ -31,7 +31,7 @@ bool HalCheckTimerExpiration(uint64_t Current, uint64_t Reference, uint64_t Tick
         return Current < Reference || Current >= Target;
     }
 
-    return Current < Reference && Current >= ((Target >> 32) << 32);
+    return Current < Reference && Current >= (Target >> 32);
 }
 
 /*-------------------------------------------------------------------------------------------------
