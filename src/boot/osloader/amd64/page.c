@@ -8,8 +8,6 @@
 #include <platform.h>
 #include <string.h>
 
-static bool HasHugePages = false;
-
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function sets up the specified page frame to be present.
@@ -206,31 +204,7 @@ static bool MapRange(
     uint64_t Size,
     int Flags) {
     while (Size) {
-        /* Use as many 1GiB pages as possible. */
-        bool UseHugePage = HasHugePages && CheckLevel(PageMap, VirtualAddress, 1) &&
-                           !(VirtualAddress & (SIZE_1GB - 1)) &&
-                           !(PhysicalAddress & (SIZE_1GB - 1)) && Size >= SIZE_1GB;
-        if (UseHugePage) {
-            if (!MapPage(
-                    MemoryDescriptorListHead,
-                    MemoryDescriptorStack,
-                    PageMap,
-                    VirtualAddress,
-                    PhysicalAddress,
-                    Flags,
-                    1,
-                    true,
-                    30)) {
-                return false;
-            }
-
-            VirtualAddress += SIZE_1GB;
-            PhysicalAddress += SIZE_1GB;
-            Size -= SIZE_1GB;
-            continue;
-        }
-
-        /* Followed by large (2MiB) pages. */
+        /* Use as many 2MiB pages as we can. */
         bool UseLargePage = CheckLevel(PageMap, VirtualAddress, 2) &&
                             !(VirtualAddress & (SIZE_2MB - 1)) &&
                             !(PhysicalAddress & (SIZE_2MB - 1)) && Size >= SIZE_2MB;
@@ -313,12 +287,6 @@ void *OslpCreatePageMap(
                    1)) {
         return NULL;
     }
-
-    /* Check for 1GiB page support; If we do support it, it can reduces the amount of work to map
-     * all ranges. */
-    uint32_t Eax, Ebx, Ecx, Edx;
-    __cpuid(0x80000001, Eax, Ebx, Ecx, Edx);
-    HasHugePages = (Edx & 0x4000000) != 0;
 
     /* The last entry of the address space contains a self-reference (so that the
      * kernel can easily manipulate the page map). */
@@ -447,10 +415,8 @@ void *OslpCreatePageMap(
         }
     }
 
-    /* Map the display's back buffer (aligning the size up to the nearest 2MiB, or the nearest 1GiB
-     * if huge pages are available). */
-    uint64_t BackBufferSize = HasHugePages ? (FrameBufferSize + SIZE_1GB - 1) & ~(SIZE_1GB - 1)
-                                           : (FrameBufferSize + SIZE_2MB - 1) & ~(SIZE_2MB - 1);
+    /* Map the display's back buffer (aligning the size up to the nearest 2MiB). */
+    uint64_t BackBufferSize = (FrameBufferSize + SIZE_2MB - 1) & ~(SIZE_2MB - 1);
     if (!MapRange(
             MemoryDescriptorListHead,
             MemoryDescriptorStack,
