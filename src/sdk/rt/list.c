@@ -68,9 +68,10 @@ void RtInitializeDList(RtDList *Head) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void RtPushDList(RtDList *Head, RtDList *Entry) {
-    Entry->Next = Head->Next;
+    RtDList *Next = Head->Next;
+    Entry->Next = Next;
     Entry->Prev = Head;
-    Head->Next->Prev = Entry;
+    Next->Prev = Entry;
     Head->Next = Entry;
 }
 
@@ -86,9 +87,10 @@ void RtPushDList(RtDList *Head, RtDList *Entry) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void RtAppendDList(RtDList *Head, RtDList *Entry) {
+    RtDList *Prev = Head->Prev;
     Entry->Next = Head;
-    Entry->Prev = Head->Prev;
-    Head->Prev->Next = Entry;
+    Entry->Prev = Prev;
+    Prev->Next = Entry;
     Head->Prev = Entry;
 }
 
@@ -104,8 +106,9 @@ void RtAppendDList(RtDList *Head, RtDList *Entry) {
  *-----------------------------------------------------------------------------------------------*/
 RtDList *RtPopDList(RtDList *Head) {
     RtDList *Entry = Head->Next;
-    Head->Next = Entry->Next;
-    Head->Next->Prev = Head;
+    RtDList *Next = Entry->Next;
+    Head->Next = Next;
+    Next->Prev = Head;
     return Entry;
 }
 
@@ -121,8 +124,9 @@ RtDList *RtPopDList(RtDList *Head) {
  *-----------------------------------------------------------------------------------------------*/
 RtDList *RtTruncateDList(RtDList *Head) {
     RtDList *Entry = Head->Prev;
-    Head->Prev = Entry->Prev;
-    Entry->Prev->Next = Head;
+    RtDList *Prev = Entry->Prev;
+    Head->Prev = Prev;
+    Prev->Next = Head;
     return Entry;
 }
 
@@ -138,6 +142,8 @@ RtDList *RtTruncateDList(RtDList *Head) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void RtUnlinkDList(RtDList *Entry) {
-    Entry->Prev->Next = Entry->Next;
-    Entry->Next->Prev = Entry->Prev;
+    RtDList *Prev = Entry->Prev;
+    RtDList *Next = Entry->Next;
+    Prev->Next = Next;
+    Next->Prev = Prev;
 }

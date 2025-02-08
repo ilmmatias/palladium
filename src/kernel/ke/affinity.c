@@ -17,7 +17,14 @@
  *-----------------------------------------------------------------------------------------------*/
 void KeInitializeAffinity(KeAffinity *Mask) {
     Mask->Size = HalpOnlineProcessorCount;
-    memset((void *)Mask->Bits, 0xFF, (Mask->Size + 7) >> 3);
+
+    /* Handle head+middle bits. */
+    memset((void *)Mask->Bits, 0xFF, Mask->Size >> 3);
+
+    /* And set all remaining bits by hand (as to not overshoot). */
+    for (uint64_t Bit = Mask->Size << 3; Bit < Mask->Size; Bit++) {
+        Mask->Bits[Bit >> 6] |= 1ull << (Bit & 0x3F);
+    }
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -81,7 +88,7 @@ uint32_t KeGetFirstAffinitySetBit(KeAffinity *Mask) {
         uint64_t Word = __atomic_load_n(&Mask->Bits[Number], __ATOMIC_SEQ_CST);
         if (Word) {
             uint32_t Result = (Number << 6) + __builtin_ctzll(Word);
-            return Result > Mask->Size ? (uint32_t)-1 : Result;
+            return Result >= Mask->Size ? (uint32_t)-1 : Result;
         }
     }
 
@@ -103,7 +110,7 @@ uint32_t KeGetFirstAffinityClearBit(KeAffinity *Mask) {
         uint64_t Word = __atomic_load_n(&Mask->Bits[Number], __ATOMIC_SEQ_CST);
         if (Word != UINT64_MAX) {
             uint32_t Result = (Number << 6) + __builtin_ctzll(~Word);
-            return Result > Mask->Size ? (uint32_t)-1 : Result;
+            return Result >= Mask->Size ? (uint32_t)-1 : Result;
         }
     }
 

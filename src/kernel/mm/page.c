@@ -111,7 +111,8 @@ void MiInitializePageAllocator(void) {
     /* Grab some physical memory and map it for the PFN database. This should be the last place we
      * need EarlyAllocatePages. */
     uint64_t Size = MaxAddressablePage * sizeof(MiPageEntry);
-    uint64_t PhysicalAddress = MiAllocateEarlyPages((Size + MM_PAGE_SIZE - 1) >> MM_PAGE_SHIFT);
+    uint64_t Pages = (Size + MM_PAGE_SIZE - 1) >> MM_PAGE_SHIFT;
+    uint64_t PhysicalAddress = MiAllocateEarlyPages(Pages);
     if (!PhysicalAddress) {
         KeFatalError(
             KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
@@ -122,7 +123,7 @@ void MiInitializePageAllocator(void) {
     }
 
     void *PageListBase = (void *)(MI_VIRTUAL_OFFSET + PhysicalAddress);
-    if (!HalpMapPages(PageListBase, PhysicalAddress, Size, MI_MAP_WRITE)) {
+    if (!HalpMapPages(PageListBase, PhysicalAddress, Pages << MM_PAGE_SHIFT, MI_MAP_WRITE)) {
         KeFatalError(
             KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
             KE_PANIC_PARAMETER_PFN_INITIALIZATION_FAILURE,

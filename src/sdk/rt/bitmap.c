@@ -90,7 +90,13 @@ void RtClearBits(RtBitmap *Header, uint64_t Start, uint64_t NumberOfBits) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void RtClearAllBits(RtBitmap *Header) {
-    memset(Header->Buffer, 0, (Header->NumberOfBits + 7) >> 3);
+    /* Handle head+middle bits. */
+    memset(Header->Buffer, 0, Header->NumberOfBits >> 3);
+
+    /* And clear all remaining bits by hand (as to not overshoot). */
+    for (uint64_t Bit = (Header->NumberOfBits >> 3) << 3; Bit < Header->NumberOfBits; Bit++) {
+        RtClearBit(Header, Bit);
+    }
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -160,7 +166,13 @@ void RtSetBits(RtBitmap *Header, uint64_t Start, uint64_t NumberOfBits) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void RtSetAllBits(RtBitmap *Header) {
-    memset(Header->Buffer, 0xFF, (Header->NumberOfBits + 7) >> 3);
+    /* Handle head+middle bits. */
+    memset(Header->Buffer, 0xFF, Header->NumberOfBits >> 3);
+
+    /* And set all remaining bits by hand (as to not overshoot). */
+    for (uint64_t Bit = (Header->NumberOfBits >> 3) << 3; Bit < Header->NumberOfBits; Bit++) {
+        RtSetBit(Header, Bit);
+    }
 }
 
 /*-------------------------------------------------------------------------------------------------
