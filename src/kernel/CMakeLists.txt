@@ -37,9 +37,9 @@ add_executable(kernel "kernel" YES
     ke/ipi.c
     ke/panic.c
 
-    mm/initialize.c
     mm/page.c
     mm/pool.c
+    mm/poolpage.c
 
     ps/idle.c
     ps/scheduler.c

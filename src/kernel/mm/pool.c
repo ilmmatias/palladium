@@ -1,10 +1,8 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#include <kernel/halp.h>
 #include <kernel/ke.h>
 #include <kernel/mi.h>
-#include <rt/bitmap.h>
 #include <string.h>
 
 #define SMALL_BLOCK_COUNT ((uint32_t)((MM_PAGE_SIZE - 16) >> 4))
@@ -13,113 +11,27 @@ typedef struct {
     RtSList ListHeader;
     char Tag[4];
     uint32_t Head;
-} PoolHeader;
-
-extern MiPageEntry *MiPageList;
-extern RtDList MiFreePageListHead;
-extern KeSpinLock MiPageListLock;
+} SmallBlockHeader;
 
 static KeSpinLock Lock = {0};
 static RtSList SmallBlocks[SMALL_BLOCK_COUNT] = {};
 
-uint64_t MiPoolStart = 0;
-uint64_t MiPoolBitmapHint = 0;
-RtBitmap MiPoolBitmap;
+char *MiPoolVirtualOffset = NULL;
+RtDList MiPoolBigFreeListHead;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function allocates a the specified amount of pages from the pool space.
+ *     This function sets up the kernel pool allocator.
  *
  * PARAMETERS:
- *     Pages - How many pages we need.
- *
- * RETURN VALUE:
- *     Virtual (mapped) pointer to the allocated space, or NULL if we failed to allocate it.
- *-----------------------------------------------------------------------------------------------*/
-static void *AllocatePoolPages(uint64_t Pages) {
-    uint64_t Offset = RtFindClearBitsAndSet(&MiPoolBitmap, MiPoolBitmapHint, Pages);
-    if (Offset == (uint64_t)-1) {
-        return NULL;
-    }
-
-    MiPoolBitmapHint = Offset + Pages;
-
-    char *VirtualAddress = (char *)MiPoolStart + (Offset << MM_PAGE_SHIFT);
-    for (uint64_t i = 0; i < Pages; i++) {
-        uint64_t PhysicalAddress = MmAllocateSinglePage();
-        if (!PhysicalAddress) {
-            return NULL;
-        } else if (!HalpMapPages(
-                       VirtualAddress + (i << MM_PAGE_SHIFT),
-                       PhysicalAddress,
-                       MM_PAGE_SIZE,
-                       MI_MAP_WRITE)) {
-            /* TODO: Free the memory we partially allocated, instead of leaking it. */
-            return NULL;
-        }
-
-        /* Mark the current page as part of the pool. */
-        MiPageEntry *Entry = &MI_PAGE_ENTRY(PhysicalAddress);
-        if (i) {
-            Entry->Flags |= MI_PAGE_FLAGS_POOL_ITEM;
-        } else {
-            Entry->Flags |= MI_PAGE_FLAGS_POOL_BASE;
-            Entry->Pages = Pages;
-        }
-    }
-
-    return VirtualAddress;
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function returns all pages belonging to the given allocation into the free list.
- *
- * PARAMETERS:
- *     Base - First virtual address of the allocation.
+ *     None.
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-static void FreePoolPages(void *Base) {
-    /* Grab the lock so that we can mess with the page list (even with the pool lock, it should be
-     * okay to do it. */
-    KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&MiPageListLock, KE_IRQL_DISPATCH);
-    uint64_t PhysicalAddress = HalpGetPhysicalAddress(Base);
-    MiPageEntry *BaseEntry = &MI_PAGE_ENTRY(PhysicalAddress);
-    if (!(BaseEntry->Flags & MI_PAGE_FLAGS_USED) || !(BaseEntry->Flags & MI_PAGE_FLAGS_POOL_BASE)) {
-        KeFatalError(KE_PANIC_BAD_PFN_HEADER, PhysicalAddress, BaseEntry->Flags, 0, 0);
-    }
-
-    /* Free up the base page. */
-    uint32_t Pages = BaseEntry->Pages;
-    BaseEntry->Flags = 0;
-    RtPushDList(&MiFreePageListHead, &BaseEntry->ListHeader);
-
-    /* And validate+free all remaining pages. */
-    for (uint32_t Offset = MM_PAGE_SIZE; Offset < Pages << MM_PAGE_SHIFT; Offset += MM_PAGE_SIZE) {
-        uint64_t PhysicalAdddress = HalpGetPhysicalAddress((char *)Base + Offset);
-        MiPageEntry *ItemEntry = &MI_PAGE_ENTRY(PhysicalAdddress);
-        if (!(ItemEntry->Flags & MI_PAGE_FLAGS_USED) ||
-            !(ItemEntry->Flags & MI_PAGE_FLAGS_POOL_ITEM)) {
-            KeFatalError(KE_PANIC_BAD_PFN_HEADER, PhysicalAddress, ItemEntry->Flags, 0, 0);
-        }
-
-        ItemEntry->Flags = 0;
-        RtPushDList(&MiFreePageListHead, &ItemEntry->ListHeader);
-    }
-
-    KeReleaseSpinLockAndLowerIrql(&MiPageListLock, OldIrql);
-
-    /* Return the pages to the bitmap (and update the hint if it's a "better" hint). */
-    uint64_t Offset = ((uint64_t)Base - MiPoolStart) >> MM_PAGE_SHIFT;
-    RtClearBits(&MiPoolBitmap, Offset, Pages);
-    if (Offset < MiPoolBitmapHint) {
-        MiPoolBitmapHint = Offset;
-    }
-
-    /* Now just unmap the whole range, and we should be done. */
-    HalpUnmapPages(Base, Pages << MM_PAGE_SHIFT);
+void MiInitializePool(void) {
+    MiPoolVirtualOffset = (char *)MI_POOL_START;
+    RtInitializeDList(&MiPoolBigFreeListHead);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -146,7 +58,7 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
     uint32_t Head = (Size + 0x0F) >> 4;
     if (Head > SMALL_BLOCK_COUNT) {
         uint64_t Pages = (Size + MM_PAGE_SIZE - 1) >> MM_PAGE_SHIFT;
-        void *Base = AllocatePoolPages(Pages);
+        void *Base = MiAllocatePoolPages(Pages);
 
         /* We don't need locking from here on out (we'd just be wasting time). */
         KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
@@ -164,8 +76,8 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
             continue;
         }
 
-        PoolHeader *Header =
-            CONTAINING_RECORD(RtPopSList(&SmallBlocks[i - 1]), PoolHeader, ListHeader);
+        SmallBlockHeader *Header =
+            CONTAINING_RECORD(RtPopSList(&SmallBlocks[i - 1]), SmallBlockHeader, ListHeader);
 
         if (Header->Head != i) {
             KeFatalError(
@@ -180,19 +92,19 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
         memcpy(Header->Tag, Tag, 4);
 
         if (i - Head > 1) {
-            PoolHeader *RemainingSpace = (PoolHeader *)((char *)Header + (Head << 4) + 16);
+            SmallBlockHeader *RemainingSpace =
+                (SmallBlockHeader *)((char *)Header + (Head << 4) + 16);
             RemainingSpace->Head = i - Head - 1;
             RtPushSList(&SmallBlocks[i - Head - 2], &RemainingSpace->ListHeader);
         }
 
         /* We don't need locking from here on out (we'd just be wasting time). */
         KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
-
         memset(Header + 1, 0, Head << 4);
         return Header + 1;
     }
 
-    PoolHeader *Header = AllocatePoolPages(1);
+    SmallBlockHeader *Header = MiAllocatePoolPages(1);
     if (!Header) {
         KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
         return NULL;
@@ -205,14 +117,13 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
     /* Wrap up by slicing the allocated page, we can add the remainder to the free list if
        it's big enough. */
     if (SMALL_BLOCK_COUNT - Head > 1) {
-        PoolHeader *RemainingSpace = (PoolHeader *)((char *)Header + (Head << 4) + 16);
+        SmallBlockHeader *RemainingSpace = (SmallBlockHeader *)((char *)Header + (Head << 4) + 16);
         RemainingSpace->Head = SMALL_BLOCK_COUNT - Head - 1;
         RtPushSList(&SmallBlocks[SMALL_BLOCK_COUNT - Head - 2], &RemainingSpace->ListHeader);
     }
 
     /* memset() inside the spin lock would be wasting time. */
     KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
-
     memset(Header + 1, 0, Head << 4);
     return Header + 1;
 }
@@ -233,13 +144,12 @@ void MmFreePool(void *Base, const char Tag[4]) {
     /* MmAllocatePool guarantees anything that is inside the small pool buckets is never going to
        be page aligned. */
     if (!((uint64_t)Base & (MM_PAGE_SIZE - 1))) {
-        FreePoolPages(Base);
+        MiFreePoolPages(Base);
         KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
         return;
     }
 
-    PoolHeader *Header = (PoolHeader *)Base - 1;
-
+    SmallBlockHeader *Header = (SmallBlockHeader *)Base - 1;
     if (memcmp(Header->Tag, Tag, 4) || Header->Head < 1 || Header->Head >= SMALL_BLOCK_COUNT ||
         Header->ListHeader.Next) {
         KeFatalError(
@@ -250,6 +160,7 @@ void MmFreePool(void *Base, const char Tag[4]) {
             Header->Head);
     }
 
+    /* TODO: Reduce fragmentation. */
     RtPushSList(&SmallBlocks[Header->Head - 1], &Header->ListHeader);
     KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
 }
