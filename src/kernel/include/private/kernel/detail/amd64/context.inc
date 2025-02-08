@@ -65,20 +65,14 @@
 #define CONTEXT_FRAME_RSP 0x08
 
 /* Flags for the ENTER_INTERRUPT macro. */
+#define INTERRUPT_FLAGS_NONE 0x00
 #define INTERRUPT_FLAGS_HAS_ERROR_CODE 0x01
 
 /* https://learn.microsoft.com/en-us/cpp/build/x64-calling-convention
  * Reference for the default x64 calling convention on PE files. */
-.macro ENTER_INTERRUPT Flags_
-    /* Make sure the Flags parameter is valid (or give it a default value). */
-    .ifb Flags_
-        .set Flags, 0
-    .else
-        .set Flags, \Flags_
-    .endif
-
+.macro ENTER_INTERRUPT Flags
     /* Inform the compiler of the machine frame, and reserve the interrupt frame space. */
-    .if (Flags & INTERRUPT_FLAGS_HAS_ERROR_CODE)
+    .if (\Flags & INTERRUPT_FLAGS_HAS_ERROR_CODE)
         .seh_pushframe @code
         sub $INTERRUPT_FRAME_SIZE - 48, %rsp
         .seh_stackalloc INTERRUPT_FRAME_SIZE - 48

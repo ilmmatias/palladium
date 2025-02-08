@@ -42,7 +42,7 @@ HalpDefaultInterruptEntry:
 .global HalpDivisionTrapEntry
 .align 16
 HalpDivisionTrapEntry:
-    ENTER_INTERRUPT
+    ENTER_INTERRUPT (INTERRUPT_FLAGS_NONE)
     mov $RT_EXC_INT_DIVIDE_BY_ZERO, %rcx
     mov %rsp, %rdx
     call HalpExceptionEntry
@@ -53,7 +53,7 @@ HalpDivisionTrapEntry:
 .global HalpDebugTrapEntry
 .align 16
 HalpDebugTrapEntry:
-    ENTER_INTERRUPT
+    ENTER_INTERRUPT (INTERRUPT_FLAGS_NONE)
     mov $RT_EXC_SINGLE_STEP, %rcx
     mov %rsp, %rdx
     call HalpExceptionEntry
@@ -64,7 +64,7 @@ HalpDebugTrapEntry:
 .global HalpNmiTrapEntry
 .align 16
 HalpNmiTrapEntry:
-    ENTER_INTERRUPT
+    ENTER_INTERRUPT (INTERRUPT_FLAGS_NONE)
     call HalpDispatchNmi
 1:  jmp 1b
 .seh_endproc
@@ -73,7 +73,7 @@ HalpNmiTrapEntry:
 .global HalpBreakpointTrapEntry
 .align 16
 HalpBreakpointTrapEntry:
-    ENTER_INTERRUPT
+    ENTER_INTERRUPT (INTERRUPT_FLAGS_NONE)
     mov $RT_EXC_BREAKPOINT, %rcx
     mov %rsp, %rdx
     call HalpExceptionEntry
@@ -84,7 +84,7 @@ HalpBreakpointTrapEntry:
 .global HalpOverflowTrapEntry
 .align 16
 HalpOverflowTrapEntry:
-    ENTER_INTERRUPT
+    ENTER_INTERRUPT (INTERRUPT_FLAGS_NONE)
     mov $RT_EXC_INT_OVERFLOW, %rcx
     mov %rsp, %rdx
     call HalpExceptionEntry
@@ -95,7 +95,7 @@ HalpOverflowTrapEntry:
 .global HalpBoundRangeTrapEntry
 .align 16
 HalpBoundRangeTrapEntry:
-    ENTER_INTERRUPT
+    ENTER_INTERRUPT (INTERRUPT_FLAGS_NONE)
     mov $RT_EXC_ARRAY_BOUNDS_EXCEEDED, %rcx
     mov %rsp, %rdx
     call HalpExceptionEntry
@@ -106,7 +106,7 @@ HalpBoundRangeTrapEntry:
 .global HalpInvalidOpcodeTrapEntry
 .align 16
 HalpInvalidOpcodeTrapEntry:
-    ENTER_INTERRUPT
+    ENTER_INTERRUPT (INTERRUPT_FLAGS_NONE)
     mov $RT_EXC_ILLEGAL_INSTRUCTION, %rcx
     mov %rsp, %rdx
     call HalpExceptionEntry
@@ -117,7 +117,7 @@ HalpInvalidOpcodeTrapEntry:
 .global HalpNumericCoprocessorTrapEntry
 .align 16
 HalpNumericCoprocessorTrapEntry:
-    ENTER_INTERRUPT
+    ENTER_INTERRUPT (INTERRUPT_FLAGS_NONE)
     mov %rsp, %rcx
     mov $RT_EXC_NUMERIC_COPROCESSOR, %rdx
     call HalpDispatchTrap
@@ -139,7 +139,7 @@ HalpDoubleFaultTrapEntry:
 .global HalpSegmentOverrunTrapEntry
 .align 16
 HalpSegmentOverrunTrapEntry:
-    ENTER_INTERRUPT
+    ENTER_INTERRUPT (INTERRUPT_FLAGS_NONE)
     mov %rsp, %rcx
     mov $RT_EXC_SEGMENT_OVERRUN, %rdx
     call HalpDispatchTrap
@@ -205,7 +205,7 @@ HalpPageFaultTrapEntry:
 .global HalpReservedTrapEntry
 .align 16
 HalpReservedTrapEntry:
-    ENTER_INTERRUPT
+    ENTER_INTERRUPT (INTERRUPT_FLAGS_NONE)
     mov %rsp, %rcx
     mov $RT_EXC_RESERVED, %rdx
     call HalpDispatchTrap
@@ -216,7 +216,7 @@ HalpReservedTrapEntry:
 .global HalpX87FloatingPointTrapEntry
 .align 16
 HalpX87FloatingPointTrapEntry:
-    ENTER_INTERRUPT
+    ENTER_INTERRUPT (INTERRUPT_FLAGS_NONE)
     mov $RT_EXC_FLT_INVALID_OPERATION, %rcx
     mov %rsp, %rdx
     call HalpExceptionEntry
@@ -238,7 +238,7 @@ HalpAlignmentCheckTrapEntry:
 .global HalpMachineCheckTrapEntry
 .align 16
 HalpMachineCheckTrapEntry:
-    ENTER_INTERRUPT
+    ENTER_INTERRUPT (INTERRUPT_FLAGS_NONE)
     mov %rsp, %rcx
     mov $RT_EXC_MACHINE_CHECK, %rdx
     call HalpDispatchTrap
@@ -249,7 +249,7 @@ HalpMachineCheckTrapEntry:
 .global HalpSimdFloatingPointTrapEntry
 .align 16
 HalpSimdFloatingPointTrapEntry:
-    ENTER_INTERRUPT
+    ENTER_INTERRUPT (INTERRUPT_FLAGS_NONE)
     mov $RT_EXC_FLT_INVALID_OPERATION, %rcx
     mov %rsp, %rdx
     call HalpExceptionEntry
@@ -260,7 +260,7 @@ HalpSimdFloatingPointTrapEntry:
 .global HalpVirtualizationTrapEntry
 .align 16
 HalpVirtualizationTrapEntry:
-    ENTER_INTERRUPT
+    ENTER_INTERRUPT (INTERRUPT_FLAGS_NONE)
     mov %rsp, %rcx
     mov $RT_EXC_VIRTUALIZATION, %rdx
     call HalpDispatchTrap
@@ -282,7 +282,7 @@ HalpControlProtectionTrapEntry:
 .global HalpHypervisorInjectionTrapEntry
 .align 16
 HalpHypervisorInjectionTrapEntry:
-    ENTER_INTERRUPT
+    ENTER_INTERRUPT (INTERRUPT_FLAGS_NONE)
     mov %rsp, %rcx
     mov $RT_EXC_HYPERVISOR_INJECTION, %rdx
     call HalpDispatchTrap
@@ -315,7 +315,7 @@ HalpSecurityTrapEntry:
 .global HalpDispatchEntry
 .align 16
 HalpDispatchEntry:
-    ENTER_INTERRUPT
+    ENTER_INTERRUPT (INTERRUPT_FLAGS_NONE)
     mov $KE_IRQL_DISPATCH, %rcx
     mov %rcx, %cr8
     call HalpSendEoi
@@ -329,7 +329,7 @@ HalpDispatchEntry:
 .global HalpTimerEntry
 .align 16
 HalpTimerEntry:
-    ENTER_INTERRUPT
+    ENTER_INTERRUPT (INTERRUPT_FLAGS_NONE)
     mov $HALP_INT_TIMER_IRQL, %rcx
     mov %rcx, %cr8
     mov %rsp, %rcx
@@ -342,7 +342,7 @@ HalpTimerEntry:
 .global HalpIpiEntry
 .align 16
 HalpIpiEntry:
-    ENTER_INTERRUPT
+    ENTER_INTERRUPT (INTERRUPT_FLAGS_NONE)
     mov $HALP_INT_IPI_IRQL, %rcx
     mov %rcx, %cr8
     call KiHandleIpi
