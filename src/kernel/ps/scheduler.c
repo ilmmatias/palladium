@@ -7,68 +7,11 @@
 #include <kernel/mm.h>
 #include <kernel/psp.h>
 
+[[noreturn]] extern void PspIdleThread(void *);
+
 static volatile uint64_t InitialiazationBarrier = 0;
 
 KeAffinity KiIdleProcessors;
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function switches the execution context between the two given threads.
- *
- * PARAMETERS:
- *     Processor - Current processor block.
- *     CurrentThread - Current executing thread, if any.
- *     CurrentThreadFrame - Current thread frame (if we were executing any thread beforehand).
- *     TargetThread - Target thread to execute.
- *     TargetThreadFrame - Target thread frame.
- *     HasCurrentThread - Set to true if CurrentThread!=null; This is used so that the compiler can
- *                        assume the value of CurrentThread when doing the busy flag set (and not
- *                        need a branch for it).
- *     RequeueThread - Set to false if the current thread is entering a waiting or terminated state
- *                     (shouldn't be requeued).
- *     OldIrql - IRQL before we raised to SYNCH.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-static inline void SwitchExecution(
-    KeProcessor *Processor,
-    PsThread *CurrentThread,
-    HalContextFrame *CurrentThreadFrame,
-    PsThread *TargetThread,
-    HalContextFrame *TargetThreadFrame,
-    bool HasCurrentThread,
-    bool RequeueThread,
-    KeIrql OldIrql) {
-    /* Update the current thread (and the current stack limits). */
-    Processor->CurrentThread = TargetThread;
-    Processor->StackBase = TargetThread->Stack;
-    Processor->StackLimit = TargetThread->StackLimit;
-
-    /* Update the idle processor mask (and the expiration ticks). */
-    if (TargetThread == Processor->IdleThread) {
-        KeSetAffinityBit(&KiIdleProcessors, Processor->Number);
-    } else {
-        TargetThread->ExpirationTicks = PSP_DEFAULT_TICKS;
-        KeClearAffinityBit(&KiIdleProcessors, Processor->Number);
-    }
-
-    /* Set ourselves as busy (no one should try using our context frame until HalpSwitchContext
-     * finishes its setup). */
-    if (HasCurrentThread) {
-        __atomic_store_n(&CurrentThread->ContextFrame.Busy, 0x01, __ATOMIC_SEQ_CST);
-    }
-
-    /* Now we should be safe to release the lock (PspQueueThread expects us to do that before
-     * calling it) and switch away (once we return, we should be back into the previous thread). */
-    KeReleaseSpinLockAtCurrentIrql(&Processor->Lock);
-    if (RequeueThread) {
-        PspQueueThread(CurrentThread, false);
-    }
-
-    HalpSwitchContext(CurrentThreadFrame, TargetThreadFrame);
-    KeLowerIrql(OldIrql);
-}
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -83,67 +26,124 @@ static inline void SwitchExecution(
  *-----------------------------------------------------------------------------------------------*/
 [[noreturn]] void PspInitializeScheduler(void) {
     /* Wait until all processors finished the early initialzation stage. */
-    KeProcessor *Processor = KeGetCurrentProcessor();
     KeSynchronizeProcessors(&InitialiazationBarrier);
 
-    /* The BSP should have queued its initial thread. */
-    KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Processor->Lock, KE_IRQL_SYNCH);
-    RtDList *ListHeader = RtPopDList(&Processor->ThreadQueue);
-    PsThread *TargetThread = Processor->IdleThread;
-    if (ListHeader != &Processor->ThreadQueue) {
-        TargetThread = CONTAINING_RECORD(ListHeader, PsThread, ListHeader);
-    }
-
-    /* SwitchExecution() should never return (as the current thread frame is NULL). */
-    SwitchExecution(
-        Processor, NULL, NULL, TargetThread, &TargetThread->ContextFrame, false, false, OldIrql);
-    while (true) {
-        StopProcessor();
-    }
+    /* All processors start execution on the idle thread, which should switch into the initial
+     * thread on the BSP. */
+    KeProcessor *Processor = KeGetCurrentProcessor();
+    Processor->IdleThread->State = PS_STATE_RUNNING;
+    Processor->CurrentThread = Processor->IdleThread;
+    PspIdleThread(NULL);
 }
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function forcefully switches out the current thread.
+ *     This function tries to give up the remaining quantum in the thread, and switch out to the
+ *     next thread.
+ *     We won't switch to the idle thread, so when the queue is empty, this function will instantly
+ *     return!
  *
  * PARAMETERS:
- *     Type - Type of the yield (QUEUE = just yield execution and add to the queue as usual;
- *                               UNQUEUE = wait or terminate state, don't add to the queue).
+ *     None.
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void PsYieldThread(int Type) {
+void PsYieldThread(void) {
     /* Raise to SYNCH (block device interrupts) and acquire the processor lock (to access the
      * queue). */
     KeIrql OldIrql = KeRaiseIrql(KE_IRQL_SYNCH);
     KeProcessor *Processor = KeGetCurrentProcessor();
     KeAcquireSpinLockAtCurrentIrql(&Processor->Lock);
 
-    /* If the yield is putting us in a waiting state, we actually want to switch into idle once
-     * we have nothing left to do; Otherwise, same as PspProcessQueue (don't switch into idle,
-     * stay on the current task). */
+    /* Make sure that we're running, because if not, how did we even get here? */
+    PsThread *CurrentThread = Processor->CurrentThread;
+    if (CurrentThread->State != PS_STATE_RUNNING) {
+        KeFatalError(KE_PANIC_BAD_THREAD_STATE, CurrentThread->State, PS_STATE_RUNNING, 0, 0);
+    }
+
+    /* Check if we have any thread to switch into; Unlike SuspendThread, we act like IdleThread
+     * isn't a thing. */
     RtDList *ListHeader = RtPopDList(&Processor->ThreadQueue);
-    if (ListHeader == &Processor->ThreadQueue && Type == PS_YIELD_TYPE_QUEUE) {
+    if (ListHeader == &Processor->ThreadQueue) {
         KeSetAffinityBit(&KiIdleProcessors, Processor->Number);
         KeReleaseSpinLockAndLowerIrql(&Processor->Lock, OldIrql);
         return;
+    } else {
+        /* If we call YieldThread on a tight loop, we need to make sure we clear the idle bit once
+         * the queue isn't empty. */
+        KeClearAffinityBit(&KiIdleProcessors, Processor->Number);
     }
 
+    /* Mark the newly chosen target as the current one. */
+    PsThread *TargetThread = CONTAINING_RECORD(ListHeader, PsThread, ListHeader);
+    TargetThread->State = PS_STATE_RUNNING;
+    TargetThread->ExpirationTicks = PSP_DEFAULT_TICKS;
+    Processor->CurrentThread = TargetThread;
+    Processor->StackBase = TargetThread->Stack;
+    Processor->StackLimit = TargetThread->StackLimit;
+
+    /* Mark the old thread as doing a context switch (then requeue it, just make sure the lock isn't
+     * held when requeueing it). */
+    CurrentThread->State = PS_STATE_QUEUED;
+    __atomic_store_n(&CurrentThread->ContextFrame.Busy, 0x01, __ATOMIC_SEQ_CST);
+    KeReleaseSpinLockAtCurrentIrql(&Processor->Lock);
+    PspQueueThread(CurrentThread, false);
+
+    /* Swap into the new thread; We should be back to lower the IRQL after another context switches
+     * back into us. */
+    HalpSwitchContext(&CurrentThread->ContextFrame, &TargetThread->ContextFrame);
+    KeLowerIrql(OldIrql);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function suspends the execution of the current thread; This is a temporary test
+ *     function, in the future, the main function of this should be suspending other threads instead
+ *     of the current thread.
+ *
+ * PARAMETERS:
+ *     None.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void PsSuspendThread(void) {
+    /* Raise to SYNCH (block device interrupts) and acquire the processor lock (to access the
+     * queue). */
+    KeIrql OldIrql = KeRaiseIrql(KE_IRQL_SYNCH);
+    KeProcessor *Processor = KeGetCurrentProcessor();
+    KeAcquireSpinLockAtCurrentIrql(&Processor->Lock);
+
+    /* Make sure that we're running, because if not, how did we even get here? */
+    PsThread *CurrentThread = Processor->CurrentThread;
+    if (CurrentThread->State != PS_STATE_RUNNING) {
+        KeFatalError(KE_PANIC_BAD_THREAD_STATE, CurrentThread->State, PS_STATE_RUNNING, 0, 0);
+    }
+
+    /* Unlike YieldThread, we do use the IdleThread if no other thread is available in the queue. */
+    RtDList *ListHeader = RtPopDList(&Processor->ThreadQueue);
     PsThread *TargetThread = Processor->IdleThread;
-    if (ListHeader != &Processor->ThreadQueue) {
+    if (ListHeader == &Processor->ThreadQueue) {
+        KeSetAffinityBit(&KiIdleProcessors, Processor->Number);
+    } else {
         TargetThread = CONTAINING_RECORD(ListHeader, PsThread, ListHeader);
+        TargetThread->ExpirationTicks = PSP_DEFAULT_TICKS;
     }
 
-    SwitchExecution(
-        Processor,
-        Processor->CurrentThread,
-        &Processor->CurrentThread->ContextFrame,
-        TargetThread,
-        &TargetThread->ContextFrame,
-        true,
-        Type == PS_YIELD_TYPE_QUEUE && Processor->CurrentThread != Processor->IdleThread,
-        OldIrql);
+    /* Mark the newly chosen target as the current one. */
+    TargetThread->State = PS_STATE_RUNNING;
+    Processor->CurrentThread = TargetThread;
+    Processor->StackBase = TargetThread->Stack;
+    Processor->StackLimit = TargetThread->StackLimit;
+
+    /* Mark the old thread as doing a context switch, and then do said context switch; We should be
+     * back after someone resumes us, except that TODO: no one can resume us yet. */
+    CurrentThread->State = PS_STATE_SUSPENDED;
+    __atomic_store_n(&CurrentThread->ContextFrame.Busy, 0x01, __ATOMIC_SEQ_CST);
+    KeReleaseSpinLockAtCurrentIrql(&Processor->Lock);
+    HalpSwitchContext(&CurrentThread->ContextFrame, &TargetThread->ContextFrame);
+    KeLowerIrql(OldIrql);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -165,12 +165,14 @@ void PspProcessQueue(HalInterruptFrame *) {
 
     /* We shouldn't have anything to do if the initial thread still isn't running. */
     KeProcessor *Processor = KeGetCurrentProcessor();
-    if (!Processor->CurrentThread) {
+    PsThread *CurrentThread = Processor->CurrentThread;
+    if (!CurrentThread) {
         return;
     }
 
-    /* Cleanup any threads that have terminated (they shouldn't be the current thread anymore); This
-     * needs to be before raising to SYNCH (because other MmFreePool will panic). */
+    /* Cleanup any threads that have terminated (they shouldn't be the current thread anymore);
+     * This needs to be before raising to SYNCH (because MmFreePool expects the IRQL to be
+     * <=DISPATCH). */
     while (true) {
         RtDList *ListHeader = RtPopDList(&Processor->TerminationQueue);
         if (ListHeader == &Processor->TerminationQueue) {
@@ -178,22 +180,37 @@ void PspProcessQueue(HalInterruptFrame *) {
         }
 
         PsThread *Thread = CONTAINING_RECORD(ListHeader, PsThread, ListHeader);
-        MmFreePool(Thread->Stack, "PsTh");
+        if (Thread->State != PS_STATE_TERMINATED) {
+            KeFatalError(KE_PANIC_BAD_THREAD_STATE, Thread->State, PS_STATE_TERMINATED, 0, 0);
+        }
+
+        /* DON'T free the stack if it wasn't allocated by us. */
+        if (Thread->AllocatedStack) {
+            MmFreePool(Thread->AllocatedStack, "PsTh");
+        }
+
         MmFreePool(Thread, "PsTh");
     }
 
-    /* Requeue any waiting threads that have expired (this too can be done at DISPATCH). */
+    /* Requeue any waiting threads that have expired (this can also be done at DISPATCH). */
     for (RtDList *ListHeader = Processor->WaitQueue.Next; ListHeader != &Processor->WaitQueue;) {
         PsThread *Thread = CONTAINING_RECORD(ListHeader, PsThread, ListHeader);
         ListHeader = ListHeader->Next;
-        if (Processor->Ticks >= Thread->WaitTicks) {
-            RtUnlinkDList(&Thread->ListHeader);
-            PspQueueThread(Thread, true);
+
+        if (Thread->State != PS_STATE_WAITING) {
+            KeFatalError(KE_PANIC_BAD_THREAD_STATE, Thread->State, PS_STATE_WAITING, 0, 0);
+        } else if (Processor->Ticks < Thread->WaitTicks) {
+            continue;
         }
+
+        Thread->State = PS_STATE_QUEUED;
+        RtUnlinkDList(&Thread->ListHeader);
+        PspQueueThread(Thread, true);
     }
 
-    /* We shouldn't have anything left to do if we haven't expired yet. */
-    if (Processor->CurrentThread->ExpirationTicks) {
+    /* We shouldn't have anything left to do if we haven't expired yet (or if we're the idle
+     * thread). */
+    if (CurrentThread->ExpirationTicks || CurrentThread == Processor->IdleThread) {
         return;
     }
 
@@ -208,16 +225,27 @@ void PspProcessQueue(HalInterruptFrame *) {
         KeSetAffinityBit(&KiIdleProcessors, Processor->Number);
         KeReleaseSpinLockAndLowerIrql(&Processor->Lock, OldIrql);
         return;
+    } else {
+        KeClearAffinityBit(&KiIdleProcessors, Processor->Number);
     }
 
+    /* Mark the newly chosen target as the current one. */
     PsThread *TargetThread = CONTAINING_RECORD(ListHeader, PsThread, ListHeader);
-    SwitchExecution(
-        Processor,
-        Processor->CurrentThread,
-        &Processor->CurrentThread->ContextFrame,
-        TargetThread,
-        &TargetThread->ContextFrame,
-        true,
-        Processor->CurrentThread != Processor->IdleThread,
-        OldIrql);
+    TargetThread->State = PS_STATE_RUNNING;
+    TargetThread->ExpirationTicks = PSP_DEFAULT_TICKS;
+    Processor->CurrentThread = TargetThread;
+    Processor->StackBase = TargetThread->Stack;
+    Processor->StackLimit = TargetThread->StackLimit;
+
+    /* Mark it the old thread as doing a context switch (then requeue it, just make sure the lock
+     * isn't held when requeueing it). */
+    CurrentThread->State = PS_STATE_QUEUED;
+    __atomic_store_n(&CurrentThread->ContextFrame.Busy, 0x01, __ATOMIC_SEQ_CST);
+    KeReleaseSpinLockAtCurrentIrql(&Processor->Lock);
+    PspQueueThread(CurrentThread, false);
+
+    /* Swap into the new thread; We should be back to lower the IRQL after another context switches
+     * back into us. */
+    HalpSwitchContext(&CurrentThread->ContextFrame, &TargetThread->ContextFrame);
+    KeLowerIrql(OldIrql);
 }

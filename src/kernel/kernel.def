@@ -21,6 +21,7 @@ EXPORTS
     PsCreateThread
     PsDelayThread
     PsQueueThread
+    PsSuspendThread
     PsYieldThread
 
     VidGetColor

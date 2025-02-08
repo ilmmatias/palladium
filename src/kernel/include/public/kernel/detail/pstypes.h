@@ -14,10 +14,12 @@
 
 typedef struct PsThread {
     RtDList ListHeader;
+    uint8_t State;
     uint64_t ExpirationTicks;
     uint64_t WaitTicks;
     char *Stack;
     char *StackLimit;
+    char *AllocatedStack;
     HalContextFrame ContextFrame;
 } PsThread;
 

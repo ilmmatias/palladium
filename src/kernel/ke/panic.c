@@ -22,6 +22,7 @@ static const char *Messages[] = {
     "BAD_PFN_HEADER",
     "BAD_POOL_HEADER",
     "PROCESSOR_LIMIT_EXCEEDED",
+    "BAD_THREAD_STATE",
 };
 
 static KeSpinLock Lock = {0};
