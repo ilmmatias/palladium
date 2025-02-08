@@ -89,8 +89,6 @@ void KiRunBootStartDrivers(void) {
  *-----------------------------------------------------------------------------------------------*/
 void KiDumpSymbol(void *Address) {
     uint64_t Offset = (uint64_t)Address;
-    char OffsetString[128];
-
     RtDList *ListHeader = KiModuleListHead.Next;
     KeModule *Image = NULL;
 
@@ -107,8 +105,7 @@ void KiDumpSymbol(void *Address) {
     }
 
     if (ListHeader == &KiModuleListHead) {
-        snprintf(OffsetString, sizeof(OffsetString), "0x%016llx - ??\n", Offset);
-        VidPutString(OffsetString);
+        VidPrintSimple("0x%016llx - ??\n", Offset);
         return;
     }
 
@@ -116,12 +113,21 @@ void KiDumpSymbol(void *Address) {
     PeHeader *Header = (PeHeader *)Start;
     PeSectionHeader *Sections = (PeSectionHeader *)(Start + Header->SizeOfOptionalHeader + 24);
 
-    /* Clang seems to not strip the coff symbol table out, so we can use it. */
+    /* Clang doesn't strip the coff symbol table out as long as you don't ask it to generate a
+     * separate PDB file. */
     CoffSymbol *SymbolTable = (CoffSymbol *)(Image->ImageBase + Header->PointerToSymbolTable);
     char *Strings = (char *)(SymbolTable + Header->NumberOfSymbols);
     CoffSymbol *Symbol = SymbolTable;
     CoffSymbol *Closest = NULL;
     uint64_t ClosestAddress = 0;
+    if (!Header->PointerToSymbolTable) {
+        VidPrintSimple(
+            "0x%016llx - %s+%#llx\n",
+            Offset,
+            Image->ImageName,
+            Offset - (uint64_t)Image->ImageBase);
+        return;
+    }
 
     while (Symbol < (CoffSymbol *)Strings) {
         if (!Symbol->SectionNumber || Symbol->SectionNumber > Header->NumberOfSections) {
@@ -144,10 +150,7 @@ void KiDumpSymbol(void *Address) {
         Symbol += Symbol->NumberOfAuxSymbols + 1;
     }
 
-    snprintf(OffsetString, sizeof(OffsetString), "0x%016llx - ", Offset);
-    VidPutString(OffsetString);
-    VidPutString(Image->ImageName);
-    VidPutString("!");
+    VidPrintSimple("0x%016llx - %s!", Offset, Image->ImageName);
 
     if (!Closest->Name[0] && !Closest->Name[1] && !Closest->Name[2] && !Closest->Name[3]) {
         VidPutString(Strings + *((uint32_t *)Closest + 1));
@@ -157,10 +160,5 @@ void KiDumpSymbol(void *Address) {
         }
     }
 
-    if (Offset - ClosestAddress) {
-        snprintf(OffsetString, sizeof(OffsetString), "+%#llx\n", Offset - ClosestAddress);
-        VidPutString(OffsetString);
-    } else {
-        VidPutChar('\n');
-    }
+    VidPrintSimple("+%#llx\n", Offset - ClosestAddress);
 }

@@ -94,7 +94,12 @@ static void ScrollUp(void) {
     const uint32_t ScreenSize = VidpPitch * VidpHeight;
     const uint32_t LineSize = VidpPitch * VidpFont.Height;
     memmove(VidpFrontBuffer, VidpFrontBuffer + LineSize, ScreenSize - LineSize);
-    memset(VidpFrontBuffer + ScreenSize - LineSize, 0, LineSize);
+
+    /* We can't just memset, thanks to the background not being fixed at 0x00000000 (black). */
+    for (int i = 0; i < VidpWidth; i++) {
+        *(uint32_t *)&VidpFrontBuffer[ScreenSize - LineSize + i * 4] = VidpBackground;
+    }
+
     PendingFullFlush = true;
     FlushY = 0;
     FlushLines = VidpHeight;
@@ -331,8 +336,55 @@ void VidPutString(const char *String) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function outputs a message into the screen; For most cases, you probably want VidPrint,
- *     but you can use this to "rename" the VidPrint function, if your driver needs/wants that.
+ *     This function outputs a non-prefixed message into the screen (we're the kernel equivalent
+ *     of vprintf); For most cases, you probably want VidPrintSimple instead of this, but you can
+ *     use this to "rename" the VidPrintSimple function, if your driver needs/wants that.
+ *
+ * PARAMETERS
+ *     Message - Format string; Works the same as printf().
+ *     Arguments - Variadic arguments.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void VidPrintSimpleVariadic(const char *Message, va_list Arguments) {
+    KeIrql OldIrql = AcquireSpinLock();
+
+    FlushY = VidpCursorY;
+    __vprintf(Message, Arguments, NULL, PutBuffer);
+
+    if (!PendingFullFlush) {
+        FlushLines = VidpCursorY - FlushY + VidpFont.Height;
+    }
+
+    Flush();
+    ReleaseSpinLock(OldIrql);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function outputs a non-prefixed message into the screen (we're the kernel equivalent
+ *     of printf).
+ *
+ * PARAMETERS:
+ *     Message - Format string; Works the same as printf().
+ *     ... - Variadic arguments.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void VidPrintSimple(const char *Message, ...) {
+    va_list Arguments;
+    va_start(Arguments, Message);
+    VidPrintSimpleVariadic(Message, Arguments);
+    va_end(Arguments);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function outputs a prefixed message (in the format <Subsystem> <Type>: <Message>) into
+ *     the screen; For most cases, you probably want VidPrint instead of this, but you can use this
+ *     to "rename" the VidPrint function, if your driver needs/wants that.
  *
  * PARAMETERS:
  *     Type - Type of the message; This is used to set up the prefix and its color.
@@ -405,7 +457,8 @@ void VidPrintVariadic(int Type, const char *Prefix, const char *Message, va_list
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function outputs a message into the screen.
+ *     This function outputs a prefixed message (in the format <Subsystem> <Type>: <Message>) into
+ *     the screen.
  *
  * PARAMETERS:
  *     Type - Type of the message; Depending on how the kernel was built, the message won't show.

@@ -3,10 +3,8 @@
 
 #include <kernel/halp.h>
 #include <kernel/ki.h>
-#include <kernel/mm.h>
 #include <kernel/vidp.h>
 #include <rt/except.h>
-#include <stdio.h>
 
 static const char *Messages[] = {
     "MANUALLY_INITIATED_CRASH",
@@ -74,21 +72,15 @@ static KeSpinLock Lock = {0};
     VidpAcquireOwnership();
     VidSetColor(VID_COLOR_PANIC);
     VidResetDisplay();
-    VidPutString("*** STOP: ");
-    VidPutString(Messages[Message]);
-    VidPutChar('\n');
+    VidPrintSimple("*** STOP: %s\n", Messages[Message]);
 
     /* Dump all available parameters. */
-    char String[128];
-    snprintf(
-        String,
-        sizeof(String),
+    VidPrintSimple(
         "*** PARAMETERS: 0x%016llx, 0x%016llx, 0x%016llx, 0x%016llx\n",
         Parameter1,
         Parameter2,
         Parameter3,
         Parameter4);
-    VidPutString(String);
 
     /* And a backtrace of all frames we can obtain from the stack.
      * TODO: We should move all of this to a RtSaveStackTrace function, as it uses arch-specific
