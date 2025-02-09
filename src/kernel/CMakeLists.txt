@@ -41,6 +41,9 @@ add_executable(kernel "kernel" YES
     mm/pool.c
     mm/poolpage.c
 
+    ob/object.c
+    ob/threadobj.c
+
     ps/idle.c
     ps/scheduler.c
     ps/thread.c

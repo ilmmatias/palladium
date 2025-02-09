@@ -4,6 +4,7 @@
 #include <kernel/halp.h>
 #include <kernel/ke.h>
 #include <kernel/mm.h>
+#include <kernel/ob.h>
 #include <kernel/psp.h>
 
 extern KeAffinity KiIdleProcessors;
@@ -25,7 +26,7 @@ extern KeAffinity KiIdleProcessors;
  *     Pointer to the thread structure, or NULL on failure.
  *-----------------------------------------------------------------------------------------------*/
 static PsThread *CreateThread(void (*EntryPoint)(void *), void *Parameter, void *Stack) {
-    PsThread *Thread = MmAllocatePool(sizeof(PsThread), "PsTh");
+    PsThread *Thread = ObCreateObject(&ObThreadType, "PsTh");
     if (!Thread) {
         return NULL;
     }

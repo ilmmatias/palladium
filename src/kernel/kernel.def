@@ -18,6 +18,11 @@ EXPORTS
     MmMapSpace
     MmUnmapSpace
 
+    ObCreateObject
+    ObDereferenceObject
+    ObReferenceObject
+    ObThreadType
+
     PsCreateThread
     PsDelayThread
     PsQueueThread

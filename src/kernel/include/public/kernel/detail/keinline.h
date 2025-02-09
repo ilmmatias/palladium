@@ -4,8 +4,7 @@
 #ifndef _KERNEL_DETAIL_KEINLINE_H_
 #define _KERNEL_DETAIL_KEINLINE_H_
 
-#include <kernel/detail/kedefs.h>
-#include <kernel/detail/ketypes.h>
+#include <kernel/detail/kefuncs.h>
 
 /* clang-format off */
 #if __has_include(ARCH_MAKE_INCLUDE_PATH(kernel/detail, keinline.h))

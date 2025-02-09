@@ -4,7 +4,7 @@
 #include <kernel/ev.h>
 #include <kernel/halp.h>
 #include <kernel/ke.h>
-#include <kernel/mm.h>
+#include <kernel/ob.h>
 #include <kernel/psp.h>
 
 [[noreturn]] extern void PspIdleThread(void *);
@@ -184,12 +184,7 @@ void PspProcessQueue(HalInterruptFrame *) {
             KeFatalError(KE_PANIC_BAD_THREAD_STATE, Thread->State, PS_STATE_TERMINATED, 0, 0);
         }
 
-        /* DON'T free the stack if it wasn't allocated by us. */
-        if (Thread->AllocatedStack) {
-            MmFreePool(Thread->AllocatedStack, "PsTh");
-        }
-
-        MmFreePool(Thread, "PsTh");
+        ObDereferenceObject(Thread, "PsTh");
     }
 
     /* Requeue any waiting threads that have expired (this can also be done at DISPATCH). */

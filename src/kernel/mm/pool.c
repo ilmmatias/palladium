@@ -83,8 +83,8 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
             KeFatalError(
                 KE_PANIC_BAD_POOL_HEADER,
                 (uint64_t)Header,
-                (uint64_t)Header->ListHeader.Next,
                 *(uint32_t *)Header->Tag,
+                *(uint32_t *)Tag,
                 Header->Head);
         }
 
@@ -134,6 +134,7 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
  *
  * PARAMETERS:
  *     Base - Start of the block.
+ *     Tag - Name/identifier attached to the block.
  *
  * RETURN VALUE:
  *     None.
@@ -155,8 +156,8 @@ void MmFreePool(void *Base, const char Tag[4]) {
         KeFatalError(
             KE_PANIC_BAD_POOL_HEADER,
             (uint64_t)Header,
-            (uint64_t)Header->ListHeader.Next,
             *(uint32_t *)Header->Tag,
+            *(uint32_t *)Tag,
             Header->Head);
     }
 
