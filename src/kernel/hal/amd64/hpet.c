@@ -61,7 +61,7 @@ void HalpInitializeHpet(void) {
             0);
     }
 
-    HpetAddress = MmMapSpace(Hpet->Address, MM_PAGE_SIZE);
+    HpetAddress = MmMapSpace(Hpet->Address, MM_PAGE_SIZE, MM_SPACE_IO);
     if (!HpetAddress) {
         KeFatalError(
             KE_PANIC_KERNEL_INITIALIZATION_FAILURE,

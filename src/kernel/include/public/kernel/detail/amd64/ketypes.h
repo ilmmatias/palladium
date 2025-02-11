@@ -39,6 +39,7 @@ typedef struct {
     HalpTssEntry TssEntry;
     HalpIdtEntry IdtEntries[256];
     RtDList InterruptList[256];
+    uint8_t InterruptUsage[256];
 } KeProcessor;
 
 #endif /* _KERNEL_DETAIL_AMD64_KETYPES_H_ */

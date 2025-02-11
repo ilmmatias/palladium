@@ -44,45 +44,6 @@ static void WriteIoapicRegister(HalpIoapicEntry *Entry, uint8_t Number, uint32_t
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function enables and sets up the given GSI.
- *
- * PARAMETERS:
- *     Gsi - Which interrupt we wish to enable.
- *     TargetVector - Which vector should be raised on the target CPU once this IRQ triggers.
- *     PinPolarity - 0: Active high, 1: Active low. You probably want this set to 0.
- *     TriggerMode - 0: Edge, 1: Level. You probably want this set to 0.
- *     ApicId - Which CPU wants to handle this vector.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-static void UnmaskIoapicVector(
-    uint8_t Gsi,
-    uint8_t TargetVector,
-    int PinPolarity,
-    int TriggerMode,
-    uint32_t ApicId) {
-    RtSList *ListHeader = IoapicListHead.Next;
-
-    while (ListHeader) {
-        HalpIoapicEntry *Entry = CONTAINING_RECORD(ListHeader, HalpIoapicEntry, ListHeader);
-
-        if (Entry->GsiBase <= Gsi && Gsi < Entry->GsiBase + Entry->Size) {
-            WriteIoapicRegister(
-                Entry,
-                HALP_IOAPIC_REDIR_REG_LOW(Gsi - Entry->GsiBase),
-                TargetVector | (PinPolarity << 13) | (TriggerMode << 15));
-            WriteIoapicRegister(
-                Entry, HALP_IOAPIC_REDIR_REG_HIGH(Gsi - Entry->GsiBase), ApicId << 24);
-            return;
-        }
-
-        ListHeader = ListHeader->Next;
-    }
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
  *     This function parses the APIC/MADT table, collecting all IOAPICs in the system.
  *
  * PARAMETERS:
@@ -120,7 +81,8 @@ void HalpInitializeIoapic(void) {
 
                 Entry->Id = Record->Ioapic.IoapicId;
                 Entry->GsiBase = Record->Ioapic.GsiBase;
-                Entry->VirtualAddress = MmMapSpace(Record->Ioapic.Address, MM_PAGE_SIZE);
+                Entry->VirtualAddress =
+                    MmMapSpace(Record->Ioapic.Address, MM_PAGE_SIZE, MM_SPACE_IO);
                 if (!Entry->VirtualAddress) {
                     KeFatalError(
                         KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
@@ -226,5 +188,48 @@ bool HalpTranslateIrq(uint8_t Irq, uint8_t *Gsi, uint8_t *PinPolarity, uint8_t *
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void HalpEnableGsi(uint8_t Gsi, uint8_t Vector, uint8_t PinPolarity, uint8_t TriggerMode) {
-    UnmaskIoapicVector(Gsi, Vector, PinPolarity, TriggerMode, KeGetCurrentProcessor()->ApicId);
+    uint32_t ApicId = KeGetCurrentProcessor()->ApicId;
+    RtSList *ListHeader = IoapicListHead.Next;
+
+    while (ListHeader) {
+        HalpIoapicEntry *Entry = CONTAINING_RECORD(ListHeader, HalpIoapicEntry, ListHeader);
+
+        if (Entry->GsiBase <= Gsi && Gsi < Entry->GsiBase + Entry->Size) {
+            WriteIoapicRegister(
+                Entry,
+                HALP_IOAPIC_REDIR_REG_LOW(Gsi - Entry->GsiBase),
+                Vector | (PinPolarity << 13) | (TriggerMode << 15));
+            WriteIoapicRegister(
+                Entry, HALP_IOAPIC_REDIR_REG_HIGH(Gsi - Entry->GsiBase), ApicId << 24);
+            return;
+        }
+
+        ListHeader = ListHeader->Next;
+    }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function disables (masks) the given GSI in the IOAPIC.
+ *
+ * PARAMETERS:
+ *     Gsi - Which GSI we wish to disable.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void HalpDisableGsi(uint8_t Gsi) {
+    RtSList *ListHeader = IoapicListHead.Next;
+
+    while (ListHeader) {
+        HalpIoapicEntry *Entry = CONTAINING_RECORD(ListHeader, HalpIoapicEntry, ListHeader);
+
+        if (Entry->GsiBase <= Gsi && Gsi < Entry->GsiBase + Entry->Size) {
+            WriteIoapicRegister(Entry, HALP_IOAPIC_REDIR_REG_LOW(Gsi - Entry->GsiBase), 0x10000);
+            WriteIoapicRegister(Entry, HALP_IOAPIC_REDIR_REG_HIGH(Gsi - Entry->GsiBase), 0);
+            return;
+        }
+
+        ListHeader = ListHeader->Next;
+    }
 }

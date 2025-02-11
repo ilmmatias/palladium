@@ -209,7 +209,7 @@ void HalpInitializeApic(void) {
 
     /* Default to the LAPIC address given in the MSR (if we're not using x2APIC). */
     if (!X2ApicEnabled) {
-        LapicAddress = MmMapSpace(ReadMsr(HALP_APIC_MSR) & ~0xFFF, MM_PAGE_SIZE);
+        LapicAddress = MmMapSpace(ReadMsr(HALP_APIC_MSR) & ~0xFFF, MM_PAGE_SIZE, MM_SPACE_IO);
         if (!LapicAddress) {
             KeFatalError(
                 KE_PANIC_KERNEL_INITIALIZATION_FAILURE,

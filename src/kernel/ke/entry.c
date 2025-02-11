@@ -53,7 +53,11 @@ static void InitializeBootProcessor(KiLoaderBlock *LoaderBlock) {
 
     /* Stage 4 (BSP): Early platform/arch initialization. */
     HalpInitializeBootProcessor();
-    VidPrint(VID_MESSAGE_INFO, "Kernel", "%u processors online\n", HalpOnlineProcessorCount);
+    if (HalpOnlineProcessorCount == 1) {
+        VidPrint(VID_MESSAGE_INFO, "Kernel", "1 processor online\n");
+    } else {
+        VidPrint(VID_MESSAGE_INFO, "Kernel", "%u processors online\n", HalpOnlineProcessorCount);
+    }
 
     /* Stage 5 (BSP): Scheduler initialization. */
     PspCreateIdleThread();

@@ -8,17 +8,14 @@
 #include <xmmintrin.h>
 
 typedef struct {
-    RtDList ListHeader;
-    bool Enabled;
-    volatile uint64_t Lock;
-    uint64_t Irql;
-    uint32_t Irq;
-    uint32_t Vector;
-    uint8_t Polarity;
+    KeIrql Irql;
+    bool HasGsi;
+    bool HasVector;
+    uint8_t SourceGsi;
+    uint8_t TargetVector;
+    uint8_t PinPolarity;
     uint8_t TriggerMode;
-    void (*Handler)(void *);
-    void *HandlerContext;
-} HalInterrupt;
+} HalInterruptData;
 
 typedef struct __attribute__((packed)) {
     uint64_t Rax;

@@ -363,18 +363,26 @@ void HalpUnmapPages(void *VirtualAddress, uint64_t Size) {
  *     PhysicalAddress - Source address, does not need to be aligned to MM_PAGE_SIZE.
  *     Size - Size in bytes of the region (also doesn't need to be aligned/a multiple of
  *            MM_PAGE_SIZE).
+ *     Type - Memory type for the mapping.
  *
  * RETURN VALUE:
  *     Pointer to the start of the virtual memory range on success, NULL otherwise.
  *-----------------------------------------------------------------------------------------------*/
-void *MmMapSpace(uint64_t PhysicalAddress, size_t Size) {
+void *MmMapSpace(uint64_t PhysicalAddress, size_t Size, uint8_t Type) {
     uint64_t Source = PhysicalAddress & ~(HALP_PT_SIZE - 1);
     uint64_t End = (PhysicalAddress + Size + HALP_PT_SIZE - 1) & ~(HALP_PT_SIZE - 1);
 
-    /* Map any unmapped pages as read/write + uncachable; We don't need to allocate any pool space,
-     * as we already have a 1-to-1 space in virtual memory for the mappings. */
-    if (!HalpMapPages(
-            (void *)(MI_VIRTUAL_OFFSET + Source), Source, End - Source, MI_MAP_WRITE | MI_MAP_UC)) {
+    /* Convert the type into proper flags. */
+    int Flags = MI_MAP_WRITE | MI_MAP_UC;
+    if (Type == MM_SPACE_IO) {
+        Flags |= MI_MAP_UC;
+    } else if (Type == MM_SPACE_GRAPHICS) {
+        Flags |= MI_MAP_WC;
+    }
+
+    /* And map any unmapped pages; We don't need to allocate any pool space, as we already have a
+     * 1-to-1 space in virtual memory for the mappings. */
+    if (!HalpMapPages((void *)(MI_VIRTUAL_OFFSET + Source), Source, End - Source, Flags)) {
         return NULL;
     }
 
@@ -393,5 +401,6 @@ void *MmMapSpace(uint64_t PhysicalAddress, size_t Size) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void MmUnmapSpace(void *VirtualAddress) {
+    // TODO? Or do we just leave it mapped?
     (void)VirtualAddress;
 }

@@ -22,14 +22,11 @@ uint64_t HalGetTimerTicks(void);
 bool HalCheckTimerExpiration(uint64_t Current, uint64_t Reference, uint64_t Ticks);
 void HalWaitTimer(uint64_t Time);
 
-HalInterrupt *HalCreateInterrupt(
-    KeIrql Irql,
-    uint32_t Irq,
-    uint32_t Vector,
-    uint8_t Polarity,
-    uint8_t TriggerMode,
-    void (*Handler)(void *),
-    void *HandlerContext);
+bool HalInitializeInterruptData(HalInterruptData *Data, uint32_t BusVector);
+void HalAllocateInterruptVector(HalInterruptData *Data);
+void HalReleaseInterruptData(HalInterruptData *Data);
+HalInterrupt *HalCreateInterrupt(HalInterruptData *Data, void (*Handler)(void *), void *Context);
+void HalDeleteInterrupt(HalInterrupt *Interrupt);
 bool HalEnableInterrupt(HalInterrupt *Interrupt);
 void HalDisableInterrupt(HalInterrupt *Interrupt);
 

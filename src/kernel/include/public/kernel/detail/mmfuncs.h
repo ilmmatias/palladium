@@ -20,7 +20,7 @@ extern "C" {
 uint64_t MmAllocateSinglePage();
 void MmFreeSinglePage(uint64_t PhysicalAddress);
 
-void *MmMapSpace(uint64_t PhysicalAddress, size_t Size);
+void *MmMapSpace(uint64_t PhysicalAddress, size_t Size, uint8_t Type);
 void MmUnmapSpace(void *VirtualAddress);
 
 void *MmAllocatePool(size_t Size, const char Tag[4]);

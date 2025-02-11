@@ -1,9 +1,16 @@
 LIBRARY kernel.exe
 EXPORTS
+    HalAllocateInterruptVector
     HalCheckTimerExpiration
+    HalCreateInterrupt
+    HalDeleteInterrupt
+    HalDisableInterrupt
+    HalEnableInterrupt
     HalGetTimerPeriod
     HalGetTimerTicks
     HalGetTimerWidth
+    HalInitializeInterruptData
+    HalReleaseInterruptData
     HalWaitTimer
 
     KeFatalError
@@ -36,6 +43,8 @@ EXPORTS
     VidGetColor
     VidGetCursor
     VidPrint
+    VidPrintSimple
+    VidPrintSimpleVariadic
     VidPrintVariadic
     VidPutChar
     VidPutString

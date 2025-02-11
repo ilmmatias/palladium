@@ -79,7 +79,7 @@ static void CacheTable(void) {
 
     /* We're forced to guess initially (as we still don't know the size); Assume <1 page, and
      * remap if wrong. */
-    SdtHeader *RootSdt = MmMapSpace(BaseAddress, MM_PAGE_SIZE);
+    SdtHeader *RootSdt = MmMapSpace(BaseAddress, MM_PAGE_SIZE, MM_SPACE_NORMAL);
     if (!RootSdt) {
         KeFatalError(
             KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
@@ -92,7 +92,7 @@ static void CacheTable(void) {
     if (RootSdt->Length > MM_PAGE_SIZE) {
         uint64_t Length = RootSdt->Length;
         MmUnmapSpace(RootSdt);
-        RootSdt = MmMapSpace(BaseAddress, Length);
+        RootSdt = MmMapSpace(BaseAddress, Length, MM_SPACE_NORMAL);
         if (!RootSdt) {
             KeFatalError(
                 KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
@@ -119,7 +119,7 @@ static void CacheTable(void) {
 
     for (uint32_t i = 0; i < (RootSdt->Length - sizeof(SdtHeader)) / (IsXsdt ? 8 : 4); i++) {
         uintptr_t Address = IsXsdt ? XsdtTables[i] : RsdtTables[i];
-        SdtHeader *Header = MmMapSpace(Address, MM_PAGE_SIZE);
+        SdtHeader *Header = MmMapSpace(Address, MM_PAGE_SIZE, MM_SPACE_NORMAL);
         if (!Header) {
             KeFatalError(
                 KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
@@ -135,7 +135,7 @@ static void CacheTable(void) {
         if (Header->Length > MM_PAGE_SIZE) {
             size_t Length = Header->Length;
             MmUnmapSpace(Header);
-            Header = MmMapSpace(Address, Length);
+            Header = MmMapSpace(Address, Length, MM_SPACE_NORMAL);
             if (!Header) {
                 KeFatalError(
                     KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
@@ -192,7 +192,7 @@ static void CacheTable(void) {
     }
 
     uint64_t Address = IsXsdt && Fadt->XDsdt ? Fadt->XDsdt : Fadt->Dsdt;
-    SdtHeader *Header = MmMapSpace(Address, MM_PAGE_SIZE);
+    SdtHeader *Header = MmMapSpace(Address, MM_PAGE_SIZE, MM_SPACE_NORMAL);
     if (!Header) {
         KeFatalError(
             KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
@@ -205,7 +205,7 @@ static void CacheTable(void) {
     if (Header->Length > MM_PAGE_SIZE) {
         size_t Length = Header->Length;
         MmUnmapSpace(Header);
-        Header = MmMapSpace(Address, Length);
+        Header = MmMapSpace(Address, Length, MM_SPACE_NORMAL);
         if (!Header) {
             KeFatalError(
                 KE_PANIC_KERNEL_INITIALIZATION_FAILURE,

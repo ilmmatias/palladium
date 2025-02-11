@@ -81,6 +81,8 @@ static struct {
     {HalpReservedTrapEntry, DESCR_IST_NONE, DESCR_DPL_KERNEL},
 };
 
+static volatile uint64_t GsiUsed[256] = {0};
+
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function tries handling a NMI (either as a processor freeze, or a machine check/panic).
@@ -274,7 +276,7 @@ void HalpDispatchInterrupt(HalInterruptFrame *InterruptFrame) {
     for (RtDList *ListHeader = HandlerList->Next; ListHeader != HandlerList;
          ListHeader = ListHeader->Next) {
         HalInterrupt *Interrupt = CONTAINING_RECORD(ListHeader, HalInterrupt, ListHeader);
-        KeSetIrql(Interrupt->Irql);
+        KeSetIrql(Interrupt->Data.Irql);
         __asm__ volatile("sti");
         KeAcquireSpinLockAtCurrentIrql(&Interrupt->Lock);
         Interrupt->Handler(Interrupt->HandlerContext);
@@ -377,29 +379,146 @@ void HalpInitializeIdt(KeProcessor *Processor) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
+ *     This function initializes the interrupt data structure for future use when enabling an
+ *     interrupt handler.
+ *     If the PinPolarity and TriggerMode values are HAL_INT_<POLARITY/TRIGGER>_UNSET (which should
+ *     be the case for an empty bus vector value), you can either edit them into what the device
+ *     prefers, or leave it unset for the default configuration.
+ *
+ * PARAMETERS:
+ *     Data - Which structure to initialize.
+ *     BusVector - A special (arch/machine-dependent) number representing where the interrupt will
+ *                 come from. This can be HAL_INT_VECTOR_UNSET if the device doesn't has any default
+ *                 interrupt vector it will come from.
+ *
+ * RETURN VALUE:
+ *     true if the an interrupt vector was successfully allocated for usage.
+ *-----------------------------------------------------------------------------------------------*/
+bool HalInitializeInterruptData(HalInterruptData *Data, uint32_t BusVector) {
+    memset(Data, 0, sizeof(HalInterruptData));
+    Data->PinPolarity = HAL_INT_POLARITY_UNSET;
+    Data->TriggerMode = HAL_INT_TRIGGER_UNSET;
+
+    /* For "legacy" devices (those discovered via non-standard ways, or that have a fixed IRQ
+     * they always come from), we need to map the IRQ into a GSI (via the IOAPIC override
+     * list). If the mapping can't be done (no override for it), then the IRQ itself should be the
+     * GSI. */
+    if (BusVector != HAL_INT_VECTOR_UNSET) {
+        if (!HalpTranslateIrq(
+                BusVector, &Data->SourceGsi, &Data->PinPolarity, &Data->TriggerMode)) {
+            Data->SourceGsi = BusVector;
+        }
+
+        if (__atomic_fetch_or(&GsiUsed[Data->SourceGsi], 0x01, __ATOMIC_ACQUIRE) & 0x01) {
+            return false;
+        } else {
+            Data->HasGsi = true;
+            return true;
+        }
+    }
+
+    /* For all other cases, we need to allocate a new unused GSI. */
+    for (size_t i = 0; i < 256; i++) {
+        if (!(__atomic_fetch_or(&GsiUsed[i], 0x01, __ATOMIC_ACQUIRE) & 0x01)) {
+            Data->HasGsi = true;
+            Data->SourceGsi = i;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function allocates a new interrupt vector to be used with HalCreateInterrupt and its
+ *     friends.
+ *
+ * PARAMETERS:
+ *     Data - Which interrupt data struct to store the new vector.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void HalAllocateInterruptVector(HalInterruptData *Data) {
+    KeProcessor *Processor = KeGetCurrentProcessor();
+    KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Processor->Lock, KE_IRQL_SYNCH);
+    uint8_t LowestCount = UINT8_MAX;
+    size_t LowestVector = 0;
+
+    Data->HasVector = true;
+
+    for (KeIrql Irql = KE_IRQL_TIMER - 1; Irql >= KE_IRQL_DEVICE; Irql--) {
+        for (uint8_t Offset = 0; Offset < 16; Offset++) {
+            uint8_t Vector = (Irql << 4) | Offset;
+
+            /* Empty vectors always get chosen if possible. */
+            if (!Processor->InterruptUsage[Vector]) {
+                Data->TargetVector = Vector;
+                Data->Irql = Irql;
+                Processor->InterruptUsage[Vector]++;
+                KeReleaseSpinLockAndLowerIrql(&Processor->Lock, OldIrql);
+                return;
+            }
+
+            /* Otherwise, keep count of which vector has the least usage. */
+            if (Processor->InterruptUsage[Vector] < LowestCount) {
+                LowestCount = Processor->InterruptUsage[Vector];
+                LowestVector = Vector;
+            }
+        }
+    }
+
+    /* As long we're inside the valid IRQL range, any vector should be usable. */
+    Data->TargetVector = LowestVector;
+    Data->Irql = LowestVector >> 4;
+    Processor->InterruptUsage[LowestVector]++;
+    KeReleaseSpinLockAndLowerIrql(&Processor->Lock, OldIrql);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function releases the resources previously allocated by HalInitializeInterruptData and
+ *     HalAllocateInterruptVector. We should only be directly called if something fails before
+ *     HalCreateInterrupt gets called, otherwise, you should call HalDeleteInterrupt instead!
+ *
+ * PARAMETERS:
+ *     Data - Which interrupt data struct to release the resources from.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void HalReleaseInterruptData(HalInterruptData *Data) {
+    KeProcessor *Processor = KeGetCurrentProcessor();
+    KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Processor->Lock, KE_IRQL_SYNCH);
+
+    if (Data->HasGsi) {
+        __atomic_store_n(&GsiUsed[Data->SourceGsi], 0, __ATOMIC_RELEASE);
+    }
+
+    if (Data->HasVector) {
+        Processor->InterruptUsage[Data->TargetVector]--;
+    }
+
+    KeReleaseSpinLockAndLowerIrql(&Processor->Lock, OldIrql);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
  *     This function creates and initializes a new interrupt object, getting it ready for
  *     HalEnableInterrupt.
  *
  * PARAMETERS:
- *     Irql - Target IRQL of the interrupt handler.
- *     Irq - Index of the IRQ in the IOAPIC. Set this to UINT32_MAX if unsure.
- *     Vector - Target interrupt vector (make sure this and the IRQL make sense together!).
- *     Polarity - Pin polarity of the interrupt (active high vs active low).
- *     TriggerMode - Type of the interrupt (edge vs level).
+ *     Data - Interrupt data previously initialized by HalInitializeInterruptData and
+ *            HalAllocateInterruptVector.
  *     Handler - Function to be called when the interrupt gets triggered.
  *     HandlerContext - Data to be provided to the interrupt handler when it gets triggered.
  *
  * RETURN VALUE:
  *     Either the interrupt object, or NULL on failure.
  *-----------------------------------------------------------------------------------------------*/
-HalInterrupt *HalCreateInterrupt(
-    KeIrql Irql,
-    uint32_t Irq,
-    uint32_t Vector,
-    uint8_t Polarity,
-    uint8_t TriggerMode,
-    void (*Handler)(void *),
-    void *HandlerContext) {
+HalInterrupt *
+HalCreateInterrupt(HalInterruptData *Data, void (*Handler)(void *), void *HandlerContext) {
     HalInterrupt *Interrupt = MmAllocatePool(sizeof(HalInterrupt), MM_POOL_TAG_INTERRUPT);
     if (!Interrupt) {
         return NULL;
@@ -407,14 +526,33 @@ HalInterrupt *HalCreateInterrupt(
 
     Interrupt->Enabled = false;
     Interrupt->Lock = 0;
-    Interrupt->Irql = Irql;
-    Interrupt->Irq = Irq != UINT32_MAX ? Irq : Vector - 32;
-    Interrupt->Vector = Vector;
-    Interrupt->Polarity = Polarity;
-    Interrupt->TriggerMode = TriggerMode;
     Interrupt->Handler = Handler;
     Interrupt->HandlerContext = HandlerContext;
+    memcpy(&Interrupt->Data, Data, sizeof(HalInterruptData));
+
     return Interrupt;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function releases the resources previously allocated by HalCreateInterrupt,
+ *     automatically disabling the interrupt if required.
+ *
+ * PARAMETERS:
+ *     Interrupt - Target interrupt to be deleted.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void HalDeleteInterrupt(HalInterrupt *Interrupt) {
+    /* The first thing DisableInterrupt() does is check if the interrupt is already enabled, so this
+     * should be okay. */
+    HalDisableInterrupt(Interrupt);
+
+    /* Now we just need to release the interrupt data resources, and free up the interrupt struct
+     * itself. */
+    HalReleaseInterruptData(&Interrupt->Data);
+    MmFreePool(Interrupt, MM_POOL_TAG_INTERRUPT);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -435,43 +573,21 @@ bool HalEnableInterrupt(HalInterrupt *Interrupt) {
         return true;
     }
 
-    /* The IOAPIC uses the top 4 bits as the TPR (which is our IRQL); TPRs of 0 and 1 don't make
-     * sense (they are traps/exceptions!), and we don't want anyone registering any interrupt
-     * directly outside the device level range. */
-    if (Interrupt->Irql != (Interrupt->Vector >> 4) &&
-        (Interrupt->Irql <= KE_IRQL_DISPATCH || Interrupt->Irql >= KE_IRQL_TIMER)) {
+    /* On the other hand, if the interrupt data hasn't been initialized properly, we'll bail out. */
+    if (!Interrupt->Data.HasGsi || !Interrupt->Data.HasVector) {
         return false;
-    }
-
-    /* The IRQL should have already told us about the vector, but let's validate it too just to
-     * be sure. */
-    if (Interrupt->Vector > 255) {
-        return false;
-    }
-
-    /* Now, try to translate the IRQ into a valid GSI; The most common case for this is IRQ0 (that
-     * gets mapped into GSI2), but overall it should just return false. */
-    uint8_t Gsi = Interrupt->Irq;
-    uint8_t PinPolarity = Interrupt->Polarity;
-    uint8_t TriggerMode = Interrupt->TriggerMode;
-    if (HalpTranslateIrq(Interrupt->Irq, &Gsi, &PinPolarity, &TriggerMode)) {
-        /* If we did translate it into something else, validate that the pin polarity and trigger
-         * mode didn't change. If they did change, we can't continue. */
-        if (PinPolarity != Interrupt->Polarity || TriggerMode != Interrupt->TriggerMode) {
-            return false;
-        }
     }
 
     KeProcessor *Processor = KeGetCurrentProcessor();
     KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Processor->Lock, KE_IRQL_SYNCH);
-    RtDList *Handlers = &Processor->InterruptList[Interrupt->Vector];
+    RtDList *Handlers = &Processor->InterruptList[Interrupt->Data.TargetVector];
 
     if (Handlers->Next != Handlers) {
         /* We already have one or more interrupt handlers on this vector, validate if we are
          * compatible with the already installed handlers. */
         HalInterrupt *FirstHandler = CONTAINING_RECORD(Handlers->Next, HalInterrupt, ListHeader);
-        if (FirstHandler->Polarity != Interrupt->Polarity ||
-            FirstHandler->TriggerMode != Interrupt->TriggerMode) {
+        if (FirstHandler->Data.PinPolarity != Interrupt->Data.PinPolarity ||
+            FirstHandler->Data.TriggerMode != Interrupt->Data.TriggerMode) {
             KeReleaseSpinLockAndLowerIrql(&Processor->Lock, OldIrql);
             return false;
         }
@@ -479,9 +595,12 @@ bool HalEnableInterrupt(HalInterrupt *Interrupt) {
 
     RtAppendDList(Handlers, &Interrupt->ListHeader);
     KeReleaseSpinLockAndLowerIrql(&Processor->Lock, OldIrql);
-    HalpEnableGsi(Gsi, Interrupt->Vector, PinPolarity, TriggerMode);
+    HalpEnableGsi(
+        Interrupt->Data.SourceGsi,
+        Interrupt->Data.TargetVector,
+        Interrupt->Data.PinPolarity,
+        Interrupt->Data.TriggerMode);
     Interrupt->Enabled = true;
-
     return true;
 }
 
@@ -506,6 +625,7 @@ void HalDisableInterrupt(HalInterrupt *Interrupt) {
     KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Processor->Lock, KE_IRQL_SYNCH);
     RtUnlinkDList(&Interrupt->ListHeader);
     KeReleaseSpinLockAndLowerIrql(&Processor->Lock, OldIrql);
+    HalpDisableGsi(Interrupt->Data.SourceGsi);
     Interrupt->Enabled = false;
 }
 

@@ -12,4 +12,15 @@
 #endif /* __has__include */
 /* clang-format on */
 
+typedef void (*HalInterruptHandler)(void *);
+
+typedef struct {
+    RtDList ListHeader;
+    bool Enabled;
+    KeSpinLock Lock;
+    HalInterruptData Data;
+    void (*Handler)(void *);
+    void *HandlerContext;
+} HalInterrupt;
+
 #endif /* _KERNEL_DETAIL_HALTYPES_H_ */
