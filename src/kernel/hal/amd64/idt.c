@@ -4,6 +4,7 @@
 #include <kernel/halp.h>
 #include <kernel/intrin.h>
 #include <kernel/ke.h>
+#include <kernel/mm.h>
 #include <rt/except.h>
 #include <string.h>
 
@@ -276,7 +277,7 @@ void HalpDispatchInterrupt(HalInterruptFrame *InterruptFrame) {
         KeSetIrql(Interrupt->Irql);
         __asm__ volatile("sti");
         KeAcquireSpinLockAtCurrentIrql(&Interrupt->Lock);
-        Interrupt->Handler(InterruptFrame, Interrupt->HandlerContext);
+        Interrupt->Handler(Interrupt->HandlerContext);
         KeReleaseSpinLockAtCurrentIrql(&Interrupt->Lock);
         __asm__ volatile("cli");
         KeSetIrql(InterruptFrame->Irql);
@@ -376,6 +377,48 @@ void HalpInitializeIdt(KeProcessor *Processor) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
+ *     This function creates and initializes a new interrupt object, getting it ready for
+ *     HalEnableInterrupt.
+ *
+ * PARAMETERS:
+ *     Irql - Target IRQL of the interrupt handler.
+ *     Irq - Index of the IRQ in the IOAPIC. Set this to UINT32_MAX if unsure.
+ *     Vector - Target interrupt vector (make sure this and the IRQL make sense together!).
+ *     Polarity - Pin polarity of the interrupt (active high vs active low).
+ *     TriggerMode - Type of the interrupt (edge vs level).
+ *     Handler - Function to be called when the interrupt gets triggered.
+ *     HandlerContext - Data to be provided to the interrupt handler when it gets triggered.
+ *
+ * RETURN VALUE:
+ *     Either the interrupt object, or NULL on failure.
+ *-----------------------------------------------------------------------------------------------*/
+HalInterrupt *HalCreateInterrupt(
+    KeIrql Irql,
+    uint32_t Irq,
+    uint32_t Vector,
+    uint8_t Polarity,
+    uint8_t TriggerMode,
+    void (*Handler)(void *),
+    void *HandlerContext) {
+    HalInterrupt *Interrupt = MmAllocatePool(sizeof(HalInterrupt), MM_POOL_TAG_INTERRUPT);
+    if (!Interrupt) {
+        return NULL;
+    }
+
+    Interrupt->Enabled = false;
+    Interrupt->Lock = 0;
+    Interrupt->Irql = Irql;
+    Interrupt->Irq = Irq != UINT32_MAX ? Irq : Vector - 32;
+    Interrupt->Vector = Vector;
+    Interrupt->Polarity = Polarity;
+    Interrupt->TriggerMode = TriggerMode;
+    Interrupt->Handler = Handler;
+    Interrupt->HandlerContext = HandlerContext;
+    return Interrupt;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
  *     This function attempts to enable the handling of the given interrupt.
  *
  * PARAMETERS:
@@ -406,15 +449,29 @@ bool HalEnableInterrupt(HalInterrupt *Interrupt) {
         return false;
     }
 
+    /* Now, try to translate the IRQ into a valid GSI; The most common case for this is IRQ0 (that
+     * gets mapped into GSI2), but overall it should just return false. */
+    uint8_t Gsi = Interrupt->Irq;
+    uint8_t PinPolarity = Interrupt->Polarity;
+    uint8_t TriggerMode = Interrupt->TriggerMode;
+    if (HalpTranslateIrq(Interrupt->Irq, &Gsi, &PinPolarity, &TriggerMode)) {
+        /* If we did translate it into something else, validate that the pin polarity and trigger
+         * mode didn't change. If they did change, we can't continue. */
+        if (PinPolarity != Interrupt->Polarity || TriggerMode != Interrupt->TriggerMode) {
+            return false;
+        }
+    }
+
     KeProcessor *Processor = KeGetCurrentProcessor();
     KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Processor->Lock, KE_IRQL_SYNCH);
     RtDList *Handlers = &Processor->InterruptList[Interrupt->Vector];
 
     if (Handlers->Next != Handlers) {
         /* We already have one or more interrupt handlers on this vector, validate if we are
-         * compatible with the already installed handlers (one single vector can only be level
-         * or edge triggered, not both). */
-        if (CONTAINING_RECORD(Handlers->Next, HalInterrupt, ListHeader)->Type != Interrupt->Type) {
+         * compatible with the already installed handlers. */
+        HalInterrupt *FirstHandler = CONTAINING_RECORD(Handlers->Next, HalInterrupt, ListHeader);
+        if (FirstHandler->Polarity != Interrupt->Polarity ||
+            FirstHandler->TriggerMode != Interrupt->TriggerMode) {
             KeReleaseSpinLockAndLowerIrql(&Processor->Lock, OldIrql);
             return false;
         }
@@ -422,6 +479,7 @@ bool HalEnableInterrupt(HalInterrupt *Interrupt) {
 
     RtAppendDList(Handlers, &Interrupt->ListHeader);
     KeReleaseSpinLockAndLowerIrql(&Processor->Lock, OldIrql);
+    HalpEnableGsi(Gsi, Interrupt->Vector, PinPolarity, TriggerMode);
     Interrupt->Enabled = true;
 
     return true;

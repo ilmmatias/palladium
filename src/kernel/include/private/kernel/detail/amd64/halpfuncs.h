@@ -24,8 +24,8 @@ void HalpSendIpi(uint32_t Target, uint8_t Vector, uint8_t DeliveryMode);
 void HalpSendEoi(void);
 
 void HalpInitializeIoapic(void);
-void HalpEnableIrq(uint8_t Irq, uint8_t Vector);
-void HalpEnableGsi(uint8_t Gsi, uint8_t Vector);
+bool HalpTranslateIrq(uint8_t Irq, uint8_t *Gsi, uint8_t *PinPolarity, uint8_t *TriggerMode);
+void HalpEnableGsi(uint8_t Gsi, uint8_t Vector, uint8_t PinPolarity, uint8_t TriggerMode);
 
 void HalpInitializeHpet(void);
 void HalpInitializeApicTimer(void);

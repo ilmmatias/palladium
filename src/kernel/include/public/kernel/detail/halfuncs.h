@@ -24,9 +24,11 @@ void HalWaitTimer(uint64_t Time);
 
 HalInterrupt *HalCreateInterrupt(
     KeIrql Irql,
+    uint32_t Irq,
     uint32_t Vector,
-    uint8_t Type,
-    void (*Handler)(HalInterruptFrame *, void *),
+    uint8_t Polarity,
+    uint8_t TriggerMode,
+    void (*Handler)(void *),
     void *HandlerContext);
 bool HalEnableInterrupt(HalInterrupt *Interrupt);
 void HalDisableInterrupt(HalInterrupt *Interrupt);

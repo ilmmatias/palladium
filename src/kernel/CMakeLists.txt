@@ -27,7 +27,6 @@ add_executable(kernel "kernel" YES
 
     ev/timer.c
 
-    hal/interrupt.c
     hal/timer.c
 
     ke/acpi.c

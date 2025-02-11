@@ -185,49 +185,46 @@ void HalpInitializeIoapic(void) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function enables the given IRQ, using the override list if required.
+ *     This function tries translating the IRQ into a GSI using the IOAPIC override list.
  *
  * PARAMETERS:
- *     Irq - Which IRQ we wish to enable.
- *     Vector - Which IDT IRQ vector it should trigger.
+ *     Irq - Which IRQ we wish to translate.
+ *     Gsi - Output; Which GSI should be used for this IRQ.
+ *     PinPolarity - Output; Polarity that should be used for this IRQ.
+ *     TriggerMode - Output; Trigger mode that should be used for this IRQ.
  *
  * RETURN VALUE:
- *     None.
+ *     true if there was an IOAPIC override, false otherwise.
  *-----------------------------------------------------------------------------------------------*/
-void HalpEnableIrq(uint8_t Irq, uint8_t Vector) {
-    uint8_t Gsi = Irq;
-    RtSList *ListHeader = IoapicOverrideListHead.Next;
-    int PinPolarity = 0;
-    int TriggerMode = 0;
-
-    while (ListHeader) {
+bool HalpTranslateIrq(uint8_t Irq, uint8_t *Gsi, uint8_t *PinPolarity, uint8_t *TriggerMode) {
+    for (RtSList *ListHeader = IoapicOverrideListHead.Next; ListHeader;
+         ListHeader = ListHeader->Next) {
         HalpIoapicOverrideEntry *Entry =
             CONTAINING_RECORD(ListHeader, HalpIoapicOverrideEntry, ListHeader);
-
         if (Entry->Irq == Irq) {
-            Gsi = Entry->Gsi;
-            PinPolarity = Entry->PinPolarity;
-            TriggerMode = Entry->TriggerMode;
-            break;
+            *Gsi = Entry->Gsi;
+            *PinPolarity = Entry->PinPolarity;
+            *TriggerMode = Entry->TriggerMode;
+            return true;
         }
-
-        ListHeader = ListHeader->Next;
     }
 
-    UnmaskIoapicVector(Gsi, Vector + 32, PinPolarity, TriggerMode, KeGetCurrentProcessor()->ApicId);
+    return false;
 }
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function enables the given GSI, without using the override list.
+ *     This function enables the given GSI in the IOAPIC, redirecting it to the given IDT vector.
  *
  * PARAMETERS:
  *     Gsi - Which GSI we wish to enable.
- *     Vector - Which IDT IRQ vector it should trigger.
+ *     Vector - Which IDT vector it should trigger.
+ *     PinPolarity - Polarity that should be used for this GSI.
+ *     TriggerMode - Trigger mode that should be used for this GSI.
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void HalpEnableGsi(uint8_t Gsi, uint8_t Vector) {
-    UnmaskIoapicVector(Gsi, Vector + 32, 0, 1, KeGetCurrentProcessor()->ApicId);
+void HalpEnableGsi(uint8_t Gsi, uint8_t Vector, uint8_t PinPolarity, uint8_t TriggerMode) {
+    UnmaskIoapicVector(Gsi, Vector, PinPolarity, TriggerMode, KeGetCurrentProcessor()->ApicId);
 }

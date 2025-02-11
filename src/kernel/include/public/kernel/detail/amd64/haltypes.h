@@ -7,6 +7,19 @@
 #include <stdint.h>
 #include <xmmintrin.h>
 
+typedef struct {
+    RtDList ListHeader;
+    bool Enabled;
+    volatile uint64_t Lock;
+    uint64_t Irql;
+    uint32_t Irq;
+    uint32_t Vector;
+    uint8_t Polarity;
+    uint8_t TriggerMode;
+    void (*Handler)(void *);
+    void *HandlerContext;
+} HalInterrupt;
+
 typedef struct __attribute__((packed)) {
     uint64_t Rax;
     uint64_t Rcx;
