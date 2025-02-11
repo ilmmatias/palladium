@@ -44,7 +44,8 @@ void HalpInitializeSmp(void) {
 
     /* Allocate space for all the processors (this is just the pointer list, we'll be allocating
      * each processor after that). */
-    HalpProcessorList = MmAllocatePool(HalpProcessorCount * sizeof(KeProcessor *), "Halp");
+    HalpProcessorList =
+        MmAllocatePool(HalpProcessorCount * sizeof(KeProcessor *), MM_POOL_TAG_PROCESSOR);
     if (!HalpProcessorList) {
         KeFatalError(
             KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
@@ -58,7 +59,7 @@ void HalpInitializeSmp(void) {
         if (!i) {
             HalpProcessorList[i] = KeGetCurrentProcessor();
         } else {
-            HalpProcessorList[i] = MmAllocatePool(sizeof(KeProcessor), "Halp");
+            HalpProcessorList[i] = MmAllocatePool(sizeof(KeProcessor), MM_POOL_TAG_PROCESSOR);
         }
 
         if (!HalpProcessorList[i]) {

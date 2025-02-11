@@ -26,7 +26,7 @@ extern KeAffinity KiIdleProcessors;
  *     Pointer to the thread structure, or NULL on failure.
  *-----------------------------------------------------------------------------------------------*/
 static PsThread *CreateThread(void (*EntryPoint)(void *), void *Parameter, void *Stack) {
-    PsThread *Thread = ObCreateObject(&ObThreadType, "PsTh");
+    PsThread *Thread = ObCreateObject(&ObThreadType, MM_POOL_TAG_THREAD);
     if (!Thread) {
         return NULL;
     }
@@ -34,15 +34,15 @@ static PsThread *CreateThread(void (*EntryPoint)(void *), void *Parameter, void 
     Thread->State = PS_STATE_CREATED;
     Thread->Stack = Stack;
     if (!Thread->Stack) {
-        Thread->Stack = MmAllocatePool(KE_STACK_SIZE, "PsTh");
-        Thread->AllocatedStack = Thread->Stack;
-        if (!Thread->Stack) {
-            MmFreePool(Thread, "PsTh");
+        Thread->AllocatedStack = MmAllocatePool(KE_STACK_SIZE, MM_POOL_TAG_THREAD);
+        if (!Thread->AllocatedStack) {
+            ObDereferenceObject(Thread, MM_POOL_TAG_THREAD);
             return NULL;
         }
 
         /* We're guessing that there's no need to initialize the thread context (in fact, it might
          * even be dangerous to do so) if it's an already allocated stack. */
+        Thread->Stack = Thread->AllocatedStack;
         HalpInitializeContext(
             &Thread->ContextFrame, Thread->Stack, KE_STACK_SIZE, EntryPoint, Parameter);
     }

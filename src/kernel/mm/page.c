@@ -12,6 +12,14 @@ RtDList MiMemoryDescriptorListHead;
 MiPageEntry *MiPageList = NULL;
 RtDList MiFreePageListHead;
 KeSpinLock MiPageListLock = {0};
+uint64_t MiTotalSystemPages = 0;
+uint64_t MiTotalReservedPages = 0;
+uint64_t MiTotalUsedPages = 0;
+uint64_t MiTotalFreePages = 0;
+uint64_t MiTotalBootPages = 0;
+uint64_t MiTotalGraphicsPages = 0;
+uint64_t MiTotalPfnPages = 0;
+uint64_t MiTotalPoolPages = 0;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -24,7 +32,7 @@ KeSpinLock MiPageListLock = {0};
  * RETURN VALUE:
  *     Physical address of the contigous pages, or 0 on failure.
  *-----------------------------------------------------------------------------------------------*/
-uint64_t MiAllocateEarlyPages(uint64_t Pages) {
+uint64_t MiAllocateEarlyPages(uint32_t Pages) {
     if (!LoaderDescriptors) {
         return 0;
     }
@@ -39,6 +47,8 @@ uint64_t MiAllocateEarlyPages(uint64_t Pages) {
         uint64_t Result = Entry->BasePage << MM_PAGE_SHIFT;
         Entry->BasePage += Pages;
         Entry->PageCount -= Pages;
+        MiTotalUsedPages += Pages;
+        MiTotalFreePages -= Pages;
         return Result;
     }
 
@@ -60,16 +70,41 @@ uint64_t MiAllocateEarlyPages(uint64_t Pages) {
 void MiInitializeEarlyPageAllocator(KiLoaderBlock *LoaderBlock) {
     LoaderDescriptors = LoaderBlock->MemoryDescriptorListHead;
 
-    /* We need to make sure we won't use the low 64KiB; They are reserved if the kernel needs
-     * any low memory (for initializing SMP or anything else like that). */
     for (RtDList *ListHeader = LoaderDescriptors->Next; ListHeader != LoaderDescriptors;
          ListHeader = ListHeader->Next) {
         MiMemoryDescriptor *Entry = CONTAINING_RECORD(ListHeader, MiMemoryDescriptor, ListHeader);
+
+        /* Unmapping the 1:1 firware temp regions should be already okay to do. */
+        if (Entry->Type == MI_DESCR_FIRMWARE_TEMPORARY ||
+            Entry->Type == MI_DESCR_FIRMWARE_PERMANENT) {
+            HalpUnmapPages(
+                (void *)(Entry->BasePage << MM_PAGE_SHIFT), Entry->PageCount << MM_PAGE_SHIFT);
+        }
+
+        /* We need to make sure we won't use the low 64KiB; They are reserved if the kernel needs
+         * any low memory (for initializing SMP or anything else like that). */
         if (Entry->BasePage < 0x10) {
+            MiTotalReservedPages += 0x10 - Entry->BasePage;
             Entry->PageCount -= 0x10 - Entry->BasePage;
             Entry->BasePage += 0x10 - Entry->BasePage;
         }
+
+        /* Otherwise, just update the global page stats using the data we from this region. */
+        if (Entry->Type >= MI_DESCR_FIRMWARE_PERMANENT) {
+            MiTotalReservedPages += Entry->PageCount;
+        } else if (Entry->Type == MI_DESCR_GRAPHICS_BUFFER) {
+            MiTotalGraphicsPages += Entry->PageCount;
+            MiTotalUsedPages += Entry->PageCount;
+        } else if (Entry->Type == MI_DESCR_PAGE_MAP || Entry->Type == MI_DESCR_LOADED_PROGRAM) {
+            MiTotalBootPages += Entry->PageCount;
+            MiTotalUsedPages += Entry->PageCount;
+        } else {
+            MiTotalFreePages += Entry->PageCount;
+        }
     }
+
+    /* Now calculate the total amount of pages the system has. */
+    MiTotalSystemPages = MiTotalReservedPages + MiTotalUsedPages + MiTotalFreePages;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -95,13 +130,6 @@ void MiInitializePageAllocator(void) {
         /* Let's use the fact we're iterating through the list and already save its size (for
          * copying it into kernel land later). */
         MemoryDescriptorListSize += sizeof(MiMemoryDescriptor);
-
-        /* Unmapping the 1:1 firware temp regions should be already okay to do. */
-        if (Entry->Type == MI_DESCR_FIRMWARE_TEMPORARY ||
-            Entry->Type == MI_DESCR_FIRMWARE_PERMANENT) {
-            HalpUnmapPages(
-                (void *)(Entry->BasePage << MM_PAGE_SHIFT), Entry->PageCount << MM_PAGE_SHIFT);
-        }
 
         if (Entry->Type <= MI_DESCR_FIRMWARE_PERMANENT) {
             MaxAddressablePage = Entry->BasePage + Entry->PageCount;
@@ -133,6 +161,7 @@ void MiInitializePageAllocator(void) {
     }
 
     MiPageList = PageListBase;
+    MiTotalPfnPages = Pages;
 
     /* Setup the page allocator (marking the free pages as free). */
     RtInitializeDList(&MiFreePageListHead);
@@ -147,11 +176,15 @@ void MiInitializePageAllocator(void) {
 
         if (Entry->Type != MI_DESCR_FREE && Entry->Type != MI_DESCR_FIRMWARE_TEMPORARY) {
             for (uint32_t i = 0; i < Entry->PageCount; i++) {
-                Group[i].Flags = MI_PAGE_FLAGS_USED;
+                Group[i].Used = 1;
+                Group[i].PoolItem = 0;
+                Group[i].PoolBase = 0;
             }
         } else {
             for (uint32_t i = 0; i < Entry->PageCount; i++) {
-                Group[i].Flags = 0;
+                Group[i].Used = 0;
+                Group[i].PoolItem = 0;
+                Group[i].PoolBase = 0;
                 RtPushDList(&MiFreePageListHead, &Group[i].ListHeader);
             }
         }
@@ -159,7 +192,7 @@ void MiInitializePageAllocator(void) {
 
     /* Now we should be free to allocate some pool memory and copy the memory descriptor list in its
      * current state. */
-    MiMemoryDescriptor *Descriptor = MmAllocatePool(MemoryDescriptorListSize, "KeMm");
+    MiMemoryDescriptor *Descriptor = MmAllocatePool(MemoryDescriptorListSize, MM_POOL_TAG_PFN);
     if (!Descriptor) {
         KeFatalError(
             KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
@@ -205,7 +238,9 @@ void MiReleaseBootRegions(void) {
 
         MiPageEntry *Group = &MiPageList[Entry->BasePage];
         for (uint64_t i = 0; i < (uint64_t)Entry->PageCount; i++) {
-            Group[i].Flags = 0;
+            Group[i].Used = 0;
+            Group[i].PoolItem = 0;
+            Group[i].PoolBase = 0;
             RtPushDList(&MiFreePageListHead, &Group[i].ListHeader);
         }
 
@@ -233,12 +268,15 @@ uint64_t MmAllocateSinglePage() {
         return 0;
     }
 
+    /* Make sure the flags make sense (if not, we probably have a corrupted PFN free list). */
     MiPageEntry *Entry = CONTAINING_RECORD(ListHeader, MiPageEntry, ListHeader);
-    if (Entry->Flags & MI_PAGE_FLAGS_USED) {
+    if (Entry->Used || Entry->PoolItem) {
         KeFatalError(KE_PANIC_BAD_PFN_HEADER, MI_PAGE_BASE(Entry), Entry->Flags, 0, 0);
     }
 
-    Entry->Flags = MI_PAGE_FLAGS_USED;
+    MiTotalUsedPages += 1;
+    MiTotalFreePages -= 1;
+    Entry->Used = 1;
     return MI_PAGE_BASE(Entry);
 }
 
@@ -256,13 +294,14 @@ void MmFreeSinglePage(uint64_t PhysicalAddress) {
     KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&MiPageListLock, KE_IRQL_DISPATCH);
     MiPageEntry *Entry = &MI_PAGE_ENTRY(PhysicalAddress);
 
-    if (!(Entry->Flags & MI_PAGE_FLAGS_USED) ||
-        (Entry->Flags & (MI_PAGE_FLAGS_CONTIG_ANY | MI_PAGE_FLAGS_POOL_ANY))) {
+    /* Use MmFreePool to free big pool allocations, instead of us! */
+    if (!Entry->Used || Entry->PoolItem) {
         KeFatalError(KE_PANIC_BAD_PFN_HEADER, PhysicalAddress, Entry->Flags, 0, 0);
     }
 
-    Entry->Flags = 0;
-
+    MiTotalUsedPages -= 1;
+    MiTotalFreePages += 1;
+    Entry->Used = 0;
     RtPushDList(&MiFreePageListHead, &Entry->ListHeader);
     KeReleaseSpinLockAndLowerIrql(&MiPageListLock, OldIrql);
 }

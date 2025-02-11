@@ -20,12 +20,29 @@ typedef struct {
     uint64_t PageCount;
 } MiMemoryDescriptor;
 
-typedef struct MiPageEntry {
-    uint16_t Flags;
+typedef struct {
+    RtDList ListHeader;
     union {
-        RtDList ListHeader;
-        uint64_t Pages;
+        struct {
+            uint32_t Used : 1;
+            uint32_t PoolItem : 1;
+            uint32_t PoolBase : 1;
+            uint32_t Padding : 29;
+        };
+        uint32_t Flags;
     };
+    uint32_t Pages;
+    char Tag[4];
 } MiPageEntry;
+
+typedef struct {
+    RtDList ListHeader;
+    char Tag[4];
+    uint64_t Allocations;
+    uint64_t AllocatedBytes;
+    uint64_t MaxAllocations;
+    uint64_t MaxAllocatedBytes;
+    uint64_t Padding;
+} MiPoolTrackerHeader;
 
 #endif /* _KERNEL_DETAIL_MITYPES_H_ */

@@ -128,6 +128,35 @@ static void InitializeApplicationProcessor(KeProcessor *Processor) {
        them. */
     KiRunBootStartDrivers();
 
+    /* Dump the PFN stats; Some of the page stat categories can/will intersect with the used/free
+     * pages count, so beware of that. */
+    VidPrintSimple("\ndumping the PFN stats:\n");
+    VidPrintSimple("       total pages: %llu\n", MiTotalSystemPages);
+    VidPrintSimple("    reserved pages: %llu\n", MiTotalReservedPages);
+    VidPrintSimple("        used pages: %llu\n", MiTotalUsedPages);
+    VidPrintSimple("        free pages: %llu\n", MiTotalFreePages);
+    VidPrintSimple("        boot pages: %llu\n", MiTotalBootPages);
+    VidPrintSimple("    graphics pages: %llu\n", MiTotalGraphicsPages);
+    VidPrintSimple("         pfn pages: %llu\n", MiTotalPfnPages);
+    VidPrintSimple("        pool pages: %llu\n", MiTotalPoolPages);
+
+    /* Dump the per-tag pool stats. */
+    VidPrintSimple("\ndumping the pool stats:\n");
+    VidPrintSimple(
+        "tag  | allocs           | bytes            | max allocs       | max bytes       \n");
+    for (RtDList *ListHeader = MiPoolTagListHead.Next; ListHeader != &MiPoolTagListHead;
+         ListHeader = ListHeader->Next) {
+        MiPoolTrackerHeader *Header =
+            CONTAINING_RECORD(ListHeader, MiPoolTrackerHeader, ListHeader);
+        VidPrintSimple(
+            "%.4s | %-16llu | %-16llu | %-16llu | %-16llu\n",
+            Header->Tag,
+            Header->Allocations,
+            Header->AllocatedBytes,
+            Header->MaxAllocations,
+            Header->MaxAllocatedBytes);
+    }
+
     while (true) {
         StopProcessor();
     }

@@ -6,7 +6,6 @@
 #include <kernel/mi.h>
 #include <string.h>
 
-extern MiPageEntry *MiPageList;
 extern bool HalpSmpInitializationComplete;
 
 typedef struct {

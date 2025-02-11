@@ -138,7 +138,7 @@ void HalpInitializeApic(void) {
                     break;
                 }
 
-                HalpLapicEntry *Entry = MmAllocatePool(sizeof(HalpLapicEntry), "Apic");
+                HalpLapicEntry *Entry = MmAllocatePool(sizeof(HalpLapicEntry), MM_POOL_TAG_APIC);
                 if (!Entry) {
                     KeFatalError(
                         KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
@@ -170,7 +170,7 @@ void HalpInitializeApic(void) {
                     break;
                 }
 
-                HalpLapicEntry *Entry = MmAllocatePool(sizeof(HalpLapicEntry), "Apic");
+                HalpLapicEntry *Entry = MmAllocatePool(sizeof(HalpLapicEntry), MM_POOL_TAG_APIC);
                 if (!Entry) {
                     KeFatalError(
                         KE_PANIC_KERNEL_INITIALIZATION_FAILURE,

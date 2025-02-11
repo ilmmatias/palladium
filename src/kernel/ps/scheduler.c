@@ -184,7 +184,7 @@ void PspProcessQueue(HalInterruptFrame *) {
             KeFatalError(KE_PANIC_BAD_THREAD_STATE, Thread->State, PS_STATE_TERMINATED, 0, 0);
         }
 
-        ObDereferenceObject(Thread, "PsTh");
+        ObDereferenceObject(Thread, MM_POOL_TAG_THREAD);
     }
 
     /* Requeue any waiting threads that have expired (this can also be done at DISPATCH). */

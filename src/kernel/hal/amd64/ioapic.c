@@ -108,7 +108,7 @@ void HalpInitializeIoapic(void) {
 
         switch (Record->Type) {
             case HALP_IOAPIC_RECORD: {
-                HalpIoapicEntry *Entry = MmAllocatePool(sizeof(HalpIoapicEntry), "Apic");
+                HalpIoapicEntry *Entry = MmAllocatePool(sizeof(HalpIoapicEntry), MM_POOL_TAG_APIC);
                 if (!Entry) {
                     KeFatalError(
                         KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
@@ -153,7 +153,7 @@ void HalpInitializeIoapic(void) {
                PIT). */
             case HALP_IOAPIC_SOURCE_OVERRIDE_RECORD: {
                 HalpIoapicOverrideEntry *Entry =
-                    MmAllocatePool(sizeof(HalpIoapicOverrideEntry), "Apic");
+                    MmAllocatePool(sizeof(HalpIoapicOverrideEntry), MM_POOL_TAG_APIC);
                 if (!Entry) {
                     KeFatalError(
                         KE_PANIC_KERNEL_INITIALIZATION_FAILURE,

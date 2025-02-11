@@ -1,6 +1,7 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
+#include <kernel/halp.h>
 #include <kernel/ke.h>
 #include <kernel/mi.h>
 #include <string.h>
@@ -18,6 +19,8 @@ static RtSList SmallBlocks[SMALL_BLOCK_COUNT] = {};
 
 char *MiPoolVirtualOffset = NULL;
 RtDList MiPoolBigFreeListHead;
+RtDList MiPoolFreeTagListHead;
+RtDList MiPoolTagListHead;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -32,6 +35,8 @@ RtDList MiPoolBigFreeListHead;
 void MiInitializePool(void) {
     MiPoolVirtualOffset = (char *)MI_POOL_START;
     RtInitializeDList(&MiPoolBigFreeListHead);
+    RtInitializeDList(&MiPoolTagListHead);
+    RtInitializeDList(&MiPoolFreeTagListHead);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -57,8 +62,12 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
        pointer size isn't 64-bits. */
     uint32_t Head = (Size + 0x0F) >> 4;
     if (Head > SMALL_BLOCK_COUNT) {
-        uint64_t Pages = (Size + MM_PAGE_SIZE - 1) >> MM_PAGE_SHIFT;
+        uint32_t Pages = (Size + MM_PAGE_SIZE - 1) >> MM_PAGE_SHIFT;
         void *Base = MiAllocatePoolPages(Pages);
+
+        /* Tag the allocation and try to account for it in the pool tracker. */
+        memcpy(MI_PAGE_ENTRY(HalpGetPhysicalAddress(Base)).Tag, Tag, 4);
+        MiAddPoolTracker(Pages << MM_PAGE_SHIFT, Tag);
 
         /* We don't need locking from here on out (we'd just be wasting time). */
         KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
@@ -99,6 +108,7 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
         }
 
         /* We don't need locking from here on out (we'd just be wasting time). */
+        MiAddPoolTracker(Head << 4, Tag);
         KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
         memset(Header + 1, 0, Head << 4);
         return Header + 1;
@@ -123,6 +133,7 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
     }
 
     /* memset() inside the spin lock would be wasting time. */
+    MiAddPoolTracker(Head << 4, Tag);
     KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
     memset(Header + 1, 0, Head << 4);
     return Header + 1;
@@ -145,7 +156,26 @@ void MmFreePool(void *Base, const char Tag[4]) {
     /* MmAllocatePool guarantees anything that is inside the small pool buckets is never going to
        be page aligned. */
     if (!((uint64_t)Base & (MM_PAGE_SIZE - 1))) {
-        MiFreePoolPages(Base);
+        /* This should be mapped and have the tag properly setup, otherwise, we weren't allocated by
+         * MmAllocatePool (maybe by MiAllocatePoolPages instead?). */
+        uint64_t PhysicalAddress = HalpGetPhysicalAddress(Base);
+        if (!PhysicalAddress) {
+            KeFatalError(KE_PANIC_BAD_POOL_HEADER, (uint64_t)Base, 0, *(uint32_t *)Tag, UINT64_MAX);
+        }
+
+        MiPageEntry *Entry = &MI_PAGE_ENTRY(PhysicalAddress);
+        if (memcmp(Entry->Tag, Tag, 4)) {
+            KeFatalError(
+                KE_PANIC_BAD_POOL_HEADER,
+                (uint64_t)Base,
+                *(uint32_t *)Entry->Tag,
+                *(uint32_t *)Tag,
+                UINT64_MAX);
+        }
+
+        /* The remaining checks are directly done by MiFreePoolPages. */
+        uint32_t Pages = MiFreePoolPages(Base);
+        MiRemovePoolTracker(Pages << MM_PAGE_SHIFT, Tag);
         KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
         return;
     }
@@ -162,6 +192,7 @@ void MmFreePool(void *Base, const char Tag[4]) {
     }
 
     /* TODO: Reduce fragmentation. */
+    MiRemovePoolTracker(Header->Head << 4, Tag);
     RtPushSList(&SmallBlocks[Header->Head - 1], &Header->ListHeader);
     KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
 }

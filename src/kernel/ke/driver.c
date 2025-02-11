@@ -27,7 +27,7 @@ void KiSaveBootStartDrivers(KiLoaderBlock *LoaderBlock) {
          ListHeader != LoaderBlock->BootDriverListHead;
          ListHeader = ListHeader->Next) {
         KeModule *SourceModule = CONTAINING_RECORD(ListHeader, KeModule, ListHeader);
-        KeModule *TargetModule = MmAllocatePool(sizeof(KeModule), "KeLd");
+        KeModule *TargetModule = MmAllocatePool(sizeof(KeModule), MM_POOL_TAG_LDR);
         if (!TargetModule) {
             KeFatalError(
                 KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
@@ -37,7 +37,8 @@ void KiSaveBootStartDrivers(KiLoaderBlock *LoaderBlock) {
                 0);
         }
 
-        char *TargetImageName = MmAllocatePool(strlen(SourceModule->ImageName) + 1, "KeLd");
+        char *TargetImageName =
+            MmAllocatePool(strlen(SourceModule->ImageName) + 1, MM_POOL_TAG_LDR);
         if (!TargetImageName) {
             KeFatalError(
                 KE_PANIC_KERNEL_INITIALIZATION_FAILURE,

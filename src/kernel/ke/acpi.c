@@ -169,7 +169,7 @@ static void CacheTable(void) {
             ListHeader = ListHeader->Next;
         }
 
-        CacheEntry *Entry = MmAllocatePool(sizeof(CacheEntry), "Acpi");
+        CacheEntry *Entry = MmAllocatePool(sizeof(CacheEntry), MM_POOL_TAG_ACPI);
         if (!Entry) {
             KeFatalError(
                 KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
@@ -225,7 +225,7 @@ static void CacheTable(void) {
             0);
     }
 
-    CacheEntry *Entry = MmAllocatePool(sizeof(CacheEntry), "Acpi");
+    CacheEntry *Entry = MmAllocatePool(sizeof(CacheEntry), MM_POOL_TAG_ACPI);
     if (!Entry) {
         KeFatalError(
             KE_PANIC_KERNEL_INITIALIZATION_FAILURE,

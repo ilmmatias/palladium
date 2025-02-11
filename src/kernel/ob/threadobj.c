@@ -18,7 +18,7 @@
 static void DeleteRoutine(void *Object) {
     PsThread *Thread = Object;
     if (Thread->AllocatedStack) {
-        MmFreePool(Thread->AllocatedStack, "PsTh");
+        MmFreePool(Thread->AllocatedStack, MM_POOL_TAG_THREAD);
     }
 }
 

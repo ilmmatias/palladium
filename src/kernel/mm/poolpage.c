@@ -10,7 +10,6 @@ typedef struct {
     uint64_t Pages;
 } BigFreeHeader;
 
-extern MiPageEntry *MiPageList;
 extern char *MiPoolVirtualOffset;
 extern RtDList MiPoolBigFreeListHead;
 
@@ -25,7 +24,7 @@ extern RtDList MiPoolBigFreeListHead;
  * RETURN VALUE:
  *     Virtual (mapped) pointer to the allocated space, or NULL if we failed to allocate it.
  *-----------------------------------------------------------------------------------------------*/
-void *MiAllocatePoolPages(uint64_t Pages) {
+void *MiAllocatePoolPages(uint32_t Pages) {
     for (RtDList *ListHeader = MiPoolBigFreeListHead.Next; ListHeader != &MiPoolBigFreeListHead;
          ListHeader = ListHeader->Next) {
         BigFreeHeader *Header = CONTAINING_RECORD(ListHeader, BigFreeHeader, ListHeader);
@@ -43,12 +42,12 @@ void *MiAllocatePoolPages(uint64_t Pages) {
             Base = (char *)Header + (Header->Pages << MM_PAGE_SHIFT);
         }
 
-        /* Mark the base of the allocation as such, everything else should have already been marked
-         * properly by FreePoolPages. */
+        /* And we're done here, just mark ourselves as the base of the allocation. */
         uint64_t PhysicalAddress = HalpGetPhysicalAddress(Base);
         MiPageEntry *BaseEntry = &MI_PAGE_ENTRY(PhysicalAddress);
-        BaseEntry->Flags = MI_PAGE_FLAGS_USED | MI_PAGE_FLAGS_POOL_BASE;
+        BaseEntry->PoolBase = 1;
         BaseEntry->Pages = Pages;
+        MiTotalUsedPages += Pages;
         return Base;
     }
 
@@ -67,12 +66,13 @@ void *MiAllocatePoolPages(uint64_t Pages) {
             return NULL;
         }
 
-        /* Mark the current page as part of the pool. */
+        /* Mark the pages of the pool as such. */
         MiPageEntry *Entry = &MI_PAGE_ENTRY(PhysicalAddress);
-        if (Offset) {
-            Entry->Flags |= MI_PAGE_FLAGS_POOL_ITEM;
-        } else {
-            Entry->Flags |= MI_PAGE_FLAGS_POOL_BASE;
+        MiTotalPoolPages += 1;
+        Entry->Used = 1;
+        Entry->PoolItem = 1;
+        if (!Offset) {
+            Entry->PoolBase = 1;
             Entry->Pages = Pages;
         }
     }
@@ -88,30 +88,24 @@ void *MiAllocatePoolPages(uint64_t Pages) {
  *     Base - First virtual address of the allocation.
  *
  * RETURN VALUE:
- *     None.
+ *     How many pages the allocation had.
  *-----------------------------------------------------------------------------------------------*/
-void MiFreePoolPages(void *Base) {
+uint32_t MiFreePoolPages(void *Base) {
     uint64_t PhysicalAddress = HalpGetPhysicalAddress(Base);
     MiPageEntry *BaseEntry = &MI_PAGE_ENTRY(PhysicalAddress);
-    uint64_t Pages = BaseEntry->Pages;
-    if (!(BaseEntry->Flags & MI_PAGE_FLAGS_USED) || !(BaseEntry->Flags & MI_PAGE_FLAGS_POOL_BASE)) {
+    uint32_t Pages = BaseEntry->Pages;
+    if (!BaseEntry->Used || !BaseEntry->PoolBase) {
         KeFatalError(KE_PANIC_BAD_PFN_HEADER, PhysicalAddress, BaseEntry->Flags, 0, 0);
     }
 
-    /* Validate all pages inside to make sure they are pool items; We probably should limit this to
-     * debug builds? */
-    BaseEntry->Flags = MI_PAGE_FLAGS_USED | MI_PAGE_FLAGS_POOL_ITEM;
-    for (uint32_t Offset = MM_PAGE_SIZE; Offset < Pages << MM_PAGE_SHIFT; Offset += MM_PAGE_SIZE) {
-        uint64_t PhysicalAdddress = HalpGetPhysicalAddress((char *)Base + Offset);
-        MiPageEntry *ItemEntry = &MI_PAGE_ENTRY(PhysicalAdddress);
-        if (!(ItemEntry->Flags & MI_PAGE_FLAGS_USED) ||
-            !(ItemEntry->Flags & MI_PAGE_FLAGS_POOL_ITEM)) {
-            KeFatalError(KE_PANIC_BAD_PFN_HEADER, PhysicalAddress, ItemEntry->Flags, 0, 0);
-        }
-    }
+    /* With this, the current state of all pages in this allocation should be:
+     * Used=1, PoolItem=1, PoolBase=0. */
+    BaseEntry->PoolBase = 0;
+    MiTotalUsedPages -= Pages;
 
-    /* TODO: Reduce fragmentation (deferred merge pages probably?). */
+    /* TODO: Reduce fragmentation (merge pages probably, either now, or on the idle thread). */
     BigFreeHeader *Header = Base;
     Header->Pages = Pages;
     RtAppendDList(&MiPoolBigFreeListHead, &Header->ListHeader);
+    return Pages;
 }

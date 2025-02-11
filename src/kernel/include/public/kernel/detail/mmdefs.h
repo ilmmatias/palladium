@@ -12,4 +12,14 @@
 
 #define MM_PAGE_SIZE (1ull << (MM_PAGE_SHIFT))
 
+#define MM_POOL_TAG_ACPI "ACPI"
+#define MM_POOL_TAG_APIC "APIC"
+#define MM_POOL_TAG_INTERRUPT "INTR"
+#define MM_POOL_TAG_LDR "LDR "
+#define MM_POOL_TAG_PFN "PFN "
+#define MM_POOL_TAG_POOL "POOL"
+#define MM_POOL_TAG_PROCESS "PCB "
+#define MM_POOL_TAG_PROCESSOR "PCR "
+#define MM_POOL_TAG_THREAD "TCB "
+
 #endif /* _KERNEL_DETAIL_MMDEFS_H_ */

@@ -25,7 +25,7 @@ HalInterrupt *HalCreateInterrupt(
     uint8_t Type,
     void (*Handler)(HalInterruptFrame *, void *),
     void *HandlerContext) {
-    HalInterrupt *Interrupt = MmAllocatePool(sizeof(HalInterrupt), "HalI");
+    HalInterrupt *Interrupt = MmAllocatePool(sizeof(HalInterrupt), MM_POOL_TAG_INTERRUPT);
     if (!Interrupt) {
         return NULL;
     }

@@ -5,6 +5,7 @@
 #define _KERNEL_DETAIL_MIFUNCS_H_
 
 #include <kernel/detail/kitypes.h>
+#include <kernel/detail/mitypes.h>
 #include <kernel/detail/mmfuncs.h>
 
 /* clang-format off */
@@ -17,14 +18,27 @@
 extern "C" {
 #endif /* __cplusplus */
 
+extern MiPageEntry *MiPageList;
+extern uint64_t MiTotalSystemPages;
+extern uint64_t MiTotalReservedPages;
+extern uint64_t MiTotalUsedPages;
+extern uint64_t MiTotalFreePages;
+extern uint64_t MiTotalBootPages;
+extern uint64_t MiTotalGraphicsPages;
+extern uint64_t MiTotalPfnPages;
+extern uint64_t MiTotalPoolPages;
+extern RtDList MiPoolTagListHead;
+
 void MiInitializeEarlyPageAllocator(KiLoaderBlock *LoaderBlock);
 void MiInitializePageAllocator(void);
 void MiReleaseBootRegions(void);
-uint64_t MiAllocateEarlyPages(uint64_t Pages);
+uint64_t MiAllocateEarlyPages(uint32_t Pages);
 
 void MiInitializePool(void);
-void *MiAllocatePoolPages(uint64_t Pages);
-void MiFreePoolPages(void *Base);
+void *MiAllocatePoolPages(uint32_t Pages);
+uint32_t MiFreePoolPages(void *Base);
+void MiAddPoolTracker(size_t Size, const char Tag[4]);
+void MiRemovePoolTracker(size_t Size, const char Tag[4]);
 
 #ifdef __cplusplus
 }
