@@ -15,8 +15,8 @@ extern RtDList MiPoolBigFreeListHead;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function allocates a the specified amount of pages from the pool space. The pool lock is
- *assumed to have already been acquired.
+ *     This function allocates a the specified amount of pages from the pool space. The pool lock
+ *     is assumed to have already been acquired.
  *
  * PARAMETERS:
  *     Pages - How many pages we need.

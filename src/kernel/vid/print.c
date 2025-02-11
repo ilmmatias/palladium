@@ -96,8 +96,11 @@ static void ScrollUp(void) {
     memmove(VidpFrontBuffer, VidpFrontBuffer + LineSize, ScreenSize - LineSize);
 
     /* We can't just memset, thanks to the background not being fixed at 0x00000000 (black). */
-    for (int i = 0; i < VidpWidth; i++) {
-        *(uint32_t *)&VidpFrontBuffer[ScreenSize - LineSize + i * 4] = VidpBackground;
+    for (int i = 0; i < VidpFont.Height; i++) {
+        for (int j = 0; j < VidpWidth; j++) {
+            *(uint32_t *)&VidpFrontBuffer[ScreenSize - LineSize + i * VidpPitch + j * 4] =
+                VidpBackground;
+        }
     }
 
     PendingFullFlush = true;
