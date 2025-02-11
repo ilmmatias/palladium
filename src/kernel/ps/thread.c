@@ -26,7 +26,7 @@ extern KeAffinity KiIdleProcessors;
  *     Pointer to the thread structure, or NULL on failure.
  *-----------------------------------------------------------------------------------------------*/
 static PsThread *CreateThread(void (*EntryPoint)(void *), void *Parameter, void *Stack) {
-    PsThread *Thread = ObCreateObject(&ObThreadType, MM_POOL_TAG_THREAD);
+    PsThread *Thread = ObCreateObject(&ObpThreadType, MM_POOL_TAG_THREAD);
     if (!Thread) {
         return NULL;
     }
@@ -36,7 +36,7 @@ static PsThread *CreateThread(void (*EntryPoint)(void *), void *Parameter, void 
     if (!Thread->Stack) {
         Thread->AllocatedStack = MmAllocatePool(KE_STACK_SIZE, MM_POOL_TAG_THREAD);
         if (!Thread->AllocatedStack) {
-            ObDereferenceObject(Thread, MM_POOL_TAG_THREAD);
+            ObDereferenceObject(Thread);
             return NULL;
         }
 
@@ -47,23 +47,9 @@ static PsThread *CreateThread(void (*EntryPoint)(void *), void *Parameter, void 
             &Thread->ContextFrame, Thread->Stack, KE_STACK_SIZE, EntryPoint, Parameter);
     }
 
+    /* The stack size (even when allocated somewhere else) should always be KE_STACK_SIZE. */
     Thread->StackLimit = Thread->Stack + KE_STACK_SIZE;
     return Thread;
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function creates and initializes a new thread.
- *
- * PARAMETERS:
- *     EntryPoint - Where the thread should jump on first execution.
- *     Parameter - What to pass into the thread entry point.
- *
- * RETURN VALUE:
- *     Pointer to the thread structure, or NULL on failure.
- *-----------------------------------------------------------------------------------------------*/
-PsThread *PsCreateThread(void (*EntryPoint)(void *), void *Parameter) {
-    return CreateThread(EntryPoint, Parameter, NULL);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -136,19 +122,35 @@ void PspQueueThread(PsThread *Thread, bool EventQueue) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function adds a thread to the execution queue.
+ *     This function creates and initializes a new thread, followed by adding it to the execution
+ *     queue.
  *
  * PARAMETERS:
- *     Thread - Which thread to add.
+ *     EntryPoint - Where the thread should jump on first execution.
+ *     Parameter - What to pass into the thread entry point.
  *
  * RETURN VALUE:
- *     None.
+ *     Pointer to the thread structure, or NULL on failure.
  *-----------------------------------------------------------------------------------------------*/
-void PsQueueThread(PsThread *Thread) {
+PsThread *PsCreateThread(void (*EntryPoint)(void *), void *Parameter) {
+    /* The thread creation itself can/should be done at a low IRQL. */
+    PsThread *Thread = CreateThread(EntryPoint, Parameter, NULL);
+    if (!Thread) {
+        return NULL;
+    }
+
+    /* By default, the thread should have two refereneces: us (the scheduler), and the caller;
+     * ObCreateObject already adds one reference (which would be us), so we just need to reference
+     * the object again to set it up for the caller. */
+    ObReferenceObject(Thread);
+
+    /* Adding the thread to the queue requires raising the IRQL. */
     KeIrql OldIrql = KeRaiseIrql(KE_IRQL_SYNCH);
     Thread->State = PS_STATE_QUEUED;
     PspQueueThread(Thread, false);
     KeLowerIrql(OldIrql);
+
+    return Thread;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -282,6 +284,9 @@ void PsDelayThread(uint64_t Time) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void PspCreateSystemThread(void) {
+    /* Clearing the affinity before creating the thread should make it go to the BSP. */
+    KeInitializeAffinity(&KiIdleProcessors);
+
     PsThread *Thread = PsCreateThread(KiContinueSystemStartup, NULL);
     if (!Thread) {
         KeFatalError(
@@ -292,10 +297,8 @@ void PspCreateSystemThread(void) {
             0);
     }
 
-    /* As the scheduler is still under initialization, this should enqueue the thread in the current
-     * (boot) processor. */
-    KeInitializeAffinity(&KiIdleProcessors);
-    PsQueueThread(Thread);
+    /* Only the scheduler can/should hold a reference to the system startup thread. */
+    ObDereferenceObject(Thread);
 }
 
 /*-------------------------------------------------------------------------------------------------

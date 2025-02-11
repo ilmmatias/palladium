@@ -13,9 +13,17 @@
 /* clang-format on */
 
 typedef struct {
-    ObTypeHeader *Type;
+    RtDList HashHeader;
+    char *Name;
+    void *Object;
+    ObDirectory *Parent;
+} ObpDirectoryEntry;
+
+typedef struct {
+    ObType *Type;
+    ObpDirectoryEntry *Parent;
     uint32_t References;
     char Tag[4];
-} ObpObjectHeader;
+} ObpObject;
 
 #endif /* _KERNEL_DETAIL_OBPTYPES_H_ */

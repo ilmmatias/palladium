@@ -42,6 +42,7 @@ add_executable(kernel "kernel" YES
     mm/poolpage.c
     mm/track.c
 
+    ob/directory.c
     ob/object.c
     ob/threadobj.c
 

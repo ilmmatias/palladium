@@ -4,7 +4,8 @@
 #ifndef _KERNEL_DETAIL_OBTYPES_H_
 #define _KERNEL_DETAIL_OBTYPES_H_
 
-#include <stdint.h>
+#include <kernel/detail/ketypes.h>
+#include <kernel/detail/obdefs.h>
 
 /* clang-format off */
 #if __has_include(ARCH_MAKE_INCLUDE_PATH(kernel/detail, obtypes.h))
@@ -13,9 +14,14 @@
 /* clang-format on */
 
 typedef struct {
-    const char Name[8];
+    const char *Name;
     uint64_t Size;
     void (*Delete)(void *);
-} ObTypeHeader;
+} ObType;
+
+typedef struct {
+    RtDList HashHeads[32];
+    KeSpinLock Lock;
+} ObDirectory;
 
 #endif /* _KERNEL_DETAIL_OBTYPES_H_ */

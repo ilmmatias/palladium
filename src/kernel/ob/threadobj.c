@@ -22,8 +22,8 @@ static void DeleteRoutine(void *Object) {
     }
 }
 
-ObTypeHeader ObThreadType = {
-    .Name = "PsThread",
+ObType ObpThreadType = {
+    .Name = "Thread",
     .Size = sizeof(PsThread),
     .Delete = DeleteRoutine,
 };

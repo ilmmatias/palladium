@@ -17,8 +17,8 @@
  * RETURN VALUE:
  *     Either the start of the usable object data/body, or NULL on failure.
  *-----------------------------------------------------------------------------------------------*/
-void *ObCreateObject(ObTypeHeader *Type, char Tag[4]) {
-    ObpObjectHeader *Object = MmAllocatePool(sizeof(ObpObjectHeader) + Type->Size, Tag);
+void *ObCreateObject(ObType *Type, char Tag[4]) {
+    ObpObject *Object = MmAllocatePool(sizeof(ObpObject) + Type->Size, Tag);
     if (!Object) {
         return NULL;
     }
@@ -37,22 +37,12 @@ void *ObCreateObject(ObTypeHeader *Type, char Tag[4]) {
  *
  * PARAMETERS:
  *     Body - The pointer to the body of the object we should add the reference to.
- *     Tag - Name/identifier attached to the block.
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void ObReferenceObject(void *Body, char Tag[4]) {
-    ObpObjectHeader *Object = (ObpObjectHeader *)Body - 1;
-    if (memcmp(Object->Tag, Tag, 4)) {
-        KeFatalError(
-            kE_PANIC_BAD_OBJECT_HEADER,
-            (uint64_t)Object,
-            *(uint32_t *)Object->Tag,
-            *(uint32_t *)Tag,
-            0);
-    }
-
+void ObReferenceObject(void *Body) {
+    ObpObject *Object = (ObpObject *)Body - 1;
     __atomic_add_fetch(&Object->References, 1, __ATOMIC_ACQUIRE);
 }
 
@@ -63,28 +53,18 @@ void ObReferenceObject(void *Body, char Tag[4]) {
  *
  * PARAMETERS:
  *     Body - The pointer to the body of the object we should remove the reference from.
- *     Tag - Name/identifier attached to the block.
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void ObDereferenceObject(void *Body, char Tag[4]) {
-    ObpObjectHeader *Object = (ObpObjectHeader *)Body - 1;
-    if (memcmp(Object->Tag, Tag, 4)) {
-        KeFatalError(
-            kE_PANIC_BAD_OBJECT_HEADER,
-            (uint64_t)Object,
-            *(uint32_t *)Object->Tag,
-            *(uint32_t *)Tag,
-            0);
-    }
-
+void ObDereferenceObject(void *Body) {
+    ObpObject *Object = (ObpObject *)Body - 1;
     if (!__atomic_sub_fetch(&Object->References, 1, __ATOMIC_RELEASE)) {
         /* Should we allow the delete pointer to be NULL? */
         if (Object->Type->Delete) {
             Object->Type->Delete(Body);
         }
 
-        MmFreePool(Object, Tag);
+        MmFreePool(Object, Object->Tag);
     }
 }

@@ -12,4 +12,6 @@
 #endif /* __has__include */
 /* clang-format on */
 
+void ObpInitializeRootDirectory(void);
+
 #endif /* _KERNEL_DETAIL_OBPFUNCS_H_ */

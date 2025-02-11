@@ -16,11 +16,20 @@
 extern "C" {
 #endif /* __cplusplus */
 
-extern ObTypeHeader ObThreadType;
+extern ObType ObpDirectoryType;
+extern ObType ObpThreadType;
 
-void *ObCreateObject(ObTypeHeader *Type, char Tag[4]);
-void ObReferenceObject(void *Body, char Tag[4]);
-void ObDereferenceObject(void *Body, char Tag[4]);
+extern ObDirectory ObRootDirectory;
+
+void *ObCreateObject(ObType *Type, char Tag[4]);
+void ObReferenceObject(void *Body);
+void ObDereferenceObject(void *Body);
+
+ObDirectory *ObCreateDirectory(void);
+bool ObInsertIntoDirectory(ObDirectory *Directory, const char *Name, void *Object);
+void ObRemoveFromDirectory(void *Object);
+void *ObLookupDirectoryEntryByName(ObDirectory *Directory, const char *Name);
+void *ObLookupDirectoryEntryByIndex(ObDirectory *Directory, size_t Index, char **Name);
 
 #ifdef __cplusplus
 }

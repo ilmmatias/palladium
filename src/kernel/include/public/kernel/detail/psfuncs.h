@@ -17,7 +17,6 @@ extern "C" {
 #endif /* __cplusplus */
 
 PsThread *PsCreateThread(void (*EntryPoint)(void *), void *Parameter);
-void PsQueueThread(PsThread *Thread);
 [[noreturn]] void PsTerminateThread(void);
 void PsYieldThread(void);
 void PsSuspendThread(void);
