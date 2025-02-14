@@ -40,7 +40,7 @@ EvSignal *EvCreateSignal(void) {
 void EvSetSignal(EvSignal *Signal) {
     KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Signal->Header.Lock, KE_IRQL_DISPATCH);
     Signal->Header.Signaled = true;
-    EvpWakeThreads(&Signal->Header);
+    EvpWakeAllThreads(&Signal->Header);
     KeReleaseSpinLockAndLowerIrql(&Signal->Header.Lock, OldIrql);
 }
 

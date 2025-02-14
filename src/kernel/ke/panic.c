@@ -21,6 +21,7 @@ static const char *Messages[] = {
     "BAD_POOL_HEADER",
     "PROCESSOR_LIMIT_EXCEEDED",
     "BAD_THREAD_STATE",
+    "MUTEX_NOT_OWNED",
 };
 
 static KeSpinLock Lock = {0};

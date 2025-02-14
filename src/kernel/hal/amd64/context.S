@@ -56,6 +56,10 @@ HalpThreadEntry:
     /* Now we should be aligned at a 16-byte boundary; C functions expect a CALL instead of a jump
      * at this point, so we need to adjust the stack. */
     sub $8, %rsp
+
+    /* Other than that, let's just cleanup the "return" address, so that the backtrace doesn't show
+     * a random stack address at the end. */
+    mov %rdx, (%rsp)
     jmp *%rax
 .seh_endproc
 

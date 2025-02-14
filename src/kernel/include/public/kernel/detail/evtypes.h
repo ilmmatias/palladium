@@ -24,4 +24,11 @@ typedef struct {
     EvHeader Header;
 } EvSignal;
 
+typedef struct {
+    EvHeader Header;
+    uint64_t Recursion;
+    uint64_t Contention;
+    void *Owner;
+} EvMutex;
+
 #endif /* _KERNEL_DETAIL_EVTYPES_H_ */

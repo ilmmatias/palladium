@@ -5,15 +5,12 @@
 #include <kernel/ke.h>
 #include <kernel/psp.h>
 
-//
-#include <kernel/vid.h>
-
 extern KeAffinity KiIdleProcessors;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function attempts to wake all threads that were waiting for the given object. We should
- *     already by at DISPATCH with the event lock held.
+ *     This function attempts to wake the next available thread that was waiting for the given
+ *     object (but leaves the rest of the wait list untouched).
  *
  * PARAMETERS:
  *     Header - Common event header of the object.
@@ -21,27 +18,44 @@ extern KeAffinity KiIdleProcessors;
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void EvpWakeThreads(EvHeader *Header) {
+void EvpWakeSingleThread(EvHeader *Header) {
+    RtDList *ListHeader = RtPopDList(&Header->WaitList);
+    if (ListHeader == &Header->WaitList) {
+        return;
+    }
+
+    /* Do the main checks under the processor lock; This guarantees that we'll be properly synched
+     * with EvWaitForObject (and won't accidentally "see"/try to manipulate a thread in the list
+     * before it enters the waiting state). */
+    PsThread *Thread = CONTAINING_RECORD(ListHeader, PsThread, WaitListHeader);
+    KeProcessor *Processor = Thread->Processor;
+    KeAcquireSpinLockAtCurrentIrql(&Processor->Lock);
+
+    if (Thread->State != PS_STATE_WAITING) {
+        KeFatalError(KE_PANIC_BAD_THREAD_STATE, Thread->State, PS_STATE_WAITING, 0, 0);
+    } else if (Thread->WaitTicks) {
+        RtUnlinkDList(&Thread->ListHeader);
+    }
+
+    KeReleaseSpinLockAtCurrentIrql(&Processor->Lock);
+    Thread->State = PS_STATE_QUEUED;
+    Thread->WaitTicks = 0;
+    PspQueueThread(Thread, true);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function attempts to wake all threads that were waiting for the given object.
+ *
+ * PARAMETERS:
+ *     Header - Common event header of the object.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void EvpWakeAllThreads(EvHeader *Header) {
     while (Header->WaitList.Next != &Header->WaitList) {
-        RtDList *ListHeader = RtPopDList(&Header->WaitList);
-        PsThread *Thread = CONTAINING_RECORD(ListHeader, PsThread, WaitListHeader);
-
-        /* Do the main checks under the processor lock; This guarantees that we'll be properly
-         * synched with EvWaitForObject (and won't accidentally "see"/try to manipulate a thread in
-         * the list before it enters the waiting state). */
-        KeProcessor *Processor = Thread->Processor;
-        KeAcquireSpinLockAtCurrentIrql(&Processor->Lock);
-
-        if (Thread->State != PS_STATE_WAITING) {
-            KeFatalError(KE_PANIC_BAD_THREAD_STATE, Thread->State, PS_STATE_WAITING, 0, 0);
-        } else if (Thread->WaitTicks) {
-            RtUnlinkDList(&Thread->ListHeader);
-        }
-
-        KeReleaseSpinLockAtCurrentIrql(&Processor->Lock);
-
-        Thread->State = PS_STATE_QUEUED;
-        PspQueueThread(Thread, true);
+        EvpWakeSingleThread(Header);
     }
 }
 
@@ -82,7 +96,7 @@ bool EvWaitForObject(void *Object, uint64_t Timeout) {
     /* Setup the thread wait as early as possible (because it also does timeout-related
      * calculations). */
     CurrentThread->WaitObject = Object;
-    RtPushDList(&Header->WaitList, &CurrentThread->WaitListHeader);
+    RtAppendDList(&Header->WaitList, &CurrentThread->WaitListHeader);
     if (Timeout != EV_TIMEOUT_UNLIMITED) {
         PspSetupThreadWait(Processor, CurrentThread, Timeout);
     } else {
@@ -103,10 +117,6 @@ bool EvWaitForObject(void *Object, uint64_t Timeout) {
 
     PspSwitchThreads(Processor, CurrentThread, TargetThread, PS_STATE_WAITING, OldIrql);
 
-    /* Check the expiration vs the current processor ticks to know if a timeout happened. */
-    if (Timeout == EV_TIMEOUT_UNLIMITED || Processor->Ticks < CurrentThread->WaitTicks) {
-        return true;
-    } else {
-        return false;
-    }
+    /* WaitTicks always gets set to zero whenever we wake up before a timeout. */
+    return !CurrentThread->WaitTicks;
 }

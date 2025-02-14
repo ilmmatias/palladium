@@ -13,6 +13,7 @@
 /* clang-format on */
 
 extern ObType ObpDirectoryType;
+extern ObType ObpMutexType;
 extern ObType ObpSignalType;
 extern ObType ObpThreadType;
 

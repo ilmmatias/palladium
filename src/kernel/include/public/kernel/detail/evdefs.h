@@ -17,5 +17,6 @@
 #define EV_SECS 1000000000ull
 
 #define EV_TYPE_SIGNAL 0
+#define EV_TYPE_MUTEX 1
 
 #endif /* _KERNEL_DETAIL_EVDEFS_H_ */

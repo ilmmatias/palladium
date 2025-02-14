@@ -16,6 +16,11 @@ EvSignal *EvCreateSignal(void);
 void EvSetSignal(EvSignal *Signal);
 void EvClearSignal(EvSignal *Signal);
 
+EvMutex *EvCreateMutex(void);
+bool EvTryAcquireMutex(EvMutex *Mutex);
+bool EvAcquireMutex(EvMutex *Mutex, uint64_t Timeout);
+void EvReleaseMutex(EvMutex *Mutex);
+
 bool EvWaitForObject(void *Object, uint64_t Timeout);
 
 #endif /* _KERNEL_DETAIL_EVFUNCS_H_ */

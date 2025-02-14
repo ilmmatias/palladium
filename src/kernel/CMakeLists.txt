@@ -26,6 +26,7 @@ add_executable(kernel "kernel" YES
     ${SOURCES}
 
     ev/dispatch.c
+    ev/mutex.c
     ev/signal.c
     ev/timer.c
 
@@ -44,6 +45,7 @@ add_executable(kernel "kernel" YES
     mm/track.c
 
     ob/directory.c
+    ob/mutexobj.c
     ob/object.c
     ob/signalobj.c
     ob/threadobj.c

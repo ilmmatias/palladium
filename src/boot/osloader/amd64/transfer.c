@@ -150,6 +150,7 @@
                      "movl $0x1F80, (%%rsp)\n"
                      "ldmxcsr (%%rsp)\n"
                      "xor %%rdx, %%rdx\n"
+                     "mov %%rdx, (%%rsp)\n"
                      "jmp *%%rax\n"
                      :
                      : "r"(EntryPoint), "r"(BootBlock), "r"((uint64_t)BootStack - 8)

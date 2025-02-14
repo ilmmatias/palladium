@@ -13,6 +13,7 @@
 #endif /* __has__include */
 /* clang-format on */
 
-void EvpWakeThreads(EvHeader *Header);
+void EvpWakeSingleThread(EvHeader *Header);
+void EvpWakeAllThreads(EvHeader *Header);
 
 #endif /* _KERNEL_DETAIL_EVPFUNCS_H_ */
