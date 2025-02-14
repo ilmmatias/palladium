@@ -84,9 +84,14 @@ void MiInitializeEarlyPageAllocator(KiLoaderBlock *LoaderBlock) {
         /* We need to make sure we won't use the low 64KiB; They are reserved if the kernel needs
          * any low memory (for initializing SMP or anything else like that). */
         if (Entry->BasePage < 0x10) {
-            MiTotalReservedPages += 0x10 - Entry->BasePage;
-            Entry->PageCount -= 0x10 - Entry->BasePage;
-            Entry->BasePage += 0x10 - Entry->BasePage;
+            uint64_t Pages = 0x10 - Entry->BasePage;
+            if (Entry->PageCount < Pages) {
+                Pages = Entry->PageCount;
+            }
+
+            MiTotalReservedPages += Pages;
+            Entry->PageCount -= Pages;
+            Entry->BasePage = 0x10;
         }
 
         /* Otherwise, just update the global page stats using the data we from this region. */
