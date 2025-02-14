@@ -14,9 +14,12 @@
 
 typedef struct PsThread {
     RtDList ListHeader;
+    RtDList WaitListHeader;
     uint8_t State;
     uint64_t ExpirationTicks;
     uint64_t WaitTicks;
+    void *WaitObject;
+    void *Processor;
     char *Stack;
     char *StackLimit;
     char *AllocatedStack;

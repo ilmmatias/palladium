@@ -12,6 +12,10 @@
 #endif /* __has__include */
 /* clang-format on */
 
+extern ObType ObpDirectoryType;
+extern ObType ObpSignalType;
+extern ObType ObpThreadType;
+
 void ObpInitializeRootDirectory(void);
 
 #endif /* _KERNEL_DETAIL_OBPFUNCS_H_ */

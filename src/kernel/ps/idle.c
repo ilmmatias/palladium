@@ -52,22 +52,7 @@ extern KeAffinity KiIdleProcessors;
             KeClearAffinityBit(&KiIdleProcessors, Processor->Number);
         }
 
-        /* Mark the newly chosen target as the current one. */
         PsThread *TargetThread = CONTAINING_RECORD(ListHeader, PsThread, ListHeader);
-        TargetThread->State = PS_STATE_RUNNING;
-        TargetThread->ExpirationTicks = PSP_DEFAULT_TICKS;
-        Processor->CurrentThread = TargetThread;
-        Processor->StackBase = TargetThread->Stack;
-        Processor->StackLimit = TargetThread->StackLimit;
-
-        /* Mark ourselves as doing a context switch; No need to change the state (it's always idle)
-         * nor requeue. */
-        __atomic_store_n(&Processor->IdleThread->ContextFrame.Busy, 0x01, __ATOMIC_SEQ_CST);
-        KeReleaseSpinLockAtCurrentIrql(&Processor->Lock);
-
-        /* Swap into the new thread; We should be back to lower the IRQL the processor gets idle
-         * again. */
-        HalpSwitchContext(&Processor->IdleThread->ContextFrame, &TargetThread->ContextFrame);
-        KeLowerIrql(OldIrql);
+        PspSwitchThreads(Processor, Processor->IdleThread, TargetThread, PS_STATE_IDLE, OldIrql);
     }
 }

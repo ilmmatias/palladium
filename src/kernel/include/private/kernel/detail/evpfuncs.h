@@ -5,11 +5,14 @@
 #define _KERNEL_DETAIL_EVPFUNCS_H_
 
 #include <kernel/detail/evfuncs.h>
+#include <kernel/detail/evtypes.h>
 
 /* clang-format off */
 #if __has_include(ARCH_MAKE_INCLUDE_PATH(kernel/detail, evpfuncs.h))
 #include ARCH_MAKE_INCLUDE_PATH(kernel/detail, evpfuncs.h)
 #endif /* __has__include */
 /* clang-format on */
+
+void EvpWakeThreads(EvHeader *Header);
 
 #endif /* _KERNEL_DETAIL_EVPFUNCS_H_ */

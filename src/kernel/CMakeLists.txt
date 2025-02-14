@@ -25,6 +25,8 @@ endif()
 add_executable(kernel "kernel" YES
     ${SOURCES}
 
+    ev/dispatch.c
+    ev/signal.c
     ev/timer.c
 
     hal/timer.c
@@ -43,6 +45,7 @@ add_executable(kernel "kernel" YES
 
     ob/directory.c
     ob/object.c
+    ob/signalobj.c
     ob/threadobj.c
 
     ps/idle.c

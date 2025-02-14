@@ -16,9 +16,6 @@
 extern "C" {
 #endif /* __cplusplus */
 
-extern ObType ObpDirectoryType;
-extern ObType ObpThreadType;
-
 extern ObDirectory ObRootDirectory;
 
 void *ObCreateObject(ObType *Type, char Tag[4]);
