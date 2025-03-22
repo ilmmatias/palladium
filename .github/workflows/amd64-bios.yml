@@ -23,7 +23,7 @@ jobs:
       uses: actions/checkout@v3
       with:
         repository: llvm/llvm-project
-        ref: release/16.x
+        ref: llvmorg-20.1.0
         path: llvm-project
 
     - name: Checkout palladium
@@ -31,69 +31,38 @@ jobs:
       with:
         path: palladium
 
-    - name: Configure compiler-rt for Target
-      run: |
-        cmake \
-          -S llvm-project/compiler-rt \
-          -B llvm-project/build.target \
-          -G Ninja \
-          -DCMAKE_AR=/usr/bin/llvm-ar \
-          -DCMAKE_ASM_COMPILER_TARGET="x86_64-w64-mingw32" \
-          -DCMAKE_ASM_FLAGS="-I${{github.workspace}}/palladium/src/sdk/crt/include"   \
-          -DCMAKE_C_COMPILER=/usr/bin/clang \
-          -DCMAKE_C_COMPILER_WORKS=true \
-          -DCMAKE_C_COMPILER_TARGET="x86_64-w64-mingw32" \
-          -DCMAKE_C_FLAGS="-I${{github.workspace}}/palladium/src/sdk/crt/include -ffreestanding" \
-          -DCMAKE_EXE_LINKER_FLAGS="-fuse-ld=lld" \
-          -DCMAKE_NM=/usr/bin/llvm-nm \
-          -DCMAKE_RANLIB=/usr/bin/llvm-ranlib \
-          -DCOMPILER_RT_OS_DIR="baremetal" \
-          -DCOMPILER_RT_BAREMETAL_BUILD=ON \
-          -DCOMPILER_RT_BUILD_BUILTINS=ON \
-          -DCOMPILER_RT_BUILD_CRT=OFF \
-          -DCOMPILER_RT_BUILD_LIBFUZZER=OFF \
-          -DCOMPILER_RT_BUILD_MEMPROF=OFF \
-          -DCOMPILER_RT_BUILD_PROFILE=OFF \
-          -DCOMPILER_RT_BUILD_SANITIZERS=OFF \
-          -DCOMPILER_RT_BUILD_XRAY=OFF \
-          -DCOMPILER_RT_DEFAULT_TARGET_ONLY=ON \
-          -DLLVM_CONFIG_PATH=/usr/bin/llvm-config
-
-    - name: Build compiler-rt for Target
-      run: cmake --build llvm-project/build.target
-
-    - name: Install compiler-rt for Target
-      run: sudo cmake --build llvm-project/build.target --target install
+    - name: Configure, build, and install compiler-rt for Target
+      run: COMPILER_RT_PATH=llvm-project/compiler-rt COMPILER_RT_TARGET=x86_64 palladium/build-compiler-rt.sh
 
     - name: Configure Target
-      run: cmake -S palladium/src -B palladium/build.target -G Ninja -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DARCH=amd64
+      run: cmake -S palladium/src -B build.target -G Ninja -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DARCH=amd64
 
     - name: Build Target
-      run: cmake --build palladium/build.target --config ${{env.BUILD_TYPE}}
+      run: cmake --build build.target --config ${{env.BUILD_TYPE}}
 
     - name: Build EFI image
       run: |
-        dd if=/dev/zero of=palladium/build.target/fat.img bs=1k count=184320
-        mformat -F -i palladium/build.target/fat.img
-        mmd -i palladium/build.target/fat.img ::/EFI
-        mmd -i palladium/build.target/fat.img ::/EFI/BOOT
-        mmd -i palladium/build.target/fat.img ::/EFI/PALLADIUM
-        mcopy -i palladium/build.target/fat.img palladium/build.target/boot/osloader/osloader.exe ::/EFI/BOOT/BOOTX64.EFI
-        mcopy -i palladium/build.target/fat.img palladium/build.target/kernel/kernel.exe ::/EFI/PALLADIUM/KERNEL.EXE
-        mcopy -i palladium/build.target/fat.img palladium/build.target/drivers/acpi/acpi.sys ::/EFI/PALLADIUM/ACPI.SYS
+        dd if=/dev/zero of=build.target/fat.img bs=1k count=184320
+        mformat -F -i build.target/fat.img
+        mmd -i build.target/fat.img ::/EFI
+        mmd -i build.target/fat.img ::/EFI/BOOT
+        mmd -i build.target/fat.img ::/EFI/PALLADIUM
+        mcopy -i build.target/fat.img build.target/boot/osloader/osloader.exe ::/EFI/BOOT/BOOTX64.EFI
+        mcopy -i build.target/fat.img build.target/kernel/kernel.exe ::/EFI/PALLADIUM/KERNEL.EXE
+        mcopy -i build.target/fat.img build.target/drivers/acpi/acpi.sys ::/EFI/PALLADIUM/ACPI.SYS
 
     - name: Build ISO image
       run: |
         mkdir -p _root
-        cp palladium/build.target/fat.img _root/fat.img
-        mkisofs -R -f -eltorito-boot fat.img -no-emul-boot -o palladium/build.target/iso9660.iso _root
+        cp build.target/fat.img _root/fat.img
+        mkisofs -R -f -eltorito-boot fat.img -no-emul-boot -o build.target/iso9660.iso _root
 
     - uses: actions/upload-artifact@v4
       with:
         name: fat.img
-        path: palladium/build.target/fat.img
+        path: build.target/fat.img
 
     - uses: actions/upload-artifact@v4
       with:
         name: iso9660.iso
-        path: palladium/build.target/iso9660.iso
+        path: build.target/iso9660.iso
