@@ -5,8 +5,8 @@ project(os/sdk/crt)
 
 if(ARCH STREQUAL "amd64")
     set(SOURCES
-        amd64/memcpy.S
-        amd64/memset.S
+        string/amd64/memcpy.S
+        string/amd64/memset.S
     )
 else()
     set(SOURCES
@@ -32,6 +32,11 @@ set(SOURCES
     ctype/isxdigit.c
     ctype/tolower.c
     ctype/toupper.c
+
+    math/__rem_pio2f.c
+    math/cosf.c
+    math/sinf.c
+    math/tanf.c
 
     stdio/__vprintf.c
     stdio/__vscanf.c
