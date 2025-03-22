@@ -51,9 +51,23 @@ set(USER_SOURCES
     string/strdup.c
     string/strndup.c)
 
-add_library(ucrt "nostdlib" SHARED ${USER_SOURCES} ucrt.def)
+set(USER_EXE_STARTUP_SOURCES
+    os/crtbegin.c
+    os/crtend.c
+    os/execrt0.c)
 
+set(USER_DLL_STARTUP_SOURCES
+    os/crtbegin.c
+    os/crtend.c
+    os/dllcrt0.c)
+
+add_library(ucrt "osapi" SHARED ${USER_SOURCES} ucrt.def)
 target_include_directories(ucrt PUBLIC include)
 target_compile_options(ucrt PRIVATE $<$<COMPILE_LANGUAGE:C>:-ffreestanding>)
-target_compile_definitions(ucrt PRIVATE _DLL)
-target_link_options(ucrt PRIVATE -Wl,--entry=CRTDLL_INIT)
+target_link_options(ucrt PRIVATE -Wl,--entry=CrtDllStartup)
+
+add_library(ucrt_exe_startup "nostdlib" OBJECT ${USER_EXE_STARTUP_SOURCES})
+target_compile_options(ucrt_exe_startup PRIVATE $<$<COMPILE_LANGUAGE:C>:-ffreestanding>)
+
+add_library(ucrt_dll_startup "nostdlib" OBJECT ${USER_DLL_STARTUP_SOURCES})
+target_compile_options(ucrt_dll_startup PRIVATE $<$<COMPILE_LANGUAGE:C>:-ffreestanding>)

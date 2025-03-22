@@ -1,2 +1,27 @@
 LIBRARY urt.dll
 EXPORTS
+    RtClearAllBits
+    RtClearBit
+    RtClearBits
+    RtFindClearBits
+    RtFindClearBitsAndSet
+    RtFindSetBits
+    RtFindSetBitsAndClear
+    RtInitializeBitmap
+    RtSetAllBits
+    RtSetBit
+    RtSetBits
+
+    RtRestoreContext
+    RtSaveContext
+
+    RtGetHash
+
+    RtAppendDList
+    RtInitializeDList
+    RtPopDList
+    RtPopSList
+    RtPushDList
+    RtPushSList
+    RtTruncateDList
+    RtUnlinkDList

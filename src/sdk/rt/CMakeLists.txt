@@ -12,8 +12,7 @@ set(SOURCES
     ${SOURCES}
     bitmap.c
     hash.c
-    list.c
-    placeholder.c)
+    list.c)
 
 include(kernel.cmake)
 include(user.cmake)

@@ -18,8 +18,6 @@ endif()
 set(SOURCES
     ${SOURCES}
 
-    placeholder.c
-
     ctype/isalnum.c
     ctype/isalpha.c
     ctype/isblank.c

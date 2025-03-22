@@ -4,4 +4,5 @@
 project(os/sdk)
 
 add_subdirectory(crt)
+add_subdirectory(osapi)
 add_subdirectory(rt)

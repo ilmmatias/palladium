@@ -4,9 +4,10 @@
 #ifndef ASSERT_H
 #define ASSERT_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
+/* -std=c23 already has static_assert defined as a keyword, so only redef it on STDC<23. */
+#if !defined(__cplusplus) && __STDC__ < 202311L
+#define static_assert _Static_assert
+#endif
 
 #ifdef NDEBUG
 #define assert(condition) ((void)0)
@@ -14,6 +15,10 @@ extern "C" {
 #define assert(condition) \
     (void)((condition) || (__assert(#condition, __FILE__, __LINE__, __func__), 0))
 #endif /* NDEBUG */
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
 
 void __assert(const char *condition, const char *file, int line, const char *func);
 
