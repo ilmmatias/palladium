@@ -1,18 +1,17 @@
-/* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
+/* SPDX-FileCopyrightText: (C) 2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
-
-#include <stddef.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function closes the OS-specific handle, notifying the OS we're done with the file.
+ *     This function releases the given lock, signaling other waiting threads that they can acquire
+ *     it.
  *
  * PARAMETERS:
- *     handle - OS-specific handle.
+ *     handle - Previously allocated handle to the lock.
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void __fclose(void *handle) {
+void __release_lock(void *handle) {
     (void)handle;
 }

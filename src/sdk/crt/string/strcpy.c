@@ -8,15 +8,15 @@
  *     This function implements generic code to copy a C string to another buffer.
  *
  * PARAMETERS:
- *     dest - Destination buffer.
- *     src - Source buffer.
+ *     s1 - Destination buffer.
+ *     s2 - Source buffer.
  *
  * RETURN VALUE:
  *     Start of the destination buffer.
  *-----------------------------------------------------------------------------------------------*/
-char *strcpy(char *dest, const char *src) {
-    char *Destination = dest;
-    const char *Source = src;
+char *strcpy(char *restrict s1, const char *restrict s2) {
+    char *Destination = s1;
+    const char *Source = s2;
 
     while (*Source) {
         *(Destination++) = *(Source++);
@@ -24,5 +24,5 @@ char *strcpy(char *dest, const char *src) {
 
     *Destination = 0;
 
-    return dest;
+    return s1;
 }

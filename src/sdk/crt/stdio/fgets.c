@@ -1,27 +1,28 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#include <crt_impl.h>
+#include <crt_impl/file_flags.h>
 #include <stdio.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function repeatedly reads bytes until we reach EOF, a new line, or the exceed/reach
- *     the max `count`, minus 1 for the null terminator.
+ *     This function repeatedly reads the file stream until we reach EOF, a new line, or the
+ *     exceed/reach the max `count`, minus 1 for the null terminator. Unlike the normal variant, we
+ *     should only be called after acquiring the file lock.
  *
  * PARAMETERS:
- *     str - Destination buffer.
+ *     s - Destination buffer.
  *     count - Max amount of bytes to read into the buffer.
  *     stream - FILE stream; Needs to be open as __STDIO_FLAGS_READ.
  *
  * RETURN VALUE:
  *     The destination buffer itself on success, NULL otherwise.
  *-----------------------------------------------------------------------------------------------*/
-char *fgets(char *str, int count, struct FILE *stream) {
+char *fgets_unlocked(char *restrict s, int count, FILE *restrict stream) {
     if (!stream) {
         return NULL;
     } else if (
-        !str || !count || !(stream->flags & __STDIO_FLAGS_READ) ||
+        !s || !count || !(stream->flags & __STDIO_FLAGS_READ) ||
         (stream->flags & __STDIO_FLAGS_WRITING) || (stream->flags & __STDIO_FLAGS_ERROR) ||
         (stream->flags & __STDIO_FLAGS_EOF)) {
         if (!(stream->flags & __STDIO_FLAGS_EOF)) {
@@ -32,11 +33,11 @@ char *fgets(char *str, int count, struct FILE *stream) {
     }
 
     bool fail = false;
-    char *dest = str;
+    char *dest = s;
     stream->flags |= __STDIO_FLAGS_READING;
 
     while (count > 1) {
-        int ch = fgetc(stream);
+        int ch = fgetc_unlocked(stream);
 
         if (ch == EOF) {
             fail = true;
@@ -52,5 +53,25 @@ char *fgets(char *str, int count, struct FILE *stream) {
     }
 
     *dest = 0;
-    return fail ? NULL : str;
+    return fail ? NULL : s;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function repeatedly reads bytes until we reach EOF, a new line, or the exceed/reach
+ *     the max `count`, minus 1 for the null terminator.
+ *
+ * PARAMETERS:
+ *     s - Destination buffer.
+ *     count - Max amount of bytes to read into the buffer.
+ *     stream - FILE stream; Needs to be open as __STDIO_FLAGS_READ.
+ *
+ * RETURN VALUE:
+ *     The destination buffer itself on success, NULL otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+char *fgets(char *restrict s, int count, FILE *restrict stream) {
+    flockfile(stream);
+    char *res = fgets_unlocked(s, count, stream);
+    funlockfile(stream);
+    return res;
 }

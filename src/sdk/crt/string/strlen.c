@@ -8,15 +8,15 @@
  *     This function implements generic code to determine the size of a C string.
  *
  * PARAMETERS:
- *     str - Source string.
+ *     s - Source string.
  *
  * RETURN VALUE:
  *     Size in bytes of the given string (excluding the \0 at the end).
  *-----------------------------------------------------------------------------------------------*/
-size_t strlen(const char *str) {
+size_t strlen(const char *s) {
     size_t Size = 0;
 
-    while (*(str++)) {
+    while (*(s++)) {
         Size++;
     }
 

@@ -1,7 +1,8 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#include <crt_impl.h>
+#include <crt_impl/file_flags.h>
+#include <crt_impl/os.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,22 +19,27 @@
  *     FILE containing the OS-specific handle and the CRT data, or NULL if something failed
  *     along the way.
  *-----------------------------------------------------------------------------------------------*/
-FILE *fopen(const char *filename, const char *mode) {
+FILE *fopen(const char *restrict filename, const char *restrict mode) {
     if (!filename || !mode) {
         return NULL;
     }
 
-    size_t length;
-    int flags = __parse_fopen_mode(mode);
-    void *handle = __fopen(filename, flags, &length);
+    int flags = __parse_open_mode(mode);
+    void *handle = __open_file(filename, flags);
     if (!handle) {
         return NULL;
     }
 
-    /* Why struct vs no struct? Just to make vscode/intellisense happy. */
-    struct FILE *stream = malloc(sizeof(FILE));
+    void *lock_handle = __create_lock();
+    if (!lock_handle) {
+        __close_file(handle);
+        return NULL;
+    }
+
+    FILE *stream = malloc(sizeof(FILE));
     if (!stream) {
-        __fclose(handle);
+        __delete_lock(lock_handle);
+        __close_file(handle);
         return NULL;
     }
 
@@ -41,18 +47,18 @@ FILE *fopen(const char *filename, const char *mode) {
     stream->buffer = malloc(BUFSIZ);
     if (!stream->buffer) {
         free(stream);
-        __fclose(handle);
+        __delete_lock(lock_handle);
+        __close_file(handle);
         return NULL;
     }
 
     stream->handle = handle;
-    stream->file_size = length;
-    stream->file_pos = 0;
+    stream->lock_handle = lock_handle;
+    stream->user_lock = true;
     stream->buffer_type = _IOFBF;
     stream->buffer_size = BUFSIZ;
     stream->buffer_read = 0;
     stream->buffer_pos = 0;
-    stream->buffer_file_pos = 0;
     stream->unget_size = 0;
     stream->flags = flags;
 

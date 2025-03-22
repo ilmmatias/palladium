@@ -7,29 +7,29 @@
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function implements generic code to create a copy of a C string, limiting the newly
- *     allocated string to at most `size` bytes + 1 (space for the null terminator).
+ *     allocated string to at most `n` bytes + 1 (space for the null terminator).
  *
  * PARAMETERS:
- *     src - The string to be copied.
- *     size - How many bytes are we allowed to copy at most.
+ *     s - The string to be copied.
+ *     n - How many bytes are we allowed to copy at most.
  *
  * RETURN VALUE:
  *     Copy of the source string, or NULL if we couldn't allocate the memory.
  *-----------------------------------------------------------------------------------------------*/
-char *strndup(const char *src, size_t size) {
+char *strndup(const char *s, size_t n) {
     /* The source string is allowed to not end with a null terminator, so we can't use
        strlen(). */
 
-    const char *Source = src;
+    const char *Source = s;
     size_t CopySize = 0;
 
-    while (*(Source++) && size--) {
+    while (*(Source++) && n--) {
         CopySize++;
     }
 
     char *Copy = malloc(CopySize + 1);
     if (Copy) {
-        memcpy(Copy, src, CopySize);
+        memcpy(Copy, s, CopySize);
         Copy[CopySize] = 0;
     }
 

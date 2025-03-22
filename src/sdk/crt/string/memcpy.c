@@ -8,20 +8,20 @@
  *     This function implements generic code to copy bytes from one region of memory to another.
  *
  * PARAMETERS:
- *     dest - Destination buffer.
- *     src - Source buffer.
- *     count - How many bytes to copy.
+ *     s1 - Destination buffer.
+ *     s2 - Source buffer.
+ *     n - How many bytes to copy.
  *
  * RETURN VALUE:
  *     Start of the destination buffer.
  *-----------------------------------------------------------------------------------------------*/
-void *memcpy(void *restrict dest, const void *restrict src, size_t count) {
-    char *restrict Destination = dest;
-    const char *restrict Source = src;
+void *memcpy(void *restrict s1, const void *restrict s2, size_t n) {
+    char *restrict Destination = s1;
+    const char *restrict Source = s2;
 
-    while (count--) {
+    while (n--) {
         *(Destination++) = *(Source++);
     }
 
-    return dest;
+    return s1;
 }

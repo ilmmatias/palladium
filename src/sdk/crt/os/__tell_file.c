@@ -1,28 +1,21 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#include <crt_impl.h>
-#include <stddef.h>
+#include <crt_impl/file_flags.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function fills in the input buffer using the file.
+ *     This function gives out the current position along the given file.
  *
  * PARAMETERS:
  *     handle - OS-specific handle.
- *     pos - Absolute offset from the start of the file.
- *     buffer - Output buffer to fill up.
- *     size - How many bytes/characters we want to read.
- *     read - Output; How many bytes/characters we wrote into the buffer.
+ *     pos - Output; Absolute offset from the start of the file.
  *
  * RETURN VALUE:
  *     0 on success, stdio flags describing the error otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int __fread(void *handle, size_t pos, void *buffer, size_t size, size_t *read) {
+int __tell_file(void *handle, long *offset) {
     (void)handle;
-    (void)pos;
-    (void)buffer;
-    (void)size;
-    (void)read;
+    (void)offset;
     return __STDIO_FLAGS_ERROR;
 }

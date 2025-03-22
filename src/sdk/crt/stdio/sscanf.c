@@ -10,17 +10,17 @@
  *     For supported format parameters, take a look at your favorite std C reference manual.
  *
  * PARAMETERS:
- *     buffer - Output buffer.
+ *     s - Output buffer.
  *     format - Base format string.
  *     ... - Further variadic arguments.
  *
  * RETURN VALUE:
  *     How many arguments have been filled.
  *-----------------------------------------------------------------------------------------------*/
-int sscanf(const char *buffer, const char *format, ...) {
+int sscanf(const char *restrict s, const char *restrict format, ...) {
     va_list vlist;
     va_start(vlist, format);
-    int size = vsscanf(buffer, format, vlist);
+    int size = vsscanf(s, format, vlist);
     va_end(vlist);
     return size;
 }

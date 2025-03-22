@@ -6,11 +6,11 @@
  *     This function checks if a character is a white-space.
  *
  * PARAMETERS:
- *     ch - Character to check.
+ *     c - Character to check.
  *
  * RETURN VALUE:
  *     Result of the check.
  *-----------------------------------------------------------------------------------------------*/
-int isspace(int ch) {
-    return (unsigned int)ch - 0x09 < 0x05 || ch == 0x20;
+int isspace(int c) {
+    return (unsigned int)c - 0x09 < 0x05 || c == 0x20;
 }

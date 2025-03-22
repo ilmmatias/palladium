@@ -9,22 +9,22 @@
  *     another.
  *
  * PARAMETERS:
- *     str - Which string to analyze.
- *     substr - String to search for.
+ *     s1 - Which string to analyze.
+ *     s2 - String to search for.
  *
  * RETURN VALUE:
  *     Position where the string was found, or NULL if it wasn't found.
  *-----------------------------------------------------------------------------------------------*/
-char *strstr(const char *str, const char *substr) {
-    if (!*substr) {
-        return (char *)str;
+char *strstr(const char *s1, const char *s2) {
+    if (!*s2) {
+        return (char *)s1;
     }
 
-    while (*str) {
-        const char *Search = substr;
-        const char *Start = str;
+    while (*s1) {
+        const char *Search = s2;
+        const char *Start = s1;
 
-        while (*str && *Search && *(str++) == *Search) {
+        while (*s1 && *Search && *(s1++) == *Search) {
             Search++;
         }
 

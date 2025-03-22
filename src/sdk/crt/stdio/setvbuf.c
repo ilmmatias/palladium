@@ -1,39 +1,39 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#include <crt_impl.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function overwrites the current file buffer. Differently from setbuf(), this allows
- *     controlling the type of the buffer directly, and the size as well.
+ *     controlling the type of the buffer directly, and the size as well. Unlike the normal variant,
+ *     we should only be called after acquiring the file lock.
  *
  * PARAMETERS:
  *     stream - Pointer to an open file handle.
- *     buffer - New file buffer.
+ *     buf - New file buffer.
  *     mode - Desired buffer type.
  *     size - Buffer size.
  *
  * RETURN VALUE:
- *     None.
+ *     0 on success, 1 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-void setvbuf(struct FILE *stream, char *buffer, int mode, size_t size) {
+int setvbuf_unlocked(FILE *restrict stream, char *restrict buf, int mode, size_t size) {
     if (!stream) {
-        return;
+        return 1;
     }
 
     /* We'll be overwriting those fields in the next block, so we need to save it. */
     bool user_buffer = stream->user_buffer;
-    fflush(stream);
+    fflush_unlocked(stream);
 
     if (mode == _IOLBF || mode == _IOFBF) {
-        if (!buffer) {
-            buffer = malloc(size);
+        if (!buf) {
+            buf = malloc(size);
 
-            if (!buffer) {
-                return;
+            if (!buf) {
+                return 1;
             }
 
             stream->user_buffer = false;
@@ -53,5 +53,27 @@ void setvbuf(struct FILE *stream, char *buffer, int mode, size_t size) {
         free(stream->buffer);
     }
 
-    stream->buffer = buffer;
+    stream->buffer = buf;
+    return 0;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function overwrites the current file buffer. Differently from setbuf(), this allows
+ *     controlling the type of the buffer directly, and the size as well.
+ *
+ * PARAMETERS:
+ *     stream - Pointer to an open file handle.
+ *     buf - New file buffer.
+ *     mode - Desired buffer type.
+ *     size - Buffer size.
+ *
+ * RETURN VALUE:
+ *     0 on success, 1 otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+int setvbuf(FILE *restrict stream, char *restrict buf, int mode, size_t size) {
+    flockfile(stream);
+    int res = setvbuf_unlocked(stream, buf, mode, size);
+    funlockfile(stream);
+    return res;
 }

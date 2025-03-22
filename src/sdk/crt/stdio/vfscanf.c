@@ -1,7 +1,7 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#include <crt_impl.h>
+#include <crt_impl/fmt.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -16,7 +16,7 @@
  *     Same result value as fgetc.
  *-----------------------------------------------------------------------------------------------*/
 static int read_ch(void *context) {
-    return fgetc((FILE *)context);
+    return fgetc_unlocked((FILE *)context);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -29,8 +29,28 @@ static int read_ch(void *context) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void unread_ch(void *context, int ch) {
-    ungetc(ch, (FILE *)context);
+static void unread_ch(void *context, int ch) {
+    ungetc_unlocked(ch, (FILE *)context);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function matches values from a FILE based on a format string.
+ *     While fscanf() takes in variadic arguments and calls va_start(), we take in the va_list
+ *     (result of va_start).
+ *     Unlike the normal variant, we should only be called after acquiring the file lock.
+ *     For supported format parameters, take a look at your favorite std C reference manual.
+ *
+ * PARAMETERS:
+ *     stream - Pointer to an open file handle.
+ *     format - Base format string.
+ *     vlist - Variadic argument list.
+ *
+ * RETURN VALUE:
+ *     How many arguments have been filled.
+ *-----------------------------------------------------------------------------------------------*/
+int vfscanf_unlocked(FILE *restrict stream, const char *restrict format, va_list arg) {
+    return __vscanf(format, arg, stream, read_ch, unread_ch);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -48,6 +68,9 @@ void unread_ch(void *context, int ch) {
  * RETURN VALUE:
  *     How many arguments have been filled.
  *-----------------------------------------------------------------------------------------------*/
-int vfscanf(FILE *stream, const char *format, va_list vlist) {
-    return __vscanf(format, vlist, stream, read_ch, unread_ch);
+int vfscanf(FILE *restrict stream, const char *restrict format, va_list arg) {
+    flockfile(stream);
+    int res = vfscanf_unlocked(stream, format, arg);
+    funlockfile(stream);
+    return res;
 }

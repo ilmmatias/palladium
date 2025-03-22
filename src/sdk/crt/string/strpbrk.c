@@ -6,19 +6,19 @@
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function implements generic code to find the position of the first character from the
- *     `breakset` in the `dest` string.
+ *     `s2` in the `s1` string.
  *
  * PARAMETERS:
- *     dest - Which string to analyze.
- *     breakset - Search set.
+ *     s1 - Which string to analyze.
+ *     s2 - Search set.
  *
  * RETURN VALUE:
  *     Position of the found character, or NULL if none was found.
  *-----------------------------------------------------------------------------------------------*/
-char *strpbrk(const char *dest, const char *breakset) {
-    while (*dest && !strchr(breakset, *dest)) {
-        dest++;
+char *strpbrk(const char *s1, const char *s2) {
+    while (*s1 && !strchr(s2, *s1)) {
+        s1++;
     }
 
-    return *dest ? (char *)dest : NULL;
+    return *s1 ? (char *)s1 : NULL;
 }

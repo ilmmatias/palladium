@@ -1,8 +1,24 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#include <crt_impl.h>
 #include <stdio.h>
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function restores a previously FILE position obtained using `fgetpos`. Unlike the normal
+ *     variant, we should only be called after acquiring the file lock.
+ *
+ * PARAMETERS:
+ *     stream - Pointer to an open file handle.
+ *     pos - Position obtained from `fgetpos`.
+ *
+ * RETURN VALUE:
+ *     0 on success, 1 otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+int fsetpos_unlocked(FILE *stream, const fpos_t *pos) {
+    /* I'm not sure if this is the actual right way to implement this? */
+    return fseek_unlocked(stream, *pos, SEEK_SET);
+}
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -15,15 +31,9 @@
  * RETURN VALUE:
  *     0 on success, 1 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int fsetpos(struct FILE *stream, struct fpos_t *pos) {
-    if (!stream || !pos) {
-        return 1;
-    }
-
-    fflush(stream);
-    stream->flags &= ~__STDIO_FLAGS_EOF;
-    stream->file_pos = pos->file_pos;
-    stream->buffer_file_pos = pos->file_pos;
-
-    return 0;
+int fsetpos(FILE *stream, const fpos_t *pos) {
+    flockfile(stream);
+    int res = fsetpos_unlocked(stream, pos);
+    funlockfile(stream);
+    return res;
 }

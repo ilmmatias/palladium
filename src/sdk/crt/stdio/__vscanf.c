@@ -25,7 +25,6 @@
  *     instead of expecting the whole string to be already in place.
  *
  * PARAMETERS:
- *     base - Which base the number is in, or 0 for auto detection.
  *     width_set - Set to true if we should take into consideration the width.
  *     width - Maximum amount of characters we're allowed to read.
  *     value - Output; Where to store the number on success.
@@ -38,7 +37,6 @@
  *     true on success, false on failure.
  *-----------------------------------------------------------------------------------------------*/
 static bool _strtoi(
-    int base,
     bool width_set,
     int width,
     intmax_t *value,
@@ -68,59 +66,8 @@ static bool _strtoi(
         (*read)++;
     }
 
-    bool prefix = false;
     size_t accum = 0;
     bool overflow = false;
-
-    if (base == 0 && ch == '0') {
-        if (!width_set || --width) {
-            ch = read_ch(context);
-            (*read)++;
-
-            if (ch == 'x' || ch == 'X') {
-                if (width_set && !--width) {
-                    *value = 0;
-                    return 1;
-                }
-
-                ch = read_ch(context);
-                base = 16;
-                (*read)++;
-            } else {
-                base = 8;
-                accum++;
-            }
-        } else {
-            *value = 0;
-            return 1;
-        }
-
-        prefix = true;
-    } else if (base == 0) {
-        base = 10;
-    }
-
-    if (!prefix && base == 16 && ch == '0') {
-        if (!width_set || --width) {
-            ch = read_ch(context);
-            (*read)++;
-
-            if (ch == 'x' || ch == 'X') {
-                if (width_set && !--width) {
-                    *value = 0;
-                    return 1;
-                }
-
-                ch = read_ch(context);
-                (*read)++;
-            } else {
-                accum++;
-            }
-        } else {
-            *value = 0;
-            return 1;
-        }
-    }
 
     *value = 0;
     while (true) {
@@ -139,14 +86,14 @@ static bool _strtoi(
             break;
         }
 
-        if (ch >= base) {
+        if (ch >= 10) {
             break;
         }
 
         /* The other main difference between this and strtoll, is that overflow isn't an error
            here (we just fix the value to INTMAX_MAX). */
         if (!overflow) {
-            *value = (*value * base) + ch;
+            *value = (*value * 10) + ch;
             if (*value < last) {
                 *value = INTMAX_MAX;
                 overflow = true;
@@ -215,12 +162,13 @@ static bool _strtou(
 
     /* Base detection is disabled/absent, as scanf doesn't have an auto-detect specifier for
        unsigned integers. */
-    if (base == 16 && ch == '0') {
+    if ((base == 2 || base == 16) && ch == '0') {
         if (!width_set || --width) {
             ch = read_ch(context);
             (*read)++;
 
-            if (ch == 'x' || ch == 'X') {
+            if ((base == 2 && (ch == 'b' || ch == 'B')) ||
+                (base == 16 && (ch == 'x' || ch == 'X'))) {
                 if (width_set && !--width) {
                     *value = 0;
                     return 1;
@@ -485,12 +433,9 @@ int __vscanf(
                 }
 
                 break;
-            /* Is there any reason why signed integer specifiers have an auto-base, but not
-               unsigned? */
             case 'd':
             case 'i':
                 if (!_strtoi(
-                        ch == 'd' ? 10 : 0,
                         width_set && width,
                         width,
                         &signed_value,
@@ -537,10 +482,13 @@ int __vscanf(
             case 'o':
             case 'x':
             case 'X':
+            case 'b':
+            case 'B':
                 if (!_strtou(
-                        ch == 'u'   ? 10
-                        : ch == 'o' ? 8
-                                    : 16,
+                        ch == 'o'                ? 8
+                        : ch == 'x' || ch == 'X' ? 16
+                        : ch == 'b' || ch == 'B' ? 2
+                                                 : 10,
                         width_set,
                         width,
                         &unsigned_value,

@@ -6,6 +6,28 @@
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
+ *     This function matches values from a FILE based on a format string. Unlike the normal
+ *     variant, we should only be called after acquiring the file lock.
+ *     For supported format parameters, take a look at your favorite std C reference manual.
+ *
+ * PARAMETERS:
+ *     stream - Pointer to an open file handle.
+ *     format - Base format string.
+ *     ... - Further variadic arguments.
+ *
+ * RETURN VALUE:
+ *     How many arguments have been filled.
+ *-----------------------------------------------------------------------------------------------*/
+int fscanf_unlocked(FILE *restrict stream, const char *restrict format, ...) {
+    va_list vlist;
+    va_start(vlist, format);
+    int size = vfscanf_unlocked(stream, format, vlist);
+    va_end(vlist);
+    return size;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
  *     This function matches values from a FILE based on a format string.
  *     For supported format parameters, take a look at your favorite std C reference manual.
  *
@@ -17,7 +39,7 @@
  * RETURN VALUE:
  *     How many arguments have been filled.
  *-----------------------------------------------------------------------------------------------*/
-int fscanf(FILE *stream, const char *format, ...) {
+int fscanf(FILE *restrict stream, const char *restrict format, ...) {
     va_list vlist;
     va_start(vlist, format);
     int size = vfscanf(stream, format, vlist);

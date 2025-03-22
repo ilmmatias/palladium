@@ -9,47 +9,47 @@
  *     This function parses an integer (more specifically, an `unsigned long`) from a string.
  *
  * PARAMETERS:
- *     str - String to be parsed.
- *     str_end - Output; pointer to after the last valid character.
+ *     nptr - String to be parsed.
+ *     endptr - Output; pointer to after the last valid character.
  *     base - Which base the number is in, or 0 for auto detection.
  *
  * RETURN VALUE:
  *     Result of the parsing if the string was a valid integer, or 0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-unsigned long strtoul(const char *str, char **str_end, int base) {
-    const char *start = str;
-    while (isspace(*str)) {
-        str++;
+unsigned long strtoul(const char *restrict nptr, char **restrict endptr, int base) {
+    const char *start = nptr;
+    while (isspace(*nptr)) {
+        nptr++;
     }
 
-    int sign = *str == '-';
-    if (sign || *str == '+') {
-        str++;
+    int sign = *nptr == '-';
+    if (sign || *nptr == '+') {
+        nptr++;
     }
 
     /* Don't skip the prefix on auto detection, we'll do that below, as it is also allowed
        without auto detection. */
     if (base == 0) {
-        if (*str == '0' && (*(str + 1) == 'x' || *(str + 1) == 'X')) {
+        if (*nptr == '0' && (*(nptr + 1) == 'x' || *(nptr + 1) == 'X')) {
             base = 16;
-        } else if (*str == '0') {
+        } else if (*nptr == '0') {
             base = 8;
         } else {
             base = 10;
         }
     }
 
-    if (base == 16 && *str == '0' && (*(str + 1) == 'x' || *(str + 1) == 'X')) {
-        str += 2;
+    if (base == 16 && *nptr == '0' && (*(nptr + 1) == 'x' || *(nptr + 1) == 'X')) {
+        nptr += 2;
     }
 
-    const char *after_prefixes = str;
+    const char *after_prefixes = nptr;
     unsigned long value = 0;
     bool error = false;
 
     while (true) {
         unsigned long last = value;
-        int digit = *str;
+        int digit = *nptr;
 
         /* First two cases are aA-fF, offset by +0x0A. */
         if (islower(digit)) {
@@ -74,17 +74,17 @@ unsigned long strtoul(const char *str, char **str_end, int base) {
             }
         }
 
-        str++;
+        nptr++;
     }
 
-    if (after_prefixes == str) {
+    if (after_prefixes == nptr) {
         error = true;
         value = 0;
-        str = start;
+        nptr = start;
     }
 
-    if (str_end) {
-        *str_end = (char *)str;
+    if (endptr) {
+        *endptr = (char *)nptr;
     }
 
     return sign && !error ? -value : value;

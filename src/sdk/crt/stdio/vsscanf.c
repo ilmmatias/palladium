@@ -1,7 +1,7 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#include <crt_impl.h>
+#include <crt_impl/fmt.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -49,15 +49,15 @@ static void unread_ch(void *context, int ch) {
  *     For supported format parameters, take a look at your favorite std C reference manual.
  *
  * PARAMETERS:
- *     buffer - Output buffer.
+ *     s - Output buffer.
  *     format - Base format string.
- *     vlist - Variadic argument list.
+ *     arg - Variadic argument list.
  *
  * RETURN VALUE:
  *     How many arguments have been filled.
  *-----------------------------------------------------------------------------------------------*/
-int vsscanf(const char *buffer, const char *format, va_list vlist) {
+int vsscanf(const char *restrict s, const char *restrict format, va_list arg) {
     context_t context;
-    context.buffer = buffer;
-    return __vscanf(format, vlist, &context, read_ch, unread_ch);
+    context.buffer = s;
+    return __vscanf(format, arg, &context, read_ch, unread_ch);
 }

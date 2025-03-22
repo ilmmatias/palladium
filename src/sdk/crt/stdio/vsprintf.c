@@ -1,7 +1,7 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#include <crt_impl.h>
+#include <crt_impl/fmt.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -36,17 +36,17 @@ static void put_buf(const void *buffer, int size, void *context) {
  *     For supported format parameters, take a look at your favorite std C reference manual.
  *
  * PARAMETERS:
- *     buffer - Output buffer.
+ *     s - Output buffer.
  *     format - Base format string.
- *     vlist - Variadic argument list.
+ *     arg - Variadic argument list.
  *
  * RETURN VALUE:
  *     How many characters have been output.
  *-----------------------------------------------------------------------------------------------*/
-int vsprintf(char *buffer, const char *format, va_list vlist) {
+int vsprintf(char *restrict s, const char *restrict format, va_list arg) {
     context_t context;
-    context.buffer = buffer;
-    int size = __vprintf(format, vlist, &context, put_buf);
+    context.buffer = s;
+    int size = __vprintf(format, arg, &context, put_buf);
     *context.buffer = 0;
     return size;
 }

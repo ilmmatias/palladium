@@ -6,34 +6,47 @@
 
 #include <stddef.h>
 
+#define __STDC_VERSION_STRING_H__ 202311L
+
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
 
-char *strcpy(char *dest, const char *src);
-char *strncpy(char *dest, const char *src, size_t count);
-char *strcat(char *dest, const char *src);
-char *strncat(char *dest, const char *src, size_t count);
-char *strdup(const char *src);
-char *strndup(const char *src, size_t size);
+/* Copying functions. */
+void *memcpy(void *restrict s1, const void *restrict s2, size_t n);
+void *memccpy(void *restrict s1, const void *restrict s2, int c, size_t n);
+void *memmove(void *s1, const void *s2, size_t n);
+char *strcpy(char *restrict s1, const char *restrict s2);
+char *strncpy(char *restrict s1, const char *restrict s2, size_t n);
+char *strdup(const char *s);
+char *strndup(const char *s, size_t n);
 
-size_t strlen(const char *str);
-int strcmp(const char *lhs, const char *rhs);
-int strncmp(const char *lhs, const char *rhs, size_t count);
-char *strchr(const char *str, int ch);
-char *strrchr(const char *str, int ch);
-size_t strspn(const char *dest, const char *src);
-size_t strcspn(const char *dest, const char *src);
-char *strpbrk(const char *dest, const char *breakset);
-char *strstr(const char *str, const char *substr);
-char *strtok(char *restrict str, const char *restrict delim);
+/* Concatenation functions. */
+char *strcat(char *restrict s1, const char *restrict s2);
+char *strncat(char *restrict s1, const char *restrict s2, size_t n);
 
-void *memchr(const void *ptr, int ch, size_t count);
-int memcmp(const void *lhs, const void *rhs, size_t count);
-void *memset(void *dest, int ch, size_t count);
-void *memcpy(void *restrict dest, const void *restrict src, size_t count);
-void *memmove(void *dest, const void *src, size_t count);
-void *memccpy(void *restrict dest, const void *restrict src, int c, size_t count);
+/* Comparison functions. */
+int memcmp(const void *s1, const void *s2, size_t n);
+int strcmp(const char *s1, const char *s2);
+int strcoll(const char *s1, const char *s2);
+int strncmp(const char *s1, const char *s2, size_t n);
+size_t strxfrm(char *restrict s1, const char *restrict s2, size_t n);
+
+/* Search functions. */
+void *memchr(const void *s, int c, size_t n);
+char *strchr(const char *s, int c);
+size_t strcspn(const char *s1, const char *s2);
+char *strpbrk(const char *s1, const char *s2);
+char *strrchr(const char *s, int c);
+size_t strspn(const char *s1, const char *s2);
+char *strstr(const char *s1, const char *s2);
+char *strtok(char *restrict s1, const char *restrict s2);
+
+/* Miscellaneous functions. */
+void *memset(void *s, int c, size_t n);
+void *memset_explicit(void *s, int c, size_t n);
+char *strerror(int errnum);
+size_t strlen(const char *s);
 
 #ifdef __cplusplus
 }

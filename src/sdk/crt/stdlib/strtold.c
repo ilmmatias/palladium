@@ -135,48 +135,48 @@ static long double parse_dec(const char *str, long double sign) {
  *     Differently from atof, this handles whitespaces in the start.
  *
  * PARAMETERS:
- *     str - String to be parsed.
- *     str_end - Output; pointer to after the last valid character.
+ *     nptr - String to be parsed.
+ *     endptr - Output; pointer to after the last valid character.
  *
  * RETURN VALUE:
  *     Result of the parsing if the string was a valid long double, 0.0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-long double strtold(const char *str, char **str_end) {
-    const char *start = str;
-    while (isspace(*str)) {
-        str++;
+long double strtold(const char *restrict nptr, char **restrict endptr) {
+    const char *start = nptr;
+    while (isspace(*nptr)) {
+        nptr++;
     }
 
-    long double sign = *str == '-' ? -1.L : 1.L;
-    if (sign < 0 || *str == '+') {
-        str++;
+    long double sign = *nptr == '-' ? -1.L : 1.L;
+    if (sign < 0 || *nptr == '+') {
+        nptr++;
     }
 
     long double value = 0.L;
 
-    if (*str == '0' && (*(str + 1) == 'x' || *(str + 1) == 'X')) {
-        if (!isxdigit(*(str + 2))) {
-            str = start;
+    if (*nptr == '0' && (*(nptr + 1) == 'x' || *(nptr + 1) == 'X')) {
+        if (!isxdigit(*(nptr + 2))) {
+            nptr = start;
         } else {
-            value = parse_hex(str + 2, sign);
+            value = parse_hex(nptr + 2, sign);
         }
-    } else if (isdigit(*str)) {
-        value = parse_dec(str, sign);
+    } else if (isdigit(*nptr)) {
+        value = parse_dec(nptr, sign);
     } else if (
-        (*str == 'i' || *str == 'I') && (*(str + 1) == 'n' || *(str + 1) == 'N') &&
-        (*(str + 2) == 'f' || *(str + 2) == 'F')) {
+        (*nptr == 'i' || *nptr == 'I') && (*(nptr + 1) == 'n' || *(nptr + 1) == 'N') &&
+        (*(nptr + 2) == 'f' || *(nptr + 2) == 'F')) {
         value = sign < 0 ? -INFINITY : INFINITY;
     } else if (
-        (*str == 'n' || *str == 'N') && (*(str + 1) == 'a' || *(str + 1) == 'A') &&
-        (*(str + 2) == 'n' || *(str + 2) == 'N')) {
+        (*nptr == 'n' || *nptr == 'N') && (*(nptr + 1) == 'a' || *(nptr + 1) == 'A') &&
+        (*(nptr + 2) == 'n' || *(nptr + 2) == 'N')) {
         /* TODO: We should also support quiet NaNs in the future. */
         value = sign < 0 ? -NAN : NAN;
     } else {
-        str = start;
+        nptr = start;
     }
 
-    if (str_end) {
-        *str_end = (char *)str;
+    if (endptr) {
+        *endptr = (char *)nptr;
     }
 
     return value;

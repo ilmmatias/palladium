@@ -7,11 +7,11 @@
  *     representation; aka, a space).
  *
  * PARAMETERS:
- *     ch - Character to check.
+ *     c - Character to check.
  *
  * RETURN VALUE:
  *     Result of the check.
  *-----------------------------------------------------------------------------------------------*/
-int isprint(int ch) {
-    return (unsigned int)ch - 0x20 < 0x5F;
+int isprint(int c) {
+    return (unsigned int)c - 0x20 < 0x5F;
 }

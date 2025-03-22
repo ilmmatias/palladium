@@ -8,18 +8,18 @@
  *     This function implements generic code to compare two C strings.
  *
  * PARAMETERS:
- *     lhs - Left-hand side of the expression.
- *     rhs - Right-hand side of the expression.
+ *     s1 - Left-hand side of the expression.
+ *     s2 - Right-hand side of the expression.
  *
  * RETURN VALUE:
- *     0 for equality, *lhs - *rhs if an inequality is found (where `lhs` and `rhs` would be
- *     pointers to where the inequality happened).
+ *     0 for equality, *s1 - *s2 if an inequality is found (where `s1` and `s2` would be pointers
+ *     to where the inequality happened).
  *-----------------------------------------------------------------------------------------------*/
-int strcmp(const char *lhs, const char *rhs) {
-    while (*lhs && *rhs && *lhs == *rhs) {
-        lhs++;
-        rhs++;
+int strcmp(const char *s1, const char *s2) {
+    while (*s1 && *s2 && *s1 == *s2) {
+        s1++;
+        s2++;
     }
 
-    return *lhs - *rhs;
+    return *s1 - *s2;
 }

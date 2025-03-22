@@ -6,11 +6,11 @@
  *     This function checks if a character is alphabetic (a letter).
  *
  * PARAMETERS:
- *     ch - Character to check.
+ *     c - Character to check.
  *
  * RETURN VALUE:
  *     Result of the check.
  *-----------------------------------------------------------------------------------------------*/
-int isupper(int ch) {
-    return (unsigned int)ch - 0x41 < 0x1A;
+int isupper(int c) {
+    return (unsigned int)c - 0x41 < 0x1A;
 }

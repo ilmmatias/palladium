@@ -8,16 +8,16 @@
  *     This function implements generic code to find the first occourence of a character.
  *
  * PARAMETERS:
- *     str - Where to search for the character.
- *     ch - Which character to search for.
+ *     s - Where to search for the character.
+ *     c - Which character to search for.
  *
  * RETURN VALUE:
  *     Pointer to where the character was found, or NULL if it wasn't found.
  *-----------------------------------------------------------------------------------------------*/
-char *strchr(const char *str, int ch) {
-    while (*str && *str != ch) {
-        str++;
+char *strchr(const char *s, int c) {
+    while (*s && *s != c) {
+        s++;
     }
 
-    return *str ? (char *)str : NULL;
+    return *s ? (char *)s : NULL;
 }

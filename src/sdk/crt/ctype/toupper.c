@@ -7,15 +7,15 @@
  *     unchanged.
  *
  * PARAMETERS:
- *     ch - Character to convert.
+ *     c - Character to convert.
  *
  * RETURN VALUE:
  *     Result of the conversion.
  *-----------------------------------------------------------------------------------------------*/
-int toupper(int ch) {
-    if ((unsigned int)ch - 0x61 < 0x1A) {
-        ch -= 0x20;
+int toupper(int c) {
+    if ((unsigned int)c - 0x61 < 0x1A) {
+        c -= 0x20;
     }
 
-    return ch;
+    return c;
 }

@@ -1,7 +1,7 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#include <crt_impl.h>
+#include <crt_impl/os.h>
 #include <string.h>
 
 typedef struct allocator_entry_t {
@@ -177,15 +177,15 @@ void *malloc(size_t size) {
  *     afterwards.
  *
  * PARAMETERS:
- *     num - How many elements the array has.
+ *     nmemb - How many elements the array has.
  *     size - The size of each element.
  *
  * RETURN VALUE:
  *     A pointer to the allocated block, or NULL if there is was no free entry and requesting
  *     a new page failed.
  *-----------------------------------------------------------------------------------------------*/
-void *calloc(size_t num, size_t size) {
-    size *= num;
+void *calloc(size_t nmemb, size_t size) {
+    size *= nmemb;
     void *base = malloc(size);
 
     if (base) {

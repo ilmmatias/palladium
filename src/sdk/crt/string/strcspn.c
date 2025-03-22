@@ -5,20 +5,20 @@
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function implements generic code to find how many characters not in the `src` set
- *     does the `dest` string start with.
+ *     This function implements generic code to find how many characters not in the `s2` set
+ *     does the `s1` string start with.
  *
  * PARAMETERS:
- *     dest - Which string to analyze.
- *     src - Search set.
+ *     s1 - Which string to analyze.
+ *     s2 - Search set.
  *
  * RETURN VALUE:
  *     How many characters not in the source set the string starts with.
  *-----------------------------------------------------------------------------------------------*/
-size_t strcspn(const char *dest, const char *src) {
+size_t strcspn(const char *s1, const char *s2) {
     size_t Count = 0;
 
-    while (*dest && !strchr(src, *(dest++))) {
+    while (*s1 && !strchr(s2, *(s1++))) {
         Count++;
     }
 

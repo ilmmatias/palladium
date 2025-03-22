@@ -1,7 +1,7 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#include <crt_impl.h>
+#include <crt_impl/os.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -15,13 +15,17 @@
  * RETURN VALUE:
  *     0 on success, EOF otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int fclose(struct FILE *stream) {
+int fclose(FILE *stream) {
     if (!stream) {
         return EOF;
     }
 
-    fflush(stream);
-    __fclose(stream->handle);
+    fflush_unlocked(stream);
+    __close_file(stream->handle);
+
+    if (stream->user_lock) {
+        __delete_lock(stream->lock_handle);
+    }
 
     if (stream->buffer && !stream->user_buffer) {
         free(stream->buffer);

@@ -76,8 +76,7 @@ static int pad(
  *     buffer - What to output.
  *     size - Size of the output data.
  *     sign - Controls if we should display a sign (either '-' or ' '), or not (0).
- *     alt - Controls if we should use the octal alt form ('o'), hex alt form ('x' or 'X'), or
- *           just the normal form (0).
+ *     alt - Controls if we should use the alt form (o/x/X/b/B), or just the normal form (0).
  *     left - Controls if we need to left-align (false), or right-align (true).
  *     zero - Controls if the pad character is a space (false), or a zero (true).
  *     width - Minimum width specifier.
@@ -111,7 +110,7 @@ static int pad_num(
     if (alt == 'o' && ((char *)buffer)[0] != '0') {
         alt_width = 1;
         alt_ch[0] = '0';
-    } else if (alt == 'x' || alt == 'X') {
+    } else if (alt == 'x' || alt == 'X' || alt == 'b' || alt == 'B') {
         alt_width = 2;
         alt_ch[0] = '0';
         alt_ch[1] = alt;
@@ -247,7 +246,7 @@ static int utoa(
     uintmax_t value,
     int base,
     bool upper,
-    bool alt,
+    int alt,
     bool left,
     bool zero,
     int width,
@@ -270,10 +269,14 @@ static int utoa(
     }
 
     if (alt) {
-        if (base == 8) {
+        if (base == 2) {
+            alt = upper ? 'B' : 'b';
+        } else if (base == 8) {
             alt = 'o';
         } else if (base == 16) {
             alt = upper ? 'X' : 'x';
+        } else {
+            alt = 0;
         }
     }
 
@@ -314,7 +317,7 @@ int __vprintf(
         /* First group, options can appear in any order (and we don't care about repeats). */
         int sign = 0;
         bool left = false;
-        bool alt = false;
+        int alt = 0;
         bool zero = false;
         while (true) {
             bool stop = false;
@@ -332,7 +335,7 @@ int __vprintf(
                     }
                     break;
                 case '#':
-                    alt = true;
+                    alt = 1;
                     break;
                 case '0':
                     zero = true;
@@ -356,6 +359,13 @@ int __vprintf(
         } else if (*format == '*') {
             width = va_arg(vlist, int);
             format++;
+
+            /* Negative numbers are equivalent to asking for a right-side padding (`"%*s", -5`
+             * should be the same as `"%-5s"`). */
+            if (width < 0) {
+                width = -width;
+                left = true;
+            }
         }
 
         /* Third group, precision/max width specifier. */
@@ -366,6 +376,8 @@ int __vprintf(
             } else if (*format == '*') {
                 prec = va_arg(vlist, int);
                 format++;
+            } else {
+                prec = 0;
             }
         }
 
@@ -411,6 +423,7 @@ int __vprintf(
         uintmax_t unsigned_value;
         intmax_t signed_value;
         const char *str;
+        void *ptr;
 
         ch = *(format++);
 
@@ -428,7 +441,13 @@ int __vprintf(
             case 's':
                 /* TODO: missing wide string support. */
                 str = va_arg(vlist, char *);
-                size += pad(str, strlen(str), left, width, prec, context, put_buf);
+
+                if (str) {
+                    size += pad(str, strlen(str), left, width, prec, context, put_buf);
+                } else {
+                    size += pad("(null)", 6, left, width, prec, context, put_buf);
+                }
+
                 break;
             case 'd':
             case 'i':
@@ -466,6 +485,8 @@ int __vprintf(
             case 'x':
             case 'X':
             case 'u':
+            case 'b':
+            case 'B':
                 switch (mod) {
                     case MOD_hh:
                         unsigned_value = (unsigned char)va_arg(vlist, int);
@@ -497,8 +518,9 @@ int __vprintf(
                     unsigned_value,
                     ch == 'o'                ? 8
                     : ch == 'x' || ch == 'X' ? 16
+                    : ch == 'b' || ch == 'B' ? 2
                                              : 10,
-                    ch == 'X',
+                    ch == 'X' || ch == 'B',
                     alt,
                     left,
                     zero,
@@ -538,17 +560,15 @@ int __vprintf(
 
                 break;
             case 'p':
-                size += utoa(
-                    (uintmax_t)va_arg(vlist, void *),
-                    16,
-                    false,
-                    'X',
-                    left,
-                    zero,
-                    width,
-                    prec,
-                    context,
-                    put_buf);
+                ptr = va_arg(vlist, void *);
+
+                if (ptr) {
+                    size += utoa(
+                        (uintmax_t)ptr, 16, false, 'X', left, zero, width, prec, context, put_buf);
+                } else {
+                    size += pad("(nil)", 5, left, width, prec, context, put_buf);
+                }
+
                 break;
             default:
                 put_buf(start, format - start, context);

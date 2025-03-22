@@ -8,20 +8,20 @@
  *     This function implements generic code to find the first occourence of a byte.
  *
  * PARAMETERS:
- *     ptr - Buffer to search the byte in.
- *     ch - Which byte to search for.
- *     count - Size of the buffer.
+ *     s - Buffer to search the byte in.
+ *     c - Which byte to search for.
+ *     n - Size of the buffer.
  *
  * RETURN VALUE:
  *     Pointer to where the byte was found, or NULL if it wasn't found.
  *-----------------------------------------------------------------------------------------------*/
-void *memchr(const void *ptr, int ch, size_t count) {
-    const char *Buffer = ptr;
+void *memchr(const void *s, int c, size_t n) {
+    const char *Buffer = s;
 
-    while (*Buffer != ch && count) {
+    while (*Buffer != c && n) {
         Buffer++;
-        count--;
+        n--;
     }
 
-    return count ? (void *)Buffer : NULL;
+    return n ? (void *)Buffer : NULL;
 }

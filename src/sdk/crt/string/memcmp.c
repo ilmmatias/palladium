@@ -8,19 +8,19 @@
  *     This function implements generic code to compare the data in two buffers.
  *
  * PARAMETERS:
- *     lhs - Left-hand side of the expression.
- *     rhs - Right-hand side of the expression.
- *     count - Size of the smallest buffer.
+ *     s1 - Left-hand side of the expression.
+ *     s2 - Right-hand side of the expression.
+ *     n - Size of the smallest buffer.
  *
  * RETURN VALUE:
- *     0 for equality, *lhs - *rhs if an inequality is found (where `lhs` and `rhs` are both
+ *     0 for equality, *s1 - *s2 if an inequality is found (where `s1` and `s1` are both
  *     reinterpreted as char*, and are pointing to where the inequality happened).
  *-----------------------------------------------------------------------------------------------*/
-int memcmp(const void *lhs, const void *rhs, size_t count) {
-    const char *Left = lhs;
-    const char *Right = rhs;
+int memcmp(const void *s1, const void *s2, size_t n) {
+    const char *Left = s1;
+    const char *Right = s2;
 
-    while (count--) {
+    while (n--) {
         if (*Left != *Right) {
             return *Left - *Right;
         }

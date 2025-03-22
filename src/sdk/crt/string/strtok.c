@@ -9,31 +9,31 @@
  *     from the set.
  *
  * PARAMETERS:
- *     str - Either a string to analyze, or NULL to use the previous context.
- *     delim - Delimiter set.
+ *     s1 - Either a string to analyze, or NULL to use the previous context.
+ *     s2 - Delimiter set.
  *
  * RETURN VALUE:
  *     Position of the next token, or NULL if there are no more tokens.
  *-----------------------------------------------------------------------------------------------*/
-char *strtok(char *restrict str, const char *restrict delim) {
+char *strtok(char *restrict s1, const char *restrict s2) {
     static char *Context = NULL;
 
-    if (!Context || str) {
-        Context = str;
+    if (!Context || s1) {
+        Context = s1;
     }
 
     if (!Context) {
         return NULL;
     }
 
-    Context += strspn(Context, delim);
+    Context += strspn(Context, s2);
     if (!*Context) {
         Context = NULL;
         return NULL;
     }
 
     char *Token = Context;
-    Context += strcspn(Context, delim);
+    Context += strcspn(Context, s2);
 
     if (*Context) {
         *(Context++) = 0;

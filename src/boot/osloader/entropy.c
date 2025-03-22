@@ -2,7 +2,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <console.h>
-#include <crt_impl.h>
+#include <crt_impl/rand.h>
 #include <efi/spec.h>
 
 #ifdef ARCH_amd64

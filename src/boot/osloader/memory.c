@@ -2,7 +2,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <console.h>
-#include <crt_impl.h>
+#include <crt_impl/rand.h>
 #include <memory.h>
 #include <rt/bitmap.h>
 

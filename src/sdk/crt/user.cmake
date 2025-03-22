@@ -4,14 +4,22 @@
 set(USER_SOURCES
     ${SOURCES}
 
+    os/__acquire_lock.c
     os/__allocate_pages.c
-    os/__fclose.c
-    os/__fopen.c
-    os/__fread.c
-    os/__fwrite.c
+    os/__close_file.c
+    os/__create_lock.c
+    os/__delete_lock.c
+    os/__open_file.c
+    os/__read_file.c
+    os/__release_lock.c
+    os/__seek_file.c
+    os/__tell_file.c
+    os/__terminate_process.c
+    os/__write_file.c
     os/handles.c
+    os/startup.c
 
-    stdio/__parse_fopen_mode.c
+    stdio/__parse_open_mode.c
     stdio/clearerr.c
     stdio/fclose.c
     stdio/feof.c
@@ -20,6 +28,7 @@ set(USER_SOURCES
     stdio/fgetc.c
     stdio/fgetpos.c
     stdio/fgets.c
+    stdio/flockfile.c
     stdio/fopen.c
     stdio/fprintf.c
     stdio/fputc.c
@@ -30,6 +39,7 @@ set(USER_SOURCES
     stdio/fseek.c
     stdio/fsetpos.c
     stdio/ftell.c
+    stdio/funlockfile.c
     stdio/fwrite.c
     stdio/getchar.c
     stdio/gets.c

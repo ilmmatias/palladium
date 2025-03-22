@@ -9,16 +9,16 @@
  *     another, handling any overlap.
  *
  * PARAMETERS:
- *     dest - Destination buffer.
- *     src - Source buffer.
- *     count - How many bytes to copy.
+ *     s1 - Destination buffer.
+ *     s2 - Source buffer.
+ *     n - How many bytes to copy.
  *
  * RETURN VALUE:
  *     Start of the destination buffer.
  *-----------------------------------------------------------------------------------------------*/
-void *memmove(void *dest, const void *src, size_t count) {
-    char *Destination = (char *)dest;
-    const char *Source = (const char *)src;
+void *memmove(void *s1, const void *s2, size_t n) {
+    char *Destination = (char *)s1;
+    const char *Source = (const char *)s2;
 
     /*  Overlapping like this:
         <src----->
@@ -28,16 +28,16 @@ void *memmove(void *dest, const void *src, size_t count) {
         <dest--->
            <src---->
         so we just call memcpy for both. */
-    if (Source >= Destination || Source + count <= Destination) {
-        return memcpy(dest, src, count);
+    if (Source >= Destination || Source + n <= Destination) {
+        return memcpy(s1, s2, n);
     }
 
-    Destination += count;
-    Source += count;
+    Destination += n;
+    Source += n;
 
-    while (count--) {
+    while (n--) {
         *(--Destination) = *(--Source);
     }
 
-    return dest;
+    return s1;
 }

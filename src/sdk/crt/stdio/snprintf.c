@@ -1,3 +1,4 @@
+
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
@@ -12,7 +13,7 @@
  *     For supported format parameters, take a look at your favorite std C reference manual.
  *
  * PARAMETERS:
- *     buffer - Output buffer.
+ *     s - Output buffer.
  *     bufsz - Size of the output buffer.
  *     format - Base format string.
  *     ... - Further variadic arguments.
@@ -20,10 +21,10 @@
  * RETURN VALUE:
  *     How many characters have been output.
  *-----------------------------------------------------------------------------------------------*/
-int snprintf(char *buffer, size_t bufsz, const char *format, ...) {
+int snprintf(char *restrict s, size_t bufsz, const char *restrict format, ...) {
     va_list vlist;
     va_start(vlist, format);
-    int size = vsnprintf(buffer, bufsz, format, vlist);
+    int size = vsnprintf(s, bufsz, format, vlist);
     va_end(vlist);
     return size;
 }

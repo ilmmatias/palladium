@@ -6,15 +6,34 @@
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     Wrapper around fwrite(str, 1, strlen(str), stream).
+ *     Wrapper around fwrite_unlocked(str, 1, strlen(str), stream).
  *
  * PARAMETERS:
- *     stream - FILE stream; Needs to be open as __STDIO_FLAGS_WRITE.
+ *     s - What to write into the file.
+ *     stream - FILE stream; Needs to be open with the write flag.
  *
  * RETURN VALUE:
- *     EOF on failure, size of the string otherwise.
+ *     Data written onto the file, or EOF on failure.
  *-----------------------------------------------------------------------------------------------*/
-int fputs(const char *str, FILE *stream) {
-    size_t count = strlen(str);
-    return fwrite((void *)str, 1, count, stream) == count ? count : EOF;
+int fputs_unlocked(const char *restrict s, FILE *restrict stream) {
+    size_t count = strlen(s);
+    return fwrite_unlocked((void *)s, 1, count, stream) == count ? count : EOF;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function writes a string into the file stream.
+ *
+ * PARAMETERS:
+ *     str - What to write into the file.
+ *     stream - FILE stream; Needs to be open with the write flag.
+ *
+ * RETURN VALUE:
+ *     Size of the data written onto the file, or EOF on failure.
+ *-----------------------------------------------------------------------------------------------*/
+int fputs(const char *restrict s, FILE *restrict stream) {
+    flockfile(stream);
+    int res = fputs_unlocked(s, stream);
+    funlockfile(stream);
+    return res;
 }

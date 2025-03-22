@@ -8,19 +8,19 @@
  *     This function implements generic code to fill a region of memory with a specific byte.
  *
  * PARAMETERS:
- *     dest - Destination buffer.
+ *     s - Destination buffer.
  *     c - Byte to be used as pattern.
- *     count - Size of the destination buffer.
+ *     n - Size of the destination buffer.
  *
  * RETURN VALUE:
  *     Start of the destination buffer.
  *-----------------------------------------------------------------------------------------------*/
-void *memset(void *dest, int c, size_t count) {
-    char *Destination = dest;
+void *memset(void *s, int c, size_t n) {
+    char *Destination = s;
 
-    while (count--) {
+    while (n--) {
         *(Destination++) = c;
     }
 
-    return dest;
+    return s;
 }

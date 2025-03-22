@@ -1,8 +1,7 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#include <crt_impl.h>
-#include <stdint.h>
+#include <crt_impl/fmt.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -50,17 +49,17 @@ static void put_buf(const void *buffer, int size, void *context) {
  *     buffer - Output buffer.
  *     bufsz - Size of the output buffer.
  *     format - Base format string.
- *     vlist - Variadic argument list.
+ *     arg - Variadic argument list.
  *
  * RETURN VALUE:
  *     How many characters have been output.
  *-----------------------------------------------------------------------------------------------*/
-int vsnprintf(char *buffer, size_t bufsz, const char *format, va_list vlist) {
+int vsnprintf(char *restrict s, size_t bufsz, const char *restrict format, va_list arg) {
     context_t context;
-    context.buffer = buffer;
+    context.buffer = s;
     context.bufsz = bufsz > 0 ? bufsz - 1 : 0;
 
-    int size = __vprintf(format, vlist, &context, put_buf);
+    int size = __vprintf(format, arg, &context, put_buf);
     if (bufsz > 0) {
         *context.buffer = 0;
     }

@@ -9,19 +9,19 @@
  *     stopping after copying the specified amount or after copying the specified byte.
  *
  * PARAMETERS:
- *     dest - Destination buffer.
- *     src - Source buffer.
+ *     s1 - Destination buffer.
+ *     s2 - Source buffer.
  *     c - Marker.
- *     count - How many bytes to copy.
+ *     n - How many bytes to copy.
  *
  * RETURN VALUE:
  *     Pointer to the byte after the marker, or NULL if the marker wasn't found.
  *-----------------------------------------------------------------------------------------------*/
-void *memccpy(void *restrict dest, const void *restrict src, int c, size_t count) {
-    char *Destination = dest;
-    const char *Source = src;
+void *memccpy(void *restrict s1, const void *restrict s2, int c, size_t n) {
+    char *Destination = s1;
+    const char *Source = s2;
 
-    while (count) {
+    while (n) {
         int Data = *(Source++);
         *(Destination++) = Data;
 
@@ -29,8 +29,8 @@ void *memccpy(void *restrict dest, const void *restrict src, int c, size_t count
             break;
         }
 
-        count--;
+        n--;
     }
 
-    return count ? Destination : NULL;
+    return n ? Destination : NULL;
 }

@@ -9,21 +9,21 @@
  *     This function implements generic code to create a copy of a C string.
  *
  * PARAMETERS:
- *     src - The string to be copied.
+ *     s - The string to be copied.
  *
  * RETURN VALUE:
  *     Copy of the source string, or NULL if we couldn't allocate the memory.
  *-----------------------------------------------------------------------------------------------*/
-char *strdup(const char *src) {
-    if (!src) {
+char *strdup(const char *s) {
+    if (!s) {
         return NULL;
     }
 
-    size_t Size = strlen(src) + 1;
+    size_t Size = strlen(s) + 1;
     char *Copy = malloc(Size);
 
     if (Copy) {
-        memcpy(Copy, src, Size);
+        memcpy(Copy, s, Size);
     }
 
     return Copy;
