@@ -17,13 +17,13 @@ jobs:
     steps:
     - name: Install basic packages
       run: |
-        sudo apt install -y build-essential cmake ninja-build mkisofs mtools
+        sudo apt install -y build-essential cmake lld ninja-build mkisofs mtools
 
     - name: Install LLVM
       run: |
         wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
         sudo add-apt-repository -y "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-20 main"
-        sudo apt install clang-20 lld-20 llvm-20 libclang-20-dev
+        sudo apt install -y clang-20 lld-20 llvm-20 libclang-20-dev
 
     - name: Checkout llvm-project
       uses: actions/checkout@v3
