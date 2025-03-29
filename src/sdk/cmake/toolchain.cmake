@@ -4,10 +4,10 @@
 set(CMAKE_SYSTEM_NAME Palladium)
 set(CMAKE_SYSTEM_PROCESSOR ${ARCH})
 
-set(CMAKE_C_COMPILER clang)
-set(CMAKE_ASM_COMPILER clang)
-set(CMAKE_RC_COMPILER llvm-windres)
-set(CMAKE_AR llvm-ar)
+set(CMAKE_C_COMPILER clang${LLVM_SUFFIX})
+set(CMAKE_ASM_COMPILER clang${LLVM_SUFFIX})
+set(CMAKE_RC_COMPILER llvm-windres${LLVM_SUFFIX})
+set(CMAKE_AR llvm-ar${LLVM_SUFFIX})
 
 set(CMAKE_C_COMPILER_WORKS 1)
 

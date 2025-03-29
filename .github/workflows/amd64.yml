@@ -15,9 +15,15 @@ jobs:
     runs-on: ubuntu-24.04
 
     steps:
-    - name: Install packages
+    - name: Install basic packages
       run: |
-        sudo apt install -y build-essential cmake ninja-build clang lld llvm libclang-dev mkisofs mtools
+        sudo apt install -y build-essential cmake ninja-build mkisofs mtools
+
+    - name: Install LLVM
+      run: |
+        wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
+        sudo add-apt-repository -y "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-20 main"
+        sudo apt install clang-20 lld-20 llvm-20 libclang-20-dev
 
     - name: Checkout llvm-project
       uses: actions/checkout@v3
@@ -36,10 +42,18 @@ jobs:
         PALLADIUM_PATH=${{github.workspace}}/palladium \
         COMPILER_RT_PATH=${{github.workspace}}/llvm-project/compiler-rt \
         COMPILER_RT_TARGET=x86_64 \
+        LLVM_SUFFIX=-20 \
         palladium/build-compiler-rt.sh
 
     - name: Configure Target
-      run: cmake -S palladium/src -B build.target -G Ninja -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DARCH=amd64
+      run: |
+        cmake \
+          -S palladium/src \
+          -B build.target \
+          -G Ninja \
+          -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
+          -DARCH=amd64 \
+          -DLLVM_SUFFIX=-20
 
     - name: Build Target
       run: cmake --build build.target --config ${{env.BUILD_TYPE}}
