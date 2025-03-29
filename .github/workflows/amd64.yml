@@ -1,4 +1,4 @@
-name: amd64 BIOS (Release)
+name: amd64 (Release)
 
 on:
   push:
@@ -23,7 +23,7 @@ jobs:
       uses: actions/checkout@v3
       with:
         repository: llvm/llvm-project
-        ref: llvmorg-20.1.0
+        ref: llvmorg-20.1.1
         path: llvm-project
 
     - name: Checkout palladium
