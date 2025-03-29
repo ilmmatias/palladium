@@ -1,6 +1,7 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
+#include <crt_impl/common.h>
 #include <ctype.h>
 #include <limits.h>
 
@@ -18,7 +19,7 @@
  * RETURN VALUE:
  *     Result of the parsing if the string was a valid integer, or 0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-long long strtoll(const char *restrict nptr, char **restrict endptr, int base) {
+long long strtoll(const char *CRT_RESTRICT nptr, char **CRT_RESTRICT endptr, int base) {
     const char *start = nptr;
     while (isspace(*nptr)) {
         nptr++;

@@ -4,6 +4,7 @@
 #ifndef STDIO_H
 #define STDIO_H
 
+#include <crt_impl/common.h>
 #include <crt_impl/file.h>
 #include <stdarg.h>
 #include <stddef.h>
@@ -48,48 +49,56 @@ char *tmpnam(char *s);
 
 /* File access functions (unlocked variants). */
 int fflush_unlocked(FILE *stream);
-void setbuf_unlocked(FILE *restrict stream, char *restrict buf);
-int setvbuf_unlocked(FILE *restrict stream, char *restrict buf, int mode, size_t size);
+void setbuf_unlocked(FILE *CRT_RESTRICT stream, char *CRT_RESTRICT buf);
+int setvbuf_unlocked(FILE *CRT_RESTRICT stream, char *CRT_RESTRICT buf, int mode, size_t size);
 
 /* File access functions. */
 int fclose(FILE *stream);
 int fflush(FILE *stream);
-FILE *fopen(const char *restrict filename, const char *restrict mode);
-FILE *freopen(const char *restrict filename, const char *restrict mode, FILE *restrict stream);
-void setbuf(FILE *restrict stream, char *restrict buf);
-int setvbuf(FILE *restrict stream, char *restrict buf, int mode, size_t size);
+CRT_MALLOC FILE *fopen(const char *CRT_RESTRICT filename, const char *CRT_RESTRICT mode);
+FILE *freopen(
+    const char *CRT_RESTRICT filename,
+    const char *CRT_RESTRICT mode,
+    FILE *CRT_RESTRICT stream);
+void setbuf(FILE *CRT_RESTRICT stream, char *CRT_RESTRICT buf);
+int setvbuf(FILE *CRT_RESTRICT stream, char *CRT_RESTRICT buf, int mode, size_t size);
 
 /* Formatted input/output functions (unlocked variants). */
-int fprintf_unlocked(FILE *restrict stream, const char *restrict format, ...);
-int fscanf_unlocked(FILE *restrict stream, const char *restrict format, ...);
-int printf_unlocked(const char *restrict format, ...);
-int scanf_unlocked(const char *restrict format, ...);
-int vfprintf_unlocked(FILE *restrict stream, const char *restrict format, va_list arg);
-int vfscanf_unlocked(FILE *restrict stream, const char *restrict format, va_list arg);
-int vprintf_unlocked(const char *restrict format, va_list arg);
-int vscanf_unlocked(const char *restrict format, va_list arg);
+CRT_FORMAT(printf, 2, 3)
+int fprintf_unlocked(FILE *CRT_RESTRICT stream, const char *CRT_RESTRICT format, ...);
+CRT_FORMAT(scanf, 2, 3)
+int fscanf_unlocked(FILE *CRT_RESTRICT stream, const char *CRT_RESTRICT format, ...);
+CRT_FORMAT(printf, 1, 2) int printf_unlocked(const char *CRT_RESTRICT format, ...);
+CRT_FORMAT(scanf, 1, 2) int scanf_unlocked(const char *CRT_RESTRICT format, ...);
+int vfprintf_unlocked(FILE *CRT_RESTRICT stream, const char *CRT_RESTRICT format, va_list arg);
+int vfscanf_unlocked(FILE *CRT_RESTRICT stream, const char *CRT_RESTRICT format, va_list arg);
+int vprintf_unlocked(const char *CRT_RESTRICT format, va_list arg);
+int vscanf_unlocked(const char *CRT_RESTRICT format, va_list arg);
 
 /* Formatted input/output functions. */
-int fprintf(FILE *restrict stream, const char *restrict format, ...);
-int fscanf(FILE *restrict stream, const char *restrict format, ...);
-int printf(const char *restrict format, ...);
-int scanf(const char *restrict format, ...);
-int snprintf(char *restrict s, size_t n, const char *restrict format, ...);
-int sprintf(char *restrict s, const char *restrict format, ...);
-int sscanf(const char *restrict s, const char *restrict format, ...);
-int vfprintf(FILE *restrict stream, const char *restrict format, va_list arg);
-int vfscanf(FILE *restrict stream, const char *restrict format, va_list arg);
-int vprintf(const char *restrict format, va_list arg);
-int vscanf(const char *restrict format, va_list arg);
-int vsnprintf(char *restrict s, size_t n, const char *restrict format, va_list arg);
-int vsprintf(char *restrict s, const char *restrict format, va_list arg);
-int vsscanf(const char *restrict s, const char *restrict format, va_list arg);
+CRT_FORMAT(printf, 2, 3)
+int fprintf(FILE *CRT_RESTRICT stream, const char *CRT_RESTRICT format, ...);
+CRT_FORMAT(scanf, 2, 3) int fscanf(FILE *CRT_RESTRICT stream, const char *CRT_RESTRICT format, ...);
+CRT_FORMAT(printf, 1, 2) int printf(const char *CRT_RESTRICT format, ...);
+CRT_FORMAT(scanf, 1, 2) int scanf(const char *CRT_RESTRICT format, ...);
+CRT_FORMAT(printf, 3, 4)
+int snprintf(char *CRT_RESTRICT s, size_t n, const char *CRT_RESTRICT format, ...);
+CRT_FORMAT(printf, 2, 3) int sprintf(char *CRT_RESTRICT s, const char *CRT_RESTRICT format, ...);
+CRT_FORMAT(scanf, 2, 3)
+int sscanf(const char *CRT_RESTRICT s, const char *CRT_RESTRICT format, ...);
+int vfprintf(FILE *CRT_RESTRICT stream, const char *CRT_RESTRICT format, va_list arg);
+int vfscanf(FILE *CRT_RESTRICT stream, const char *CRT_RESTRICT format, va_list arg);
+int vprintf(const char *CRT_RESTRICT format, va_list arg);
+int vscanf(const char *CRT_RESTRICT format, va_list arg);
+int vsnprintf(char *CRT_RESTRICT s, size_t n, const char *CRT_RESTRICT format, va_list arg);
+int vsprintf(char *CRT_RESTRICT s, const char *CRT_RESTRICT format, va_list arg);
+int vsscanf(const char *CRT_RESTRICT s, const char *CRT_RESTRICT format, va_list arg);
 
 /* Character input/output functions (unlocked variants). */
 int fgetc_unlocked(FILE *stream);
-char *fgets_unlocked(char *restrict s, int n, FILE *restrict stream);
+char *fgets_unlocked(char *CRT_RESTRICT s, int n, FILE *CRT_RESTRICT stream);
 int fputc_unlocked(int c, FILE *stream);
-int fputs_unlocked(const char *restrict s, FILE *restrict stream);
+int fputs_unlocked(const char *CRT_RESTRICT s, FILE *CRT_RESTRICT stream);
 int getchar_unlocked(void);
 int putchar_unlocked(int c);
 int puts_unlocked(const char *s);
@@ -97,27 +106,28 @@ int ungetc_unlocked(int c, FILE *stream);
 
 /* Character input/output functions. */
 int fgetc(FILE *stream);
-char *fgets(char *restrict s, int n, FILE *restrict stream);
+char *fgets(char *CRT_RESTRICT s, int n, FILE *CRT_RESTRICT stream);
 int fputc(int c, FILE *stream);
-int fputs(const char *restrict s, FILE *restrict stream);
+int fputs(const char *CRT_RESTRICT s, FILE *CRT_RESTRICT stream);
 int getchar(void);
 int putchar(int c);
 int puts(const char *s);
 int ungetc(int c, FILE *stream);
 
 /* Direct input/output functions (unlocked variants). */
-size_t fread_unlocked(void *restrict ptr, size_t size, size_t nmemb, FILE *restrict stream);
-size_t fwrite_unlocked(const void *restrict ptr, size_t size, size_t nmemb, FILE *restrict stream);
-int fgetpos_unlocked(FILE *restrict stream, fpos_t *restrict pos);
+size_t fread_unlocked(void *CRT_RESTRICT ptr, size_t size, size_t nmemb, FILE *CRT_RESTRICT stream);
+size_t
+fwrite_unlocked(const void *CRT_RESTRICT ptr, size_t size, size_t nmemb, FILE *CRT_RESTRICT stream);
+int fgetpos_unlocked(FILE *CRT_RESTRICT stream, fpos_t *CRT_RESTRICT pos);
 int fseek_unlocked(FILE *stream, long int offset, int whence);
 int fsetpos_unlocked(FILE *stream, const fpos_t *pos);
 long int ftell_unlocked(FILE *stream);
 void rewind_unlocked(FILE *stream);
 
 /* Direct input/output functions. */
-size_t fread(void *restrict ptr, size_t size, size_t nmemb, FILE *restrict stream);
-size_t fwrite(const void *restrict ptr, size_t size, size_t nmemb, FILE *restrict stream);
-int fgetpos(FILE *restrict stream, fpos_t *restrict pos);
+size_t fread(void *CRT_RESTRICT ptr, size_t size, size_t nmemb, FILE *CRT_RESTRICT stream);
+size_t fwrite(const void *CRT_RESTRICT ptr, size_t size, size_t nmemb, FILE *CRT_RESTRICT stream);
+int fgetpos(FILE *CRT_RESTRICT stream, fpos_t *CRT_RESTRICT pos);
 int fseek(FILE *stream, long int offset, int whence);
 int fsetpos(FILE *stream, const fpos_t *pos);
 long int ftell(FILE *stream);

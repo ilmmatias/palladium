@@ -1,6 +1,7 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
+#include <crt_impl/common.h>
 #include <stddef.h>
 
 /*-------------------------------------------------------------------------------------------------
@@ -16,7 +17,7 @@
  * RETURN VALUE:
  *     Start of the destination buffer.
  *-----------------------------------------------------------------------------------------------*/
-char *strncat(char *restrict s1, const char *restrict s2, size_t n) {
+char *strncat(char *CRT_RESTRICT s1, const char *CRT_RESTRICT s2, size_t n) {
     char *Destination = s1;
     const char *Source = s2;
 

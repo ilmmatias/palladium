@@ -21,7 +21,7 @@
  * RETURN VALUE:
  *     How many characters have been output.
  *-----------------------------------------------------------------------------------------------*/
-int snprintf(char *restrict s, size_t bufsz, const char *restrict format, ...) {
+int snprintf(char *CRT_RESTRICT s, size_t bufsz, const char *CRT_RESTRICT format, ...) {
     va_list vlist;
     va_start(vlist, format);
     int size = vsnprintf(s, bufsz, format, vlist);

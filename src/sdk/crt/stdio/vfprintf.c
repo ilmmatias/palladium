@@ -36,7 +36,7 @@ static void put_buf(const void *buffer, int size, void *context) {
  * RETURN VALUE:
  *     How many characters have been output.
  *-----------------------------------------------------------------------------------------------*/
-int vfprintf_unlocked(FILE *restrict stream, const char *restrict format, va_list arg) {
+int vfprintf_unlocked(FILE *CRT_RESTRICT stream, const char *CRT_RESTRICT format, va_list arg) {
     return __vprintf(format, arg, stream, put_buf);
 }
 
@@ -55,7 +55,7 @@ int vfprintf_unlocked(FILE *restrict stream, const char *restrict format, va_lis
  * RETURN VALUE:
  *     How many characters have been output.
  *-----------------------------------------------------------------------------------------------*/
-int vfprintf(FILE *restrict stream, const char *restrict format, va_list arg) {
+int vfprintf(FILE *CRT_RESTRICT stream, const char *CRT_RESTRICT format, va_list arg) {
     flockfile(stream);
     int res = vfprintf_unlocked(stream, format, arg);
     funlockfile(stream);

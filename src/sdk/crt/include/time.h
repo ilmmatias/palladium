@@ -4,6 +4,7 @@
 #ifndef TIME_H
 #define TIME_H
 
+#include <crt_impl/common.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -58,10 +59,10 @@ struct tm *gmtime_r(const time_t *timer, struct tm *buf);
 struct tm *localtime(const time_t *timer);
 struct tm *localtime_r(const time_t *timer, struct tm *buf);
 size_t strftime(
-    char *restrict s,
+    char *CRT_RESTRICT s,
     size_t maxsize,
-    const char *restrict format,
-    const struct tm *restrict timeptr);
+    const char *CRT_RESTRICT format,
+    const struct tm *CRT_RESTRICT timeptr);
 
 #ifdef __cplusplus
 }

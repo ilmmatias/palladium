@@ -155,17 +155,30 @@
 #define INT8_C(value) (value)
 #define INT16_C(value) (value)
 #define INT32_C(value) (value)
+#if UINTPTR_MAX == UINT64_MAX
 #define INT64_C(value) (value##L)
+#else
+#define INT64_C(value) (value##LL)
+#endif /* UINTPTR_MAX == UINT64_MAX */
 
 /* Macros for minimum-width unsigned integer constants. */
 #define UINT8_C(value) (value)
 #define UINT16_C(value) (value)
 #define UINT32_C(value) (value##U)
+#if UINTPTR_MAX == UINT64_MAX
 #define UINT64_C(value) (value##UL)
+#else
+#define UINT64_C(value) (value##ULL)
+#endif /* UINTPTR_MAX == UINT64_MAX */
 
 /* Macros for greatest-width integer constants. */
+#if UINTPTR_MAX == UINT64_MAX
 #define INTMAX_C(value) (value##L)
 #define UINTMAX_C(value) (value##UL)
+#else
+#define INTMAX_C(value) (value##LL)
+#define UINTMAX_C(value) (value##ULL)
+#endif /* UINTPTR_MAX == UINT64_MAX */
 
 /* Exact-width signed integer types. */
 typedef __INT8_TYPE__ int8_t;

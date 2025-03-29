@@ -3,6 +3,7 @@
 
 #include <crt_impl/ieee754.h>
 #include <crt_impl/math.h>
+#include <stddef.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -86,6 +87,6 @@ float cosf(float x) {
         case 3:
             return __sinf(res);
         default:
-            __builtin_unreachable();
+            unreachable();
     }
 }

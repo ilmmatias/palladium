@@ -32,7 +32,11 @@ jobs:
         path: palladium
 
     - name: Configure, build, and install compiler-rt for Target
-      run: COMPILER_RT_PATH=llvm-project/compiler-rt COMPILER_RT_TARGET=x86_64 palladium/build-compiler-rt.sh
+      run: |
+        PALLADIUM_PATH=${{github.workspace}}/palladium \
+        COMPILER_RT_PATH=${{github.workspace}}/llvm-project/compiler-rt \
+        COMPILER_RT_TARGET=x86_64 \
+        palladium/build-compiler-rt.sh
 
     - name: Configure Target
       run: cmake -S palladium/src -B build.target -G Ninja -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DARCH=amd64

@@ -18,7 +18,7 @@
  * RETURN VALUE:
  *     The destination buffer itself on success, NULL otherwise.
  *-----------------------------------------------------------------------------------------------*/
-char *fgets_unlocked(char *restrict s, int count, FILE *restrict stream) {
+char *fgets_unlocked(char *CRT_RESTRICT s, int count, FILE *CRT_RESTRICT stream) {
     if (!stream) {
         return NULL;
     } else if (
@@ -69,7 +69,7 @@ char *fgets_unlocked(char *restrict s, int count, FILE *restrict stream) {
  * RETURN VALUE:
  *     The destination buffer itself on success, NULL otherwise.
  *-----------------------------------------------------------------------------------------------*/
-char *fgets(char *restrict s, int count, FILE *restrict stream) {
+char *fgets(char *CRT_RESTRICT s, int count, FILE *CRT_RESTRICT stream) {
     flockfile(stream);
     char *res = fgets_unlocked(s, count, stream);
     funlockfile(stream);

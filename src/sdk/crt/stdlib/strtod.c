@@ -1,6 +1,7 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
+#include <crt_impl/common.h>
 #include <ctype.h>
 #include <math.h>
 
@@ -141,7 +142,7 @@ double __strtod_dec(const char *str, double sign) {
  * RETURN VALUE:
  *     Result of the parsing if the string was a valid double, 0.0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-double strtod(const char *restrict nptr, char **restrict endptr) {
+double strtod(const char *CRT_RESTRICT nptr, char **CRT_RESTRICT endptr) {
     const char *start = nptr;
     while (isspace(*nptr)) {
         nptr++;

@@ -4,6 +4,8 @@
 #ifndef SETJMP_H
 #define SETJMP_H
 
+#include <crt_impl/common.h>
+
 #if defined(ARCH_amd64)
 #include <crt_impl/amd64/setjmp.h>
 #else
@@ -20,7 +22,7 @@ extern "C" {
 int setjmp(jmp_buf env);
 
 /* Restore calling environment. */
-[[noreturn]] void longjmp(jmp_buf env, int val);
+CRT_NORETURN void longjmp(jmp_buf env, int val);
 
 #ifdef __cplusplus
 }

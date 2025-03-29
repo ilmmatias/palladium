@@ -15,7 +15,7 @@
  * RETURN VALUE:
  *     Data written onto the file, or EOF on failure.
  *-----------------------------------------------------------------------------------------------*/
-int fputs_unlocked(const char *restrict s, FILE *restrict stream) {
+int fputs_unlocked(const char *CRT_RESTRICT s, FILE *CRT_RESTRICT stream) {
     size_t count = strlen(s);
     return fwrite_unlocked((void *)s, 1, count, stream) == count ? count : EOF;
 }
@@ -31,7 +31,7 @@ int fputs_unlocked(const char *restrict s, FILE *restrict stream) {
  * RETURN VALUE:
  *     Size of the data written onto the file, or EOF on failure.
  *-----------------------------------------------------------------------------------------------*/
-int fputs(const char *restrict s, FILE *restrict stream) {
+int fputs(const char *CRT_RESTRICT s, FILE *CRT_RESTRICT stream) {
     flockfile(stream);
     int res = fputs_unlocked(s, stream);
     funlockfile(stream);

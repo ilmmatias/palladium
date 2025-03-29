@@ -17,7 +17,7 @@
  * RETURN VALUE:
  *     How many arguments have been filled.
  *-----------------------------------------------------------------------------------------------*/
-int sscanf(const char *restrict s, const char *restrict format, ...) {
+int sscanf(const char *CRT_RESTRICT s, const char *CRT_RESTRICT format, ...) {
     va_list vlist;
     va_start(vlist, format);
     int size = vsscanf(s, format, vlist);

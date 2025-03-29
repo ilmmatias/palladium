@@ -27,6 +27,13 @@ typedef union {
 } max_align_t;
 
 typedef __WCHAR_TYPE__ wchar_t;
-typedef typeof_unqual(nullptr) nullptr_t;
+
+/* Either define nullptr_t using __typeof__ (for C, should be good enough for both GCC and Clang),
+ * or using decltype (for C++). */
+#if defined(__cplusplus) && __cplusplus >= 201103L
+typedef decltype(nullptr) nullptr_t;
+#elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 202311L
+typedef __typeof__(nullptr) nullptr_t;
+#endif /* __cplusplus || __STDC_VERSION__ */
 
 #endif /* STDDEF_H */

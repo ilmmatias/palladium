@@ -18,7 +18,7 @@
  * RETURN VALUE:
  *     How many characters have been output.
  *-----------------------------------------------------------------------------------------------*/
-int fprintf_unlocked(FILE *restrict stream, const char *restrict format, ...) {
+int fprintf_unlocked(FILE *CRT_RESTRICT stream, const char *CRT_RESTRICT format, ...) {
     va_list vlist;
     va_start(vlist, format);
     int size = vfprintf_unlocked(stream, format, vlist);
@@ -39,7 +39,7 @@ int fprintf_unlocked(FILE *restrict stream, const char *restrict format, ...) {
  * RETURN VALUE:
  *     How many characters have been output.
  *-----------------------------------------------------------------------------------------------*/
-int fprintf(FILE *restrict stream, const char *restrict format, ...) {
+int fprintf(FILE *CRT_RESTRICT stream, const char *CRT_RESTRICT format, ...) {
     va_list vlist;
     va_start(vlist, format);
     int size = vfprintf(stream, format, vlist);

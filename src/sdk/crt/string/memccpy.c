@@ -1,6 +1,7 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
+#include <crt_impl/common.h>
 #include <stddef.h>
 
 /*-------------------------------------------------------------------------------------------------
@@ -17,7 +18,7 @@
  * RETURN VALUE:
  *     Pointer to the byte after the marker, or NULL if the marker wasn't found.
  *-----------------------------------------------------------------------------------------------*/
-void *memccpy(void *restrict s1, const void *restrict s2, int c, size_t n) {
+void *memccpy(void *CRT_RESTRICT s1, const void *CRT_RESTRICT s2, int c, size_t n) {
     char *Destination = s1;
     const char *Source = s2;
 

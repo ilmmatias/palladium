@@ -43,7 +43,7 @@ static void put_buf(const void *buffer, int size, void *context) {
  * RETURN VALUE:
  *     How many characters have been output.
  *-----------------------------------------------------------------------------------------------*/
-int vsprintf(char *restrict s, const char *restrict format, va_list arg) {
+int vsprintf(char *CRT_RESTRICT s, const char *CRT_RESTRICT format, va_list arg) {
     context_t context;
     context.buffer = s;
     int size = __vprintf(format, arg, &context, put_buf);

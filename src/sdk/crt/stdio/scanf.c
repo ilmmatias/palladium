@@ -17,7 +17,7 @@
  * RETURN VALUE:
  *     How many arguments have been filled.
  *-----------------------------------------------------------------------------------------------*/
-int scanf_unlocked(const char *restrict format, ...) {
+int scanf_unlocked(const char *CRT_RESTRICT format, ...) {
     va_list vlist;
     va_start(vlist, format);
     int size = vscanf_unlocked(format, vlist);
@@ -37,7 +37,7 @@ int scanf_unlocked(const char *restrict format, ...) {
  * RETURN VALUE:
  *     How many arguments have been filled.
  *-----------------------------------------------------------------------------------------------*/
-int scanf(const char *restrict format, ...) {
+int scanf(const char *CRT_RESTRICT format, ...) {
     va_list vlist;
     va_start(vlist, format);
     int size = vscanf(format, vlist);

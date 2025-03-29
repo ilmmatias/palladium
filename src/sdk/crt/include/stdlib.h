@@ -4,6 +4,7 @@
 #ifndef STDLIB_H
 #define STDLIB_H
 
+#include <crt_impl/common.h>
 #include <limits.h>
 #include <stddef.h>
 #include <threads.h>
@@ -41,38 +42,38 @@ double atof(const char *nptr);
 int atoi(const char *nptr);
 long atol(const char *nptr);
 long long atoll(const char *nptr);
-int strfromd(char *restrict str, size_t n, const char **restrict format, double fp);
-int strfromf(char *restrict str, size_t n, const char **restrict format, float fp);
-int strfroml(char *restrict str, size_t n, const char **restrict format, long double fp);
-long double strtold(const char *restrict nptr, char **restrict endptr);
-float strtof(const char *restrict nptr, char **restrict endptr);
-double strtod(const char *restrict nptr, char **restrict endptr);
-long strtol(const char *restrict nptr, char **restrict endptr, int base);
-long long strtoll(const char *restrict nptr, char **restrict endptr, int base);
-unsigned long strtoul(const char *restrict nptr, char **restrict endptr, int base);
-unsigned long long strtoull(const char *restrict nptr, char **restrict endptr, int base);
+int strfromd(char *CRT_RESTRICT str, size_t n, const char **CRT_RESTRICT format, double fp);
+int strfromf(char *CRT_RESTRICT str, size_t n, const char **CRT_RESTRICT format, float fp);
+int strfroml(char *CRT_RESTRICT str, size_t n, const char **CRT_RESTRICT format, long double fp);
+long double strtold(const char *CRT_RESTRICT nptr, char **CRT_RESTRICT endptr);
+float strtof(const char *CRT_RESTRICT nptr, char **CRT_RESTRICT endptr);
+double strtod(const char *CRT_RESTRICT nptr, char **CRT_RESTRICT endptr);
+long strtol(const char *CRT_RESTRICT nptr, char **CRT_RESTRICT endptr, int base);
+long long strtoll(const char *CRT_RESTRICT nptr, char **CRT_RESTRICT endptr, int base);
+unsigned long strtoul(const char *CRT_RESTRICT nptr, char **CRT_RESTRICT endptr, int base);
+unsigned long long strtoull(const char *CRT_RESTRICT nptr, char **CRT_RESTRICT endptr, int base);
 
 /* Pseudo-random sequence generation functions. */
 int rand(void);
 void srand(unsigned seed);
 
 /* Memory management functions. */
-void *aligned_alloc(size_t alignment, size_t size);
-void *calloc(size_t nmemb, size_t size);
+CRT_MALLOC CRT_ALLOC_ALIGN(1) CRT_ALLOC_SIZE(2) void *aligned_alloc(size_t alignment, size_t size);
+CRT_MALLOC CRT_ALLOC_SIZE(1, 2) void *calloc(size_t nmemb, size_t size);
 void free(void *ptr);
 void free_sized(void *ptr, size_t size);
 void free_aligned_sized(void *ptr, size_t alignment, size_t size);
-void *malloc(size_t size);
-void *realloc(void *ptr, size_t size);
+CRT_MALLOC CRT_ALLOC_SIZE(1) void *malloc(size_t size);
+CRT_ALLOC_SIZE(2) void *realloc(void *ptr, size_t size);
 
 /* Communication with the environment. */
-[[noreturn]] void abort(void);
+CRT_NORETURN void abort(void);
 int atexit(void (*func)(void));
 int at_quick_exit(void (*func)(void));
-[[noreturn]] void exit(int status);
-[[noreturn]] void _Exit(int status);
+CRT_NORETURN void exit(int status);
+CRT_NORETURN void _Exit(int status);
 char *getenv(const char *name);
-[[noreturn]] void quick_exit(int status);
+CRT_NORETURN void quick_exit(int status);
 int system(const char *string);
 
 /* Searching and sorting utilities. */
@@ -94,12 +95,12 @@ lldiv_t lldiv(long long int numer, long long int denom);
 
 /* Multibyte/wide character conversion functions. */
 int mblen(const char *s, size_t n);
-int mbtowc(wchar_t *restrict pwc, const char *restrict s, size_t n);
+int mbtowc(wchar_t *CRT_RESTRICT pwc, const char *CRT_RESTRICT s, size_t n);
 int wctomb(char *s, wchar_t wc);
 
 /* Multibyte/wide string conversion functions. */
-size_t mbstowcs(wchar_t *restrict pwcs, const char *restrict s, size_t n);
-size_t wcstombs(char *restrict s, const wchar_t *restrict pwcs, size_t n);
+size_t mbstowcs(wchar_t *CRT_RESTRICT pwcs, const char *CRT_RESTRICT s, size_t n);
+size_t wcstombs(char *CRT_RESTRICT s, const wchar_t *CRT_RESTRICT pwcs, size_t n);
 
 /* Alignment of memory. */
 size_t memalignment(const void *p);

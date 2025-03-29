@@ -1,6 +1,8 @@
 /* SPDX-FileCopyrightText: (C) 2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
+#include <crt_impl/common.h>
+
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function terminates the current process (and all of its childs).
@@ -11,7 +13,7 @@
  * RETURN VALUE:
  *     Does not return!
  *-----------------------------------------------------------------------------------------------*/
-[[noreturn]] void __terminate_process(int res) {
+CRT_NORETURN void __terminate_process(int res) {
     (void)res;
     while (true) {
     }

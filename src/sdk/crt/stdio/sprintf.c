@@ -17,7 +17,7 @@
  * RETURN VALUE:
  *     How many characters have been output.
  *-----------------------------------------------------------------------------------------------*/
-int sprintf(char *restrict s, const char *restrict format, ...) {
+int sprintf(char *CRT_RESTRICT s, const char *CRT_RESTRICT format, ...) {
     va_list vlist;
     va_start(vlist, format);
     int size = vsprintf(s, format, vlist);

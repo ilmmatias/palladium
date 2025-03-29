@@ -21,7 +21,11 @@
  * RETURN VALUE:
  *     How many chunks we were able to write without any error.
  *-----------------------------------------------------------------------------------------------*/
-size_t fwrite_unlocked(const void *restrict ptr, size_t size, size_t nmemb, FILE *restrict stream) {
+size_t fwrite_unlocked(
+    const void *CRT_RESTRICT ptr,
+    size_t size,
+    size_t nmemb,
+    FILE *CRT_RESTRICT stream) {
     if (!stream || !size || !nmemb) {
         return 0;
     } else if (
@@ -104,7 +108,7 @@ size_t fwrite_unlocked(const void *restrict ptr, size_t size, size_t nmemb, FILE
  * RETURN VALUE:
  *     How many chunks we were able to write without any error.
  *-----------------------------------------------------------------------------------------------*/
-size_t fwrite(const void *restrict ptr, size_t size, size_t nmemb, FILE *restrict stream) {
+size_t fwrite(const void *CRT_RESTRICT ptr, size_t size, size_t nmemb, FILE *CRT_RESTRICT stream) {
     flockfile(stream);
     size_t res = fwrite_unlocked(ptr, size, nmemb, stream);
     funlockfile(stream);

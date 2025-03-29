@@ -19,7 +19,7 @@
  *     FILE containing the OS-specific handle and the CRT data, or NULL if something failed
  *     along the way.
  *-----------------------------------------------------------------------------------------------*/
-FILE *fopen(const char *restrict filename, const char *restrict mode) {
+FILE *fopen(const char *CRT_RESTRICT filename, const char *CRT_RESTRICT mode) {
     if (!filename || !mode) {
         return NULL;
     }

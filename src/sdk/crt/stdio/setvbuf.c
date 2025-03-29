@@ -19,7 +19,7 @@
  * RETURN VALUE:
  *     0 on success, 1 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int setvbuf_unlocked(FILE *restrict stream, char *restrict buf, int mode, size_t size) {
+int setvbuf_unlocked(FILE *CRT_RESTRICT stream, char *CRT_RESTRICT buf, int mode, size_t size) {
     if (!stream) {
         return 1;
     }
@@ -71,7 +71,7 @@ int setvbuf_unlocked(FILE *restrict stream, char *restrict buf, int mode, size_t
  * RETURN VALUE:
  *     0 on success, 1 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int setvbuf(FILE *restrict stream, char *restrict buf, int mode, size_t size) {
+int setvbuf(FILE *CRT_RESTRICT stream, char *CRT_RESTRICT buf, int mode, size_t size) {
     flockfile(stream);
     int res = setvbuf_unlocked(stream, buf, mode, size);
     funlockfile(stream);

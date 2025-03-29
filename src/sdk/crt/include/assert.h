@@ -4,10 +4,12 @@
 #ifndef ASSERT_H
 #define ASSERT_H
 
+#include <crt_impl/common.h>
+
 #define __STDC_VERSION_ASSERT_H__ 202311L
 
 /* -std=c23 already has static_assert defined as a keyword, so only redef it on STDC<23. */
-#if !defined(__cplusplus) && __STDC__ < 202311L
+#if !defined(__cplusplus) && __STDC_VERSION__ < 202311L
 #define static_assert _Static_assert
 #endif
 
@@ -23,7 +25,7 @@
 extern "C" {
 #endif /* __cplusplus */
 
-[[noreturn]]
+CRT_NORETURN
 void __assert(const char *condition, const char *file, int line, const char *func);
 
 #ifdef __cplusplus

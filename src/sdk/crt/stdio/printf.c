@@ -17,7 +17,7 @@
  * RETURN VALUE:
  *     How many characters have been output.
  *-----------------------------------------------------------------------------------------------*/
-int printf_unlocked(const char *restrict format, ...) {
+int printf_unlocked(const char *CRT_RESTRICT format, ...) {
     va_list vlist;
     va_start(vlist, format);
     int size = vprintf_unlocked(format, vlist);
@@ -37,7 +37,7 @@ int printf_unlocked(const char *restrict format, ...) {
  * RETURN VALUE:
  *     How many characters have been output.
  *-----------------------------------------------------------------------------------------------*/
-int printf(const char *restrict format, ...) {
+int printf(const char *CRT_RESTRICT format, ...) {
     va_list vlist;
     va_start(vlist, format);
     int size = vprintf(format, vlist);

@@ -19,7 +19,7 @@
  * RETURN VALUE:
  *     How many characters have been output.
  *-----------------------------------------------------------------------------------------------*/
-int vprintf_unlocked(const char *restrict format, va_list arg) {
+int vprintf_unlocked(const char *CRT_RESTRICT format, va_list arg) {
     return vfprintf_unlocked(stdout, format, arg);
 }
 
@@ -38,6 +38,6 @@ int vprintf_unlocked(const char *restrict format, va_list arg) {
  * RETURN VALUE:
  *     How many characters have been output.
  *-----------------------------------------------------------------------------------------------*/
-int vprintf(const char *restrict format, va_list arg) {
+int vprintf(const char *CRT_RESTRICT format, va_list arg) {
     return vfprintf(stdout, format, arg);
 }

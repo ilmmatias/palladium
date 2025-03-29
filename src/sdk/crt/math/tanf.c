@@ -3,6 +3,7 @@
 
 #include <crt_impl/ieee754.h>
 #include <crt_impl/math.h>
+#include <stddef.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -121,6 +122,6 @@ float tanf(float x) {
         case 1:
             return -__cotf(res);
         default:
-            __builtin_unreachable();
+            unreachable();
     }
 }

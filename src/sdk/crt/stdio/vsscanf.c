@@ -56,7 +56,7 @@ static void unread_ch(void *context, int ch) {
  * RETURN VALUE:
  *     How many arguments have been filled.
  *-----------------------------------------------------------------------------------------------*/
-int vsscanf(const char *restrict s, const char *restrict format, va_list arg) {
+int vsscanf(const char *CRT_RESTRICT s, const char *CRT_RESTRICT format, va_list arg) {
     context_t context;
     context.buffer = s;
     return __vscanf(format, arg, &context, read_ch, unread_ch);

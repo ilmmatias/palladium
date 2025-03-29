@@ -14,6 +14,6 @@
  * RETURN VALUE:
  *     Result of the parsing if the string was a valid float, 0.0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-float strtof(const char *restrict nptr, char **restrict endptr) {
+float strtof(const char *CRT_RESTRICT nptr, char **CRT_RESTRICT endptr) {
     return (float)strtod(nptr, endptr);
 }

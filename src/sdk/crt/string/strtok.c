@@ -1,6 +1,7 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
+#include <crt_impl/common.h>
 #include <string.h>
 
 /*-------------------------------------------------------------------------------------------------
@@ -15,7 +16,7 @@
  * RETURN VALUE:
  *     Position of the next token, or NULL if there are no more tokens.
  *-----------------------------------------------------------------------------------------------*/
-char *strtok(char *restrict s1, const char *restrict s2) {
+char *strtok(char *CRT_RESTRICT s1, const char *CRT_RESTRICT s2) {
     static char *Context = NULL;
 
     if (!Context || s1) {

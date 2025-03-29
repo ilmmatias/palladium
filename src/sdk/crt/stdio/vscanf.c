@@ -18,7 +18,7 @@
  * RETURN VALUE:
  *     How many arguments have been filled.
  *-----------------------------------------------------------------------------------------------*/
-int vscanf_unlocked(const char *restrict format, va_list arg) {
+int vscanf_unlocked(const char *CRT_RESTRICT format, va_list arg) {
     return vfscanf_unlocked(stdin, format, arg);
 }
 
@@ -36,6 +36,6 @@ int vscanf_unlocked(const char *restrict format, va_list arg) {
  * RETURN VALUE:
  *     How many arguments have been filled.
  *-----------------------------------------------------------------------------------------------*/
-int vscanf(const char *restrict format, va_list arg) {
+int vscanf(const char *CRT_RESTRICT format, va_list arg) {
     return vfscanf(stdin, format, arg);
 }

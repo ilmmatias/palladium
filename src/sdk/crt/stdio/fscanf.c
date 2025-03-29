@@ -18,7 +18,7 @@
  * RETURN VALUE:
  *     How many arguments have been filled.
  *-----------------------------------------------------------------------------------------------*/
-int fscanf_unlocked(FILE *restrict stream, const char *restrict format, ...) {
+int fscanf_unlocked(FILE *CRT_RESTRICT stream, const char *CRT_RESTRICT format, ...) {
     va_list vlist;
     va_start(vlist, format);
     int size = vfscanf_unlocked(stream, format, vlist);
@@ -39,7 +39,7 @@ int fscanf_unlocked(FILE *restrict stream, const char *restrict format, ...) {
  * RETURN VALUE:
  *     How many arguments have been filled.
  *-----------------------------------------------------------------------------------------------*/
-int fscanf(FILE *restrict stream, const char *restrict format, ...) {
+int fscanf(FILE *CRT_RESTRICT stream, const char *CRT_RESTRICT format, ...) {
     va_list vlist;
     va_start(vlist, format);
     int size = vfscanf(stream, format, vlist);

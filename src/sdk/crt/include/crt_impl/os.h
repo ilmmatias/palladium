@@ -4,6 +4,7 @@
 #ifndef CRT_IMPL_OS_H
 #define CRT_IMPL_OS_H
 
+#include <crt_impl/common.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -19,7 +20,7 @@
 extern "C" {
 #endif /* __cplusplus */
 
-[[noreturn]] void __terminate_process(int res);
+CRT_NORETURN void __terminate_process(int res);
 
 void *__create_lock(void);
 void __delete_lock(void *handle);

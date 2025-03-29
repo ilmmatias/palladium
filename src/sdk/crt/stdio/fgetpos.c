@@ -16,7 +16,7 @@
  * RETURN VALUE:
  *     0 on success, 1 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int fgetpos_unlocked(FILE *restrict stream, fpos_t *restrict pos) {
+int fgetpos_unlocked(FILE *CRT_RESTRICT stream, fpos_t *CRT_RESTRICT pos) {
     /* I'm not sure if this is the actual right way to implement this? */
     long offset = ftell_unlocked(stream);
     if (offset != -1) {
@@ -39,7 +39,7 @@ int fgetpos_unlocked(FILE *restrict stream, fpos_t *restrict pos) {
  * RETURN VALUE:
  *     0 on success, 1 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int fgetpos(FILE *restrict stream, fpos_t *restrict pos) {
+int fgetpos(FILE *CRT_RESTRICT stream, fpos_t *CRT_RESTRICT pos) {
     flockfile(stream);
     int res = fgetpos_unlocked(stream, pos);
     funlockfile(stream);

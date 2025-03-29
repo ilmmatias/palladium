@@ -18,7 +18,7 @@
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void setbuf_unlocked(FILE *restrict stream, char *restrict buf) {
+void setbuf_unlocked(FILE *CRT_RESTRICT stream, char *CRT_RESTRICT buf) {
     if (!stream) {
         return;
     }
@@ -55,7 +55,7 @@ void setbuf_unlocked(FILE *restrict stream, char *restrict buf) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void setbuf(FILE *restrict stream, char *restrict buf) {
+void setbuf(FILE *CRT_RESTRICT stream, char *CRT_RESTRICT buf) {
     flockfile(stream);
     setbuf_unlocked(stream, buf);
     funlockfile(stream);

@@ -49,7 +49,7 @@ static void unread_ch(void *context, int ch) {
  * RETURN VALUE:
  *     How many arguments have been filled.
  *-----------------------------------------------------------------------------------------------*/
-int vfscanf_unlocked(FILE *restrict stream, const char *restrict format, va_list arg) {
+int vfscanf_unlocked(FILE *CRT_RESTRICT stream, const char *CRT_RESTRICT format, va_list arg) {
     return __vscanf(format, arg, stream, read_ch, unread_ch);
 }
 
@@ -68,7 +68,7 @@ int vfscanf_unlocked(FILE *restrict stream, const char *restrict format, va_list
  * RETURN VALUE:
  *     How many arguments have been filled.
  *-----------------------------------------------------------------------------------------------*/
-int vfscanf(FILE *restrict stream, const char *restrict format, va_list arg) {
+int vfscanf(FILE *CRT_RESTRICT stream, const char *CRT_RESTRICT format, va_list arg) {
     flockfile(stream);
     int res = vfscanf_unlocked(stream, format, arg);
     funlockfile(stream);

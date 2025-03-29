@@ -54,7 +54,7 @@ static void put_buf(const void *buffer, int size, void *context) {
  * RETURN VALUE:
  *     How many characters have been output.
  *-----------------------------------------------------------------------------------------------*/
-int vsnprintf(char *restrict s, size_t bufsz, const char *restrict format, va_list arg) {
+int vsnprintf(char *CRT_RESTRICT s, size_t bufsz, const char *CRT_RESTRICT format, va_list arg) {
     context_t context;
     context.buffer = s;
     context.bufsz = bufsz > 0 ? bufsz - 1 : 0;

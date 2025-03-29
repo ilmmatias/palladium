@@ -19,7 +19,10 @@
  * RETURN VALUE:
  *     `stream` if the new handle has been opened properly, NULL otherwise.
  *-----------------------------------------------------------------------------------------------*/
-FILE *freopen(const char *restrict filename, const char *restrict mode, FILE *restrict stream) {
+FILE *freopen(
+    const char *CRT_RESTRICT filename,
+    const char *CRT_RESTRICT mode,
+    FILE *CRT_RESTRICT stream) {
     if (!stream) {
         return NULL;
     }
