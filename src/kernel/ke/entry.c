@@ -37,6 +37,15 @@ static void InitializeBootProcessor(KiLoaderBlock *LoaderBlock) {
         KE_GIT_HASH);
 #endif
 
+    /* We only support clang for now, but maybe we should add GCC support + extend this code to
+     * handle it in the future? */
+    VidPrint(
+        VID_MESSAGE_INFO,
+        "Kernel",
+        "built on %s using clang version %s\n",
+        __DATE__,
+        __clang_version__);
+
     /* Stage 1 (BSP): Memory manager initialization; This won't mark the OSLOADER pages as free
      * just yet. */
     MiInitializeEarlyPageAllocator(LoaderBlock);
