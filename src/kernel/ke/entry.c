@@ -42,9 +42,11 @@ static void InitializeBootProcessor(KiLoaderBlock *LoaderBlock) {
     VidPrint(
         VID_MESSAGE_INFO,
         "Kernel",
-        "built on %s using clang version %s\n",
+        "built on %s using Clang %d.%d.%d\n",
         __DATE__,
-        __clang_version__);
+        __clang_major__,
+        __clang_minor__,
+        __clang_patchlevel__);
 
     /* Stage 1 (BSP): Memory manager initialization; This won't mark the OSLOADER pages as free
      * just yet. */
