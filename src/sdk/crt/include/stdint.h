@@ -103,39 +103,39 @@
 
 /* Maximal values of exact-width signed integer types. */
 #define INT8_MAX __INT8_MAX__
-#define INT16_MAX __INT8_MAX__
-#define INT32_MAX __INT16_MAX__
-#define INT64_MAX __INT32_MAX__
+#define INT16_MAX __INT16_MAX__
+#define INT32_MAX __INT32_MAX__
+#define INT64_MAX __INT64_MAX__
 
 /* Maximal values of exact-width unsigned integer types. */
 #define UINT8_MAX __UINT8_MAX__
-#define UINT16_MAX __UINT8_MAX__
-#define UINT32_MAX __UINT16_MAX__
-#define UINT64_MAX __UINT32_MAX__
+#define UINT16_MAX __UINT16_MAX__
+#define UINT32_MAX __UINT32_MAX__
+#define UINT64_MAX __UINT64_MAX__
 
 /* Maximal values of minimum-width signed integer types. */
 #define INT_LEAST8_MAX __INT_LEAST8_MAX__
-#define INT_LEAST16_MAX __INT_LEAST8_MAX__
-#define INT_LEAST32_MAX __INT_LEAST16_MAX__
-#define INT_LEAST64_MAX __INT_LEAST32_MAX__
+#define INT_LEAST16_MAX __INT_LEAST16_MAX__
+#define INT_LEAST32_MAX __INT_LEAST32_MAX__
+#define INT_LEAST64_MAX __INT_LEAST64_MAX__
 
 /* Maximal values of minimum-width unsigned integer types. */
 #define UINT_LEAST8_MAX __UINT_LEAST8_MAX__
-#define UINT_LEAST16_MAX __UINT_LEAST8_MAX__
-#define UINT_LEAST32_MAX __UINT_LEAST16_MAX__
-#define UINT_LEAST64_MAX __UINT_LEAST32_MAX__
+#define UINT_LEAST16_MAX __UINT_LEAST16_MAX__
+#define UINT_LEAST32_MAX __UINT_LEAST32_MAX__
+#define UINT_LEAST64_MAX __UINT_LEAST64_MAX__
 
 /* Maximal values of fastest minimum-width signed integer types. */
 #define INT_LEAST8_MAX __INT_LEAST8_MAX__
-#define INT_LEAST16_MAX __INT_LEAST8_MAX__
-#define INT_LEAST32_MAX __INT_LEAST16_MAX__
-#define INT_LEAST64_MAX __INT_LEAST32_MAX__
+#define INT_LEAST16_MAX __INT_LEAST16_MAX__
+#define INT_LEAST32_MAX __INT_LEAST32_MAX__
+#define INT_LEAST64_MAX __INT_LEAST64_MAX__
 
 /* Maximal values of fastest minimum-width unsigned integer types. */
 #define UINT_FAST8_MAX __UINT_FAST8_MAX__
-#define UINT_FAST16_MAX __UINT_FAST8_MAX__
-#define UINT_FAST32_MAX __UINT_FAST16_MAX__
-#define UINT_FAST64_MAX __UINT_FAST32_MAX__
+#define UINT_FAST16_MAX __UINT_FAST16_MAX__
+#define UINT_FAST32_MAX __UINT_FAST32_MAX__
+#define UINT_FAST64_MAX __UINT_FAST64_MAX__
 
 /* Maximal values of integer types capable of holding object pointers. */
 #define INTPTR_MAX __INTPTR_MAX__
