@@ -1,5 +1,8 @@
 LIBRARY ucrt.dll
 EXPORTS
+    __stack_chk_fail
+    __stack_chk_guard DATA
+
     isalnum
     isalpha
     isblank

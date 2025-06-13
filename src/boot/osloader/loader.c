@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <console.h>
+#include <crt_impl/rand.h>
 #include <file.h>
 #include <loader.h>
 #include <memory.h>
@@ -182,6 +183,13 @@ bool OslLoadExecutable(RtDList *LoadedPrograms, const char *ImageName, const cha
                 (char *)ThisProgram->PhysicalAddress + NamePointers[i];
             ThisProgram->ExportTable[i].Address =
                 Header->ImageBase + AddressTable[ExportOrdinals[i]];
+
+            /* If we happen to find the stack guard symbol (which should have been exported by the
+             * kernel), randomize it. */
+            if (!strcmp(ThisProgram->ExportTable[i].Name, "__stack_chk_guard")) {
+                *(uintptr_t *)((uintptr_t)ThisProgram->PhysicalAddress +
+                               AddressTable[ExportOrdinals[i]]) = (uintptr_t)__rand64();
+            }
         }
     } else {
         ThisProgram->ExportTableSize = 0;

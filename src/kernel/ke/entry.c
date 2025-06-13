@@ -7,6 +7,8 @@
 #include <kernel/psp.h>
 #include <kernel/vidp.h>
 
+extern uintptr_t __stack_chk_guard;
+
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function runs the required BSP-only initialization routines.

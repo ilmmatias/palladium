@@ -4,6 +4,8 @@
 set(USER_SOURCES
     ${SOURCES}
 
+    compiler/stackcheck.c
+
     os/__acquire_lock.c
     os/__allocate_pages.c
     os/__close_file.c

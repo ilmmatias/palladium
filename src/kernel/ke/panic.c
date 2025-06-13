@@ -22,6 +22,7 @@ static const char *Messages[] = {
     "PROCESSOR_LIMIT_EXCEEDED",
     "BAD_THREAD_STATE",
     "MUTEX_NOT_OWNED",
+    "STACK_SMASHING_DETECTED",
 };
 
 static KeSpinLock Lock = {0};

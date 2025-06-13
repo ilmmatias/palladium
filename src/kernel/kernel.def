@@ -22,6 +22,8 @@ EXPORTS
     HalReleaseInterruptData
     HalWaitTimer
 
+    __stack_chk_fail
+    __stack_chk_guard DATA
     KeFatalError
     KeRequestIpiRoutine
     KeSynchronizeProcessors
@@ -42,7 +44,7 @@ EXPORTS
     ObLookupDirectoryEntryByName
     ObReferenceObject
     ObRemoveFromDirectory
-    ObRootDirectory
+    ObRootDirectory DATA
 
     PsCreateThread
     PsDelayThread

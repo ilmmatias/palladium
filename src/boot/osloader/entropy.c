@@ -9,6 +9,8 @@
 #include <cpuid.h>
 #endif
 
+extern uintptr_t __stack_chk_guard;
+
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function initialize the entropy/random number generator source for the memory arena
@@ -72,4 +74,7 @@ void OslpInitializeEntropy(void) {
 
     OslPrint("Failed to initialize the entropy source.\r\n");
     OslPrint("KASLR will be predictable across reboots.\r\n");
+
+    /* Initialize the stack guard canary. */
+    __stack_chk_guard = __rand64();
 }
