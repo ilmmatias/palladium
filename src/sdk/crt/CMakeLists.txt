@@ -35,6 +35,7 @@ set(SOURCES
 
     math/__rem_pio2f.c
     math/cosf.c
+    math/logf.c
     math/sinf.c
     math/tanf.c
 
