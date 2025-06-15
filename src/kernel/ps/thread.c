@@ -76,6 +76,7 @@ TryQueueThreadIn(PsThread *Thread, KeProcessor *Processor, bool EventQueue, bool
         return false;
     }
 
+    __atomic_add_fetch(&Processor->ThreadCount, 1, __ATOMIC_RELAXED);
     if (EventQueue) {
         RtPushDList(&Processor->ThreadQueue, &Thread->ListHeader);
     } else {
@@ -105,8 +106,8 @@ void PspQueueThread(PsThread *Thread, bool EventQueue) {
         return;
     }
 
-    /* Otherwise, we try to queue in the left most thread that is idle (empty queue and/or running
-     * the idle thread). */
+    /* Otherwise, we try to queue in the left most processor that is idle (empty queue and/or
+     * running the idle thread). */
     while (true) {
         uint32_t Index = KeGetFirstAffinitySetBit(&KiIdleProcessors);
         if (Index == (uint32_t)-1) {
@@ -214,6 +215,7 @@ PsThread *PsCreateThread(void (*EntryPoint)(void *), void *Parameter) {
     if (ListHeader == &Processor->ThreadQueue) {
         KeSetAffinityBit(&KiIdleProcessors, Processor->Number);
     } else {
+        __atomic_sub_fetch(&Processor->ThreadCount, 1, __ATOMIC_RELAXED);
         TargetThread = CONTAINING_RECORD(ListHeader, PsThread, ListHeader);
     }
 
@@ -267,6 +269,7 @@ void PsDelayThread(uint64_t Time) {
     if (ListHeader == &Processor->ThreadQueue) {
         KeSetAffinityBit(&KiIdleProcessors, Processor->Number);
     } else {
+        __atomic_sub_fetch(&Processor->ThreadCount, 1, __ATOMIC_RELAXED);
         TargetThread = CONTAINING_RECORD(ListHeader, PsThread, ListHeader);
     }
 
@@ -314,6 +317,7 @@ void PsYieldThread(void) {
     } else {
         /* If we call YieldThread on a tight loop, we need to make sure we clear the idle bit once
          * the queue isn't empty. */
+        __atomic_sub_fetch(&Processor->ThreadCount, 1, __ATOMIC_RELAXED);
         KeClearAffinityBit(&KiIdleProcessors, Processor->Number);
     }
 
@@ -352,6 +356,7 @@ void PsSuspendThread(void) {
     if (ListHeader == &Processor->ThreadQueue) {
         KeSetAffinityBit(&KiIdleProcessors, Processor->Number);
     } else {
+        __atomic_sub_fetch(&Processor->ThreadCount, 1, __ATOMIC_RELAXED);
         TargetThread = CONTAINING_RECORD(ListHeader, PsThread, ListHeader);
     }
 

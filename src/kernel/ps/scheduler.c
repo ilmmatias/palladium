@@ -201,6 +201,7 @@ void PspProcessQueue(HalInterruptFrame *) {
         KeReleaseSpinLockAndLowerIrql(&Processor->Lock, OldIrql);
         return;
     } else {
+        __atomic_sub_fetch(&Processor->ThreadCount, 1, __ATOMIC_RELAXED);
         KeClearAffinityBit(&KiIdleProcessors, Processor->Number);
     }
 
