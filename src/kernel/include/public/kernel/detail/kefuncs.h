@@ -24,6 +24,8 @@ void KeSetAffinityBit(KeAffinity *Mask, uint32_t Index);
 void KeClearAffinityBit(KeAffinity *Mask, uint32_t Index);
 uint32_t KeGetFirstAffinitySetBit(KeAffinity *Mask);
 uint32_t KeGetFirstAffinityClearBit(KeAffinity *Mask);
+uint64_t KeCountAffinitySetBits(KeAffinity *Mask);
+uint64_t KeCountAffinityClearBits(KeAffinity *Mask);
 
 void KeSynchronizeProcessors(volatile uint64_t *State);
 void KeRequestIpiRoutine(void (*Routine)(void *), void *Parameter);
