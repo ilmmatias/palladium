@@ -30,6 +30,8 @@ typedef struct {
     uint64_t LowIrqlTicks;
     uint64_t IdleTicks;
     int EventType;
+    RtDList FreePageListHead;
+    uint64_t FreePageListSize;
     char *StackBase;
     char *StackLimit;
     char SystemStack[KE_STACK_SIZE] __attribute__((aligned(MM_PAGE_SIZE)));

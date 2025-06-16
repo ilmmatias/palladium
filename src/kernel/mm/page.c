@@ -195,6 +195,11 @@ void MiInitializePageAllocator(void) {
         }
     }
 
+    /* Now MmAllocatePool (and MmAllocateSinglePage) are almost ready to be called; But they attempt
+     * to mess with the processor's local page cache, so we need to initialize it early for the boot
+     * processor (or, we'll probably crash really hard). */
+    RtInitializeDList(&KeGetCurrentProcessor()->FreePageListHead);
+
     /* Now we should be free to allocate some pool memory and copy the memory descriptor list in its
      * current state. */
     MiMemoryDescriptor *Descriptor = MmAllocatePool(MemoryDescriptorListSize, MM_POOL_TAG_PFN);
@@ -265,12 +270,36 @@ void MiReleaseBootRegions(void) {
  *     Physical address of the allocated page, or 0 on failure.
  *-----------------------------------------------------------------------------------------------*/
 uint64_t MmAllocateSinglePage() {
-    KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&MiPageListLock, KE_IRQL_DISPATCH);
-    RtDList *ListHeader = RtPopDList(&MiFreePageListHead);
-    KeReleaseSpinLockAndLowerIrql(&MiPageListLock, OldIrql);
+    KeIrql OldIrql = KeRaiseIrql(KE_IRQL_DISPATCH);
+    KeProcessor *Processor = KeGetCurrentProcessor();
 
-    if (ListHeader == &MiFreePageListHead) {
+    /* Can we grab anything from the local cache? If not, we need to try filling the cache. */
+    if (!Processor->FreePageListSize) {
+        KeAcquireSpinLockAtCurrentIrql(&MiPageListLock);
+
+        for (int i = 0; i < MI_PROCESSOR_PAGE_CACHE_BATCH_SIZE; i++) {
+            RtDList *ListHeader = RtPopDList(&MiFreePageListHead);
+            if (ListHeader == &MiFreePageListHead) {
+                break;
+            }
+
+            /* The main allocation path is expected to check for the validity of the pages it pops,
+             * so we just add them to the list here. */
+            RtAppendDList(&Processor->FreePageListHead, ListHeader);
+            Processor->FreePageListSize++;
+        }
+
+        KeReleaseSpinLockAtCurrentIrql(&MiPageListLock);
+    }
+
+    /* Now we should just be able to pop from the local cache (if that fails, the system is out of
+     * memory). */
+    RtDList *ListHeader = RtPopDList(&Processor->FreePageListHead);
+    KeLowerIrql(OldIrql);
+    if (ListHeader == &Processor->FreePageListHead) {
         return 0;
+    } else {
+        Processor->FreePageListSize--;
     }
 
     /* Make sure the flags make sense (if not, we probably have a corrupted PFN free list). */
@@ -296,17 +325,39 @@ uint64_t MmAllocateSinglePage() {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void MmFreeSinglePage(uint64_t PhysicalAddress) {
-    KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&MiPageListLock, KE_IRQL_DISPATCH);
-    MiPageEntry *Entry = &MI_PAGE_ENTRY(PhysicalAddress);
+    KeIrql OldIrql = KeRaiseIrql(KE_IRQL_DISPATCH);
+    KeProcessor *Processor = KeGetCurrentProcessor();
 
     /* Use MmFreePool to free big pool allocations, instead of us! */
+    MiPageEntry *Entry = &MI_PAGE_ENTRY(PhysicalAddress);
     if (!Entry->Used || Entry->PoolItem) {
         KeFatalError(KE_PANIC_BAD_PFN_HEADER, PhysicalAddress, Entry->Flags, 0, 0);
     }
 
+    /* Update all stat, and check if we can just append this to the local cache. */
     MiTotalUsedPages -= 1;
     MiTotalFreePages += 1;
     Entry->Used = 0;
-    RtPushDList(&MiFreePageListHead, &Entry->ListHeader);
-    KeReleaseSpinLockAndLowerIrql(&MiPageListLock, OldIrql);
+    if (Processor->FreePageListSize < MI_PROCESSOR_PAGE_CACHE_HIGH_LIMIT) {
+        RtAppendDList(&Processor->FreePageListHead, &Entry->ListHeader);
+        Processor->FreePageListSize++;
+        KeLowerIrql(OldIrql);
+        return;
+    }
+
+    /* Otherwise, remove some pages out of the local free page list (and return the given allocation
+     * to the global list rather than the local list as well). */
+    KeAcquireSpinLockAtCurrentIrql(&MiPageListLock);
+
+    for (int i = 0; i < MI_PROCESSOR_PAGE_CACHE_BATCH_SIZE; i++) {
+        /* RtPopDList should always return SOMETHING here, as we already checked the list
+         * size, so it's probably safe to not check it (unless the kernel state gets
+         * corrupted, which would be bad anyways and cause lots of other problems). */
+        RtAppendDList(&MiFreePageListHead, RtPopDList(&Processor->FreePageListHead));
+    }
+
+    RtAppendDList(&Processor->FreePageListHead, &Entry->ListHeader);
+    KeReleaseSpinLockAtCurrentIrql(&MiPageListLock);
+    Processor->FreePageListSize -= MI_PROCESSOR_PAGE_CACHE_BATCH_SIZE;
+    KeLowerIrql(OldIrql);
 }

@@ -29,4 +29,8 @@
 #define MI_PAGE_ENTRY(Base) (MiPageList[(uint64_t)(Base) >> MM_PAGE_SHIFT])
 #define MI_PAGE_BASE(Entry) ((uint64_t)((Entry) - MiPageList) << MM_PAGE_SHIFT)
 
+#define MI_PROCESSOR_PAGE_CACHE_HIGH_LIMIT 64
+#define MI_PROCESSOR_PAGE_CACHE_LOW_LIMIT 16
+#define MI_PROCESSOR_PAGE_CACHE_BATCH_SIZE 32
+
 #endif /* _KERNEL_DETAIL_MIDEFS_H_ */
