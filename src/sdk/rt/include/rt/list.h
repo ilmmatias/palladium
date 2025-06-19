@@ -23,11 +23,14 @@ extern "C" {
 #endif /* __cplusplus */
 
 void RtPushSList(RtSList *Head, RtSList *Entry);
+void RtSpliceSList(RtSList *Target, RtSList *Source);
 RtSList *RtPopSList(RtSList *Head);
 
 void RtInitializeDList(RtDList *Head);
 void RtPushDList(RtDList *Head, RtDList *Entry);
 void RtAppendDList(RtDList *Head, RtDList *Entry);
+void RtSpliceHeadDList(RtDList *Target, RtDList *Source);
+void RtSpliceTailDList(RtDList *Target, RtDList *Source);
 RtDList *RtPopDList(RtDList *Head);
 RtDList *RtTruncateDList(RtDList *Head);
 void RtUnlinkDList(RtDList *Entry);

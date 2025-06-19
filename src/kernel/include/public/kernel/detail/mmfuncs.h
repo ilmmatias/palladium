@@ -26,6 +26,9 @@ void MmUnmapSpace(void *VirtualAddress);
 void *MmAllocatePool(size_t Size, const char Tag[4]);
 void MmFreePool(void *Base, const char Tag[4]);
 
+void *MmAllocateKernelStack(void);
+void MmFreeKernelStack(void *Base);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

@@ -3,6 +3,7 @@
 
 #include <crt_impl/rand.h>
 #include <kernel/halp.h>
+#include <kernel/mi.h>
 #include <kernel/psp.h>
 #include <kernel/vid.h>
 
@@ -77,6 +78,9 @@ static PsThread *TrySteal(KeProcessor *Processor) {
     KeProcessor *Processor = KeGetCurrentProcessor();
 
     while (true) {
+        /* Try to execute some general system cleanup. */
+        MiTryReturnKernelStacks();
+
         /* Let the processor rest for a bit before continuing. */
         PauseProcessor();
 

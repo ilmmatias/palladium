@@ -21,6 +21,34 @@ void RtPushSList(RtSList *Head, RtSList *Entry) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
+ *     This function combines the contents of two singly linked lists. Essentially, we execute
+ *     RtPushSList(Target, RtPopSList(Source)) until the Source list is empty, but in a slightly
+ *     more optimized manner.
+ *
+ * PARAMETERS:
+ *     Target - Which list to insert the items into.
+ *     Source - Which list to grab the items from.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void RtSpliceSList(RtSList *Target, RtSList *Source) {
+    if (!Source->Next) {
+        return;
+    }
+
+    RtSList *Tail = Source->Next;
+    while (Tail->Next) {
+        Tail = Tail->Next;
+    }
+
+    Tail->Next = Target->Next;
+    Target->Next = Source->Next;
+    Source->Next = NULL;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
  *     This function removes the last inserted entry from a singly linked list.
  *
  * PARAMETERS:
@@ -92,6 +120,58 @@ void RtAppendDList(RtDList *Head, RtDList *Entry) {
     Entry->Prev = Prev;
     Prev->Next = Entry;
     Head->Prev = Entry;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function combines the contents of two doubly linked lists. Essentially, we execute
+ *     RtPushDList(Target, RtTruncateDList(Source)) until the Source list is empty, but in a
+ *     slightly more optimized manner.
+ *
+ * PARAMETERS:
+ *     Target - Which list to insert the items into.
+ *     Source - Which list to grab the items from.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void RtSpliceHeadDList(RtDList *Target, RtDList *Source) {
+    if (Source->Next == Source) {
+        return;
+    }
+
+    Source->Prev->Next = Target->Next;
+    Target->Next->Prev = Source->Prev;
+    Target->Next = Source->Next;
+    Source->Next->Prev = Target;
+    Source->Next = Source;
+    Source->Prev = Source;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function combines the contents of two doubly linked lists. Essentially, we execute
+ *     RtAppendDList(Target, RtPopDList(Source)) until the Source list is empty, but in a slightly
+ *     more optimized manner.
+ *
+ * PARAMETERS:
+ *     Target - Which list to insert the items into.
+ *     Source - Which list to grab the items from.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void RtSpliceTailDList(RtDList *Target, RtDList *Source) {
+    if (Source->Next == Source) {
+        return;
+    }
+
+    Target->Prev->Next = Source->Next;
+    Source->Next->Prev = Target->Prev;
+    Target->Prev = Source->Prev;
+    Source->Prev->Next = Target;
+    Source->Next = Source;
+    Source->Prev = Source;
 }
 
 /*-------------------------------------------------------------------------------------------------

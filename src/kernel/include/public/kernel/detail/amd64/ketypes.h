@@ -32,6 +32,8 @@ typedef struct {
     int EventType;
     RtDList FreePageListHead;
     uint64_t FreePageListSize;
+    RtSList FreeKernelStackListHead;
+    uint64_t FreeKernelStackListSize;
     char *StackBase;
     char *StackLimit;
     char SystemStack[KE_STACK_SIZE] __attribute__((aligned(MM_PAGE_SIZE)));

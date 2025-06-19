@@ -273,8 +273,9 @@ uint64_t MmAllocateSinglePage() {
     KeIrql OldIrql = KeRaiseIrql(KE_IRQL_DISPATCH);
     KeProcessor *Processor = KeGetCurrentProcessor();
 
-    /* Can we grab anything from the local cache? If not, we need to try filling the cache. */
-    if (!Processor->FreePageListSize) {
+    /* Trigger a cache refill if it's the first allocation we're doing (or if we dropped below the
+     * lower limit). */
+    if (Processor->FreePageListSize < MI_PROCESSOR_PAGE_CACHE_LOW_LIMIT) {
         KeAcquireSpinLockAtCurrentIrql(&MiPageListLock);
 
         for (int i = 0; i < MI_PROCESSOR_PAGE_CACHE_BATCH_SIZE; i++) {
@@ -356,7 +357,7 @@ void MmFreeSinglePage(uint64_t PhysicalAddress) {
         RtAppendDList(&MiFreePageListHead, RtPopDList(&Processor->FreePageListHead));
     }
 
-    RtAppendDList(&Processor->FreePageListHead, &Entry->ListHeader);
+    RtAppendDList(&MiFreePageListHead, &Entry->ListHeader);
     KeReleaseSpinLockAtCurrentIrql(&MiPageListLock);
     Processor->FreePageListSize -= MI_PROCESSOR_PAGE_CACHE_BATCH_SIZE;
     KeLowerIrql(OldIrql);

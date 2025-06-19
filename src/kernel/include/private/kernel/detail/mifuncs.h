@@ -40,6 +40,8 @@ uint32_t MiFreePoolPages(void *Base);
 void MiAddPoolTracker(size_t Size, const char Tag[4]);
 void MiRemovePoolTracker(size_t Size, const char Tag[4]);
 
+void MiTryReturnKernelStacks(void);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

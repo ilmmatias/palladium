@@ -29,8 +29,10 @@ EXPORTS
     KeSynchronizeProcessors
     KiFindAcpiTable
 
+    MmAllocateKernelStack
     MmAllocatePool
     MmAllocateSinglePage
+    MmFreeKernelStack
     MmFreePool
     MmFreeSinglePage
     MmMapSpace

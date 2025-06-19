@@ -40,6 +40,7 @@ add_executable(kernel "kernel" YES
     ke/panic.c
     ke/stackcheck.c
 
+    mm/kernelstack.c
     mm/page.c
     mm/pool.c
     mm/poolpage.c
