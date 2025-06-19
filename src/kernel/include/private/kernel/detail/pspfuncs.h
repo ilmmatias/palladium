@@ -21,7 +21,13 @@ void PspCreateIdleThread(void);
 void PspCreateSystemThread(void);
 
 void PspQueueThread(PsThread *Thread, bool EventQueue);
+void PspQueueThreadList(RtDList *ThreadList, uint64_t ThreadCount, bool EventQueue);
 void PspSetupThreadWait(KeProcessor *Processor, PsThread *Thread, uint64_t Time);
+void PspSuspendExecution(
+    KeProcessor *Processor,
+    PsThread *CurrentThread,
+    int NewState,
+    KeIrql OldIrql);
 void PspSwitchThreads(
     KeProcessor *Processor,
     PsThread *CurrentThread,

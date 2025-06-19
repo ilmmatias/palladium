@@ -52,6 +52,7 @@ EXPORTS
 
     PsCreateThread
     PsDelayThread
+    PsResumeThread
     PsSuspendThread
     PsYieldThread
 

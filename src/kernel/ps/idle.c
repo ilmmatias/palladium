@@ -49,7 +49,7 @@ static PsThread *TrySteal(KeProcessor *Processor) {
 
         /* Attempt to grab the victim thread; After this, we can then unlock (and lower the IRQL),
          * and return early if we already have something. */
-        RtDList *TargetThread = RtPopDList(&TargetProcessor->ThreadQueue);
+        RtDList *TargetThread = RtTruncateDList(&TargetProcessor->ThreadQueue);
         KeReleaseSpinLockAndLowerIrql(&TargetProcessor->Lock, OldIrql);
         if (TargetThread != &TargetProcessor->ThreadQueue) {
             __atomic_sub_fetch(&TargetProcessor->ThreadCount, 1, __ATOMIC_RELAXED);

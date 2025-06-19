@@ -31,7 +31,13 @@ void EvpWakeSingleThread(EvHeader *Header) {
     KeProcessor *Processor = Thread->Processor;
     KeAcquireSpinLockAtCurrentIrql(&Processor->Lock);
 
-    if (Thread->State != PS_STATE_WAITING) {
+    /* At least for now, we'll just ignore PS_STATE_PENDING_TERMINATE (as we'll assume it means
+     * someone tried signaling right as the thread was being cleaned up someone else, rather than
+     * state corruption). */
+    if (Thread->State == PS_STATE_PENDING_TERMINATE) {
+        KeReleaseSpinLockAtCurrentIrql(&Processor->Lock);
+        return;
+    } else if (Thread->State != PS_STATE_WAITING) {
         KeFatalError(KE_PANIC_BAD_THREAD_STATE, Thread->State, PS_STATE_WAITING, 0, 0);
     } else if (Thread->WaitTicks) {
         RtUnlinkDList(&Thread->ListHeader);
@@ -87,8 +93,17 @@ bool EvWaitForObject(void *Object, uint64_t Timeout) {
     KeProcessor *Processor = KeGetCurrentProcessor();
     KeAcquireSpinLockAtCurrentIrql(&Processor->Lock);
 
-    /* Make sure the thread state is sane. */
+    /* Make sure we didn't get terminated (or suspended) right as we were trying to enter the
+     * waiting state. */
     PsThread *CurrentThread = Processor->CurrentThread;
+    if (CurrentThread->State == PS_STATE_PENDING_SUSPEND ||
+        CurrentThread->State == PS_STATE_PENDING_TERMINATE) {
+        KeReleaseSpinLockAtCurrentIrql(&Processor->Lock);
+        KeReleaseSpinLockAndLowerIrql(&Header->Lock, OldIrql);
+        return true;
+    }
+
+    /* Make sure the thread state is sane. */
     if (CurrentThread->State != PS_STATE_RUNNING) {
         KeFatalError(KE_PANIC_BAD_THREAD_STATE, CurrentThread->State, PS_STATE_RUNNING, 0, 0);
     }

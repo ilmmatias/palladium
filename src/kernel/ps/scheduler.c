@@ -8,6 +8,7 @@
 #include <kernel/psp.h>
 
 [[noreturn]] extern void PspIdleThread(void *);
+extern uint64_t PspGlobalThreadCount;
 
 static volatile uint64_t InitialiazationBarrier = 0;
 
@@ -129,6 +130,9 @@ void PspProcessQueue(HalInterruptFrame *) {
     }
 
     /* Requeue any waiting threads that have expired (this can also be done at DISPATCH). */
+    RtDList RequeueListHead;
+    uint64_t RequeueListSize = 0;
+    RtInitializeDList(&RequeueListHead);
     while (true) {
         /* Hold the processor lock while modifying the per-processor wait list. */
         KeAcquireSpinLockAtCurrentIrql(&Processor->Lock);
@@ -155,7 +159,8 @@ void PspProcessQueue(HalInterruptFrame *) {
         EvHeader *Event = Thread->WaitObject;
         if (!Event) {
             Thread->State = PS_STATE_QUEUED;
-            PspQueueThread(Thread, true);
+            RtAppendDList(&RequeueListHead, &Thread->ListHeader);
+            RequeueListSize++;
             continue;
         }
 
@@ -178,8 +183,24 @@ void PspProcessQueue(HalInterruptFrame *) {
              * that can't happen anymore because we already unlinked), we can requeue the
              * thread. */
             Thread->State = PS_STATE_QUEUED;
-            PspQueueThread(Thread, true);
+            RtAppendDList(&RequeueListHead, &Thread->ListHeader);
+            RequeueListSize++;
         } while (false);
+    }
+
+    if (RequeueListHead.Next != &RequeueListHead) {
+        PspQueueThreadList(&RequeueListHead, RequeueListSize, true);
+    }
+
+    /* For any PENDING_* threads, we need to finish executing whichever action got us to here. */
+    if (CurrentThread->State == PS_STATE_PENDING_SUSPEND) {
+        PspSuspendExecution(Processor, CurrentThread, PS_STATE_SUSPENDED, (KeIrql)-1);
+        return;
+    } else if (CurrentThread->State == PS_STATE_PENDING_TERMINATE) {
+        KeAcquireSpinLockAndRaiseIrql(&Processor->Lock, KE_IRQL_SYNCH);
+        RtAppendDList(&Processor->TerminationQueue, &CurrentThread->ListHeader);
+        PspSuspendExecution(Processor, CurrentThread, PS_STATE_TERMINATED, KE_IRQL_SYNCH);
+        KeFatalError(KE_PANIC_BAD_THREAD_STATE, PS_STATE_RUNNING, PS_STATE_TERMINATED, 0, 0);
     }
 
     /* We shouldn't have anything left to do if we haven't expired yet (or if we're the idle
@@ -202,6 +223,7 @@ void PspProcessQueue(HalInterruptFrame *) {
         return;
     } else {
         __atomic_sub_fetch(&Processor->ThreadCount, 1, __ATOMIC_RELAXED);
+        __atomic_sub_fetch(&PspGlobalThreadCount, 1, __ATOMIC_RELAXED);
         KeClearAffinityBit(&KiIdleProcessors, Processor->Number);
     }
 

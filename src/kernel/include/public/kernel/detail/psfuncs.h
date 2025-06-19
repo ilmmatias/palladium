@@ -16,10 +16,11 @@
 extern "C" {
 #endif /* __cplusplus */
 
-PsThread *PsCreateThread(void (*EntryPoint)(void *), void *Parameter);
-[[noreturn]] void PsTerminateThread(void);
+PsThread *PsCreateThread(uint64_t Flags, void (*EntryPoint)(void *), void *Parameter);
+bool PsTerminateThread(PsThread *Thread);
 void PsYieldThread(void);
-void PsSuspendThread(void);
+bool PsSuspendThread(PsThread *Thread);
+bool PsResumeThread(PsThread *Thread);
 void PsDelayThread(uint64_t Time);
 
 #ifdef __cplusplus
