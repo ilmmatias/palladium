@@ -22,6 +22,12 @@ typedef struct {
 } KeModule;
 
 typedef struct {
+    RtDList ListHeader;
+    void (*Routine)(void *);
+    void *Context;
+} KeDpc;
+
+typedef struct {
     uint64_t Size;
     volatile uint64_t Bits[KE_MAX_PROCESSORS / 64];
 } KeAffinity;

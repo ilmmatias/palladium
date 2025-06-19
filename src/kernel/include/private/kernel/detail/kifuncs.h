@@ -23,6 +23,8 @@ void KiSaveBootStartDrivers(KiLoaderBlock *BootData);
 void KiRunBootStartDrivers(void);
 void KiDumpSymbol(void *Address);
 
+void KiProcessDpcQueue(void);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

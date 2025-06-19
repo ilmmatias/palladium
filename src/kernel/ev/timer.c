@@ -27,6 +27,11 @@ void EvpHandleTimer(HalInterruptFrame *InterruptFrame) {
         Processor->IdleTicks++;
     }
 
+    /* Check if we have any DPCs to execute. */
+    if (Processor->DpcQueue.Next != &Processor->DpcQueue) {
+        HalpNotifyProcessor(Processor);
+    }
+
     /* Check if any threads have been terminated. */
     if (Processor->TerminationQueue.Next != &Processor->TerminationQueue) {
         HalpNotifyProcessor(Processor);

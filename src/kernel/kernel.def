@@ -25,6 +25,8 @@ EXPORTS
     __stack_chk_fail
     __stack_chk_guard DATA
     KeFatalError
+    KeInitializeDpc
+    KeQueueDpc
     KeRequestIpiRoutine
     KeSynchronizeProcessors
     KiFindAcpiTable

@@ -73,6 +73,7 @@ void HalpInitializeSmp(void) {
 
         HalpProcessorList[i]->Number = i;
 
+        RtInitializeDList(&HalpProcessorList[i]->DpcQueue);
         RtInitializeDList(&HalpProcessorList[i]->WaitQueue);
         RtInitializeDList(&HalpProcessorList[i]->ThreadQueue);
         RtInitializeDList(&HalpProcessorList[i]->TerminationQueue);
