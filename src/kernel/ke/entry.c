@@ -7,7 +7,7 @@
 #include <kernel/psp.h>
 #include <kernel/vidp.h>
 
-extern uintptr_t __stack_chk_guard;
+extern RtSList MiPoolTagListHead[256];
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -161,17 +161,19 @@ static void InitializeApplicationProcessor(KeProcessor *Processor) {
     VidPrintSimple("\ndumping the pool stats:\n");
     VidPrintSimple(
         "tag  | allocs           | bytes            | max allocs       | max bytes       \n");
-    for (RtDList *ListHeader = MiPoolTagListHead.Next; ListHeader != &MiPoolTagListHead;
-         ListHeader = ListHeader->Next) {
-        MiPoolTrackerHeader *Header =
-            CONTAINING_RECORD(ListHeader, MiPoolTrackerHeader, ListHeader);
-        VidPrintSimple(
-            "%.4s | %-16llu | %-16llu | %-16llu | %-16llu\n",
-            Header->Tag,
-            Header->Allocations,
-            Header->AllocatedBytes,
-            Header->MaxAllocations,
-            Header->MaxAllocatedBytes);
+    for (int i = 0; i < 256; i++) {
+        for (RtSList *ListHeader = MiPoolTagListHead[i].Next; ListHeader;
+             ListHeader = ListHeader->Next) {
+            MiPoolTrackerHeader *Header =
+                CONTAINING_RECORD(ListHeader, MiPoolTrackerHeader, ListHeader);
+            VidPrintSimple(
+                "%.4s | %-16llu | %-16llu | %-16llu | %-16llu\n",
+                Header->Tag,
+                Header->Allocations,
+                Header->AllocatedBytes,
+                Header->MaxAllocations,
+                Header->MaxAllocatedBytes);
+        }
     }
 
     while (true) {

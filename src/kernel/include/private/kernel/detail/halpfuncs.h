@@ -27,7 +27,16 @@ void HalpInitializeBootProcessor(void);
 void HalpInitializeApplicationProcessor(KeProcessor *Processor);
 
 uint64_t HalpGetPhysicalAddress(void *VirtualAddress);
-bool HalpMapPages(void *VirtualAddress, uint64_t PhysicalAddress, uint64_t Size, int Flags);
+bool HalpMapContiguousPages(
+    void *VirtualAddress,
+    uint64_t PhysicalAddresses,
+    uint64_t Size,
+    int Flags);
+bool HalpMapNonContiguousPages(
+    void *VirtualAddress,
+    uint64_t *PhysicalAddresses,
+    uint64_t Size,
+    int Flags);
 void HalpUnmapPages(void *VirtualAddress, uint64_t Size);
 
 void HalpBroadcastIpi(void);

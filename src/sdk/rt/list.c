@@ -21,6 +21,29 @@ void RtPushSList(RtSList *Head, RtSList *Entry) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
+ *     This function atomically inserts a new entry into a singly linked list. This should
+ *     essentially only be used when you want to synchronize multiple readers/writers without a
+ *     lock, but don't intend on popping from the list (as we currently don't implement any
+ *     RtAtomicPopSList).
+ *
+ * PARAMETERS:
+ *     Head - Header entry of the list.
+ *     Entry - What we're inserting.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void RtAtomicPushSList(RtSList *Head, RtSList *Entry) {
+    RtSList *OldNext;
+    do {
+        OldNext = __atomic_load_n(&Head->Next, __ATOMIC_ACQUIRE);
+        Entry->Next = OldNext;
+    } while (!__atomic_compare_exchange_n(
+        &Head->Next, &OldNext, Entry, 0, __ATOMIC_RELEASE, __ATOMIC_ACQUIRE));
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
  *     This function combines the contents of two singly linked lists. Essentially, we execute
  *     RtPushSList(Target, RtPopSList(Source)) until the Source list is empty, but in a slightly
  *     more optimized manner.

@@ -36,7 +36,7 @@ typedef struct {
 } MiPageEntry;
 
 typedef struct {
-    RtDList ListHeader;
+    RtSList ListHeader;
     char Tag[4];
     uint64_t Allocations;
     uint64_t AllocatedBytes;

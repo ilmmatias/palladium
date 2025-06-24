@@ -243,7 +243,42 @@ uint64_t HalpGetPhysicalAddress(void *VirtualAddress) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function maps a range of physical addresses into virtual memory.
+ *     This function walks the page tables until we reach the lowest level (PTE), allocating all
+ *     levels along the way (or we fail because we encoutered a large page). This should only be
+ *     used when mapping new pages!
+ *
+ * PARAMETERS:
+ *     Target - Which address to get the page frame from.
+ *
+ * RETURN VALUE:
+ *     Either a pointer to the target page frame, or NULL on failure.
+ *-----------------------------------------------------------------------------------------------*/
+static HalpPageFrame *WalkPageTable(uint64_t Target) {
+    /* Extending this to PML5 should be as easy as handling the PML5 level the same as PML4. */
+    HalpPageFrame *CurrentFrame = &HALP_PML4_BASE[(Target >> HALP_PML4_SHIFT) & HALP_PML4_MASK];
+    HalpPageFrame *NextFrame = &HALP_PDPT_BASE[(Target >> HALP_PDPT_SHIFT) & HALP_PDPT_MASK];
+    if (!AllocateFrame(CurrentFrame, NextFrame)) {
+        return NULL;
+    }
+
+    CurrentFrame = NextFrame;
+    NextFrame = &HALP_PD_BASE[(Target >> HALP_PD_SHIFT) & HALP_PD_MASK];
+    if (!AllocateFrame(CurrentFrame, NextFrame)) {
+        return NULL;
+    }
+
+    CurrentFrame = NextFrame;
+    NextFrame = &HALP_PT_BASE[(Target >> HALP_PT_SHIFT) & HALP_PT_MASK];
+    if (!AllocateFrame(CurrentFrame, NextFrame)) {
+        return NULL;
+    }
+
+    return NextFrame;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function maps a range of contiguous physical addresses into virtual memory.
  *
  * PARAMETERS:
  *     VirtualAddress - Destination address.
@@ -254,7 +289,11 @@ uint64_t HalpGetPhysicalAddress(void *VirtualAddress) {
  * RETURN VALUE:
  *     true on success, false otherwise.
  *-----------------------------------------------------------------------------------------------*/
-bool HalpMapPages(void *VirtualAddress, uint64_t PhysicalAddress, uint64_t Size, int Flags) {
+bool HalpMapContiguousPages(
+    void *VirtualAddress,
+    uint64_t PhysicalAddress,
+    uint64_t Size,
+    int Flags) {
     /* Ensure 4KiB alignment on small pages. */
     if (((uint64_t)VirtualAddress & (HALP_PT_SIZE - 1)) || (PhysicalAddress & (HALP_PT_SIZE - 1)) ||
         (Size & (HALP_PT_SIZE - 1))) {
@@ -264,36 +303,91 @@ bool HalpMapPages(void *VirtualAddress, uint64_t PhysicalAddress, uint64_t Size,
     uint64_t Target = (uint64_t)VirtualAddress;
     uint64_t Source = PhysicalAddress;
 
-    while (Size) {
-        /* Extending this to PML5 should be as easy as handling the PML5 level the same as PML4. */
-        HalpPageFrame *CurrentFrame = &HALP_PML4_BASE[(Target >> HALP_PML4_SHIFT) & HALP_PML4_MASK];
-        HalpPageFrame *NextFrame = &HALP_PDPT_BASE[(Target >> HALP_PDPT_SHIFT) & HALP_PDPT_MASK];
-        if (!AllocateFrame(CurrentFrame, NextFrame)) {
-            return false;
-        }
+    /* Fully walk the page table (once, it should be enough for most cases). */
+    HalpPageFrame *CurrentFrame = WalkPageTable(Target);
+    if (!CurrentFrame) {
+        return false;
+    }
 
-        /* TODO: support large pages as well. */
-        CurrentFrame = NextFrame;
-        NextFrame = &HALP_PD_BASE[(Target >> HALP_PD_SHIFT) & HALP_PD_MASK];
-        if (!AllocateFrame(CurrentFrame, NextFrame)) {
-            return false;
-        }
-
-        CurrentFrame = NextFrame;
-        NextFrame = &HALP_PT_BASE[(Target >> HALP_PT_SHIFT) & HALP_PT_MASK];
-        if (!AllocateFrame(CurrentFrame, NextFrame)) {
-            return false;
+    for (uint64_t Offset = 0; Offset < Size; Offset += HALP_PT_SIZE) {
+        /* If we reached the end of this PD (2MiB page), rewalk the page table (we really should
+         * only rewalk what we need, but for now let's rewalk the whole thing). */
+        if (Offset && !(Target & (HALP_PD_SIZE - 1))) {
+            CurrentFrame = WalkPageTable(Target);
+            if (!CurrentFrame) {
+                return false;
+            }
         }
 
         /* Maybe we should return failure on already mapped pages instead? */
-        CurrentFrame = NextFrame;
         if (!CurrentFrame->Present) {
             BuildFrame(CurrentFrame, Source, HALP_PT_LEVEL, Flags);
         }
 
         Target += HALP_PT_SIZE;
         Source += HALP_PT_SIZE;
-        Size = Size > HALP_PT_SIZE ? Size - HALP_PT_SIZE : 0;
+        CurrentFrame++;
+    }
+
+    return true;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function maps a range of non contiguous physical addresses into contiguous virtual
+ *     memory.
+ *
+ * PARAMETERS:
+ *     VirtualAddress - Destination address.
+ *     PhysicalAddresses - List of source addresses.
+ *     Size - How many bytes we want to map.
+ *     Flags - How we want to map the pages.
+ *
+ * RETURN VALUE:
+ *     true on success, false otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+bool HalpMapNonContiguousPages(
+    void *VirtualAddress,
+    uint64_t *PhysicalAddresses,
+    uint64_t Size,
+    int Flags) {
+    /* This is essentially just a copy and paste of HalpMapContiguousPages, but we index the
+     * PhysicalAddresses list using the current offset; As such, no comments needed (just take a
+     * look at the other function). */
+
+    if (((uint64_t)VirtualAddress & (HALP_PT_SIZE - 1)) || (Size & (HALP_PT_SIZE - 1))) {
+        return false;
+    }
+
+    for (uint64_t Offset = 0; Offset < Size; Offset += HALP_PT_SIZE) {
+        if (PhysicalAddresses[Offset >> HALP_PT_SHIFT] & (HALP_PT_SIZE - 1)) {
+            return false;
+        }
+    }
+
+    uint64_t Target = (uint64_t)VirtualAddress;
+    uint64_t *Source = PhysicalAddresses;
+
+    HalpPageFrame *CurrentFrame = WalkPageTable(Target);
+    if (!CurrentFrame) {
+        return false;
+    }
+
+    for (uint64_t Offset = 0; Offset < Size; Offset += HALP_PT_SIZE) {
+        if (Offset && !(Target & (HALP_PD_SIZE - 1))) {
+            CurrentFrame = WalkPageTable(Target);
+            if (!CurrentFrame) {
+                return false;
+            }
+        }
+
+        if (!CurrentFrame->Present) {
+            BuildFrame(CurrentFrame, *Source, HALP_PT_LEVEL, Flags);
+        }
+
+        Target += HALP_PT_SIZE;
+        Source++;
+        CurrentFrame++;
     }
 
     return true;
@@ -326,8 +420,8 @@ void HalpUnmapPages(void *VirtualAddress, uint64_t Size) {
         bool Present = GetFrame(Address, &TargetLevel, &TargetFrame);
         uint64_t TargetSize = TableLevels[TargetLevel].Size;
 
-        /* We'll be freeing large pages if we match the proper alignment (maybe we shouldn't do it
-         * like this?). */
+        /* We'll be freeing large pages if we match the proper alignment (maybe we shouldn't do
+         * it like this?). */
         if (Present && TargetLevel != HALP_PT_LEVEL && !(Address & (TargetSize - 1))) {
             TargetFrame->Present = 0;
             ReloadCr3 = true;
@@ -356,8 +450,8 @@ void HalpUnmapPages(void *VirtualAddress, uint64_t Size) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function maps a range of physical addresses (assumed to be device/MMIO) into contiguous
- *     virtual memory.
+ *     This function maps a range of physical addresses (assumed to be device/MMIO) into
+ *contiguous virtual memory.
  *
  * PARAMETERS:
  *     PhysicalAddress - Source address, does not need to be aligned to MM_PAGE_SIZE.
@@ -380,9 +474,10 @@ void *MmMapSpace(uint64_t PhysicalAddress, size_t Size, uint8_t Type) {
         Flags |= MI_MAP_WC;
     }
 
-    /* And map any unmapped pages; We don't need to allocate any pool space, as we already have a
-     * 1-to-1 space in virtual memory for the mappings. */
-    if (!HalpMapPages((void *)(MI_VIRTUAL_OFFSET + Source), Source, End - Source, Flags)) {
+    /* And map any unmapped pages; We don't need to allocate any pool space, as we already have
+     * a 1-to-1 space in virtual memory for the mappings. */
+    if (!HalpMapContiguousPages(
+            (void *)(MI_VIRTUAL_OFFSET + Source), Source, End - Source, Flags)) {
         return NULL;
     }
 

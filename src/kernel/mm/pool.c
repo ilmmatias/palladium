@@ -6,21 +6,80 @@
 #include <kernel/mi.h>
 #include <string.h>
 
-#define SMALL_BLOCK_COUNT ((uint32_t)((MM_PAGE_SIZE - 16) >> 4))
-
 typedef struct {
     RtSList ListHeader;
     char Tag[4];
     uint32_t Head;
-} SmallBlockHeader;
+} BlockHeader;
 
-static KeSpinLock Lock = {0};
-static RtSList SmallBlocks[SMALL_BLOCK_COUNT] = {};
+static RtSList FreeBlockList[MM_POOL_BLOCK_COUNT] = {};
+static KeSpinLock FreeBlockLock[MM_POOL_BLOCK_COUNT] = {};
 
 char *MiPoolVirtualOffset = NULL;
-RtDList MiPoolBigFreeListHead;
-RtDList MiPoolFreeTagListHead;
-RtDList MiPoolTagListHead;
+RtSList MiPoolTagListHead[256] = {};
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function gets the bucket index for the given size.
+ *
+ * PARAMETERS:
+ *     Size - Size in bytes.
+ *
+ * RETURN VALUE:
+ *     Bucket index.
+ *-----------------------------------------------------------------------------------------------*/
+static uint32_t GetHeadIndex(size_t Size) {
+    if (Size < MM_POOL_SMALL_MAX) {
+        return Size >> MM_POOL_SMALL_SHIFT;
+    } else if (Size < MM_POOL_MEDIUM_MAX) {
+        return MM_POOL_SMALL_COUNT + ((Size - MM_POOL_MEDIUM_MIN) >> MM_POOL_MEDIUM_SHIFT);
+    } else {
+        return MM_POOL_SMALL_COUNT + MM_POOL_MEDIUM_COUNT +
+               ((Size - MM_POOL_LARGE_MIN) >> MM_POOL_LARGE_SHIFT);
+    }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function gets the size of a specific bucket.
+ *
+ * PARAMETERS:
+ *     Head - Bucket index.
+ *
+ * RETURN VALUE:
+ *     Size in bytes of the specified bucket.
+ *-----------------------------------------------------------------------------------------------*/
+static uint64_t GetHeadSize(uint32_t Head) {
+    if (Head < MM_POOL_SMALL_COUNT) {
+        return (Head + 1) << MM_POOL_SMALL_SHIFT;
+    } else if (Head < MM_POOL_SMALL_COUNT + MM_POOL_MEDIUM_COUNT) {
+        return MM_POOL_MEDIUM_MIN + ((Head - MM_POOL_SMALL_COUNT + 1) << MM_POOL_MEDIUM_SHIFT);
+    } else {
+        return MM_POOL_LARGE_MIN +
+               ((Head - MM_POOL_SMALL_COUNT - MM_POOL_MEDIUM_COUNT + 1) << MM_POOL_LARGE_SHIFT);
+    }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function gets how many pages should be used when allocating a new segment for a
+ *     specific bucket size.
+ *
+ * PARAMETERS:
+ *     Head - Bucket index.
+ *
+ * RETURN VALUE:
+ *     Amount of pages that should be allocated.
+ *-----------------------------------------------------------------------------------------------*/
+static uint64_t GetHeadPages(uint32_t Head) {
+    if (Head < MM_POOL_SMALL_COUNT) {
+        return MM_POOL_SMALL_PAGES;
+    } else if (Head < MM_POOL_SMALL_COUNT + MM_POOL_MEDIUM_COUNT) {
+        return MM_POOL_MEDIUM_PAGES;
+    } else {
+        return MM_POOL_LARGE_PAGES;
+    }
+}
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -34,9 +93,6 @@ RtDList MiPoolTagListHead;
  *-----------------------------------------------------------------------------------------------*/
 void MiInitializePool(void) {
     MiPoolVirtualOffset = (char *)MI_POOL_START;
-    RtInitializeDList(&MiPoolBigFreeListHead);
-    RtInitializeDList(&MiPoolTagListHead);
-    RtInitializeDList(&MiPoolFreeTagListHead);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -52,25 +108,19 @@ void MiInitializePool(void) {
  *     a new page failed.
  *-----------------------------------------------------------------------------------------------*/
 void *MmAllocatePool(size_t Size, const char Tag[4]) {
-    KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Lock, KE_IRQL_DISPATCH);
-
     if (!Size) {
         Size = 1;
     }
 
-    /* The header should always be 16 bytes, fix up the struct at the start of the file if the
-       pointer size isn't 64-bits. */
-    uint32_t Head = (Size + 0x0F) >> 4;
-    if (Head > SMALL_BLOCK_COUNT) {
+    /* Anything higher than LARGE_SIZE is going into the underlying pool page allocator (and we
+     * won't cache it). */
+    if (Size > MM_POOL_LARGE_MAX) {
         uint32_t Pages = (Size + MM_PAGE_SIZE - 1) >> MM_PAGE_SHIFT;
         void *Base = MiAllocatePoolPages(Pages);
 
         /* Tag the allocation and try to account for it in the pool tracker. */
         memcpy(MI_PAGE_ENTRY(HalpGetPhysicalAddress(Base)).Tag, Tag, 4);
         MiAddPoolTracker(Pages << MM_PAGE_SHIFT, Tag);
-
-        /* We don't need locking from here on out (we'd just be wasting time). */
-        KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
 
         if (Base) {
             memset(Base, 0, Pages << MM_PAGE_SHIFT);
@@ -79,63 +129,68 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
         return Base;
     }
 
-    /* Start at an exact match, and try everything onwards too (if there was nothing free). */
-    for (uint32_t i = Head; i <= SMALL_BLOCK_COUNT; i++) {
-        if (!SmallBlocks[i - 1].Next) {
-            continue;
+    /* Otherwise, we need to discover the "head" (bucket index) of the allocation size, and then we
+     * can try popping a free entry from the matching bucket (either from the local list, or from
+     * the global list after acquiring its lock). */
+    uint32_t Head = GetHeadIndex(Size);
+    uint32_t HeadPages = GetHeadPages(Head);
+    uint64_t HeadSize = GetHeadSize(Head);
+    uint64_t FullSize = HeadSize + sizeof(BlockHeader);
+    KeProcessor *Processor = KeGetCurrentProcessor();
+    if (Processor->FreePoolBlockListHead[Head].Next) {
+        BlockHeader *Header = CONTAINING_RECORD(
+            RtPopSList(&Processor->FreePoolBlockListHead[Head]), BlockHeader, ListHeader);
+
+        if (Header->Head != Head) {
+            KeFatalError(KE_PANIC_BAD_POOL_HEADER, (uint64_t)Header, Header->Head, Head, 0);
         }
 
-        SmallBlockHeader *Header =
-            CONTAINING_RECORD(RtPopSList(&SmallBlocks[i - 1]), SmallBlockHeader, ListHeader);
-
-        if (Header->Head != i) {
-            KeFatalError(
-                KE_PANIC_BAD_POOL_HEADER,
-                (uint64_t)Header,
-                *(uint32_t *)Header->Tag,
-                *(uint32_t *)Tag,
-                Header->Head);
-        }
-
-        Header->Head = Head;
+        Processor->FreePoolBlockListSize[Head]--;
+        MiAddPoolTracker(FullSize, Tag);
         memcpy(Header->Tag, Tag, 4);
-
-        if (i - Head > 1) {
-            SmallBlockHeader *RemainingSpace =
-                (SmallBlockHeader *)((char *)Header + (Head << 4) + 16);
-            RemainingSpace->Head = i - Head - 1;
-            RtPushSList(&SmallBlocks[i - Head - 2], &RemainingSpace->ListHeader);
-        }
-
-        /* We don't need locking from here on out (we'd just be wasting time). */
-        MiAddPoolTracker(Head << 4, Tag);
-        KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
-        memset(Header + 1, 0, Head << 4);
+        memset(Header + 1, 0, HeadSize);
         return Header + 1;
     }
 
-    SmallBlockHeader *Header = MiAllocatePoolPages(1);
-    if (!Header) {
-        KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
+    KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&FreeBlockLock[Head], KE_IRQL_DISPATCH);
+    if (FreeBlockList[Head].Next) {
+        BlockHeader *Header =
+            CONTAINING_RECORD(RtPopSList(&FreeBlockList[Head]), BlockHeader, ListHeader);
+
+        if (Header->Head != Head) {
+            KeFatalError(KE_PANIC_BAD_POOL_HEADER, (uint64_t)Header, Header->Head, Head, 0);
+        }
+
+        KeReleaseSpinLockAndLowerIrql(&FreeBlockLock[Head], OldIrql);
+        MiAddPoolTracker(FullSize, Tag);
+        memcpy(Header->Tag, Tag, 4);
+        memset(Header + 1, 0, HeadSize);
+        return Header + 1;
+    }
+    KeReleaseSpinLockAndLowerIrql(&FreeBlockLock[Head], OldIrql);
+
+    /* Allocate some extra space, and carve it into a bunch of Head-sized elements. */
+    char *StartAddress = MiAllocatePoolPages(HeadPages);
+    if (!StartAddress) {
         return NULL;
     }
 
-    Header->ListHeader.Next = NULL;
-    Header->Head = Head;
-    memcpy(Header->Tag, Tag, 4);
-
-    /* Wrap up by slicing the allocated page, we can add the remainder to the free list if
-       it's big enough. */
-    if (SMALL_BLOCK_COUNT - Head > 1) {
-        SmallBlockHeader *RemainingSpace = (SmallBlockHeader *)((char *)Header + (Head << 4) + 16);
-        RemainingSpace->Head = SMALL_BLOCK_COUNT - Head - 1;
-        RtPushSList(&SmallBlocks[SMALL_BLOCK_COUNT - Head - 2], &RemainingSpace->ListHeader);
+    /* Split the pages into equal sized chunks; This can have some waste depending on the chosen
+     * bucket sizes, so make sure to tune the min/max/shift values! */
+    OldIrql = KeAcquireSpinLockAndRaiseIrql(&FreeBlockLock[Head], KE_IRQL_DISPATCH);
+    for (uint64_t i = 0; i < (HeadPages << MM_PAGE_SHIFT) / FullSize; i++) {
+        BlockHeader *Header = (BlockHeader *)(StartAddress + i * FullSize);
+        Header->Head = Head;
+        RtPushSList(&FreeBlockList[Head], &Header->ListHeader);
     }
 
-    /* memset() inside the spin lock would be wasting time. */
-    MiAddPoolTracker(Head << 4, Tag);
-    KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
-    memset(Header + 1, 0, Head << 4);
+    BlockHeader *Header =
+        CONTAINING_RECORD(RtPopSList(&FreeBlockList[Head]), BlockHeader, ListHeader);
+
+    KeReleaseSpinLockAndLowerIrql(&FreeBlockLock[Head], OldIrql);
+    MiAddPoolTracker(FullSize, Tag);
+    memcpy(Header->Tag, Tag, 4);
+    memset(Header + 1, 0, HeadSize);
     return Header + 1;
 }
 
@@ -151,9 +206,7 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void MmFreePool(void *Base, const char Tag[4]) {
-    KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Lock, KE_IRQL_DISPATCH);
-
-    /* MmAllocatePool guarantees anything that is inside the small pool buckets is never going to
+    /* MmAllocatePool guarantees anything that is inside the managed pool buckets is never going to
        be page aligned. */
     if (!((uint64_t)Base & (MM_PAGE_SIZE - 1))) {
         /* This should be mapped and have the tag properly setup, otherwise, we weren't allocated by
@@ -176,12 +229,11 @@ void MmFreePool(void *Base, const char Tag[4]) {
         /* The remaining checks are directly done by MiFreePoolPages. */
         uint32_t Pages = MiFreePoolPages(Base);
         MiRemovePoolTracker(Pages << MM_PAGE_SHIFT, Tag);
-        KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
         return;
     }
 
-    SmallBlockHeader *Header = (SmallBlockHeader *)Base - 1;
-    if (memcmp(Header->Tag, Tag, 4) || Header->Head < 1 || Header->Head >= SMALL_BLOCK_COUNT ||
+    BlockHeader *Header = (BlockHeader *)Base - 1;
+    if (memcmp(Header->Tag, Tag, 4) || Header->Head >= MM_POOL_BLOCK_COUNT ||
         Header->ListHeader.Next) {
         KeFatalError(
             KE_PANIC_BAD_POOL_HEADER,
@@ -191,8 +243,21 @@ void MmFreePool(void *Base, const char Tag[4]) {
             Header->Head);
     }
 
-    /* TODO: Reduce fragmentation. */
-    MiRemovePoolTracker(Header->Head << 4, Tag);
-    RtPushSList(&SmallBlocks[Header->Head - 1], &Header->ListHeader);
-    KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
+    /* If we haven't overflow the local cache yet, just directly push to it (as it doesn't need any
+     * locks). */
+    uint64_t FullSize = GetHeadSize(Header->Head) + 16;
+    KeProcessor *Processor = KeGetCurrentProcessor();
+    if (Processor->FreePoolBlockListSize[Header->Head] < MI_PROCESSOR_POOL_CACHE_MAX_SIZE) {
+        RtPushSList(&Processor->FreePoolBlockListHead[Header->Head], &Header->ListHeader);
+        MiRemovePoolTracker(FullSize, Tag);
+        Processor->FreePoolBlockListSize[Header->Head]++;
+        return;
+    }
+
+    /* TODO: At some point, we really should be returning this memory to the big pool allocator
+     * (in case the whole segment is free). */
+    KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&FreeBlockLock[Header->Head], KE_IRQL_DISPATCH);
+    RtPushSList(&FreeBlockList[Header->Head], &Header->ListHeader);
+    KeReleaseSpinLockAndLowerIrql(&FreeBlockLock[Header->Head], OldIrql);
+    MiRemovePoolTracker(FullSize, Tag);
 }

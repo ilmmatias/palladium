@@ -18,10 +18,14 @@ EXPORTS
     RtGetHash
 
     RtAppendDList
+    RtAtomicPushSList
     RtInitializeDList
     RtPopDList
     RtPopSList
     RtPushDList
     RtPushSList
+    RtSpliceHeadDList
+    RtSpliceTailDList
+    RtSpliceSList
     RtTruncateDList
     RtUnlinkDList

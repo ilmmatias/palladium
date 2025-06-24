@@ -78,9 +78,6 @@ static PsThread *TrySteal(KeProcessor *Processor) {
     KeProcessor *Processor = KeGetCurrentProcessor();
 
     while (true) {
-        /* Try to execute some general system cleanup. */
-        MiTryReturnKernelStacks();
-
         /* Let the processor rest for a bit before continuing. */
         PauseProcessor();
 

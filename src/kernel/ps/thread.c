@@ -37,7 +37,7 @@ static PsThread *CreateThread(void (*EntryPoint)(void *), void *Parameter, void 
     Thread->State = PS_STATE_CREATED;
     Thread->Stack = Stack;
     if (!Thread->Stack) {
-        Thread->AllocatedStack = MmAllocateKernelStack();
+        Thread->AllocatedStack = MmAllocatePool(KE_STACK_SIZE, MM_POOL_TAG_KERNEL_STACK);
         if (!Thread->AllocatedStack) {
             ObDereferenceObject(Thread);
             return NULL;

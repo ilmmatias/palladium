@@ -23,6 +23,7 @@ extern "C" {
 #endif /* __cplusplus */
 
 void RtPushSList(RtSList *Head, RtSList *Entry);
+void RtAtomicPushSList(RtSList *Head, RtSList *Entry);
 void RtSpliceSList(RtSList *Target, RtSList *Source);
 RtSList *RtPopSList(RtSList *Head);
 

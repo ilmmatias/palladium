@@ -33,7 +33,8 @@ void HalpInitializeSmp(void) {
 
     /* Map the AP startup code (0x8000), and copy all the trampoline data to it. */
     uint64_t EntryAddress = 0x8000;
-    HalpMapPages((void *)EntryAddress, EntryAddress, MM_PAGE_SIZE, MI_MAP_WRITE | MI_MAP_EXEC);
+    HalpMapContiguousPages(
+        (void *)EntryAddress, EntryAddress, MM_PAGE_SIZE, MI_MAP_WRITE | MI_MAP_EXEC);
     memcpy((void *)EntryAddress, HalpApplicationProcessorEntry, MM_PAGE_SIZE);
 
     /* Save the kernel page map (shared between all processors).

@@ -58,8 +58,8 @@ uint64_t MiAllocateEarlyPages(uint32_t Pages) {
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function prepares for the memory manager initialization by setting up a really dummy
- *     page allocator that uses the osloader memory map directly. HalpMapPages should automatically
- *     use this during early boot (as needed).
+ *     page allocator that uses the osloader memory map directly. HalpMap(Non)ContiguousPages should
+ *     automatically use this during early boot (as needed).
  *
  * PARAMETERS:
  *     LoaderBlock - Data prepared by the boot loader for us.
@@ -156,7 +156,8 @@ void MiInitializePageAllocator(void) {
     }
 
     void *PageListBase = (void *)(MI_VIRTUAL_OFFSET + PhysicalAddress);
-    if (!HalpMapPages(PageListBase, PhysicalAddress, Pages << MM_PAGE_SHIFT, MI_MAP_WRITE)) {
+    if (!HalpMapContiguousPages(
+            PageListBase, PhysicalAddress, Pages << MM_PAGE_SHIFT, MI_MAP_WRITE)) {
         KeFatalError(
             KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
             KE_PANIC_PARAMETER_PFN_INITIALIZATION_FAILURE,
@@ -199,6 +200,10 @@ void MiInitializePageAllocator(void) {
      * to mess with the processor's local page cache, so we need to initialize it early for the boot
      * processor (or, we'll probably crash really hard). */
     RtInitializeDList(&KeGetCurrentProcessor()->FreePageListHead);
+
+    /* We're also forced to initialize the pool trackers before continuing (or we'll fail because
+     * MiPoolTracker will be a NULL pointer). */
+    MiInitializePoolTracker();
 
     /* Now we should be free to allocate some pool memory and copy the memory descriptor list in its
      * current state. */
@@ -275,7 +280,7 @@ uint64_t MmAllocateSinglePage() {
 
     /* Trigger a cache refill if it's the first allocation we're doing (or if we dropped below the
      * lower limit). */
-    if (Processor->FreePageListSize < MI_PROCESSOR_PAGE_CACHE_LOW_LIMIT) {
+    if (Processor->FreePageListSize < MI_PROCESSOR_PAGE_CACHE_MIN_SIZE) {
         KeAcquireSpinLockAtCurrentIrql(&MiPageListLock);
 
         for (int i = 0; i < MI_PROCESSOR_PAGE_CACHE_BATCH_SIZE; i++) {
@@ -288,6 +293,8 @@ uint64_t MmAllocateSinglePage() {
              * so we just add them to the list here. */
             RtAppendDList(&Processor->FreePageListHead, ListHeader);
             Processor->FreePageListSize++;
+            MiTotalUsedPages += 1;
+            MiTotalFreePages -= 1;
         }
 
         KeReleaseSpinLockAtCurrentIrql(&MiPageListLock);
@@ -296,11 +303,12 @@ uint64_t MmAllocateSinglePage() {
     /* Now we should just be able to pop from the local cache (if that fails, the system is out of
      * memory). */
     RtDList *ListHeader = RtPopDList(&Processor->FreePageListHead);
-    KeLowerIrql(OldIrql);
     if (ListHeader == &Processor->FreePageListHead) {
+        KeLowerIrql(OldIrql);
         return 0;
     } else {
         Processor->FreePageListSize--;
+        KeLowerIrql(OldIrql);
     }
 
     /* Make sure the flags make sense (if not, we probably have a corrupted PFN free list). */
@@ -309,8 +317,6 @@ uint64_t MmAllocateSinglePage() {
         KeFatalError(KE_PANIC_BAD_PFN_HEADER, MI_PAGE_BASE(Entry), Entry->Flags, 0, 0);
     }
 
-    MiTotalUsedPages += 1;
-    MiTotalFreePages -= 1;
     Entry->Used = 1;
     return MI_PAGE_BASE(Entry);
 }
@@ -336,29 +342,20 @@ void MmFreeSinglePage(uint64_t PhysicalAddress) {
     }
 
     /* Update all stat, and check if we can just append this to the local cache. */
-    MiTotalUsedPages -= 1;
-    MiTotalFreePages += 1;
     Entry->Used = 0;
-    if (Processor->FreePageListSize < MI_PROCESSOR_PAGE_CACHE_HIGH_LIMIT) {
+    if (Processor->FreePageListSize < MI_PROCESSOR_PAGE_CACHE_MAX_SIZE) {
         RtAppendDList(&Processor->FreePageListHead, &Entry->ListHeader);
         Processor->FreePageListSize++;
         KeLowerIrql(OldIrql);
         return;
     }
 
-    /* Otherwise, remove some pages out of the local free page list (and return the given allocation
-     * to the global list rather than the local list as well). */
+    /* Otherwise, append the page to the global free page list (we do need the global lock for
+     * this). */
     KeAcquireSpinLockAtCurrentIrql(&MiPageListLock);
 
-    for (int i = 0; i < MI_PROCESSOR_PAGE_CACHE_BATCH_SIZE; i++) {
-        /* RtPopDList should always return SOMETHING here, as we already checked the list
-         * size, so it's probably safe to not check it (unless the kernel state gets
-         * corrupted, which would be bad anyways and cause lots of other problems). */
-        RtAppendDList(&MiFreePageListHead, RtPopDList(&Processor->FreePageListHead));
-    }
-
     RtAppendDList(&MiFreePageListHead, &Entry->ListHeader);
-    KeReleaseSpinLockAtCurrentIrql(&MiPageListLock);
-    Processor->FreePageListSize -= MI_PROCESSOR_PAGE_CACHE_BATCH_SIZE;
-    KeLowerIrql(OldIrql);
+    MiTotalUsedPages -= 1;
+    MiTotalFreePages += 1;
+    KeReleaseSpinLockAndLowerIrql(&MiPageListLock, OldIrql);
 }
