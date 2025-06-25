@@ -72,19 +72,27 @@ EXPORTS
     RtClearBit
     RtClearBits
     RtDispatchException
+    RtEnumerateAvlTree
     RtFindClearBits
     RtFindClearBitsAndSet
     RtFindSetBits
     RtFindSetBitsAndClear
     RtGetHash
+    RtInitializeAvlTree
     RtInitializeBitmap
     RtInitializeDList
+    RtInsertAvlTree
+    RtLookupAvlTree
+    RtLookupByIndexAvlTree
     RtLookupFunctionEntry
     RtLookupImageBase
     RtPopDList
     RtPopSList
     RtPushDList
     RtPushSList
+    RtQueryHeightAvlTree
+    RtQuerySizeAvlTree
+    RtRemoveAvlTree
     RtRestoreContext
     RtSaveContext
     RtSetAllBits

@@ -10,6 +10,7 @@ endif()
 
 set(SOURCES
     ${SOURCES}
+    avltree.c
     bitmap.c
     hash.c
     list.c)

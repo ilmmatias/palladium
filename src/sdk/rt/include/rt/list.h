@@ -7,8 +7,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#ifndef CONTAINING_RECORD
 #define CONTAINING_RECORD(address, type, field) \
     ((type *)((char *)(address) - (uintptr_t)(&((type *)0)->field)))
+#endif /* CONTAINING_RECORD */
 
 typedef struct RtSList {
     struct RtSList *Next;

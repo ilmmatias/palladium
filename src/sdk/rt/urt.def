@@ -1,5 +1,14 @@
 LIBRARY urt.dll
 EXPORTS
+    RtEnumerateAvlTree
+    RtInitializeAvlTree
+    RtInsertAvlTree
+    RtQueryHeightAvlTree
+    RtQuerySizeAvlTree
+    RtRemoveAvlTree
+    RtLookupAvlTree
+    RtLookupByIndexAvlTree
+
     RtClearAllBits
     RtClearBit
     RtClearBits
