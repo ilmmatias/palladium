@@ -54,7 +54,9 @@ static void split_entry(allocator_entry_t *entry, size_t size) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 static void merge_forward(allocator_entry_t *base) {
-    while (base->next && base + (base->size << 12) == base->next && !base->next->used) {
+    while (base->next &&
+           (uintptr_t)base + base->size + sizeof(allocator_entry_t) == (uintptr_t)base->next &&
+           !base->next->used) {
         base->size += base->next->size;
         base->next = base->next->next;
 
@@ -80,7 +82,10 @@ static void merge_forward(allocator_entry_t *base) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 static void merge_backward(allocator_entry_t *base) {
-    while (base->prev && base->prev + (base->prev->size << 12) == base && !base->prev->used) {
+    while (base->prev &&
+           (uintptr_t)base->prev + base->prev->size + sizeof(allocator_entry_t) ==
+               (uintptr_t)base &&
+           !base->prev->used) {
         base->prev->size += base->size;
         base->prev->next = base->next;
 

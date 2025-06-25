@@ -26,8 +26,9 @@ char *strncpy(char *CRT_RESTRICT s1, const char *CRT_RESTRICT s2, size_t n) {
         n--;
     }
 
-    if (n) {
-        *Destination = 0;
+    while (n > 0) {
+        *(Destination++) = '\0';
+        n--;
     }
 
     return s1;
