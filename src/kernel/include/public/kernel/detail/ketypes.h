@@ -5,6 +5,7 @@
 #define _KERNEL_DETAIL_KETYPES_H_
 
 #include <kernel/detail/kedefs.h>
+#include <rt/avltree.h>
 #include <rt/list.h>
 
 /* clang-format off */

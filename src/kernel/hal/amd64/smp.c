@@ -6,6 +6,7 @@
 #include <kernel/intrin.h>
 #include <kernel/ke.h>
 #include <kernel/mm.h>
+#include <kernel/psp.h>
 #include <string.h>
 
 extern void HalpApplicationProcessorEntry(void);
@@ -73,9 +74,10 @@ void HalpInitializeSmp(void) {
         }
 
         HalpProcessorList[i]->Number = i;
+        HalpProcessorList[i]->ClosestWaitTick = UINT64_MAX;
 
-        RtInitializeDList(&HalpProcessorList[i]->DpcQueue);
-        RtInitializeDList(&HalpProcessorList[i]->WaitQueue);
+        RtInitializeDList(&HalpProcessorList[i]->KernelSignalQueue);
+        RtInitializeAvlTree(&HalpProcessorList[i]->WaitTree, PspCompareWaitThreads);
         RtInitializeDList(&HalpProcessorList[i]->ThreadQueue);
         RtInitializeDList(&HalpProcessorList[i]->TerminationQueue);
 

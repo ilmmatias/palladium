@@ -20,6 +20,8 @@ typedef struct {
     uint32_t Number;
     uint32_t ApicId;
     RtDList KernelSignalQueue;
+    RtAvlTree WaitTree;
+    uint64_t ClosestWaitTick;
     RtDList ThreadQueue;
     RtDList TerminationQueue;
     struct PsThread *CurrentThread;

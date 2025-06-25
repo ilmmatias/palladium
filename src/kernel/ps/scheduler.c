@@ -40,6 +40,39 @@ KeAffinity KiIdleProcessors;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
+ *     This function compares two threads in the wait tree based on their expiration tick.
+ *
+ * PARAMETERS:
+ *     FirstStruct - The node currently in the tree.
+ *     SecondStruct - The node we're trying to insert/find.
+ *
+ * RETURN VALUE:
+ *     Either EQUAL if the threads are equal, or LEFT/RIGHT depending on the insertion point.
+ *-----------------------------------------------------------------------------------------------*/
+RtAvlCompareResult PspCompareWaitThreads(RtAvlNode *FirstStruct, RtAvlNode *SecondStruct) {
+    PsThread *FirstThread = CONTAINING_RECORD(FirstStruct, PsThread, WaitTreeNode);
+    PsThread *SecondThread = CONTAINING_RECORD(SecondStruct, PsThread, WaitTreeNode);
+
+    if (FirstThread->WaitTicks > SecondThread->WaitTicks) {
+        return RT_AVL_COMPARE_RESULT_LEFT;
+    } else if (FirstThread->WaitTicks < SecondThread->WaitTicks) {
+        return RT_AVL_COMPARE_RESULT_RIGHT;
+    }
+
+    /* Do a tiebreaker with the thread struct addresses themselves, as we should be able to add
+     * multiple threads with the same expiration (as long as the threads themselves are
+     * different). */
+    if ((uintptr_t)FirstThread > (uintptr_t)SecondThread) {
+        return RT_AVL_COMPARE_RESULT_LEFT;
+    } else if ((uintptr_t)FirstThread < (uintptr_t)SecondThread) {
+        return RT_AVL_COMPARE_RESULT_RIGHT;
+    }
+
+    return RT_AVL_COMPARE_RESULT_EQUAL;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
  *     This function executes a context switch of the specified type between the current and
  *     specified threads. For QUEUED switches, the old/current thread is automatically rescheduled.
  *     This should be called at SYNCH with the processor lock held.
@@ -115,81 +148,91 @@ void PspProcessQueue(HalInterruptFrame *) {
     /* Cleanup any threads that have terminated (they shouldn't be the current thread anymore);
      * This needs to be before raising to SYNCH (because MmFreePool expects the IRQL to be
      * <=DISPATCH). */
-    while (true) {
-        RtDList *ListHeader = RtPopDList(&Processor->TerminationQueue);
-        if (ListHeader == &Processor->TerminationQueue) {
-            break;
-        }
-
-        PsThread *Thread = CONTAINING_RECORD(ListHeader, PsThread, ListHeader);
-        if (Thread->State != PS_STATE_TERMINATED) {
-            KeFatalError(KE_PANIC_BAD_THREAD_STATE, Thread->State, PS_STATE_TERMINATED, 0, 0);
-        }
-
-        ObDereferenceObject(Thread);
-    }
-
-    /* Requeue any waiting threads that have expired (this can also be done at DISPATCH). */
-    RtDList RequeueListHead;
-    uint64_t RequeueListSize = 0;
-    RtInitializeDList(&RequeueListHead);
-    while (true) {
-        /* Hold the processor lock while modifying the per-processor wait list. */
-        KeAcquireSpinLockAtCurrentIrql(&Processor->Lock);
-        RtDList *ListHeader = Processor->WaitQueue.Next;
-        if (ListHeader == &Processor->WaitQueue) {
-            KeReleaseSpinLockAtCurrentIrql(&Processor->Lock);
-            break;
-        }
-
-        /* The list should be ordered, so we're the closest expiration; If we didn't expire yet, no
-         * one ahead of us did. */
-        PsThread *Thread = CONTAINING_RECORD(ListHeader, PsThread, ListHeader);
-        if (Thread->State != PS_STATE_WAITING) {
-            KeFatalError(KE_PANIC_BAD_THREAD_STATE, Thread->State, PS_STATE_WAITING, 0, 0);
-        } else if (Processor->Ticks < Thread->WaitTicks) {
-            KeReleaseSpinLockAtCurrentIrql(&Processor->Lock);
-            break;
-        }
-
-        RtUnlinkDList(&Thread->ListHeader);
-        KeReleaseSpinLockAtCurrentIrql(&Processor->Lock);
-
-        /* Shortcut for DelayThread(), we always want to queue the thread in that case. */
-        EvHeader *Event = Thread->WaitObject;
-        if (!Event) {
-            Thread->State = PS_STATE_QUEUED;
-            RtAppendDList(&RequeueListHead, &Thread->ListHeader);
-            RequeueListSize++;
-            continue;
-        }
-
-        do {
-            /* Now with the processor lock released, acquire the event lock (to modify the
-             * per-event wait list). */
-            KeAcquireSpinLockAtCurrentIrql(&Event->Lock);
-
-            /* Is this the best way of checking if we're still linked? Not sure, maybe we should
-             * add some other signal to say we're still inserted? */
-            if (Thread->WaitListHeader.Prev->Next != &Thread->WaitListHeader) {
-                KeReleaseSpinLockAtCurrentIrql(&Event->Lock);
+    if (Processor->TerminationQueue.Next) {
+        while (true) {
+            RtDList *ListHeader = RtPopDList(&Processor->TerminationQueue);
+            if (ListHeader == &Processor->TerminationQueue) {
                 break;
             }
 
-            RtUnlinkDList(&Thread->WaitListHeader);
-            KeReleaseSpinLockAtCurrentIrql(&Event->Lock);
+            PsThread *Thread = CONTAINING_RECORD(ListHeader, PsThread, ListHeader);
+            if (Thread->State != PS_STATE_TERMINATED) {
+                KeFatalError(KE_PANIC_BAD_THREAD_STATE, Thread->State, PS_STATE_TERMINATED, 0, 0);
+            }
 
-            /* Now that we know the event didn't get signaled just as we reached a timeout (and
-             * that can't happen anymore because we already unlinked), we can requeue the
-             * thread. */
-            Thread->State = PS_STATE_QUEUED;
-            RtAppendDList(&RequeueListHead, &Thread->ListHeader);
-            RequeueListSize++;
-        } while (false);
+            ObDereferenceObject(Thread);
+        }
     }
 
-    if (RequeueListHead.Next != &RequeueListHead) {
-        PspQueueThreadList(&RequeueListHead, RequeueListSize, true);
+    /* Requeue any waiting threads that have expired (this can also be done at DISPATCH). */
+    if (Processor->Ticks >= Processor->ClosestWaitTick) {
+        RtDList RequeueListHead;
+        uint64_t RequeueListSize = 0;
+        RtInitializeDList(&RequeueListHead);
+
+        while (true) {
+            /* Hold the processor lock while modifying the per-processor wait list. */
+            KeAcquireSpinLockAtCurrentIrql(&Processor->Lock);
+            RtAvlNode *Node = RtLookupByIndexAvlTree(&Processor->WaitTree, 0);
+            if (!Node) {
+                KeReleaseSpinLockAtCurrentIrql(&Processor->Lock);
+                break;
+            }
+
+            /* The list should be ordered, so we're the closest expiration; If we didn't expire yet,
+             * no one ahead of us did. */
+            PsThread *Thread = CONTAINING_RECORD(Node, PsThread, WaitTreeNode);
+            if (Thread->State != PS_STATE_WAITING) {
+                KeFatalError(KE_PANIC_BAD_THREAD_STATE, Thread->State, PS_STATE_WAITING, 0, 0);
+            } else if (Processor->Ticks < Thread->WaitTicks) {
+                Processor->ClosestWaitTick = Thread->WaitTicks;
+                KeReleaseSpinLockAtCurrentIrql(&Processor->Lock);
+                break;
+            }
+
+            RtRemoveAvlTree(&Processor->WaitTree, &Thread->WaitTreeNode);
+            KeReleaseSpinLockAtCurrentIrql(&Processor->Lock);
+
+            /* Shortcut for DelayThread(), we always want to queue the thread in that case. */
+            EvHeader *Event = Thread->WaitObject;
+            if (!Event) {
+                Thread->State = PS_STATE_QUEUED;
+                RtAppendDList(&RequeueListHead, &Thread->ListHeader);
+                RequeueListSize++;
+                continue;
+            }
+
+            do {
+                /* Now with the processor lock released, acquire the event lock (to modify the
+                 * per-event wait list). */
+                KeAcquireSpinLockAtCurrentIrql(&Event->Lock);
+
+                /* Is this the best way of checking if we're still linked? Not sure, maybe we should
+                 * add some other signal to say we're still inserted? */
+                if (Thread->WaitListHeader.Prev->Next != &Thread->WaitListHeader) {
+                    KeReleaseSpinLockAtCurrentIrql(&Event->Lock);
+                    break;
+                }
+
+                RtUnlinkDList(&Thread->WaitListHeader);
+                KeReleaseSpinLockAtCurrentIrql(&Event->Lock);
+
+                /* Now that we know the event didn't get signaled just as we reached a timeout (and
+                 * that can't happen anymore because we already unlinked), we can requeue the
+                 * thread. */
+                Thread->State = PS_STATE_QUEUED;
+                RtAppendDList(&RequeueListHead, &Thread->ListHeader);
+                RequeueListSize++;
+            } while (false);
+        }
+
+        if (RequeueListHead.Next != &RequeueListHead) {
+            PspQueueThreadList(&RequeueListHead, RequeueListSize, true);
+        }
+
+        if (!RtQuerySizeAvlTree(&Processor->WaitTree)) {
+            Processor->ClosestWaitTick = UINT64_MAX;
+        }
     }
 
     /* For any PENDING_* threads, we need to finish executing whichever action got us to here. */

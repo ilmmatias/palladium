@@ -40,7 +40,16 @@ void EvpWakeSingleThread(EvHeader *Header) {
     } else if (Thread->State != PS_STATE_WAITING) {
         KeFatalError(KE_PANIC_BAD_THREAD_STATE, Thread->State, PS_STATE_WAITING, 0, 0);
     } else if (Thread->WaitTicks) {
-        RtUnlinkDList(&Thread->ListHeader);
+        RtRemoveAvlTree(&Processor->WaitTree, &Thread->WaitTreeNode);
+        if (Thread->WaitTicks == Processor->ClosestWaitTick &&
+            RtQuerySizeAvlTree(&Processor->WaitTree)) {
+            Processor->ClosestWaitTick =
+                CONTAINING_RECORD(
+                    RtLookupByIndexAvlTree(&Processor->WaitTree, 0), PsThread, WaitTreeNode)
+                    ->WaitTicks;
+        } else if (Thread->WaitTicks == Processor->ClosestWaitTick) {
+            Processor->ClosestWaitTick = UINT64_MAX;
+        }
     }
 
     KeReleaseSpinLockAtCurrentIrql(&Processor->Lock);

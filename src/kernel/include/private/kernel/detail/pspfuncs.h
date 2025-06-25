@@ -35,6 +35,8 @@ void PspSwitchThreads(
     uint8_t Type,
     KeIrql OldIrql);
 
+RtAvlCompareResult PspCompareWaitThreads(RtAvlNode *FirstStruct, RtAvlNode *SecondStruct);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

@@ -38,9 +38,9 @@ void EvpHandleTimer(HalInterruptFrame *InterruptFrame) {
         NotifyProcessor = true;
     }
 
-    /* Check if we have any waiting threads to check under DISPATCH. */
-    if (Processor->WaitQueue.Next != &Processor->WaitQueue) {
-        HalpNotifyProcessor(Processor);
+    /* Check if the closest event has already reached its expiration tick. */
+    if (Processor->Ticks >= Processor->ClosestWaitTick) {
+        NotifyProcessor = true;
     }
 
     /* Update the quantum (if required). */
