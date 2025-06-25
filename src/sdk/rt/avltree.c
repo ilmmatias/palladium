@@ -91,18 +91,18 @@ static RtAvlNode* RotateLeft(RtAvlNode* Node) {
     RtAvlNode* Center = NewRoot->Left;
     RtAvlNode* OldParent = Node->Parent;
 
-    // Perform the actual rotation.
+    /* Perform the actual rotation. */
     NewRoot->Left = Node;
     Node->Right = Center;
 
-    // Update the parent pointers.
+    /* Update the parent pointers. */
     NewRoot->Parent = OldParent;
     Node->Parent = NewRoot;
     if (Center) {
         Center->Parent = Node;
     }
 
-    // Update heights and subtree sizes. Order is important, don't swap it around.
+    /* Update heights and subtree sizes. Order is important, don't swap it around. */
     Node->Height = RecalculateHeight(Node);
     Node->SubtreeSize = RecalculateSubtreeSize(Node);
     NewRoot->Height = RecalculateHeight(NewRoot);
@@ -126,18 +126,18 @@ static RtAvlNode* RotateRight(RtAvlNode* Node) {
     RtAvlNode* Center = NewRoot->Right;
     RtAvlNode* OldParent = Node->Parent;
 
-    // Perform the actual rotation.
+    /* Perform the actual rotation. */
     NewRoot->Right = Node;
     Node->Left = Center;
 
-    // Update the parent pointers.
+    /* Update the parent pointers. */
     NewRoot->Parent = OldParent;
     Node->Parent = NewRoot;
     if (Center) {
         Center->Parent = Node;
     }
 
-    // Update heights and subtree sizes. Order is important, don't swap it around.
+    /* Update heights and subtree sizes. Order is important, don't swap it around. */
     Node->Height = RecalculateHeight(Node);
     Node->SubtreeSize = RecalculateSubtreeSize(Node);
     NewRoot->Height = RecalculateHeight(NewRoot);
@@ -200,11 +200,11 @@ static void RebalanceTree(RtAvlTree* Tree, RtAvlNode* StartNode) {
     RtAvlNode* CurrentNode = StartNode;
 
     while (CurrentNode) {
-        // Update metrics for the current node.
+        /* Update metrics for the current node. */
         CurrentNode->Height = RecalculateHeight(CurrentNode);
         CurrentNode->SubtreeSize = RecalculateSubtreeSize(CurrentNode);
 
-        // Determine if a rotation is needed.
+        /* Determine if a rotation is needed. */
         int Balance = GetBalance(CurrentNode);
         RtAvlNode* ParentNode = CurrentNode->Parent;
         RtAvlNode* NewRoot = NULL;
@@ -220,8 +220,8 @@ static void RebalanceTree(RtAvlTree* Tree, RtAvlNode* StartNode) {
             NewRoot = RotateLeft(CurrentNode);
         }
 
-        // If a rotation did happen, the new root of the subtree needs to be
-        // linked to the original parent.
+        /* If a rotation did happen, the new root of the subtree needs to be linked to the original
+         * parent. */
         if (NewRoot) {
             if (!ParentNode) {
                 Tree->Root = NewRoot;
@@ -362,7 +362,7 @@ RtAvlNode* RtRemoveAvlTree(RtAvlTree* Tree, RtAvlNode* NodeToRemove) {
         ChildNode = NodeToReplace->Right;
     }
 
-    // Splice out NodeToReplace by linking its child to its parent.
+    /* Splice out NodeToReplace by linking its child to its parent. */
     RtAvlNode* RebalanceNode = NodeToReplace->Parent;
     if (ChildNode) {
         ChildNode->Parent = RebalanceNode;
@@ -377,9 +377,9 @@ RtAvlNode* RtRemoveAvlTree(RtAvlTree* Tree, RtAvlNode* NodeToRemove) {
     }
 
     if (NodeToReplace != NodeToRemove) {
-        // As we don't have any idea about the struct we're contained within,
-        // we cannot simple execute a memcpy, and instead, we need to manually
-        // swap the pointers around to reach the desired effect.
+        /* As we don't have any idea about the struct we're contained within, we cannot simple
+         * execute a memcpy, and instead, we need to manually swap the pointers around to reach the
+         * desired effect. */
         NodeToReplace->Height = NodeToRemove->Height;
         NodeToReplace->SubtreeSize = NodeToRemove->SubtreeSize;
         NodeToReplace->Parent = NodeToRemove->Parent;
@@ -485,14 +485,14 @@ RtAvlNode* RtLookupByIndexAvlTree(RtAvlTree* Tree, int Index) {
         LeftSize = GetSubtreeSize(CurrentNode->Left);
 
         if (Index < LeftSize) {
-            // Target is in the left subtree
+            /* Target is in the left subtree. */
             CurrentNode = CurrentNode->Left;
         } else if (Index > LeftSize) {
-            // Target is in the right subtree
+            /* Target is in the right subtree. */
             Index -= LeftSize + 1;
             CurrentNode = CurrentNode->Right;
         } else {
-            // Index == LeftSize, so the current node is the target
+            /* Index == LeftSize, so the current node is the target. */
             return CurrentNode;
         }
     }
@@ -520,11 +520,11 @@ RtAvlNode* RtEnumerateAvlTree(RtAvlTree* Tree, RtAvlNode** RestartKey) {
     if (!*RestartKey) {
         CurrentNode = GetMinimumNode(Tree->Root);
     } else if ((*RestartKey)->Right) {
-        // If there's a right subtree, the successor is the left-most node in it.
+        /* If there's a right subtree, the successor is the left-most node in it. */
         CurrentNode = GetMinimumNode((*RestartKey)->Right);
     } else {
-        // Otherwise, go up the tree until we find a parent from which
-        // we descended from the left.
+        /* Otherwise, go up the tree until we find a parent from which we descended from the
+         * left. */
         CurrentNode = *RestartKey;
         ParentNode = CurrentNode->Parent;
 
