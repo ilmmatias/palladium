@@ -96,7 +96,7 @@ HalpApplicationProcessorEntry:
     movabs $HalpProcessorList, %rbp
     mov (%rbp), %rbp
     mov (%rbp, %rax, 8), %rdx
-    lea 0x2FF8(%rdx), %rsp
+    lea 0x4FF8(%rdx), %rsp
 
     /* Now we can enable SSE and load up the same sane defaults the BSP uses. */
     fninit

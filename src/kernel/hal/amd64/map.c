@@ -6,6 +6,8 @@
 #include <kernel/mi.h>
 #include <string.h>
 
+static KeSpinLock Lock;
+
 extern bool HalpSmpInitializationComplete;
 
 typedef struct {
@@ -300,12 +302,14 @@ bool HalpMapContiguousPages(
         return false;
     }
 
+    KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Lock, KE_IRQL_DISPATCH);
     uint64_t Target = (uint64_t)VirtualAddress;
     uint64_t Source = PhysicalAddress;
 
     /* Fully walk the page table (once, it should be enough for most cases). */
     HalpPageFrame *CurrentFrame = WalkPageTable(Target);
     if (!CurrentFrame) {
+        KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
         return false;
     }
 
@@ -315,6 +319,7 @@ bool HalpMapContiguousPages(
         if (Offset && !(Target & (HALP_PD_SIZE - 1))) {
             CurrentFrame = WalkPageTable(Target);
             if (!CurrentFrame) {
+                KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
                 return false;
             }
         }
@@ -329,6 +334,7 @@ bool HalpMapContiguousPages(
         CurrentFrame++;
     }
 
+    KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
     return true;
 }
 
@@ -365,11 +371,13 @@ bool HalpMapNonContiguousPages(
         }
     }
 
+    KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Lock, KE_IRQL_DISPATCH);
     uint64_t Target = (uint64_t)VirtualAddress;
     uint64_t *Source = PhysicalAddresses;
 
     HalpPageFrame *CurrentFrame = WalkPageTable(Target);
     if (!CurrentFrame) {
+        KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
         return false;
     }
 
@@ -377,6 +385,7 @@ bool HalpMapNonContiguousPages(
         if (Offset && !(Target & (HALP_PD_SIZE - 1))) {
             CurrentFrame = WalkPageTable(Target);
             if (!CurrentFrame) {
+                KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
                 return false;
             }
         }
@@ -390,6 +399,7 @@ bool HalpMapNonContiguousPages(
         CurrentFrame++;
     }
 
+    KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
     return true;
 }
 
@@ -414,6 +424,8 @@ void HalpUnmapPages(void *VirtualAddress, uint64_t Size) {
         return;
     }
 
+    KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Lock, KE_IRQL_DISPATCH);
+
     while (Size) {
         uint64_t TargetLevel = 0;
         HalpPageFrame *TargetFrame = NULL;
@@ -435,6 +447,8 @@ void HalpUnmapPages(void *VirtualAddress, uint64_t Size) {
         Size = Size > TargetSize ? Size - TargetSize : 0;
     }
 
+    KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
+
     IpiContext Context;
     Context.ReloadCr3 = ReloadCr3;
     Context.Start = (uint64_t)VirtualAddress;
@@ -451,7 +465,7 @@ void HalpUnmapPages(void *VirtualAddress, uint64_t Size) {
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function maps a range of physical addresses (assumed to be device/MMIO) into
- *contiguous virtual memory.
+ *     contiguous virtual memory.
  *
  * PARAMETERS:
  *     PhysicalAddress - Source address, does not need to be aligned to MM_PAGE_SIZE.

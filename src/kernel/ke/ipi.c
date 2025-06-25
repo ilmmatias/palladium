@@ -41,8 +41,9 @@ void KeSynchronizeProcessors(volatile uint64_t *State) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void KeRequestIpiRoutine(void (*Routine)(void *), void *Parameter) {
-    /* Lock ourselves out of being interrupted by other IPIs. */
-    KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Lock, KE_IRQL_IPI);
+    /* Lock ourselves out of trying to execute multiple IPIs at the same time (because the global
+     * state only allows for one IPI at a time). */
+    KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Lock, KE_IRQL_SYNCH);
 
     /* Initialize the synchronization state. */
     TargetRoutine = Routine;
@@ -55,6 +56,7 @@ void KeRequestIpiRoutine(void (*Routine)(void *), void *Parameter) {
 
     /* Synchronize all processors before running anything. */
     KeSynchronizeProcessors(&EarlyBarrier);
+    KeSetIrql(KE_IRQL_IPI);
     Routine(Parameter);
 
     /* And synchronize afterwards as well. */
