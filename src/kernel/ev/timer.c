@@ -28,13 +28,14 @@ void EvpHandleTimer(HalInterruptFrame *InterruptFrame) {
     }
 
     /* Check if we have any DPCs to execute. */
+    bool NotifyProcessor = false;
     if (Processor->DpcQueue.Next != &Processor->DpcQueue) {
-        HalpNotifyProcessor(Processor);
+        NotifyProcessor = true;
     }
 
     /* Check if any threads have been terminated. */
     if (Processor->TerminationQueue.Next != &Processor->TerminationQueue) {
-        HalpNotifyProcessor(Processor);
+        NotifyProcessor = true;
     }
 
     /* Check if we have any waiting threads to check under DISPATCH. */
@@ -45,6 +46,12 @@ void EvpHandleTimer(HalInterruptFrame *InterruptFrame) {
     /* Update the quantum (if required). */
     PsThread *CurrentThread = Processor->CurrentThread;
     if (CurrentThread && CurrentThread->ExpirationTicks && !--CurrentThread->ExpirationTicks) {
+        NotifyProcessor = true;
+    }
+
+    /* And finally, if any of the conditions above were true, notify the current processor to run
+     * the dispatch handler. */
+    if (NotifyProcessor) {
         HalpNotifyProcessor(Processor);
     }
 }

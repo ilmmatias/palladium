@@ -113,8 +113,9 @@ bool EvAcquireMutex(EvMutex *Mutex, uint64_t Timeout) {
     /* Let's use WaitForObject and rely on EvReleaseMutex only waking up one thread at a time
      * (so when it returns, it's either timeout or we're safe to setup the lock). */
     if (!EvWaitForObject(Mutex, Timeout)) {
-        /* It needs to be atomic, but it should be safe to do it without the lock. */
-        __atomic_fetch_sub(&Mutex->Contention, 1, __ATOMIC_RELAXED);
+        OldIrql = KeAcquireSpinLockAndRaiseIrql(&Mutex->Header.Lock, KE_IRQL_DISPATCH);
+        Mutex->Contention--;
+        KeReleaseSpinLockAndLowerIrql(&Mutex->Header.Lock, OldIrql);
         return false;
     }
 
