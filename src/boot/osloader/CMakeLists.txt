@@ -10,7 +10,7 @@ if(ARCH STREQUAL "amd64")
     )
 endif()
 
-add_executable(osloader "kstdlib" NO
+add_executable(osloader "bstdlib" NO
     ${SOURCES}
     acpi.c
     console.c

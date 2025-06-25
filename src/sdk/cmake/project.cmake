@@ -9,6 +9,8 @@ function(add_executable target type has_lib)
             target_link_libraries(${target} PRIVATE kcrt)
         elseif(type STREQUAL "kstdlib")
             target_link_libraries(${target} PRIVATE kcrt krt)
+        elseif(type STREQUAL "bstdlib")
+            target_link_libraries(${target} PRIVATE kcrt brt)
         elseif(type STREQUAL "kernel")
             target_link_libraries(${target} PRIVATE kcrt krt)
             target_include_directories(${target} INTERFACE $<TARGET_PROPERTY:kcrt,INCLUDE_DIRECTORIES>)
@@ -23,7 +25,8 @@ function(add_executable target type has_lib)
     endif()
 
     if((ARCH STREQUAL "amd64" OR ARCH STREQUAL "x86") AND
-       (type STREQUAL "kcrt" OR type STREQUAL "kstdlib" OR type STREQUAL "knostdlib" OR type STREQUAL "kernel"))
+       (type STREQUAL "kcrt" OR type STREQUAL "kstdlib" OR type STREQUAL "bstdlib" OR
+        type STREQUAL "knostdlib" OR type STREQUAL "kernel"))
         target_compile_options(
             ${target}
             PRIVATE
@@ -63,6 +66,8 @@ function(add_library target type)
             target_link_libraries(${target} PRIVATE kcrt)
         elseif(type STREQUAL "kstdlib")
             target_link_libraries(${target} PRIVATE kcrt krt)
+        elseif(type STREQUAL "bstdlib")
+            target_link_libraries(${target} PRIVATE kcrt brt)
         elseif(type STREQUAL "kernel")
             target_link_libraries(${target} PRIVATE kcrt krt)
             target_include_directories(${target} INTERFACE $<TARGET_PROPERTY:kcrt,INCLUDE_DIRECTORIES>)
@@ -77,7 +82,8 @@ function(add_library target type)
     endif()
 
     if((ARCH STREQUAL "amd64" OR ARCH STREQUAL "x86") AND
-       (type STREQUAL "kcrt" OR type STREQUAL "kstdlib" OR type STREQUAL "knostdlib" OR type STREQUAL "kernel"))
+       (type STREQUAL "kcrt" OR type STREQUAL "kstdlib" OR type STREQUAL "bstdlib" OR
+        type STREQUAL "knostdlib" OR type STREQUAL "kernel"))
         target_compile_options(
             ${target}
             PRIVATE

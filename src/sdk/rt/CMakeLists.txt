@@ -14,5 +14,6 @@ set(SOURCES
     hash.c
     list.c)
 
+include(boot.cmake)
 include(kernel.cmake)
 include(user.cmake)
