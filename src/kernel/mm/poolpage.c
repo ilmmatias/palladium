@@ -29,14 +29,16 @@ void *MiAllocatePoolPages(uint32_t Pages) {
      * allocations), we have a special path (caching of recently freed entries). */
     if (Pages <= 4) {
         /* Start by checking in the per-processor list (as that's lock-free). */
+        KeIrql OldIrql = KeRaiseIrql(KE_IRQL_DISPATCH);
         KeProcessor *Processor = KeGetCurrentProcessor();
         RtSList *ListHeader = RtPopSList(&Processor->FreePoolPageListHead[Pages - 1]);
 
         /* And if that fails, try grabbing something out of the global list (that needs a lock). */
         if (ListHeader) {
             Processor->FreePoolPageListSize[Pages - 1]--;
+            KeLowerIrql(OldIrql);
         } else {
-            KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Lock, KE_IRQL_DISPATCH);
+            KeAcquireSpinLockAtCurrentIrql(&Lock);
             ListHeader = RtPopSList(&FreeLists[Pages - 1]);
             KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
         }
@@ -113,13 +115,15 @@ uint32_t MiFreePoolPages(void *Base) {
      * uncapped, and return the memory (or part of it) if our memory usage is above a certain
      * point? */
     if (Pages <= 4) {
+        KeIrql OldIrql = KeRaiseIrql(KE_IRQL_DISPATCH);
         KeProcessor *Processor = KeGetCurrentProcessor();
 
         if (Processor->FreePoolPageListSize[Pages - 1] < MI_PROCESSOR_POOL_CACHE_MAX_SIZE) {
             RtPushSList(&Processor->FreePoolPageListHead[Pages - 1], Base);
-            Processor->FreePoolPageListSize[Pages - 1]--;
+            Processor->FreePoolPageListSize[Pages - 1]++;
+            KeLowerIrql(OldIrql);
         } else {
-            KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Lock, KE_IRQL_DISPATCH);
+            KeAcquireSpinLockAtCurrentIrql(&Lock);
             RtPushSList(&FreeLists[Pages - 1], Base);
             KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
         }

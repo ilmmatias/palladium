@@ -14,6 +14,7 @@ RtDList MiFreePageListHead;
 KeSpinLock MiPageListLock = {0};
 uint64_t MiTotalSystemPages = 0;
 uint64_t MiTotalReservedPages = 0;
+uint64_t MiTotalCachedPages = 0;
 uint64_t MiTotalUsedPages = 0;
 uint64_t MiTotalFreePages = 0;
 uint64_t MiTotalBootPages = 0;
@@ -293,8 +294,8 @@ uint64_t MmAllocateSinglePage() {
              * so we just add them to the list here. */
             RtAppendDList(&Processor->FreePageListHead, ListHeader);
             Processor->FreePageListSize++;
-            MiTotalUsedPages += 1;
-            MiTotalFreePages -= 1;
+            __atomic_add_fetch(&MiTotalCachedPages, 1, __ATOMIC_RELAXED);
+            __atomic_sub_fetch(&MiTotalFreePages, 1, __ATOMIC_RELAXED);
         }
 
         KeReleaseSpinLockAtCurrentIrql(&MiPageListLock);
@@ -309,6 +310,8 @@ uint64_t MmAllocateSinglePage() {
     } else {
         Processor->FreePageListSize--;
         KeLowerIrql(OldIrql);
+        __atomic_sub_fetch(&MiTotalCachedPages, 1, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&MiTotalUsedPages, 1, __ATOMIC_RELAXED);
     }
 
     /* Make sure the flags make sense (if not, we probably have a corrupted PFN free list). */
@@ -347,15 +350,16 @@ void MmFreeSinglePage(uint64_t PhysicalAddress) {
         RtAppendDList(&Processor->FreePageListHead, &Entry->ListHeader);
         Processor->FreePageListSize++;
         KeLowerIrql(OldIrql);
+        __atomic_add_fetch(&MiTotalCachedPages, 1, __ATOMIC_RELAXED);
+        __atomic_sub_fetch(&MiTotalUsedPages, 1, __ATOMIC_RELAXED);
         return;
     }
 
     /* Otherwise, append the page to the global free page list (we do need the global lock for
      * this). */
     KeAcquireSpinLockAtCurrentIrql(&MiPageListLock);
-
     RtAppendDList(&MiFreePageListHead, &Entry->ListHeader);
-    MiTotalUsedPages -= 1;
-    MiTotalFreePages += 1;
     KeReleaseSpinLockAndLowerIrql(&MiPageListLock, OldIrql);
+    __atomic_sub_fetch(&MiTotalUsedPages, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&MiTotalFreePages, 1, __ATOMIC_RELAXED);
 }

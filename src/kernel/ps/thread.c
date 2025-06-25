@@ -242,19 +242,11 @@ void PspQueueThreadList(RtDList *ThreadList, uint64_t ThreadCount, bool EventQue
 void PspSetupThreadWait(KeProcessor *Processor, PsThread *Thread, uint64_t Time) {
     Thread->WaitTicks = Processor->Ticks + (Time + EVP_TICK_PERIOD - 1) / EVP_TICK_PERIOD;
 
-    /* Make sure we stop AFTER the wanted entry, as we don't have any RtInsertAfterDList, so we
-     * need to use RtPushDList. */
-    RtDList *ListHeader = Processor->WaitQueue.Next;
-    while (ListHeader != &Processor->WaitQueue) {
-        PsThread *Entry = CONTAINING_RECORD(ListHeader, PsThread, ListHeader);
-        if (Entry->WaitTicks >= Thread->WaitTicks) {
-            break;
-        }
-
-        ListHeader = ListHeader->Next;
+    if (Thread->WaitTicks < Processor->ClosestWaitTick) {
+        Processor->ClosestWaitTick = Thread->WaitTicks;
     }
 
-    RtPushDList(ListHeader->Prev, &Thread->ListHeader);
+    RtInsertAvlTree(&Processor->WaitTree, &Thread->WaitTreeNode);
 }
 
 /*-------------------------------------------------------------------------------------------------

@@ -6,8 +6,6 @@
 #include <kernel/vid.h>
 #include <string.h>
 
-extern RtSList MiPoolTagListHead[256];
-
 static RtSList FreeList = {};
 static KeSpinLock FreeListLock = {0};
 static KeSpinLock TagListLock[256] = {0};

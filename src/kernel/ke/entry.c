@@ -7,8 +7,6 @@
 #include <kernel/psp.h>
 #include <kernel/vidp.h>
 
-extern RtSList MiPoolTagListHead[256];
-
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function runs the required BSP-only initialization routines.
@@ -150,6 +148,7 @@ static void InitializeApplicationProcessor(KeProcessor *Processor) {
     VidPrintSimple("\ndumping the PFN stats:\n");
     VidPrintSimple("       total pages: %llu\n", MiTotalSystemPages);
     VidPrintSimple("    reserved pages: %llu\n", MiTotalReservedPages);
+    VidPrintSimple("      cached pages: %llu\n", MiTotalCachedPages);
     VidPrintSimple("        used pages: %llu\n", MiTotalUsedPages);
     VidPrintSimple("        free pages: %llu\n", MiTotalFreePages);
     VidPrintSimple("        boot pages: %llu\n", MiTotalBootPages);

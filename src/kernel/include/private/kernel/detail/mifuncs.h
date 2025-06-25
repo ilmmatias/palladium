@@ -21,12 +21,14 @@ extern "C" {
 extern MiPageEntry *MiPageList;
 extern uint64_t MiTotalSystemPages;
 extern uint64_t MiTotalReservedPages;
+extern uint64_t MiTotalCachedPages;
 extern uint64_t MiTotalUsedPages;
 extern uint64_t MiTotalFreePages;
 extern uint64_t MiTotalBootPages;
 extern uint64_t MiTotalGraphicsPages;
 extern uint64_t MiTotalPfnPages;
 extern uint64_t MiTotalPoolPages;
+extern RtSList MiPoolTagListHead[256];
 
 void MiInitializeEarlyPageAllocator(KiLoaderBlock *LoaderBlock);
 void MiInitializePageAllocator(void);
