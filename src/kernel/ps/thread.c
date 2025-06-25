@@ -150,7 +150,7 @@ void PspQueueThread(PsThread *Thread, bool EventQueue) {
     /* Otherwise, we fallback onto the slow path, and search for the least loaded processor (falling
      * back to the current processor if everyone is equally loaded). */
     uint32_t TargetIndex = Processor->Number;
-    uint64_t TargetLoad = 0;
+    uint64_t TargetLoad = __atomic_load_n(&Processor->ThreadCount, __ATOMIC_RELAXED);
     for (uint32_t i = 0; i < HalpOnlineProcessorCount; i++) {
         KeProcessor *Processor = HalpProcessorList[i];
         uint64_t ThreadCount = __atomic_load_n(&Processor->ThreadCount, __ATOMIC_RELAXED);
