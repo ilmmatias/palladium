@@ -34,10 +34,10 @@ add_executable(kernel "kernel" YES
 
     ke/acpi.c
     ke/affinity.c
-    ke/dpc.c
     ke/driver.c
     ke/entry.c
     ke/ipi.c
+    ke/kernelsignal.c
     ke/panic.c
     ke/stackcheck.c
 

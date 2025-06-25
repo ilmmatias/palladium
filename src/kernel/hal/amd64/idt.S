@@ -16,7 +16,7 @@
 .extern HalpDispatchNmi
 .extern HalpSendEoi
 .extern KiHandleIpi
-.extern KiProcessDpcQueue
+.extern KiProcessKernelSignalQueue
 .extern PspProcessQueue
 
 .global HalpDefaultInterruptHandlers
@@ -322,7 +322,7 @@ HalpDispatchEntry:
     call HalpSendEoi
     sti
     mov %rsp, %rcx
-    call KiProcessDpcQueue
+    call KiProcessKernelSignalQueue
     mov %rsp, %rcx
     call PspProcessQueue
     LEAVE_INTERRUPT

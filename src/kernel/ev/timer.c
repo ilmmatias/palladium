@@ -27,9 +27,9 @@ void EvpHandleTimer(HalInterruptFrame *InterruptFrame) {
         Processor->IdleTicks++;
     }
 
-    /* Check if we have any DPCs to execute. */
+    /* Check if we have any kernel signals to execute. */
     bool NotifyProcessor = false;
-    if (Processor->DpcQueue.Next != &Processor->DpcQueue) {
+    if (Processor->KernelSignalQueue.Next != &Processor->KernelSignalQueue) {
         NotifyProcessor = true;
     }
 
