@@ -276,13 +276,9 @@ void HalpDispatchInterrupt(HalInterruptFrame *InterruptFrame) {
     for (RtDList *ListHeader = HandlerList->Next; ListHeader != HandlerList;
          ListHeader = ListHeader->Next) {
         HalInterrupt *Interrupt = CONTAINING_RECORD(ListHeader, HalInterrupt, ListHeader);
-        KeSetIrql(Interrupt->Data.Irql);
-        __asm__ volatile("sti");
         KeAcquireSpinLockAtCurrentIrql(&Interrupt->Lock);
         Interrupt->Handler(Interrupt->HandlerContext);
         KeReleaseSpinLockAtCurrentIrql(&Interrupt->Lock);
-        __asm__ volatile("cli");
-        KeSetIrql(InterruptFrame->Irql);
     }
 
     HalpSendEoi();

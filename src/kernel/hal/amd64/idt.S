@@ -34,6 +34,10 @@ HalpDefaultInterruptHandlers:
 .align 16
 HalpDefaultInterruptEntry:
     ENTER_INTERRUPT (INTERRUPT_FLAGS_HAS_ERROR_CODE)
+    mov INTERRUPT_FRAME_INTERRUPT_NUMBER(%rsp), %rcx
+    shr $4, %rcx
+    mov %rcx, %cr8
+    sti
     mov %rsp, %rcx
     call HalpDispatchInterrupt
     LEAVE_INTERRUPT
