@@ -4,7 +4,7 @@
 #include <kernel/ki.h>
 #include <kernel/mi.h>
 #include <kernel/vid.h>
-#include <pe.h>
+#include <os/pe.h>
 #include <stdio.h>
 #include <string.h>
 

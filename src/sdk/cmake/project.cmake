@@ -44,7 +44,7 @@ function(add_executable target type has_lib)
         -fexceptions
         -fseh-exceptions
         -fms-extensions
-        -include ${CMAKE_SOURCE_DIR}/sdk/rt/include/intellisense.h)
+        -include ${CMAKE_SOURCE_DIR}/sdk/include/os/intellisense.h)
 
     target_link_options(
     	${target}
@@ -52,6 +52,11 @@ function(add_executable target type has_lib)
     	--target=${TARGET_${ARCH}}-w64-mingw32
     	-fuse-ld=lld
     	/usr/local/lib/baremetal/libclang_rt.builtins-${TARGET_${ARCH}}.a)
+
+    target_include_directories(
+        ${target}
+        PRIVATE
+        ${CMAKE_SOURCE_DIR}/sdk/include)
 
     if(has_lib)
         target_link_options(${target} PRIVATE -Wl,--out-implib,${CMAKE_CURRENT_BINARY_DIR}/${target}.lib)
@@ -101,7 +106,7 @@ function(add_library target type)
         -fexceptions
         -fseh-exceptions
         -fms-extensions
-        -include ${CMAKE_SOURCE_DIR}/sdk/rt/include/intellisense.h)
+        -include ${CMAKE_SOURCE_DIR}/sdk/include/os/intellisense.h)
 
     target_link_options(
         	${target}
@@ -110,4 +115,9 @@ function(add_library target type)
             -Wl,--out-implib,${CMAKE_CURRENT_BINARY_DIR}/${target}.lib
         	-fuse-ld=lld
         	/usr/local/lib/baremetal/libclang_rt.builtins-${TARGET_${ARCH}}.a)
+    
+    target_include_directories(
+        ${target}
+        PRIVATE
+        ${CMAKE_SOURCE_DIR}/sdk/include)
 endfunction()

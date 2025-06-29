@@ -6,7 +6,7 @@
 #include <file.h>
 #include <loader.h>
 #include <memory.h>
-#include <pe.h>
+#include <os/pe.h>
 #include <string.h>
 
 /*-------------------------------------------------------------------------------------------------
@@ -357,21 +357,21 @@ void OslFixupRelocations(RtDList *LoadedPrograms) {
                 void *Offset = BaseAddress + (*(BlockRelocations++) & 0xFFF);
 
                 switch (Type) {
-                    case IMAGE_REL_BASED_HIGH:
+                    case PE_IMAGE_REL_BASED_HIGH:
                         *((uint16_t *)Offset) += ThisProgram->BaseDiff >> 16;
                         break;
-                    case IMAGE_REL_BASED_LOW:
+                    case PE_IMAGE_REL_BASED_LOW:
                         *((uint16_t *)Offset) += ThisProgram->BaseDiff;
                         break;
-                    case IMAGE_REL_BASED_HIGHLOW:
+                    case PE_IMAGE_REL_BASED_HIGHLOW:
                         *((uint32_t *)Offset) += ThisProgram->BaseDiff;
                         break;
-                    case IMAGE_REL_BASED_HIGHADJ:
+                    case PE_IMAGE_REL_BASED_HIGHADJ:
                         *((uint16_t *)Offset) += ThisProgram->BaseDiff >> 16;
                         *((uint16_t *)(BaseAddress + (*(BlockRelocations++) & 0xFFF))) =
                             ThisProgram->BaseDiff;
                         break;
-                    case IMAGE_REL_BASED_DIR64:
+                    case PE_IMAGE_REL_BASED_DIR64:
                         *((uint64_t *)Offset) += ThisProgram->BaseDiff;
                         break;
                 }

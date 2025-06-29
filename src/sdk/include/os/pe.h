@@ -1,8 +1,8 @@
-/* SPDX-FileCopyrightText: (C) 2024-2025 ilmmatias
+/* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#ifndef _PE_H_
-#define _PE_H_
+#ifndef _OS_PE_H_
+#define _OS_PE_H_
 
 #include <stdint.h>
 
@@ -11,19 +11,78 @@
 #if defined(ARCH_amd64)
 #define PE_MACHINE 0x8664
 #else
-#error "Undefined ARCH for the osloader module!"
+#error "Undefined ARCH for the sdk module!"
 #endif
 
-#define IMAGE_REL_BASED_HIGH 1
-#define IMAGE_REL_BASED_LOW 2
-#define IMAGE_REL_BASED_HIGHLOW 3
-#define IMAGE_REL_BASED_HIGHADJ 4
-#define IMAGE_REL_BASED_DIR64 10
+#define PE_IMAGE_REL_BASED_HIGH 1
+#define PE_IMAGE_REL_BASED_LOW 2
+#define PE_IMAGE_REL_BASED_HIGHLOW 3
+#define PE_IMAGE_REL_BASED_HIGHADJ 4
+#define PE_IMAGE_REL_BASED_DIR64 10
 
 typedef struct __attribute__((packed)) {
     uint32_t VirtualAddress;
     uint32_t Size;
 } PeDataDirectory;
+
+typedef struct __attribute__((packed)) {
+    char Signature[4];
+    uint16_t Machine;
+    uint16_t NumberOfSections;
+    uint32_t TimeDateStamp;
+    uint32_t PointerToSymbolTable;
+    uint32_t NumberOfSymbols;
+    uint16_t SizeOfOptionalHeader;
+    uint16_t Characteristics;
+    uint16_t Magic;
+    uint8_t MajorLinkerVersion;
+    uint8_t MinorLinkerVersion;
+    uint32_t SizeOfCode;
+    uint32_t SizeOfInitializedData;
+    uint32_t SizeOfUninitializedData;
+    uint32_t AddressOfEntryPoint;
+    uint32_t BaseOfCode;
+    uint32_t BaseOfData;
+    uint32_t ImageBase;
+    uint32_t SectionAlignment;
+    uint32_t FileAlignment;
+    uint16_t MajorOperatingSystemVersion;
+    uint16_t MinorOperatingSystemVersion;
+    uint16_t MajorImageVersion;
+    uint16_t MinorImageVersion;
+    uint16_t MajorSubsystemVersion;
+    uint16_t MinorSubsystemVersion;
+    uint32_t Win32VersionValue;
+    uint32_t SizeOfImage;
+    uint32_t SizeOfHeaders;
+    uint32_t CheckSum;
+    uint16_t Subsystem;
+    uint16_t DllCharacteristics;
+    uint32_t SizeOfStackReserve;
+    uint32_t SizeOfStackCommit;
+    uint32_t SizeOfHeapReserve;
+    uint32_t SizeOfHeapCommit;
+    uint32_t LoaderFlags;
+    uint32_t NumberOfRvaAndSizes;
+    struct {
+        PeDataDirectory ExportTable;
+        PeDataDirectory ImportTable;
+        PeDataDirectory ResourceTable;
+        PeDataDirectory ExceptionTable;
+        PeDataDirectory CertificateTable;
+        PeDataDirectory BaseRelocationTable;
+        PeDataDirectory Debug;
+        PeDataDirectory Architecture;
+        PeDataDirectory GlobalPtr;
+        PeDataDirectory TlsTable;
+        PeDataDirectory LoadConfigTable;
+        PeDataDirectory BoundImport;
+        PeDataDirectory Iat;
+        PeDataDirectory DelayImportDescriptor;
+        PeDataDirectory ClrRuntimeHeader;
+        PeDataDirectory Reserved;
+    } DataDirectories;
+} PeHeader32;
 
 typedef struct __attribute__((packed)) {
     char Signature[4];
@@ -81,7 +140,7 @@ typedef struct __attribute__((packed)) {
         PeDataDirectory ClrRuntimeHeader;
         PeDataDirectory Reserved;
     } DataDirectories;
-} PeHeader;
+} PeHeader64;
 
 typedef struct __attribute__((packed)) {
     char Name[8];
@@ -123,4 +182,19 @@ typedef struct __attribute__((packed)) {
     uint32_t BlockSize;
 } PeBaseRelocationBlock;
 
-#endif /* _PE_H_ */
+typedef struct __attribute__((packed)) {
+    char Name[8];
+    uint32_t Value;
+    uint16_t SectionNumber;
+    uint16_t Type;
+    uint8_t StorageClass;
+    uint8_t NumberOfAuxSymbols;
+} CoffSymbol;
+
+#if UINTPTR_MAX == UINT64_MAX
+typedef PeHeader64 PeHeader;
+#else
+typedef PeHeader32 PeHeader;
+#endif
+
+#endif /* _OS_PE_H_ */
