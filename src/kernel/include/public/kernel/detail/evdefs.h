@@ -10,7 +10,7 @@
 #endif /* __has__include */
 /* clang-format on */
 
-#define EV_TIMEOUT_UNLIMITED 0
+#define EV_TIMEOUT_UNLIMITED ((uint64_t)-1)
 
 #define EV_MICROSECS 1000ull
 #define EV_MILLISECS 1000000ull

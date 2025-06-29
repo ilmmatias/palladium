@@ -119,8 +119,12 @@ bool EvAcquireMutex(EvMutex *Mutex, uint64_t Timeout) {
         return false;
     }
 
+    OldIrql = KeAcquireSpinLockAndRaiseIrql(&Mutex->Header.Lock, KE_IRQL_DISPATCH);
     Mutex->Recursion = 1;
     Mutex->Owner = PsGetCurrentThread();
+    Mutex->Contention--;
+    KeReleaseSpinLockAndLowerIrql(&Mutex->Header.Lock, OldIrql);
+
     return true;
 }
 
@@ -155,7 +159,6 @@ void EvReleaseMutex(EvMutex *Mutex) {
          * signaled/acquirable, and that would cause a lot of trouble. */
         Mutex->Owner = NULL;
         if (Mutex->Contention) {
-            Mutex->Contention--;
             EvpWakeSingleThread(&Mutex->Header);
         } else {
             Mutex->Header.Signaled = true;

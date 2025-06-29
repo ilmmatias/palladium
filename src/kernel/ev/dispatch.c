@@ -81,7 +81,7 @@ void EvpWakeAllThreads(EvHeader *Header) {
  *
  * PARAMETERS:
  *     Object - Which object to wait for.
- *     Timeout - Either how many ns to wait, or 0 (EV_TIMEOUT_UNLIMITED) for no timeout.
+ *     Timeout - Either how many ns to wait, or -1 (EV_TIMEOUT_UNLIMITED) for no timeout.
  *
  * RETURN VALUE:
  *     false if the timeout expires, true otherwise.
@@ -109,7 +109,7 @@ bool EvWaitForObject(void *Object, uint64_t Timeout) {
         CurrentThread->State == PS_STATE_PENDING_TERMINATE) {
         KeReleaseSpinLockAtCurrentIrql(&Processor->Lock);
         KeReleaseSpinLockAndLowerIrql(&Header->Lock, OldIrql);
-        return true;
+        return false;
     }
 
     /* Make sure the thread state is sane. */
