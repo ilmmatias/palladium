@@ -530,6 +530,14 @@ HalCreateInterrupt(HalInterruptData *Data, void (*Handler)(void *), void *Handle
     Interrupt->HandlerContext = HandlerContext;
     memcpy(&Interrupt->Data, Data, sizeof(HalInterruptData));
 
+    if (Interrupt->Data.PinPolarity == HAL_INT_POLARITY_UNSET) {
+        Interrupt->Data.PinPolarity = HAL_INT_POLARITY_HIGH;
+    }
+
+    if (Interrupt->Data.TriggerMode == HAL_INT_TRIGGER_UNSET) {
+        Interrupt->Data.PinPolarity = HAL_INT_TRIGGER_EDGE;
+    }
+
     return Interrupt;
 }
 
