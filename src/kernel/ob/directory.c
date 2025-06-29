@@ -18,9 +18,9 @@
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 static void DeleteRoutine(void *Object) {
-    /* No references are left, and as such, no one else should be able to hold the lock, so we'll
-     * skip on acquiring it. */
     ObDirectory *Directory = Object;
+    KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Directory->Lock, KE_IRQL_DISPATCH);
+
     for (size_t Head = 0; Head < 32; Head++) {
         while (Directory->HashHeads[Head].Next != &Directory->HashHeads[Head]) {
             RtDList *ListHeader = RtPopDList(&Directory->HashHeads[Head]);
@@ -43,6 +43,8 @@ static void DeleteRoutine(void *Object) {
             }
         }
     }
+
+    KeReleaseSpinLockAndLowerIrql(&Directory->Lock, OldIrql);
 }
 
 ObType ObpDirectoryType = {

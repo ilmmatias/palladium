@@ -137,7 +137,7 @@ uint32_t KeGetFirstAffinityClearBit(KeAffinity *Mask) {
  *-----------------------------------------------------------------------------------------------*/
 uint64_t KeCountAffinitySetBits(KeAffinity *Mask) {
     uint64_t Result = 0;
-    uint32_t WordCount = (Mask->Size + 7) >> 3;
+    uint32_t WordCount = (Mask->Size + 63) >> 6;
 
     for (uint32_t Number = 0; Number < WordCount - 1; Number++) {
         uint64_t Word = __atomic_load_n(&Mask->Bits[Number], __ATOMIC_SEQ_CST);
@@ -169,7 +169,7 @@ uint64_t KeCountAffinitySetBits(KeAffinity *Mask) {
  *-----------------------------------------------------------------------------------------------*/
 uint64_t KeCountAffinityClearBits(KeAffinity *Mask) {
     uint64_t Result = 0;
-    uint32_t WordCount = (Mask->Size + 7) >> 3;
+    uint32_t WordCount = (Mask->Size + 63) >> 6;
 
     for (uint32_t Number = 0; Number < WordCount - 1; Number++) {
         uint64_t Word = __atomic_load_n(&Mask->Bits[Number], __ATOMIC_SEQ_CST);
