@@ -21,7 +21,8 @@ static uint64_t SpaceSize = 1 << VIRTUAL_RANDOM_BITS;
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 EFI_STATUS OslpInitializeVirtualAllocator(void) {
-    EFI_STATUS Status = gBS->AllocatePool(EfiLoaderData, SpaceSize >> 3, &BitmapBuffer);
+    EFI_STATUS Status =
+        gBS->AllocatePool(EfiLoaderData, ((SpaceSize + 63) >> 6) << 3, &BitmapBuffer);
     if (Status != EFI_SUCCESS) {
         OslPrint("Failed to allocate space for the virtual memory bitmap.\r\n");
         OslPrint("The boot process cannot continue.\r\n");

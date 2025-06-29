@@ -153,11 +153,12 @@ static void InitializeApplicationProcessor(KeProcessor *Processor) {
     VidPrintSimple("        free pages: %llu\n", MiTotalFreePages);
     VidPrintSimple("        boot pages: %llu\n", MiTotalBootPages);
     VidPrintSimple("    graphics pages: %llu\n", MiTotalGraphicsPages);
+    VidPrintSimple("         pte pages: %llu\n", MiTotalPtePages);
     VidPrintSimple("         pfn pages: %llu\n", MiTotalPfnPages);
     VidPrintSimple("        pool pages: %llu\n", MiTotalPoolPages);
 
     /* Dump the per-tag pool stats. */
-    VidPrintSimple("\ndumping the pool stats:\n");
+    VidPrintSimple("\ndumping the tag stats:\n");
     VidPrintSimple(
         "tag  | allocs           | bytes            | max allocs       | max bytes       \n");
     for (int i = 0; i < 256; i++) {

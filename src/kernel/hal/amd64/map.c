@@ -97,6 +97,7 @@ static bool AllocateFrame(HalpPageFrame *CurrentFrame, HalpPageFrame *NextFrame)
     /* And clean up the child level via the recursive paging (so that we don't need the allocated
      * page to be mapped into higher memory). */
     memset((void *)((uint64_t)NextFrame & ~(HALP_PT_SIZE - 1)), 0, HALP_PT_SIZE);
+    __atomic_add_fetch(&MiTotalPtePages, 1, __ATOMIC_RELAXED);
     return true;
 }
 
@@ -190,6 +191,7 @@ static bool CleanFrame(uint64_t VirtualAddress, uint64_t TargetLevel) {
 
         if (MiPageList) {
             MmFreeSinglePage(ParentFrame->Address << MM_PAGE_SHIFT);
+            __atomic_sub_fetch(&MiTotalPtePages, 1, __ATOMIC_RELAXED);
         }
 
         ParentFrame->RawData = 0;

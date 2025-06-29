@@ -19,6 +19,7 @@ uint64_t MiTotalUsedPages = 0;
 uint64_t MiTotalFreePages = 0;
 uint64_t MiTotalBootPages = 0;
 uint64_t MiTotalGraphicsPages = 0;
+uint64_t MiTotalPtePages = 0;
 uint64_t MiTotalPfnPages = 0;
 uint64_t MiTotalPoolPages = 0;
 
