@@ -180,8 +180,8 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
     uint32_t HeadPages = GetHeadPages(Head);
     uint64_t HeadSize = GetHeadSize(Head);
     uint64_t FullSize = HeadSize + sizeof(BlockHeader);
-    KeProcessor *Processor = KeGetCurrentProcessor();
     KeIrql OldIrql = KeRaiseIrql(KE_IRQL_DISPATCH);
+    KeProcessor *Processor = KeGetCurrentProcessor();
     if (Processor->FreePoolBlockListHead[Head].Next) {
         BlockHeader *Header = CONTAINING_RECORD(
             RtPopSList(&Processor->FreePoolBlockListHead[Head]), BlockHeader, ListHeader);
@@ -299,8 +299,8 @@ void MmFreePool(void *Base, const char Tag[4]) {
     /* If we haven't overflow the local cache yet, just directly push to it (as it doesn't need any
      * locks). */
     uint64_t FullSize = GetHeadSize(Header->Head) + 16;
-    KeProcessor *Processor = KeGetCurrentProcessor();
     KeIrql OldIrql = KeRaiseIrql(KE_IRQL_DISPATCH);
+    KeProcessor *Processor = KeGetCurrentProcessor();
     if (Processor->FreePoolBlockListSize[Header->Head] < MI_PROCESSOR_POOL_CACHE_MAX_SIZE) {
         RtPushSList(&Processor->FreePoolBlockListHead[Header->Head], &Header->ListHeader);
         KeLowerIrql(OldIrql);
