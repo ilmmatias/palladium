@@ -4,8 +4,10 @@
 #include <kernel/halp.h>
 #include <kernel/ke.h>
 #include <kernel/mi.h>
+#include <rt/bitmap.h>
 
-extern char *MiPoolVirtualOffset;
+extern RtBitmap MiPoolBitmap;
+extern uint64_t MiPoolBitmapHint;
 
 static RtSList FreeLists[4] = {};
 static KeSpinLock Lock = {0};
@@ -55,18 +57,18 @@ void *MiAllocatePoolPages(uint32_t Pages) {
         }
     }
 
-    /* This might end up happening on systems with a lower virtual space reservation (so, 32-bit
-     * systems), so, TODO: change this to a balanced tree of some kind. */
+    /* Otherwise, we need to grab more virtual space (this needs the lock). */
     KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Lock, KE_IRQL_DISPATCH);
-    if (MiPoolVirtualOffset + (Pages << MM_PAGE_SHIFT) > (char *)MI_POOL_END) {
+    uint64_t Index = RtFindClearBitsAndSet(&MiPoolBitmap, MiPoolBitmapHint, Pages);
+    if (Index == (uint64_t)-1) {
         KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
         return NULL;
+    } else {
+        MiPoolBitmapHint = Index + Pages;
+        KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
     }
 
-    char *VirtualAddress = MiPoolVirtualOffset;
-    MiPoolVirtualOffset += Pages << MM_PAGE_SHIFT;
-    KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
-
+    char *VirtualAddress = (char *)(MI_POOL_START + (Index << MM_PAGE_SHIFT));
     for (uint64_t Offset = 0; Offset < Pages << MM_PAGE_SHIFT; Offset += MM_PAGE_SIZE) {
         /* TODO: What exactly should be do when we fail to map/allocate the space, unmap+free
          * the pages, mark them as big pool free? */
@@ -147,10 +149,16 @@ uint32_t MiFreePoolPages(void *Base) {
         MmFreeSinglePage(PhysicalAddress);
     }
 
-    /* And wrap up by unmapping the whole range; This is going to leak virtual space left and right
-     * if we do it too much, so, maybe, TODO: fix this? Shouldn't be a problem on 64-bit address
-     * spaces, but it can be problematic on 32-bit systems. */
+    /* And wrap up by unmapping and returning the whole range (the later one needs to be done under
+     * the lock). */
     HalpUnmapPages(Base, Pages << MM_PAGE_SHIFT);
+
+    KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Lock, KE_IRQL_DISPATCH);
+    uint64_t Index = ((uint64_t)Base - MI_POOL_START) >> MM_PAGE_SHIFT;
+    RtClearBits(&MiPoolBitmap, Index, Pages);
+    MiPoolBitmapHint = Index;
+    KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
+
     __atomic_fetch_sub(&MiTotalPoolPages, Pages, __ATOMIC_RELAXED);
     return Pages;
 }

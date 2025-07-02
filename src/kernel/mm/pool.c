@@ -4,6 +4,7 @@
 #include <kernel/halp.h>
 #include <kernel/ke.h>
 #include <kernel/mi.h>
+#include <rt/bitmap.h>
 #include <string.h>
 
 typedef struct {
@@ -15,7 +16,9 @@ typedef struct {
 static RtSList FreeBlockList[MM_POOL_BLOCK_COUNT] = {};
 static KeSpinLock FreeBlockLock[MM_POOL_BLOCK_COUNT] = {};
 
-char *MiPoolVirtualOffset = NULL;
+uint64_t *MiPoolBitmapBuffer = NULL;
+RtBitmap MiPoolBitmap = {};
+uint64_t MiPoolBitmapHint = 0;
 RtSList MiPoolTagListHead[256] = {};
 
 /*-------------------------------------------------------------------------------------------------
@@ -92,7 +95,43 @@ static uint64_t GetHeadPages(uint32_t Head) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void MiInitializePool(void) {
-    MiPoolVirtualOffset = (char *)MI_POOL_START;
+    /* It doesn't make much sense to go over the physical memory limit in the pool, so, let's limit
+     * it to 75% of the physical memory size (or the max pool size, whichever is smaller). */
+    uint64_t MemorySize = MiTotalSystemPages * MM_PAGE_SIZE;
+    uint64_t PoolSize = ((MemorySize * 75) / 100 + MM_PAGE_SIZE - 1) & ~(MM_PAGE_SIZE - 1);
+    if (PoolSize > MI_POOL_MAX_SIZE) {
+        PoolSize = MI_POOL_MAX_SIZE;
+    }
+
+    /* Grab some physical memory and map it for the pool bitmap. */
+    uint64_t PoolPages = PoolSize >> MM_PAGE_SHIFT;
+    uint64_t Size = ((PoolPages + 63) >> 6) << 3;
+    uint64_t Pages = (Size + MM_PAGE_SIZE - 1) >> MM_PAGE_SHIFT;
+    uint64_t PhysicalAddress = MiAllocateEarlyPages(Pages);
+    if (!PhysicalAddress) {
+        KeFatalError(
+            KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+            KE_PANIC_PARAMETER_POOL_INITIALIZATION_FAILURE,
+            KE_PANIC_PARAMETER_OUT_OF_RESOURCES,
+            0,
+            0);
+    }
+
+    MiPoolBitmapBuffer = (uint64_t *)(MI_VIRTUAL_OFFSET + PhysicalAddress);
+    if (!HalpMapContiguousPages(
+            MiPoolBitmapBuffer, PhysicalAddress, Pages << MM_PAGE_SHIFT, MI_MAP_WRITE)) {
+        KeFatalError(
+            KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+            KE_PANIC_PARAMETER_POOL_INITIALIZATION_FAILURE,
+            KE_PANIC_PARAMETER_OUT_OF_RESOURCES,
+            0,
+            0);
+    }
+
+    /* And clear up the bitmap (as, unlike MmAllocatePool, doing Allocate+MapPages doesn't clean the
+     * memory). */
+    RtInitializeBitmap(&MiPoolBitmap, MiPoolBitmapBuffer, PoolPages);
+    RtClearAllBits(&MiPoolBitmap);
 }
 
 /*-------------------------------------------------------------------------------------------------
