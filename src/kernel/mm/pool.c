@@ -33,12 +33,12 @@ RtSList MiPoolTagListHead[256] = {};
  *-----------------------------------------------------------------------------------------------*/
 static uint32_t GetHeadIndex(size_t Size) {
     if (Size < MM_POOL_SMALL_MAX) {
-        return Size >> MM_POOL_SMALL_SHIFT;
+        return (Size - 1) >> MM_POOL_SMALL_SHIFT;
     } else if (Size < MM_POOL_MEDIUM_MAX) {
-        return MM_POOL_SMALL_COUNT + ((Size - MM_POOL_MEDIUM_MIN) >> MM_POOL_MEDIUM_SHIFT);
+        return MM_POOL_SMALL_COUNT + ((Size - MM_POOL_MEDIUM_MIN - 1) >> MM_POOL_MEDIUM_SHIFT);
     } else {
         return MM_POOL_SMALL_COUNT + MM_POOL_MEDIUM_COUNT +
-               ((Size - MM_POOL_LARGE_MIN) >> MM_POOL_LARGE_SHIFT);
+               ((Size - MM_POOL_LARGE_MIN - 1) >> MM_POOL_LARGE_SHIFT);
     }
 }
 
