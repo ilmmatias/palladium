@@ -8,6 +8,8 @@
 #include <platform.h>
 #include <string.h>
 
+static bool HasHugePages = false;
+
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function sets up the specified page frame to be present.
@@ -204,7 +206,31 @@ static bool MapRange(
     uint64_t Size,
     int Flags) {
     while (Size) {
-        /* Use as many 2MiB pages as we can. */
+        /* Use as many 1GiB pages as possible. */
+        bool UseHugePage = HasHugePages && CheckLevel(PageMap, VirtualAddress, 1) &&
+                           !(VirtualAddress & (SIZE_1GB - 1)) &&
+                           !(PhysicalAddress & (SIZE_1GB - 1)) && Size >= SIZE_1GB;
+        if (UseHugePage) {
+            if (!MapPage(
+                    MemoryDescriptorListHead,
+                    MemoryDescriptorStack,
+                    PageMap,
+                    VirtualAddress,
+                    PhysicalAddress,
+                    Flags,
+                    1,
+                    true,
+                    30)) {
+                return false;
+            }
+
+            VirtualAddress += SIZE_1GB;
+            PhysicalAddress += SIZE_1GB;
+            Size -= SIZE_1GB;
+            continue;
+        }
+
+        /* Followed by large (2MiB) pages. */
         bool UseLargePage = CheckLevel(PageMap, VirtualAddress, 2) &&
                             !(VirtualAddress & (SIZE_2MB - 1)) &&
                             !(PhysicalAddress & (SIZE_2MB - 1)) && Size >= SIZE_2MB;
@@ -288,14 +314,20 @@ void *OslpCreatePageMap(
         return NULL;
     }
 
+    /* Check for 1GiB page support; If we do support it, it can reduces the amount of work to map
+     * all ranges. */
+    uint32_t Eax, Ebx, Ecx, Edx;
+    __cpuid(0x80000001, Eax, Ebx, Ecx, Edx);
+    HasHugePages = (Edx & 0x4000000) != 0;
+
     /* The last entry of the address space contains a self-reference (so that the
      * kernel can easily manipulate the page map). */
     PageFrame *PageMap = (PageFrame *)PhysicalAddress;
     memset(PageMap, 0, SIZE_4KB);
     SetupFrame(&PageMap[511], (uint64_t)PageMap, PAGE_FLAGS_WRITE, false);
 
-    /* Identity map all descriptors that are either OSLOADER (because we need them while we change
-     * CR3) or FIRMWARE (we need them for SetVirtualAddressMap). */
+    /* Identity map (into low memory) all descriptors that are either OSLOADER (because we need them
+     * while we change CR3) or FIRMWARE (we need them for SetVirtualAddressMap). */
     for (RtDList *ListHeader = MemoryDescriptorListHead->Next;
          ListHeader != MemoryDescriptorListHead;
          ListHeader = ListHeader->Next) {
@@ -316,57 +348,6 @@ void *OslpCreatePageMap(
                 Descriptor->BasePage << EFI_PAGE_SHIFT,
                 Descriptor->PageCount << EFI_PAGE_SHIFT,
                 PAGE_FLAGS_WRITE | PAGE_FLAGS_EXEC)) {
-            OslPrint("The system ran out of memory while creating the boot page map.\r\n");
-            OslPrint("The boot process cannot continue.\r\n");
-            return NULL;
-        }
-    }
-
-    /* Map all FIRMWARE descriptors into high memory (as read+write+exec). */
-    for (RtDList *ListHeader = MemoryDescriptorListHead->Next;
-         ListHeader != MemoryDescriptorListHead;
-         ListHeader = ListHeader->Next) {
-        OslpMemoryDescriptor *Descriptor =
-            CONTAINING_RECORD(ListHeader, OslpMemoryDescriptor, ListHeader);
-
-        if (Descriptor->Type != PAGE_TYPE_FIRMWARE_PERMANENT) {
-            continue;
-        }
-
-        if (!MapRange(
-                MemoryDescriptorListHead,
-                MemoryDescriptorStack,
-                PageMap,
-                0xFFFF800000000000 + (Descriptor->BasePage << EFI_PAGE_SHIFT),
-                Descriptor->BasePage << EFI_PAGE_SHIFT,
-                Descriptor->PageCount << EFI_PAGE_SHIFT,
-                PAGE_FLAGS_WRITE | PAGE_FLAGS_EXEC)) {
-            OslPrint("The system ran out of memory while creating the boot page map.\r\n");
-            OslPrint("The boot process cannot continue.\r\n");
-            return NULL;
-        }
-    }
-
-    /* Map all entries related to the boot block into the high area as well. */
-    for (RtDList *ListHeader = MemoryDescriptorListHead->Next;
-         ListHeader != MemoryDescriptorListHead;
-         ListHeader = ListHeader->Next) {
-        OslpMemoryDescriptor *Descriptor =
-            CONTAINING_RECORD(ListHeader, OslpMemoryDescriptor, ListHeader);
-
-        if (Descriptor->Type != PAGE_TYPE_GRAPHICS_BUFFER &&
-            Descriptor->Type != PAGE_TYPE_OSLOADER_TEMPORARY) {
-            continue;
-        }
-
-        if (!MapRange(
-                MemoryDescriptorListHead,
-                MemoryDescriptorStack,
-                PageMap,
-                0xFFFF800000000000 + (Descriptor->BasePage << EFI_PAGE_SHIFT),
-                Descriptor->BasePage << EFI_PAGE_SHIFT,
-                Descriptor->PageCount << EFI_PAGE_SHIFT,
-                PAGE_FLAGS_WRITE)) {
             OslPrint("The system ran out of memory while creating the boot page map.\r\n");
             OslPrint("The boot process cannot continue.\r\n");
             return NULL;
@@ -415,6 +396,31 @@ void *OslpCreatePageMap(
         }
     }
 
+    /* Map all FIRMWARE descriptors into high memory (as read+write+exec). */
+    for (RtDList *ListHeader = MemoryDescriptorListHead->Next;
+         ListHeader != MemoryDescriptorListHead;
+         ListHeader = ListHeader->Next) {
+        OslpMemoryDescriptor *Descriptor =
+            CONTAINING_RECORD(ListHeader, OslpMemoryDescriptor, ListHeader);
+
+        if (Descriptor->Type != PAGE_TYPE_FIRMWARE_PERMANENT) {
+            continue;
+        }
+
+        if (!MapRange(
+                MemoryDescriptorListHead,
+                MemoryDescriptorStack,
+                PageMap,
+                0xFFFF800000000000 + (Descriptor->BasePage << EFI_PAGE_SHIFT),
+                Descriptor->BasePage << EFI_PAGE_SHIFT,
+                Descriptor->PageCount << EFI_PAGE_SHIFT,
+                PAGE_FLAGS_WRITE | PAGE_FLAGS_EXEC)) {
+            OslPrint("The system ran out of memory while creating the boot page map.\r\n");
+            OslPrint("The boot process cannot continue.\r\n");
+            return NULL;
+        }
+    }
+
     /* Map the display's back buffer (aligning the size up to the nearest 2MiB). */
     uint64_t BackBufferSize = (FrameBufferSize + SIZE_2MB - 1) & ~(SIZE_2MB - 1);
     if (!MapRange(
@@ -425,6 +431,37 @@ void *OslpCreatePageMap(
             (uint64_t)BackBuffer,
             BackBufferSize,
             PAGE_FLAGS_WRITE | PAGE_FLAGS_WC)) {
+        OslPrint("The system ran out of memory while creating the boot page map.\r\n");
+        OslPrint("The boot process cannot continue.\r\n");
+        return NULL;
+    }
+
+    /* Find the effective memory size, and map all of it into high memory as R+W (anything that
+     * needs different flags has already been mapped/carved out). */
+    uint64_t MaxAddress = 0;
+    for (RtDList *ListHeader = MemoryDescriptorListHead->Next;
+         ListHeader != MemoryDescriptorListHead;
+         ListHeader = ListHeader->Next) {
+        OslpMemoryDescriptor *Descriptor =
+            CONTAINING_RECORD(ListHeader, OslpMemoryDescriptor, ListHeader);
+        uint64_t End = (Descriptor->BasePage + Descriptor->PageCount) << EFI_PAGE_SHIFT;
+        if (End > MaxAddress) {
+            MaxAddress = End;
+        }
+    }
+
+    /* Align the size up to either 2MiB or 1GiB (depending on what we have available). */
+    MaxAddress = HasHugePages ? (MaxAddress + SIZE_1GB - 1) & ~(SIZE_1GB - 1)
+                              : (MaxAddress + SIZE_2MB - 1) & ~(SIZE_2MB - 1);
+
+    if (!MapRange(
+            MemoryDescriptorListHead,
+            MemoryDescriptorStack,
+            PageMap,
+            0xFFFF800000000000,
+            0,
+            MaxAddress,
+            PAGE_FLAGS_WRITE)) {
         OslPrint("The system ran out of memory while creating the boot page map.\r\n");
         OslPrint("The boot process cannot continue.\r\n");
         return NULL;

@@ -1,0 +1,11 @@
+This describes the address space in the 4-level paging schema.
+Once we add support for 5-level paging, we should update this (or add a new file describing it).
+
+Start            | End              | Size          | Description
+0000000000000000 | 00007FFFFFFFFFFF | 128TiB        | User mode space
+0000800000000000 | FFFF7FFFFFFFFFFF | 16EiB-256TiB  | Non-canonical (unusable) space
+FFFF800000000000 | FFFF8FFFFFFFFFFF | 16TiB         | Direct mapping (1:1 with physical memory)
+FFFF900000000000 | FFFF907FFFFFFFFF | 512GiB        | Loader mappings (kernel, boot drivers, etc)
+FFFF908000000000 | FFFF909FFFFFFFFF | 128GiB        | Pool space
+FFFF90A000000000 | FFFFFF7FFFFFFFFF | 111TiB-128GiB | Unused space
+FFFFFF8000000000 | FFFFFFFFFFFFFFFF | 512GiB        | Recursive PML4 mapping

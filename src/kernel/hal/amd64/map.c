@@ -6,7 +6,7 @@
 #include <kernel/mi.h>
 #include <string.h>
 
-static KeSpinLock Lock;
+static KeSpinLock Lock = {0};
 
 extern bool HalpSmpInitializationComplete;
 
@@ -479,24 +479,8 @@ void HalpUnmapPages(void *VirtualAddress, uint64_t Size) {
  *     Pointer to the start of the virtual memory range on success, NULL otherwise.
  *-----------------------------------------------------------------------------------------------*/
 void *MmMapSpace(uint64_t PhysicalAddress, size_t Size, uint8_t Type) {
-    uint64_t Source = PhysicalAddress & ~(HALP_PT_SIZE - 1);
-    uint64_t End = (PhysicalAddress + Size + HALP_PT_SIZE - 1) & ~(HALP_PT_SIZE - 1);
-
-    /* Convert the type into proper flags. */
-    int Flags = MI_MAP_WRITE | MI_MAP_UC;
-    if (Type == MM_SPACE_IO) {
-        Flags |= MI_MAP_UC;
-    } else if (Type == MM_SPACE_GRAPHICS) {
-        Flags |= MI_MAP_WC;
-    }
-
-    /* And map any unmapped pages; We don't need to allocate any pool space, as we already have
-     * a 1-to-1 space in virtual memory for the mappings. */
-    if (!HalpMapContiguousPages(
-            (void *)(MI_VIRTUAL_OFFSET + Source), Source, End - Source, Flags)) {
-        return NULL;
-    }
-
+    (void)Size;
+    (void)Type;
     return (void *)(MI_VIRTUAL_OFFSET + PhysicalAddress);
 }
 
@@ -512,6 +496,5 @@ void *MmMapSpace(uint64_t PhysicalAddress, size_t Size, uint8_t Type) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void MmUnmapSpace(void *VirtualAddress) {
-    // TODO? Or do we just leave it mapped?
     (void)VirtualAddress;
 }
