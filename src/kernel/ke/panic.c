@@ -84,36 +84,20 @@ static KeSpinLock Lock = {0};
         Parameter3,
         Parameter4);
 
-    /* And a backtrace of all frames we can obtain from the stack.
-     * TODO: We should move all of this to a RtSaveStackTrace function, as it uses arch-specific
-     * knowledge (Context.Rip and Context.Rsp). */
+    /* And a backtrace of the first few frames from the stack. */
     VidPutString("*** STACK TRACE:\n");
 
-    /* Capture the current context (RtVirtualUnwind uses it). */
-    RtContext Context;
-    RtSaveContext(&Context);
+    /* Maybe move this limit to a macro? */
+    void *Frames[32];
+    int CapturedFrames = RtCaptureStackTrace(Frames, 32, 1);
+    for (int Frame = 0; Frame < CapturedFrames; Frame++) {
+        KiDumpSymbol(Frames[Frame]);
+    }
 
-    /* And start walking the unwind data (until we leave the kernel space). */
-    while (true) {
-        KiDumpSymbol((void *)Context.Rip);
-
-        uint64_t ImageBase = RtLookupImageBase(Context.Rip);
-        if (!ImageBase) {
-            break;
-        }
-
-        RtRuntimeFunction *FunctionEntry = RtLookupFunctionEntry(ImageBase, Context.Rip);
-        if (FunctionEntry) {
-            RtVirtualUnwind(
-                RT_UNW_FLAG_NHANDLER, ImageBase, Context.Rip, FunctionEntry, &Context, NULL, NULL);
-        } else {
-            Context.Rip = *(uint64_t *)Context.Rsp;
-            Context.Rsp += sizeof(uint64_t);
-        }
-
-        if (Context.Rip < 0xFFFF800000000000 || Context.Rsp < 0xFFFF800000000000) {
-            break;
-        }
+    /* Maybe we should add some output flag/signal to RtCaptureStackTrace so we know when there is
+     * probably more frames avaliable? For now, this should be enough though. */
+    if (CapturedFrames >= 32) {
+        VidPrintSimple("(more frames may follow...)\n");
     }
 
     while (true) {

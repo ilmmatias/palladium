@@ -112,6 +112,8 @@ RtUnwind(void *TargetFrame, void *TargetIp, RtExceptionRecord *ExceptionRecord, 
 
 bool RtDispatchException(RtExceptionRecord *ExceptionRecord, RtContext *ContextRecord);
 
+int RtCaptureStackTrace(void **Frames, int FramesToCapture, int FramesToSkip);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

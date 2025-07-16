@@ -7,7 +7,7 @@
 #include <stdint.h>
 #include <x86intrin.h>
 
-typedef struct __attribute__((packed)) {
+typedef struct __attribute__((aligned(16))) {
     union {
         struct __attribute__((packed)) {
             uint64_t Rax;
