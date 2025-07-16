@@ -24,6 +24,11 @@ function(add_executable target type has_lib)
         endif()
     endif()
 
+    # amd64 depends on cmpxchg16b (for lock-free SLists).
+    if (ARCH STREQUAL "amd64")
+        target_compile_options(${target} PRIVATE -mcx16)
+    endif()
+
     if((ARCH STREQUAL "amd64" OR ARCH STREQUAL "x86") AND
        (type STREQUAL "kcrt" OR type STREQUAL "kstdlib" OR type STREQUAL "bstdlib" OR
         type STREQUAL "knostdlib" OR type STREQUAL "kernel"))
@@ -84,6 +89,11 @@ function(add_library target type)
         else()
             target_link_libraries(${target} PRIVATE osapi ucrt ucrt_dll_startup urt)
         endif()
+    endif()
+
+    # amd64 depends on cmpxchg16b (for lock-free SLists).
+    if (ARCH STREQUAL "amd64")
+        target_compile_options(${target} PRIVATE -mcx16)
     endif()
 
     if((ARCH STREQUAL "amd64" OR ARCH STREQUAL "x86") AND

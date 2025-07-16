@@ -4,13 +4,7 @@
 #ifndef _RT_LIST_H_
 #define _RT_LIST_H_
 
-#include <stddef.h>
-#include <stdint.h>
-
-#ifndef CONTAINING_RECORD
-#define CONTAINING_RECORD(address, type, field) \
-    ((type *)((char *)(address) - (uintptr_t)(&((type *)0)->field)))
-#endif /* CONTAINING_RECORD */
+#include <os/containing_record.h>
 
 typedef struct RtSList {
     struct RtSList *Next;
@@ -25,7 +19,6 @@ extern "C" {
 #endif /* __cplusplus */
 
 void RtPushSList(RtSList *Head, RtSList *Entry);
-void RtAtomicPushSList(RtSList *Head, RtSList *Entry);
 void RtSpliceSList(RtSList *Target, RtSList *Source);
 RtSList *RtPopSList(RtSList *Head);
 

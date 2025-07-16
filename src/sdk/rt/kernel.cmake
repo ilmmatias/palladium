@@ -10,6 +10,7 @@ endif()
 
 set(KERNEL_SOURCES
     ${KERNEL_SOURCES}
+    atomic.c
     image.c)
 
 add_library(krt "kcrt" STATIC ${SOURCES} ${KERNEL_SOURCES})

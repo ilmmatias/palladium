@@ -4,13 +4,7 @@
 #ifndef _RT_AVLTREE_H_
 #define _RT_AVLTREE_H_
 
-#include <stddef.h>
-#include <stdint.h>
-
-#ifndef CONTAINING_RECORD
-#define CONTAINING_RECORD(address, type, field) \
-    ((type *)((char *)(address) - (uintptr_t)(&((type *)0)->field)))
-#endif /* CONTAINING_RECORD */
+#include <os/containing_record.h>
 
 struct RtAvlNode;
 

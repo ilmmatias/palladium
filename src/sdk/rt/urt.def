@@ -27,7 +27,6 @@ EXPORTS
     RtGetHash
 
     RtAppendDList
-    RtAtomicPushSList
     RtInitializeDList
     RtPopDList
     RtPopSList

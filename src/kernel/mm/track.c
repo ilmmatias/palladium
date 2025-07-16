@@ -49,7 +49,7 @@ void MiInitializePoolTracker(void) {
     PoolTracker->AllocatedBytes = MM_PAGE_SIZE;
     PoolTracker->MaxAllocations = 1;
     PoolTracker->MaxAllocatedBytes = MM_PAGE_SIZE;
-    RtPushSList(&MiPoolTagListHead[PoolTagHash], &PoolTracker->ListHeader);
+    RtPushAtomicSList(&MiPoolTagListHead[PoolTagHash], &PoolTracker->ListHeader);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -129,7 +129,7 @@ void MiAddPoolTracker(size_t Size, const char Tag[4]) {
         if (ListHeader) {
             Match = CONTAINING_RECORD(ListHeader, MiPoolTrackerHeader, ListHeader);
             memcpy(Match->Tag, Tag, 4);
-            RtAtomicPushSList(&MiPoolTagListHead[Hash], &Match->ListHeader);
+            RtPushAtomicSList(&MiPoolTagListHead[Hash], &Match->ListHeader);
             KeReleaseSpinLockAtCurrentIrql(&TagListLock[Hash]);
         }
     }
@@ -162,7 +162,7 @@ void MiAddPoolTracker(size_t Size, const char Tag[4]) {
         Match = CONTAINING_RECORD(RtPopSList(&FreeList), MiPoolTrackerHeader, ListHeader);
         KeReleaseSpinLockAtCurrentIrql(&FreeListLock);
         memcpy(Match->Tag, Tag, 4);
-        RtAtomicPushSList(&MiPoolTagListHead[Hash], &Match->ListHeader);
+        RtPushAtomicSList(&MiPoolTagListHead[Hash], &Match->ListHeader);
         KeReleaseSpinLockAtCurrentIrql(&TagListLock[Hash]);
 
         /* At last, we did a new pool related allocation, so we need to update the pool tracker

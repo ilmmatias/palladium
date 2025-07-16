@@ -19,7 +19,7 @@ static KeSpinLock FreeBlockLock[MM_POOL_BLOCK_COUNT] = {};
 uint64_t *MiPoolBitmapBuffer = NULL;
 RtBitmap MiPoolBitmap = {};
 uint64_t MiPoolBitmapHint = 0;
-RtSList MiPoolTagListHead[256] = {};
+RtAtomicSList MiPoolTagListHead[256] = {};
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:

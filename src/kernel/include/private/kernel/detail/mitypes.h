@@ -5,6 +5,7 @@
 #define _KERNEL_DETAIL_MITYPES_H_
 
 #include <kernel/detail/mmtypes.h>
+#include <rt/atomic.h>
 #include <rt/list.h>
 
 /* clang-format off */

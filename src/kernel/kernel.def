@@ -86,8 +86,10 @@ EXPORTS
     RtLookupByIndexAvlTree
     RtLookupFunctionEntry
     RtLookupImageBase
+    RtPopAtomicSList
     RtPopDList
     RtPopSList
+    RtPushAtomicSList
     RtPushDList
     RtPushSList
     RtQueryHeightAvlTree
