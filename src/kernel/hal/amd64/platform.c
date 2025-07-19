@@ -66,6 +66,8 @@ void HalpInitializeBootProcessor(void) {
     HalpEnableApic();
     BootProcessor.ApicId = HalpReadLapicId();
     HalpInitializeHpet();
+    HalpInitializeTsc();
+    HalpInitializeTimer();
     HalpInitializeSmp();
     HalpInitializeApicTimer();
 }

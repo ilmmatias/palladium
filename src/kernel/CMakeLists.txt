@@ -18,7 +18,8 @@ if(ARCH STREQUAL "amd64")
         hal/${ARCH}/platform.c
         hal/${ARCH}/smp.c
         hal/${ARCH}/smp.S
-        hal/${ARCH}/timer.c)
+        hal/${ARCH}/timer.c
+        hal/${ARCH}/tsc.c)
     set(ARCH_STR "amd64")
 endif()
 

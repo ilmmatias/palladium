@@ -54,7 +54,9 @@ static void InitializeBootProcessor(KiLoaderBlock *LoaderBlock) {
     MiInitializePool();
     MiInitializePageAllocator();
 
-    /* Stage 2 (BSP): Save all the remaining data that we care about from the loader block. */
+    /* Stage 2 (BSP): Save all the remaining data that we care about from the loader block. After
+     * this, the stack trace on KeFatalError will start working properly (as it depends on the
+     * module data to unwind). */
     KiSaveAcpiData(LoaderBlock);
     KiSaveBootStartDrivers(LoaderBlock);
 

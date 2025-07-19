@@ -29,6 +29,15 @@ void HalpEnableGsi(uint8_t Gsi, uint8_t Vector, uint8_t PinPolarity, uint8_t Tri
 void HalpDisableGsi(uint8_t Gsi);
 
 void HalpInitializeHpet(void);
+int HalpGetHpetWidth(void);
+uint64_t HalpGetHpetFrequency(void);
+uint64_t HalpGetHpetTicks(void);
+
+void HalpInitializeTsc(void);
+uint64_t HalpGetTscFrequency(void);
+uint64_t HalpGetTscTicks(void);
+
+void HalpInitializeTimer(void);
 void HalpInitializeApicTimer(void);
 
 void HalpInitializeSmp(void);

@@ -48,7 +48,7 @@ bool HalCheckTimerExpiration(uint64_t Current, uint64_t Reference, uint64_t Tick
  *-----------------------------------------------------------------------------------------------*/
 void HalWaitTimer(uint64_t Time) {
     uint64_t Start = HalGetTimerTicks();
-    uint64_t Ticks = ((__uint128_t)Time * HalGetTimerFrequency()) / EV_SECS;
+    uint64_t Ticks = (__uint128_t)Time * HalGetTimerFrequency() / EV_SECS;
     while (!HalCheckTimerExpiration(HalGetTimerTicks(), Start, Ticks))
         ;
 }
