@@ -6,6 +6,7 @@ project(os/boot/osloader)
 if(ARCH STREQUAL "amd64")
     set(SOURCES
         ${ARCH}/page.c
+        ${ARCH}/support.c
         ${ARCH}/transfer.c
     )
 endif()

@@ -9,6 +9,7 @@
 #include <loader.h>
 #include <platform.h>
 #include <string.h>
+#include <support.h>
 
 EFI_HANDLE *gIH = NULL;
 EFI_SYSTEM_TABLE *gST = NULL;
@@ -38,6 +39,11 @@ OslMain(EFI_HANDLE *ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
 
     /* Get rid of the watchdog timer (just to be sure). */
     gBS->SetWatchdogTimer(0, 0, 0, NULL);
+
+    /* Run the basic compatibility checks against the host system. */
+    if (!OslpCheckArchSupport()) {
+        return EFI_LOAD_ERROR;
+    }
 
     /* Get the RNG ready for randomizing the virtual memory load addresses. */
     OslpInitializeEntropy();
