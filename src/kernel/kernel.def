@@ -15,7 +15,7 @@ EXPORTS
     HalDeleteInterrupt
     HalDisableInterrupt
     HalEnableInterrupt
-    HalGetTimerPeriod
+    HalGetTimerFrequency
     HalGetTimerTicks
     HalGetTimerWidth
     HalInitializeInterruptData

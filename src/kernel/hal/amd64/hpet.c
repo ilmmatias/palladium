@@ -8,7 +8,7 @@
 #include <kernel/vid.h>
 
 static void *HpetAddress = NULL;
-static uint64_t Period = 1;
+static uint64_t Frequency = 1;
 static int Width = HAL_TIMER_WIDTH_64B;
 
 /*-------------------------------------------------------------------------------------------------
@@ -85,13 +85,40 @@ void HalpInitializeHpet(void) {
 
     Reg = ReadHpetRegister(HPET_CAP_REG);
     Width = (Reg & HPET_CAP_64B) ? HAL_TIMER_WIDTH_64B : HAL_TIMER_WIDTH_32B;
-    Period = (Reg >> HPET_CAP_FREQ_START) / 1000000;
+    Frequency = 1000000000000000 / (Reg >> HPET_CAP_FREQ_START);
+
+    /* Break down the frequency into something we can pretty print (in the smallest possible unit);
+     * Using float/double would be good too, but we don't have floating point support in
+     * __vprintf. */
+    const char *Unit;
+    uint64_t IntPart;
+    uint64_t FractPart;
+    if (Frequency >= 1000000000) {
+        Unit = "GHz";
+        IntPart = Frequency / 1000000000;
+        FractPart = (Frequency % 1000000000) / 10000000;
+    } else if (Frequency >= 1000000) {
+        Unit = "MHz";
+        IntPart = Frequency / 1000000;
+        FractPart = (Frequency % 1000000) / 10000;
+    } else if (Frequency >= 1000) {
+        Unit = "KHz";
+        IntPart = Frequency / 1000;
+        FractPart = (Frequency % 1000) / 10;
+    } else {
+        Unit = "Hz";
+        IntPart = Frequency;
+        FractPart = 0;
+    }
+
     VidPrint(
         VID_MESSAGE_INFO,
         "Kernel HAL",
-        "using HPET as timer tick source (%u-bits counter, period = %llu ns)\n",
+        "using HPET as timer tick source (%u-bits counter, frequency = %llu.%02llu %s)\n",
         Width,
-        Period);
+        IntPart,
+        FractPart,
+        Unit);
 
     /* At last we can reenable the main counter (after zeroing it). */
     Reg = ReadHpetRegister(HPET_CFG_REG);
@@ -116,16 +143,16 @@ int HalGetTimerWidth(void) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function returns the period (in nanoseconds) of the HAL timer.
+ *     This function returns the frequency (in HZ) of the HAL timer.
  *
  * PARAMETERS:
  *     None.
  *
  * RETURN VALUE:
- *     Period of the timer.
+ *     Frequency of the timer.
  *-----------------------------------------------------------------------------------------------*/
-uint64_t HalGetTimerPeriod(void) {
-    return Period;
+uint64_t HalGetTimerFrequency(void) {
+    return Frequency;
 }
 
 /*-------------------------------------------------------------------------------------------------
