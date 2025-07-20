@@ -10,14 +10,12 @@ EXPORTS
     EvWaitForObject
 
     HalAllocateInterruptVector
-    HalCheckTimerExpiration
     HalCreateInterrupt
     HalDeleteInterrupt
     HalDisableInterrupt
     HalEnableInterrupt
     HalGetTimerFrequency
     HalGetTimerTicks
-    HalGetTimerWidth
     HalInitializeInterruptData
     HalReleaseInterruptData
     HalWaitTimer

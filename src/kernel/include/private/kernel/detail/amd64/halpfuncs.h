@@ -29,7 +29,6 @@ void HalpEnableGsi(uint8_t Gsi, uint8_t Vector, uint8_t PinPolarity, uint8_t Tri
 void HalpDisableGsi(uint8_t Gsi);
 
 void HalpInitializeHpet(void);
-int HalpGetHpetWidth(void);
 uint64_t HalpGetHpetFrequency(void);
 uint64_t HalpGetHpetTicks(void);
 

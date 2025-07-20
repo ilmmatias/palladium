@@ -105,6 +105,8 @@
 #define HALP_IOAPIC_REDIR_REG_LOW(n) (0x10 + ((n) << 1))
 #define HALP_IOAPIC_REDIR_REG_HIGH(n) (0x11 + ((n) << 1))
 
+#define HALP_TSC_MSR 0x10
+
 #define HALP_PML4_LEVEL 0
 #define HALP_PML4_BASE ((HalpPageFrame *)0xFFFFFFFFFFFFF000)
 #define HALP_PML4_SHIFT 39

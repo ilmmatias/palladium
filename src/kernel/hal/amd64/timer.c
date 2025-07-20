@@ -6,7 +6,9 @@
 #include <kernel/intrin.h>
 #include <kernel/vid.h>
 
-static int Width = 0;
+bool HalpTscActive = false;
+bool HalpTimerInitialized = false;
+
 static uint64_t Frequency = 0;
 static uint64_t (*GetTicks)(void) = NULL;
 
@@ -26,46 +28,29 @@ void HalpInitializeTimer(void) {
     if (HalpGetTscFrequency()) {
         /* Prefer the TSC if we have invariant TSC support (as it has a way lower latency for
          * access, and is guaranteed to be 64-bits). */
+        HalpTscActive = true;
         Source = "TSC";
-        Width = HAL_TIMER_WIDTH_64B;
         Frequency = HalpGetTscFrequency();
         GetTicks = HalpGetTscTicks;
     } else {
         /* Otherwise, fallback to the HPET (which is slower, but also works). */
         Source = "HPET";
-        Width = HalpGetHpetWidth();
         Frequency = HalpGetHpetFrequency();
         GetTicks = HalpGetHpetTicks;
     }
 
-    /* Break down the frequency into something we can pretty print; Using float/double would be a
-     * choice too, but we don't have floating point support yet in __vprintf. */
-    const char* Unit;
-    uint64_t IntPart;
-    uint64_t FractPart;
-    if (Frequency >= 1000000) {
-        Unit = "MHz";
-        IntPart = Frequency / 1000000;
-        FractPart = (Frequency % 1000000) / 10000;
-    } else if (Frequency >= 1000) {
-        Unit = "KHz";
-        IntPart = Frequency / 1000;
-        FractPart = (Frequency % 1000) / 10;
-    } else {
-        Unit = "Hz";
-        IntPart = Frequency;
-        FractPart = 0;
-    }
-
+    /* Print the frequency in MHz (we'd expect the performance counter to have at least a 1MHz
+     * frequency; If it's less than that, it will still hopefully show up the fractional part
+     * though). */
     VidPrint(
         VID_MESSAGE_INFO,
         "Kernel HAL",
-        "using %s as the timer tick source (%u-bits counter, frequency = %llu.%02llu %s)\n",
+        "using %s as the timer source (frequency = %llu.%02llu MHz)\n",
         Source,
-        Width,
-        IntPart,
-        FractPart,
-        Unit);
+        Frequency / 1000000,
+        (Frequency % 1000000) / 10000);
+
+    HalpTimerInitialized = true;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -100,21 +85,6 @@ void HalpInitializeApicTimer(void) {
     HalpWriteLapicRegister(HALP_APIC_LVTT_REG, Record.RawData);
     HalpWriteLapicRegister(HALP_APIC_TIMER_DCR_REG, 0);
     HalpWriteLapicRegister(HALP_APIC_TIMER_ICR_REG, Accum / 5);
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function returns the width of the system timer (useful for handling overflow!).
- *
- * PARAMETERS:
- *     None.
- *
- * RETURN VALUE:
- *     HAL_TIMER_WIDTH_32B if the timer is 32-bits long, or HAL_TIMER_WIDTH_64B if the timer is
- *     64-bits long.
- *-----------------------------------------------------------------------------------------------*/
-int HalGetTimerWidth(void) {
-    return Width;
 }
 
 /*-------------------------------------------------------------------------------------------------

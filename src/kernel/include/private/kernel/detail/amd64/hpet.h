@@ -44,4 +44,12 @@ typedef struct __attribute__((packed)) {
     uint8_t PageProtection;
 } HpetHeader;
 
+typedef union {
+    struct {
+        uint32_t LowPart;
+        uint32_t HighPart;
+    };
+    uint64_t RawData;
+} HpetOverflowHelper;
+
 #endif /* _KERNEL_DETAIL_AMD64_HPET_H_ */

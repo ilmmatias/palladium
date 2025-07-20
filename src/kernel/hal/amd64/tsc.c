@@ -4,6 +4,7 @@
 #include <cpuid.h>
 #include <kernel/ev.h>
 #include <kernel/halp.h>
+#include <kernel/intrin.h>
 #include <kernel/vid.h>
 #include <stdint.h>
 
@@ -62,6 +63,9 @@ void HalpInitializeTsc(void) {
             Frequency = CurrentFrequency;
         }
     }
+
+    /* Clean up the TSC to start in a clean slate. */
+    WriteMsr(HALP_TSC_MSR, 0);
 }
 
 /*-------------------------------------------------------------------------------------------------

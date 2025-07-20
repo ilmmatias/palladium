@@ -2,13 +2,18 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <kernel/detail/amd64/hpet.h>
-#include <kernel/hal.h>
+#include <kernel/halp.h>
 #include <kernel/ke.h>
 #include <kernel/mm.h>
 
+extern bool HalpTimerInitialized;
+extern bool HalpTscActive;
+
 static void *HpetAddress = NULL;
 static uint64_t Frequency = 1;
-static int Width = HAL_TIMER_WIDTH_64B;
+static int Width = 64;
+
+static HpetOverflowHelper OverflowHelper = {};
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -37,6 +42,38 @@ static uint64_t ReadHpetRegister(uint32_t Number) {
  *-----------------------------------------------------------------------------------------------*/
 static void WriteHpetRegister(uint32_t Number, uint64_t Data) {
     *(volatile uint64_t *)((char *)HpetAddress + Number) = Data;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function handles a clock event (updating the overflow stats for 32-bit HPET counters).
+ *
+ * PARAMETERS:
+ *     None.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void HalpHandleTimer(void) {
+    /* This routine should only run in the BSP, and only for active (in use) 32-bit HPET timers
+     * (don't do anything if the TSC is active instead). */
+    if (Width != 32 || HalpTscActive || KeGetCurrentProcessor()->Number) {
+        return;
+    }
+
+    /* Compare the current HPET value with the previous one; This should be enough to determine if
+     * an overflow happend. */
+    uint64_t CurrentValue = ReadHpetRegister(HPET_VAL_REG);
+    HpetOverflowHelper NewValue;
+    if (CurrentValue < OverflowHelper.LowPart) {
+        NewValue.HighPart = OverflowHelper.HighPart + 1;
+
+    } else {
+        NewValue.HighPart = OverflowHelper.HighPart;
+    }
+
+    NewValue.LowPart = CurrentValue;
+    __atomic_store_n(&OverflowHelper.RawData, NewValue.RawData, __ATOMIC_RELEASE);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -83,28 +120,13 @@ void HalpInitializeHpet(void) {
     }
 
     Reg = ReadHpetRegister(HPET_CAP_REG);
-    Width = (Reg & HPET_CAP_64B) ? HAL_TIMER_WIDTH_64B : HAL_TIMER_WIDTH_32B;
+    Width = (Reg & HPET_CAP_64B) ? 64 : 32;
     Frequency = 1000000000000000 / (Reg >> HPET_CAP_FREQ_START);
 
     /* At last we can reenable the main counter (after zeroing it). */
     Reg = ReadHpetRegister(HPET_CFG_REG);
     WriteHpetRegister(HPET_VAL_REG, 0);
     WriteHpetRegister(HPET_CFG_REG, (Reg & ~HPET_CFG_MASK) | HPET_CFG_INT_ENABLE);
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function returns the width of the HPET (useful for handling overflow!).
- *
- * PARAMETERS:
- *     None.
- *
- * RETURN VALUE:
- *     HAL_TIMER_WIDTH_32B if the timer is 32-bits long, or HAL_TIMER_WIDTH_64B if the timer is
- *     64-bits long.
- *-----------------------------------------------------------------------------------------------*/
-int HalpGetHpetWidth(void) {
-    return Width;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -133,5 +155,21 @@ uint64_t HalpGetHpetFrequency(void) {
  *     many nanoseconds have elapsed.
  *-----------------------------------------------------------------------------------------------*/
 uint64_t HalpGetHpetTicks(void) {
-    return ReadHpetRegister(HPET_VAL_REG);
+    /* For 64-bit timers, don't bother with the overflow code (overflows are only guaranteed to be
+     * handled for 32-bit timers); We also use the same path for any waits before the timer
+     * subsystem is fully initailized, as the LAPIC timer (and overflow detection) isn't online yet
+     * in that case. */
+    if (Width == 64 || !HalpTimerInitialized) {
+        return ReadHpetRegister(HPET_VAL_REG);
+    }
+
+    /* Otherwise, let's cooperate with the overflow handler to try and fix our high part. */
+    HpetOverflowHelper OldValue = {
+        .RawData = __atomic_load_n(&OverflowHelper.RawData, __ATOMIC_ACQUIRE)};
+    uint64_t LowPart = ReadHpetRegister(HPET_VAL_REG);
+    if (LowPart < OldValue.LowPart) {
+        return ((uint64_t)(OldValue.HighPart + 1) << 32) | LowPart;
+    } else {
+        return ((uint64_t)OldValue.HighPart << 32) | LowPart;
+    }
 }

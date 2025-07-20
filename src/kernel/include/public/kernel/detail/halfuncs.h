@@ -16,10 +16,8 @@
 extern "C" {
 #endif /* __cplusplus */
 
-int HalGetTimerWidth(void);
 uint64_t HalGetTimerFrequency(void);
 uint64_t HalGetTimerTicks(void);
-bool HalCheckTimerExpiration(uint64_t Current, uint64_t Reference, uint64_t Ticks);
 void HalWaitTimer(uint64_t Time);
 
 bool HalInitializeInterruptData(HalInterruptData *Data, uint32_t BusVector);

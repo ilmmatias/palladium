@@ -14,6 +14,7 @@
 .extern HalpDispatchInterrup
 .extern HalpDispatchTrap
 .extern HalpDispatchNmi
+.extern HalpHandleTimer
 .extern HalpSendEoi
 .extern KiHandleIpi
 .extern KiProcessKernelSignalQueue
@@ -339,6 +340,7 @@ HalpTimerEntry:
     ENTER_INTERRUPT (INTERRUPT_FLAGS_NONE)
     mov $HALP_INT_TIMER_IRQL, %rcx
     mov %rcx, %cr8
+    call HalpHandleTimer
     mov %rsp, %rcx
     call EvpHandleTimer
     call HalpSendEoi
