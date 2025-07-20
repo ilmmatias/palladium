@@ -6,6 +6,8 @@
 #include <kernel/vidp.h>
 #include <rt/except.h>
 
+extern RtDList KiModuleListHead;
+
 static const char *Messages[] = {
     "MANUALLY_INITIATED_CRASH",
     "IRQL_NOT_LESS_OR_EQUAL",
@@ -78,26 +80,37 @@ static KeSpinLock Lock = {0};
 
     /* Dump all available parameters. */
     VidPrintSimple(
-        "*** PARAMETERS: 0x%016llx, 0x%016llx, 0x%016llx, 0x%016llx\n",
+        "*** PARAMETERS: %016llx, %016llx, %016llx, %016llx\n",
         Parameter1,
         Parameter2,
         Parameter3,
         Parameter4);
 
-    /* And a backtrace of the first few frames from the stack. */
-    VidPutString("*** STACK TRACE:\n");
+    /* We should be able to check for KiModuleListHead.Next's value to check if the boot module list
+     * has already been saved (or if at least the kernel module itself has already been saved). */
+    if (KiModuleListHead.Next != NULL && KiModuleListHead.Next != &KiModuleListHead) {
+        /* And if so, we can print the backtrace of the first few frames from the stack (maybe move
+         * the frame limit to a macro?) */
+        void *Frames[32];
+        int CapturedFrames = RtCaptureStackTrace(Frames, 32, 1);
 
-    /* Maybe move this limit to a macro? */
-    void *Frames[32];
-    int CapturedFrames = RtCaptureStackTrace(Frames, 32, 1);
-    for (int Frame = 0; Frame < CapturedFrames; Frame++) {
-        KiDumpSymbol(Frames[Frame]);
-    }
+        if (CapturedFrames) {
+            VidPrintSimple("*** STACK TRACE:\n");
 
-    /* Maybe we should add some output flag/signal to RtCaptureStackTrace so we know when there is
-     * probably more frames avaliable? For now, this should be enough though. */
-    if (CapturedFrames >= 32) {
-        VidPrintSimple("(more frames may follow...)\n");
+            for (int Frame = 0; Frame < CapturedFrames; Frame++) {
+                KiDumpSymbol(Frames[Frame]);
+            }
+        } else {
+            VidPutString("*** STACK TRACE NOT AVAILABLE\n");
+        }
+
+        /* Maybe we should add some output flag/signal to RtCaptureStackTrace so we know when
+         * there is probably more frames avaliable? For now, this should be enough though. */
+        if (CapturedFrames >= 32) {
+            VidPrintSimple("(more frames may follow...)\n");
+        }
+    } else {
+        VidPutString("*** STACK TRACE NOT AVAILABLE\n");
     }
 
     while (true) {

@@ -53,12 +53,17 @@ static void InitializeBootProcessor(KiLoaderBlock *LoaderBlock) {
     MiInitializeEarlyPageAllocator(LoaderBlock);
     MiInitializePool();
     MiInitializePageAllocator();
+    VidPrint(
+        VID_MESSAGE_INFO,
+        "Kernel",
+        "booting with %llu MiB of memory\n",
+        MiTotalSystemPages * MM_PAGE_SIZE / 1048576);
 
     /* Stage 2 (BSP): Save all the remaining data that we care about from the loader block. After
      * this, the stack trace on KeFatalError will start working properly (as it depends on the
      * module data to unwind). */
-    KiSaveAcpiData(LoaderBlock);
     KiSaveBootStartDrivers(LoaderBlock);
+    KiSaveAcpiData(LoaderBlock);
 
     /* Stage 3 (BSP): Release and unmap all OSLOADER memory regions; Everything we need should have
      * already been copied to kernel land, so this should be safe. */
@@ -144,39 +149,6 @@ static void InitializeApplicationProcessor(KeProcessor *Processor) {
     /* Stage 6 (BSP): Initialize all boot drivers; We can't load anything further than this without
        them. */
     KiRunBootStartDrivers();
-
-    /* Dump the PFN stats; Some of the page stat categories can/will intersect with the used/free
-     * pages count, so beware of that. */
-    VidPrintSimple("\ndumping the PFN stats:\n");
-    VidPrintSimple("       total pages: %llu\n", MiTotalSystemPages);
-    VidPrintSimple("    reserved pages: %llu\n", MiTotalReservedPages);
-    VidPrintSimple("      cached pages: %llu\n", MiTotalCachedPages);
-    VidPrintSimple("        used pages: %llu\n", MiTotalUsedPages);
-    VidPrintSimple("        free pages: %llu\n", MiTotalFreePages);
-    VidPrintSimple("        boot pages: %llu\n", MiTotalBootPages);
-    VidPrintSimple("    graphics pages: %llu\n", MiTotalGraphicsPages);
-    VidPrintSimple("         pte pages: %llu\n", MiTotalPtePages);
-    VidPrintSimple("         pfn pages: %llu\n", MiTotalPfnPages);
-    VidPrintSimple("        pool pages: %llu\n", MiTotalPoolPages);
-
-    /* Dump the per-tag pool stats. */
-    VidPrintSimple("\ndumping the tag stats:\n");
-    VidPrintSimple(
-        "tag  | allocs           | bytes            | max allocs       | max bytes       \n");
-    for (int i = 0; i < 256; i++) {
-        for (RtSList *ListHeader = MiPoolTagListHead[i].Next; ListHeader;
-             ListHeader = ListHeader->Next) {
-            MiPoolTrackerHeader *Header =
-                CONTAINING_RECORD(ListHeader, MiPoolTrackerHeader, ListHeader);
-            VidPrintSimple(
-                "%.4s | %-16llu | %-16llu | %-16llu | %-16llu\n",
-                Header->Tag,
-                Header->Allocations,
-                Header->AllocatedBytes,
-                Header->MaxAllocations,
-                Header->MaxAllocatedBytes);
-        }
-    }
 
     while (true) {
         StopProcessor();

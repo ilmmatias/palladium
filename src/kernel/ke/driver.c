@@ -8,7 +8,7 @@
 #include <stdio.h>
 #include <string.h>
 
-RtDList KiModuleListHead;
+RtDList KiModuleListHead = {};
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
