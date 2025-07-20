@@ -6,10 +6,13 @@
 
 #include <rt/list.h>
 
-/* This needs to be aligned(8) for 32-bit systems, so, TODO. */
+#if UINTPTR_MAX == UINT64_MAX
 typedef struct __attribute__((aligned(16))) RtAtomicSList {
+#else
+typedef struct __attribute__((aligned(8))) RtAtomicSList {
+#endif
     RtSList *Next;
-    uint64_t Tag;
+    uintptr_t Tag;
 } RtAtomicSList;
 
 #ifdef __cplusplus

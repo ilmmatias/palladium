@@ -43,7 +43,7 @@ void *ObCreateObject(ObType *Type, char Tag[4]) {
  *-----------------------------------------------------------------------------------------------*/
 void ObReferenceObject(void *Body) {
     ObpObject *Object = (ObpObject *)Body - 1;
-    __atomic_add_fetch(&Object->References, 1, __ATOMIC_ACQUIRE);
+    __atomic_add_fetch(&Object->References, 1, __ATOMIC_RELEASE);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -59,7 +59,7 @@ void ObReferenceObject(void *Body) {
  *-----------------------------------------------------------------------------------------------*/
 void ObDereferenceObject(void *Body) {
     ObpObject *Object = (ObpObject *)Body - 1;
-    if (!__atomic_sub_fetch(&Object->References, 1, __ATOMIC_RELEASE)) {
+    if (!__atomic_sub_fetch(&Object->References, 1, __ATOMIC_ACQUIRE)) {
         /* Should we allow the delete pointer to be NULL? */
         if (Object->Type->Delete) {
             Object->Type->Delete(Body);

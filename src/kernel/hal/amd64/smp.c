@@ -113,7 +113,7 @@ void HalpInitializeSmp(void) {
         ListHeader = ListHeader->Next;
     }
 
-    while (__atomic_load_n(&HalpOnlineProcessorCount, __ATOMIC_RELAXED) != HalpProcessorCount) {
+    while (__atomic_load_n(&HalpOnlineProcessorCount, __ATOMIC_ACQUIRE) != HalpProcessorCount) {
         HalWaitTimer(100 * EV_MICROSECS);
     }
 

@@ -34,7 +34,7 @@ static PsThread *TrySteal(KeProcessor *Processor) {
         }
 
         /* Don't bother if there doesn't seem to be any threads we can steal. */
-        if (__atomic_load_n(&TargetProcessor->ThreadCount, __ATOMIC_RELAXED) < 2) {
+        if (__atomic_load_n(&TargetProcessor->ThreadCount, __ATOMIC_ACQUIRE) < 2) {
             CurrentIndex = (CurrentIndex + 1) % HalpOnlineProcessorCount;
             continue;
         }
@@ -52,7 +52,7 @@ static PsThread *TrySteal(KeProcessor *Processor) {
         RtDList *TargetThread = RtTruncateDList(&TargetProcessor->ThreadQueue);
         KeReleaseSpinLockAndLowerIrql(&TargetProcessor->Lock, OldIrql);
         if (TargetThread != &TargetProcessor->ThreadQueue) {
-            __atomic_sub_fetch(&TargetProcessor->ThreadCount, 1, __ATOMIC_RELAXED);
+            __atomic_sub_fetch(&TargetProcessor->ThreadCount, 1, __ATOMIC_RELEASE);
             return CONTAINING_RECORD(TargetThread, PsThread, ListHeader);
         }
 
@@ -110,7 +110,7 @@ static PsThread *TrySteal(KeProcessor *Processor) {
                     Processor->Number);
                 continue;
             } else {
-                __atomic_sub_fetch(&Processor->ThreadCount, 1, __ATOMIC_RELAXED);
+                __atomic_sub_fetch(&Processor->ThreadCount, 1, __ATOMIC_RELEASE);
                 TargetThread = CONTAINING_RECORD(ListHeader, PsThread, ListHeader);
             }
         }

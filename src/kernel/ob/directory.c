@@ -35,8 +35,8 @@ static void DeleteRoutine(void *Object) {
                     &ExpectedParent,
                     NULL,
                     0,
-                    __ATOMIC_ACQUIRE,
-                    __ATOMIC_RELAXED)) {
+                    __ATOMIC_RELEASE,
+                    __ATOMIC_ACQUIRE)) {
                 ObDereferenceObject(Entry->Object);
                 MmFreePool(Entry->Name, MM_POOL_TAG_OBJECT);
                 MmFreePool(Entry, MM_POOL_TAG_OBJECT);
@@ -128,7 +128,7 @@ bool ObInsertIntoDirectory(ObDirectory *Directory, const char *Name, void *Objec
     /* Hopefully this will succeed, otherwise, free up everything and bail out. */
     ObpDirectoryEntry *ExpectedParent = NULL;
     if (!__atomic_compare_exchange_n(
-            &ObjectHeader->Parent, &ExpectedParent, Entry, 0, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED)) {
+            &ObjectHeader->Parent, &ExpectedParent, Entry, 0, __ATOMIC_RELEASE, __ATOMIC_ACQUIRE)) {
         MmFreePool(Entry->Name, MM_POOL_TAG_OBJECT);
         MmFreePool(Entry, MM_POOL_TAG_OBJECT);
         return false;
@@ -169,7 +169,7 @@ void ObRemoveFromDirectory(void *Object) {
     /* As long as we do an interlocked xchg, this should work... */
     ObpDirectoryEntry *ExpectedParent = DirectoryEntry;
     if (!__atomic_compare_exchange_n(
-            &ObjectHeader->Parent, &ExpectedParent, NULL, 0, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED)) {
+            &ObjectHeader->Parent, &ExpectedParent, NULL, 0, __ATOMIC_RELEASE, __ATOMIC_ACQUIRE)) {
         return;
     }
 

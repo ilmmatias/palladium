@@ -108,7 +108,7 @@ void PspSwitchThreads(
     /* We only want to reschedule/requeue the old thread in case of a "normal" context switch (yield
      * or quantum expiration), for anything else, we just set as busy and skip the requeue. */
     CurrentThread->State = Type;
-    __atomic_store_n(&CurrentThread->ContextFrame.Busy, 0x01, __ATOMIC_SEQ_CST);
+    __atomic_store_n(&CurrentThread->ContextFrame.Busy, 0x01, __ATOMIC_RELEASE);
     KeReleaseSpinLockAtCurrentIrql(&Processor->Lock);
 
     if (Type == PS_STATE_QUEUED) {
@@ -265,8 +265,8 @@ void PspProcessQueue(HalInterruptFrame *) {
         KeReleaseSpinLockAndLowerIrql(&Processor->Lock, OldIrql);
         return;
     } else {
-        __atomic_sub_fetch(&Processor->ThreadCount, 1, __ATOMIC_RELAXED);
-        __atomic_sub_fetch(&PspGlobalThreadCount, 1, __ATOMIC_RELAXED);
+        __atomic_sub_fetch(&Processor->ThreadCount, 1, __ATOMIC_RELEASE);
+        __atomic_sub_fetch(&PspGlobalThreadCount, 1, __ATOMIC_RELEASE);
         KeClearAffinityBit(&KiIdleProcessors, Processor->Number);
     }
 

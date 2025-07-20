@@ -23,8 +23,8 @@ static volatile uint64_t LateBarrier = 0;
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void KeSynchronizeProcessors(volatile uint64_t *State) {
-    __atomic_fetch_add(State, 1, __ATOMIC_SEQ_CST);
-    while (__atomic_load_n(State, __ATOMIC_RELAXED) != HalpOnlineProcessorCount) {
+    __atomic_fetch_add(State, 1, __ATOMIC_RELEASE);
+    while (__atomic_load_n(State, __ATOMIC_ACQUIRE) != HalpOnlineProcessorCount) {
         PauseProcessor();
     }
 }
@@ -48,8 +48,8 @@ void KeRequestIpiRoutine(void (*Routine)(void *), void *Parameter) {
     /* Initialize the synchronization state. */
     TargetRoutine = Routine;
     TargetParameter = Parameter;
-    __atomic_store_n(&EarlyBarrier, 0, __ATOMIC_SEQ_CST);
-    __atomic_store_n(&LateBarrier, 0, __ATOMIC_SEQ_CST);
+    __atomic_store_n(&EarlyBarrier, 0, __ATOMIC_RELEASE);
+    __atomic_store_n(&LateBarrier, 0, __ATOMIC_RELEASE);
 
     /* Interrupt all processors into the IPI handler. */
     HalpBroadcastIpi();
@@ -79,5 +79,5 @@ void KiHandleIpi(void) {
      * supposed to notify the starting processor that we finished. */
     KeSynchronizeProcessors(&EarlyBarrier);
     TargetRoutine(TargetParameter);
-    __atomic_fetch_add(&LateBarrier, 1, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add(&LateBarrier, 1, __ATOMIC_RELEASE);
 }

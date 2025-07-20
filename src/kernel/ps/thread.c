@@ -77,8 +77,8 @@ static void QueueThreadIn(PsThread *Thread, KeProcessor *Processor, bool EventQu
         RtAppendDList(&Processor->ThreadQueue, &Thread->ListHeader);
     }
 
-    __atomic_add_fetch(&Processor->ThreadCount, 1, __ATOMIC_RELAXED);
-    __atomic_add_fetch(&PspGlobalThreadCount, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&Processor->ThreadCount, 1, __ATOMIC_RELEASE);
+    __atomic_add_fetch(&PspGlobalThreadCount, 1, __ATOMIC_RELEASE);
     KeReleaseSpinLockAtCurrentIrql(&Processor->Lock);
 }
 
@@ -108,8 +108,8 @@ static void QueueThreadListIn(
         RtSpliceTailDList(&Processor->ThreadQueue, ThreadList);
     }
 
-    __atomic_add_fetch(&Processor->ThreadCount, ThreadCount, __ATOMIC_RELAXED);
-    __atomic_add_fetch(&PspGlobalThreadCount, ThreadCount, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&Processor->ThreadCount, ThreadCount, __ATOMIC_RELEASE);
+    __atomic_add_fetch(&PspGlobalThreadCount, ThreadCount, __ATOMIC_RELEASE);
     KeReleaseSpinLockAtCurrentIrql(&Processor->Lock);
 }
 
@@ -131,8 +131,8 @@ void PspQueueThread(PsThread *Thread, bool EventQueue) {
      * (as the processor's cache will probably be more warm/have more hits for the thread if we stay
      * always on the same thread).  */
     KeProcessor *Processor = KeGetCurrentProcessor();
-    uint64_t LocalThreadCount = __atomic_load_n(&Processor->ThreadCount, __ATOMIC_RELAXED) + 1;
-    uint64_t GlobalThreadCount = __atomic_load_n(&PspGlobalThreadCount, __ATOMIC_RELAXED) + 1;
+    uint64_t LocalThreadCount = __atomic_load_n(&Processor->ThreadCount, __ATOMIC_ACQUIRE) + 1;
+    uint64_t GlobalThreadCount = __atomic_load_n(&PspGlobalThreadCount, __ATOMIC_ACQUIRE) + 1;
     if (LocalThreadCount < (GlobalThreadCount * PSP_LOAD_BALANCE_BIAS) / 100) {
         QueueThreadIn(Thread, Processor, EventQueue);
         return;
@@ -150,10 +150,10 @@ void PspQueueThread(PsThread *Thread, bool EventQueue) {
     /* Otherwise, we fallback onto the slow path, and search for the least loaded processor (falling
      * back to the current processor if everyone is equally loaded). */
     uint32_t TargetIndex = Processor->Number;
-    uint64_t TargetLoad = __atomic_load_n(&Processor->ThreadCount, __ATOMIC_RELAXED);
+    uint64_t TargetLoad = __atomic_load_n(&Processor->ThreadCount, __ATOMIC_ACQUIRE);
     for (uint32_t i = 0; i < HalpOnlineProcessorCount; i++) {
         KeProcessor *Processor = HalpProcessorList[i];
-        uint64_t ThreadCount = __atomic_load_n(&Processor->ThreadCount, __ATOMIC_RELAXED);
+        uint64_t ThreadCount = __atomic_load_n(&Processor->ThreadCount, __ATOMIC_ACQUIRE);
         if (ThreadCount < TargetLoad) {
             TargetIndex = i;
             TargetLoad = ThreadCount;
@@ -188,9 +188,9 @@ void PspQueueThreadList(RtDList *ThreadList, uint64_t ThreadCount, bool EventQue
      * always on the same thread).  */
     KeProcessor *Processor = KeGetCurrentProcessor();
     uint64_t LocalThreadCount =
-        __atomic_load_n(&Processor->ThreadCount, __ATOMIC_RELAXED) + ThreadCount;
+        __atomic_load_n(&Processor->ThreadCount, __ATOMIC_ACQUIRE) + ThreadCount;
     uint64_t GlobalThreadCount =
-        __atomic_load_n(&PspGlobalThreadCount, __ATOMIC_RELAXED) + ThreadCount;
+        __atomic_load_n(&PspGlobalThreadCount, __ATOMIC_ACQUIRE) + ThreadCount;
     if (LocalThreadCount < (GlobalThreadCount * PSP_LOAD_BALANCE_BIAS) / 100) {
         QueueThreadListIn(ThreadList, ThreadCount, Processor, EventQueue);
         return;
@@ -282,8 +282,8 @@ void PspSuspendExecution(
     if (ListHeader == &Processor->ThreadQueue) {
         KeSetAffinityBit(&KiIdleProcessors, Processor->Number);
     } else {
-        __atomic_sub_fetch(&Processor->ThreadCount, 1, __ATOMIC_RELAXED);
-        __atomic_sub_fetch(&PspGlobalThreadCount, 1, __ATOMIC_RELAXED);
+        __atomic_sub_fetch(&Processor->ThreadCount, 1, __ATOMIC_RELEASE);
+        __atomic_sub_fetch(&PspGlobalThreadCount, 1, __ATOMIC_RELEASE);
         TargetThread = CONTAINING_RECORD(ListHeader, PsThread, ListHeader);
     }
 
@@ -384,8 +384,8 @@ bool PsTerminateThread(PsThread *Thread) {
      * some point, the target processor should finish the clean up. */
     if (Thread->State == PS_STATE_QUEUED) {
         RtUnlinkDList(&Thread->ListHeader);
-        __atomic_sub_fetch(&Processor->ThreadCount, 1, __ATOMIC_RELAXED);
-        __atomic_sub_fetch(&PspGlobalThreadCount, 1, __ATOMIC_RELAXED);
+        __atomic_sub_fetch(&Processor->ThreadCount, 1, __ATOMIC_RELEASE);
+        __atomic_sub_fetch(&PspGlobalThreadCount, 1, __ATOMIC_RELEASE);
         Thread->State = PS_STATE_TERMINATED;
         RtAppendDList(&Processor->TerminationQueue, &Thread->ListHeader);
         KeReleaseSpinLockAndLowerIrql(&Processor->Lock, OldIrql);
@@ -519,8 +519,8 @@ void PsYieldThread(void) {
     } else {
         /* If we call YieldThread on a tight loop, we need to make sure we clear the idle bit
          * once the queue isn't empty. */
-        __atomic_sub_fetch(&Processor->ThreadCount, 1, __ATOMIC_RELAXED);
-        __atomic_sub_fetch(&PspGlobalThreadCount, 1, __ATOMIC_RELAXED);
+        __atomic_sub_fetch(&Processor->ThreadCount, 1, __ATOMIC_RELEASE);
+        __atomic_sub_fetch(&PspGlobalThreadCount, 1, __ATOMIC_RELEASE);
         KeClearAffinityBit(&KiIdleProcessors, Processor->Number);
     }
 
@@ -584,8 +584,8 @@ bool PsSuspendThread(PsThread *Thread) {
      * processor that they need to swap threads. */
     if (Thread->State == PS_STATE_QUEUED) {
         RtUnlinkDList(&Thread->ListHeader);
-        __atomic_sub_fetch(&Processor->ThreadCount, 1, __ATOMIC_RELAXED);
-        __atomic_sub_fetch(&PspGlobalThreadCount, 1, __ATOMIC_RELAXED);
+        __atomic_sub_fetch(&Processor->ThreadCount, 1, __ATOMIC_RELEASE);
+        __atomic_sub_fetch(&PspGlobalThreadCount, 1, __ATOMIC_RELEASE);
         Thread->State = PS_STATE_SUSPENDED;
         KeReleaseSpinLockAndLowerIrql(&Processor->Lock, OldIrql);
     } else {
