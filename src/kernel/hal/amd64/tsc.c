@@ -43,27 +43,58 @@ void HalpInitializeTsc(void) {
         return;
     }
 
-    /* By now we're sure we have invariant TSC; There is a way to extract the exact TSC frequency
-     * (via leafs 15h and 16h) but that doesn't seem too supported (we probably should also
-     * implement this path though), so, what we'll do instead, is calibrate it against the HPET. */
-    uint64_t Ticks = (__uint128_t)(10 * EV_MILLISECS) * HalpGetHpetFrequency() / EV_SECS;
-    for (int i = 0; i < 5; i++) {
-        uint64_t StartTsc = __rdtsc();
-        uint64_t StartHpet = HalpGetHpetTicks();
+    /* By now we're sure we have invariant TSC; At first, let's attempt to extract the exact TSC
+     * frequency via CPUID leafs 15h and 16h (which is really only supported on newer Intel
+     * processors, so not really that widely supported). */
+    do {
+        __cpuid(0, Eax, Ebx, Ecx, Edx);
+        if (Eax < 0x15) {
+            VidPrint(VID_MESSAGE_DEBUG, "Kernel HAL", "CPUID leaf 15h is unavailable\n");
+            break;
+        }
 
-        while (HalpGetHpetTicks() < StartHpet + Ticks)
-            ;
+        /* Leaf 15h is pretty unreliable, as most processors don't set CoreFreq; If at least we have
+         * leaf 16h, we can use that to get the core crystal freq. */
+        uint64_t RatioDenom, RatioNum, CoreFreq;
+        __cpuid(0x15, RatioDenom, RatioNum, CoreFreq, Edx);
+        if (!CoreFreq && Eax >= 0x16) {
+            __cpuid(0x16, Eax, Ebx, Ecx, Edx);
+            CoreFreq = (Eax * 10000000) * (RatioDenom / RatioNum);
+        }
 
-        uint64_t EndTsc = __rdtsc();
-        uint64_t EndHpet = HalpGetHpetTicks();
+        /* If even that was not good, then just bail out. */
+        if (!CoreFreq) {
+            VidPrint(
+                VID_MESSAGE_DEBUG,
+                "Kernel HAL",
+                "CPUID leaf 15h has no core crystal clock frequency\n");
+            break;
+        }
 
-        /* We're going to guess that the fastest run is the correct one; Maybe we should change this
-         * to avg the values instead? Not 100% sure. */
-        uint64_t DeltaTsc = EndTsc - StartTsc;
-        uint64_t DeltaHpet = EndHpet - StartHpet;
-        uint64_t CurrentFrequency = (__uint128_t)DeltaTsc * HalpGetHpetFrequency() / DeltaHpet;
-        if (CurrentFrequency > Frequency) {
-            Frequency = CurrentFrequency;
+        Frequency = CoreFreq * (RatioNum / RatioDenom);
+    } while (false);
+
+    /* Otherwise, just calibrate it against the HPET. */
+    if (!Frequency) {
+        uint64_t Ticks = (__uint128_t)(10 * EV_MILLISECS) * HalpGetHpetFrequency() / EV_SECS;
+        for (int i = 0; i < 5; i++) {
+            uint64_t StartTsc = __rdtsc();
+            uint64_t StartHpet = HalpGetHpetTicks();
+
+            while (HalpGetHpetTicks() < StartHpet + Ticks)
+                ;
+
+            uint64_t EndTsc = __rdtsc();
+            uint64_t EndHpet = HalpGetHpetTicks();
+
+            /* We're going to guess that the fastest run is the correct one; Maybe we should change
+             * this to avg the values instead? Not 100% sure. */
+            uint64_t DeltaTsc = EndTsc - StartTsc;
+            uint64_t DeltaHpet = EndHpet - StartHpet;
+            uint64_t CurrentFrequency = (__uint128_t)DeltaTsc * HalpGetHpetFrequency() / DeltaHpet;
+            if (CurrentFrequency > Frequency) {
+                Frequency = CurrentFrequency;
+            }
         }
     }
 
