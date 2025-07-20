@@ -27,16 +27,19 @@ void HalpInitializeTsc(void) {
     uint64_t Eax, Ebx, Ecx, Edx;
     __cpuid(1, Eax, Ebx, Ecx, Edx);
     if (!(Edx & bit_TSC)) {
+        VidPrint(VID_MESSAGE_DEBUG, "Kernel HAL", "RDTSC is unavailable\n");
         return;
     }
 
     __cpuid(0x80000000, Eax, Ebx, Ecx, Edx);
     if (Eax < 0x80000007) {
+        VidPrint(VID_MESSAGE_DEBUG, "Kernel HAL", "invariant TSC is unavailable\n");
         return;
     }
 
     __cpuid(0x80000007, Eax, Ebx, Ecx, Edx);
     if (!(Edx & 0x100)) {
+        VidPrint(VID_MESSAGE_DEBUG, "Kernel HAL", "invariant TSC is unavailable\n");
         return;
     }
 
@@ -66,6 +69,13 @@ void HalpInitializeTsc(void) {
 
     /* Clean up the TSC to start in a clean slate. */
     WriteMsr(HALP_TSC_MSR, 0);
+
+    VidPrint(
+        VID_MESSAGE_DEBUG,
+        "Kernel HAL",
+        "found an invariant TSC (frequency = %llu.%02llu MHz)\n",
+        Frequency / 1000000,
+        (Frequency % 1000000) / 10000);
 }
 
 /*-------------------------------------------------------------------------------------------------

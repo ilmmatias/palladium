@@ -5,6 +5,7 @@
 #include <kernel/halp.h>
 #include <kernel/ke.h>
 #include <kernel/mm.h>
+#include <kernel/vid.h>
 
 extern bool HalpTimerInitialized;
 extern bool HalpTscActive;
@@ -127,6 +128,14 @@ void HalpInitializeHpet(void) {
     Reg = ReadHpetRegister(HPET_CFG_REG);
     WriteHpetRegister(HPET_VAL_REG, 0);
     WriteHpetRegister(HPET_CFG_REG, (Reg & ~HPET_CFG_MASK) | HPET_CFG_INT_ENABLE);
+
+    VidPrint(
+        VID_MESSAGE_DEBUG,
+        "Kernel HAL",
+        "found a %d-bits HPET (frequency = %llu.%02llu MHz)\n",
+        Width,
+        Frequency / 1000000,
+        (Frequency % 1000000) / 10000);
 }
 
 /*-------------------------------------------------------------------------------------------------
