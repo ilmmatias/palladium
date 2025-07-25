@@ -52,6 +52,11 @@ static PsThread *CreateThread(void (*EntryPoint)(void *), void *Parameter, void 
 
     /* The stack size (even when allocated somewhere else) should always be KE_STACK_SIZE. */
     Thread->StackLimit = Thread->Stack + KE_STACK_SIZE;
+
+    /* Initialize the event header (used when waiting for the thread's completion). */
+    Thread->EventHeader.Type = EV_TYPE_THREAD;
+    RtInitializeDList(&Thread->EventHeader.WaitList);
+
     return Thread;
 }
 
@@ -255,6 +260,12 @@ PsThread *PsCreateThread(uint64_t Flags, void (*EntryPoint)(void *), void *Param
     if (CurrentThread->State != PS_STATE_RUNNING) {
         KeFatalError(KE_PANIC_BAD_THREAD_STATE, CurrentThread->State, PS_STATE_RUNNING, 0, 0);
     }
+
+    /* Signal to anyone waiting for us (should we do this here at the start, or somewhere else?) */
+    KeAcquireSpinLockAtCurrentIrql(&CurrentThread->EventHeader.Lock);
+    CurrentThread->EventHeader.Signaled = true;
+    EvpWakeAllThreads((EvHeader *)&CurrentThread->EventHeader);
+    KeReleaseSpinLockAtCurrentIrql(&CurrentThread->EventHeader.Lock);
 
     /* Disable anyone from sending us alerts from now on (so that we can clean up the signal
      * list). */

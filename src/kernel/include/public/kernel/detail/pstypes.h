@@ -13,6 +13,14 @@
 /* clang-format on */
 
 typedef struct PsThread {
+    /* The struct needs to be inlined like this, as we can't include evtypes.h over here; Keep this
+     * synched with EvHeader! */
+    struct {
+        uint8_t Type;
+        KeSpinLock Lock;
+        RtDList WaitList;
+        bool Signaled;
+    } EventHeader;
     RtDList ListHeader;
     RtDList WaitListHeader;
     RtAvlNode WaitTreeNode;

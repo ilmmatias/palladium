@@ -18,5 +18,6 @@
 
 #define EV_TYPE_SIGNAL 0
 #define EV_TYPE_MUTEX 1
+#define EV_TYPE_THREAD 2
 
 #endif /* _KERNEL_DETAIL_EVDEFS_H_ */
