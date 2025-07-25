@@ -53,13 +53,18 @@ void HalpInitializeTsc(void) {
             break;
         }
 
-        /* Leaf 15h is pretty unreliable, as most processors don't set CoreFreq; If at least we have
-         * leaf 16h, we can use that to get the core crystal freq. */
         uint64_t RatioDenom, RatioNum, CoreFreq;
         __cpuid(0x15, RatioDenom, RatioNum, CoreFreq, Edx);
+        if (!RatioNum) {
+            VidPrint(VID_MESSAGE_DEBUG, "Kernel HAL", "CPUID leaf 15h has no valid data\n");
+            break;
+        }
+
+        /* Leaf 15h is pretty unreliable, as most processors don't set CoreFreq; If at least we have
+         * leaf 16h, we can use that to get the core crystal freq. */
         if (!CoreFreq && Eax >= 0x16) {
             __cpuid(0x16, Eax, Ebx, Ecx, Edx);
-            CoreFreq = (Eax * 10000000) * (RatioDenom / RatioNum);
+            CoreFreq = Eax * 1000000 * RatioDenom / RatioNum;
         }
 
         /* If even that was not good, then just bail out. */
@@ -71,12 +76,13 @@ void HalpInitializeTsc(void) {
             break;
         }
 
-        Frequency = CoreFreq * (RatioNum / RatioDenom);
+        Frequency = CoreFreq * RatioNum / RatioDenom;
     } while (false);
 
     /* Otherwise, just calibrate it against the HPET. */
     if (!Frequency) {
         uint64_t Ticks = (__uint128_t)(10 * EV_MILLISECS) * HalpGetHpetFrequency() / EV_SECS;
+
         for (int i = 0; i < 5; i++) {
             uint64_t StartTsc = __rdtsc();
             uint64_t StartHpet = HalpGetHpetTicks();
@@ -87,15 +93,12 @@ void HalpInitializeTsc(void) {
             uint64_t EndTsc = __rdtsc();
             uint64_t EndHpet = HalpGetHpetTicks();
 
-            /* We're going to guess that the fastest run is the correct one; Maybe we should change
-             * this to avg the values instead? Not 100% sure. */
             uint64_t DeltaTsc = EndTsc - StartTsc;
             uint64_t DeltaHpet = EndHpet - StartHpet;
-            uint64_t CurrentFrequency = (__uint128_t)DeltaTsc * HalpGetHpetFrequency() / DeltaHpet;
-            if (CurrentFrequency > Frequency) {
-                Frequency = CurrentFrequency;
-            }
+            Frequency += (__uint128_t)DeltaTsc * HalpGetHpetFrequency() / DeltaHpet;
         }
+
+        Frequency /= 5;
     }
 
     /* Clean up the TSC to start in a clean slate. */
