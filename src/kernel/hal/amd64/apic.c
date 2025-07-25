@@ -1,7 +1,6 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#include <cpuid.h>
 #include <kernel/halp.h>
 #include <kernel/intrin.h>
 #include <kernel/ke.h>
@@ -51,7 +50,7 @@ static HalpLapicEntry *GetLapic(uint32_t Id) {
  *-----------------------------------------------------------------------------------------------*/
 uint64_t HalpReadLapicRegister(uint32_t Number) {
     if (X2ApicEnabled) {
-        return ReadMsr(HALP_APIC_REG_MSR + (Number >> 4));
+        return ReadMsr(HALP_MSR_APIC_REG(Number));
     } else {
         return *(volatile uint32_t *)((char *)LapicAddress + Number);
     }
@@ -70,7 +69,7 @@ uint64_t HalpReadLapicRegister(uint32_t Number) {
  *-----------------------------------------------------------------------------------------------*/
 void HalpWriteLapicRegister(uint32_t Number, uint64_t Data) {
     if (X2ApicEnabled) {
-        WriteMsr(HALP_APIC_REG_MSR + (Number >> 4), Data);
+        WriteMsr(HALP_MSR_APIC_REG(Number), Data);
     } else {
         *(volatile uint32_t *)((char *)LapicAddress + Number) = Data;
     }
@@ -114,9 +113,7 @@ void HalpInitializeApic(void) {
             0);
     }
 
-    uint32_t Eax, Ebx, Ecx, Edx;
-    __cpuid(1, Eax, Ebx, Ecx, Edx);
-    if (Ecx & 0x200000) {
+    if (HalpPlatformFeatures & HALP_FEATURE_X2APIC) {
         /* x2APIC uses MSRs instead of the LAPIC address, so Read/WriteRegister needs to know if we
            enabled it. */
         X2ApicEnabled = true;
@@ -209,7 +206,7 @@ void HalpInitializeApic(void) {
 
     /* Default to the LAPIC address given in the MSR (if we're not using x2APIC). */
     if (!X2ApicEnabled) {
-        LapicAddress = MmMapSpace(ReadMsr(HALP_APIC_MSR) & ~0xFFF, MM_PAGE_SIZE, MM_SPACE_IO);
+        LapicAddress = MmMapSpace(ReadMsr(HALP_MSR_APIC) & ~0xFFF, MM_PAGE_SIZE, MM_SPACE_IO);
         if (!LapicAddress) {
             KeFatalError(
                 KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
@@ -234,11 +231,11 @@ void HalpInitializeApic(void) {
 void HalpEnableApic(void) {
     /* More than likely APIC is already enabled in the MSR, but just in case, set it up (activating
      * X2APIC if possible). */
-    uint64_t Value = ReadMsr(HALP_APIC_MSR) | HALP_APIC_MSR_ENABLE;
+    uint64_t Value = ReadMsr(HALP_MSR_APIC) | HALP_APIC_MSR_ENABLE;
     if (X2ApicEnabled) {
-        WriteMsr(HALP_APIC_MSR, Value | HALP_APIC_MSR_X2APIC_ENABLE);
+        WriteMsr(HALP_MSR_APIC, Value | HALP_APIC_MSR_X2APIC_ENABLE);
     } else {
-        WriteMsr(HALP_APIC_MSR, Value);
+        WriteMsr(HALP_MSR_APIC, Value);
     }
 
     /* Mask (disable) the legacy PIC. */

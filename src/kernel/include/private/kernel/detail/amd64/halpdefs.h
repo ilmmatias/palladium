@@ -7,6 +7,72 @@
 #include <kernel/detail/amd64/halptypes.h>
 #include <kernel/detail/amd64/kedefs.h>
 
+#define HALP_FEATURE_HYPERVISOR (1ull << 0)
+#define HALP_FEATURE_HYBRID (1ull << 1)
+#define HALP_FEATURE_PDPE_1GB (1ull << 2)
+#define HALP_FEATURE_X2APIC (1ull << 3)
+#define HALP_FEATURE_PCID (1ull << 4)
+#define HALP_FEATURE_VMX (1ull << 5)
+#define HALP_FEATURE_ERMS (1ull << 6)
+#define HALP_FEATURE_LA57 (1ull << 7)
+#define HALP_FEATURE_FRED (1ull << 8)
+#define HALP_FEATURE_LKGS (1ull << 9)
+#define HALP_FEATURE_TSC (1ull << 10)
+#define HALP_FEATURE_INVARIANT_TSC (1ull << 11)
+#define HALP_FEATURE_MONITOR (1ull << 12)
+#define HALP_FEATURE_CX16 (1ull << 13)
+#define HALP_FEATURE_CMPCCXADD (1ull << 14)
+#define HALP_FEATURE_RDRAND (1ull << 15)
+#define HALP_FEATURE_RDSEED (1ull << 16)
+#define HALP_FEATURE_PCLMULQDQ (1ull << 17)
+#define HALP_FEATURE_MOVBE (1ull << 18)
+#define HALP_FEATURE_MOVDIRI (1ull << 19)
+#define HALP_FEATURE_MOVDIR64B (1ull << 20)
+#define HALP_FEATURE_RDTSCP (1ull << 21)
+#define HALP_FEATURE_RDPID (1ull << 22)
+#define HALP_FEATURE_INVPCID (1ull << 23)
+#define HALP_FEATURE_FSGSBASE (1ull << 24)
+#define HALP_FEATURE_XSAVE (1ull << 25)
+#define HALP_FEATURE_FMA (1ull << 26)
+#define HALP_FEATURE_POPCNT (1ull << 27)
+#define HALP_FEATURE_LZCNT (1ull << 28)
+#define HALP_FEATURE_BMI1 (1ull << 29)
+#define HALP_FEATURE_BMI2 (1ull << 30)
+#define HALP_FEATURE_SHA (1ull << 31)
+#define HALP_FEATURE_SHA512 (1ull << 32)
+#define HALP_FEATURE_AES_NI (1ull << 33)
+#define HALP_FEATURE_APX (1ull << 34)
+#define HALP_FEATURE_SSE (1ull << 35)
+#define HALP_FEATURE_SSE2 (1ull << 36)
+#define HALP_FEATURE_SSE3 (1ull << 37)
+#define HALP_FEATURE_SSSE3 (1ull << 38)
+#define HALP_FEATURE_SSE41 (1ull << 39)
+#define HALP_FEATURE_SSE42 (1ull << 40)
+#define HALP_FEATURE_AVX (1ull << 41)
+#define HALP_FEATURE_AVX2 (1ull << 42)
+#define HALP_FEATURE_F16C (1ull << 43)
+#define HALP_FEATURE_GFNI (1ull << 44)
+#define HALP_FEATURE_SMAP (1ull << 45)
+#define HALP_FEATURE_SMEP (1ull << 46)
+#define HALP_FEATURE_UMIP (1ull << 47)
+#define HALP_FEATURE_WAITPKG (1ull << 48)
+
+#define HALP_CPUID_MAX_LEAF 0x00000000
+#define HALP_CPUID_PROCESSOR_INFO 0x00000001
+#define HALP_CPUID_EXTENDED_FEATURES 0x00000007
+#define HALP_CPUID_TSC_FREQUENCY 0x00000015
+#define HALP_CPUID_PROCESSOR_FREQUENCY 0x00000016
+
+#define HALP_CPUID_MAX_EXTENDED_LEAF 0x80000000
+#define HALP_CPUID_EXTENDED_PROCESSOR_INFO 0x80000001
+#define HALP_CPUID_EXTENDED_PROCESSOR_BRAND(Part) (0x80000002 + (Part))
+#define HALP_CPUID_PPM_INFO 0x80000007
+
+#define HALP_MSR_TSC 0x00000010
+#define HALP_MSR_APIC 0x0000001B
+#define HALP_MSR_APIC_REG(Number) (0x00000800 + ((Number) >> 4))
+#define HALP_MSR_KERNEL_GS_BASE 0xC0000102
+
 #define HALP_INT_DISPATCH_IRQL 2
 #define HALP_INT_TIMER_IRQL 13
 #define HALP_INT_IPI_IRQL 14
@@ -35,9 +101,6 @@
 #define HALP_PIC_ICW4_MASTER 0x05
 #define HALP_PIC_ICW4_SLAVE 0x01
 #define HALP_PIC_MASK 0xFF
-
-#define HALP_APIC_MSR 0x1B
-#define HALP_APIC_REG_MSR 0x800
 
 #define HALP_APIC_MSR_X2APIC_ENABLE 0x400
 #define HALP_APIC_MSR_ENABLE 0x800
@@ -104,8 +167,6 @@
 #define HALP_IOAPIC_ARB_REG 0x02
 #define HALP_IOAPIC_REDIR_REG_LOW(n) (0x10 + ((n) << 1))
 #define HALP_IOAPIC_REDIR_REG_HIGH(n) (0x11 + ((n) << 1))
-
-#define HALP_TSC_MSR 0x10
 
 #define HALP_PML4_LEVEL 0
 #define HALP_PML4_BASE ((HalpPageFrame *)0xFFFFFFFFFFFFF000)

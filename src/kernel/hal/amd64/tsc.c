@@ -24,21 +24,10 @@ static uint64_t Frequency = 0;
 void HalpInitializeTsc(void) {
     /* Don't bother with TSC if it's not marked as invariant (essentially anything newer than the
      * Intel Core 2 series should support it, but still, it's good to check). */
-    uint64_t Eax, Ebx, Ecx, Edx;
-    __cpuid(1, Eax, Ebx, Ecx, Edx);
-    if (!(Edx & bit_TSC)) {
+    if (!(HalpPlatformFeatures & HALP_FEATURE_TSC)) {
         VidPrint(VID_MESSAGE_DEBUG, "Kernel HAL", "RDTSC is unavailable\n");
         return;
-    }
-
-    __cpuid(0x80000000, Eax, Ebx, Ecx, Edx);
-    if (Eax < 0x80000007) {
-        VidPrint(VID_MESSAGE_DEBUG, "Kernel HAL", "invariant TSC is unavailable\n");
-        return;
-    }
-
-    __cpuid(0x80000007, Eax, Ebx, Ecx, Edx);
-    if (!(Edx & 0x100)) {
+    } else if (!(HalpPlatformFeatures & HALP_FEATURE_INVARIANT_TSC)) {
         VidPrint(VID_MESSAGE_DEBUG, "Kernel HAL", "invariant TSC is unavailable\n");
         return;
     }
@@ -47,32 +36,32 @@ void HalpInitializeTsc(void) {
      * frequency via CPUID leafs 15h and 16h (which is really only supported on newer Intel
      * processors, so not really that widely supported). */
     do {
-        __cpuid(0, Eax, Ebx, Ecx, Edx);
-        if (Eax < 0x15) {
-            VidPrint(VID_MESSAGE_DEBUG, "Kernel HAL", "CPUID leaf 15h is unavailable\n");
+        if (HalpPlatformMaxLeaf < HALP_CPUID_TSC_FREQUENCY) {
+            VidPrint(
+                VID_MESSAGE_DEBUG, "Kernel HAL", "cannot acquire the TSC frequency via CPUID\n");
             break;
         }
 
-        uint64_t RatioDenom, RatioNum, CoreFreq;
-        __cpuid(0x15, RatioDenom, RatioNum, CoreFreq, Edx);
+        uint64_t RatioDenom, RatioNum, CoreFreq, Unused;
+        __cpuid(HALP_CPUID_TSC_FREQUENCY, RatioDenom, RatioNum, CoreFreq, Unused);
         if (!RatioNum) {
-            VidPrint(VID_MESSAGE_DEBUG, "Kernel HAL", "CPUID leaf 15h has no valid data\n");
+            VidPrint(
+                VID_MESSAGE_DEBUG, "Kernel HAL", "cannot acquire the TSC frequency via CPUID\n");
             break;
         }
 
         /* Leaf 15h is pretty unreliable, as most processors don't set CoreFreq; If at least we have
          * leaf 16h, we can use that to get the core crystal freq. */
-        if (!CoreFreq && Eax >= 0x16) {
-            __cpuid(0x16, Eax, Ebx, Ecx, Edx);
-            CoreFreq = Eax * 1000000 * RatioDenom / RatioNum;
+        if (!CoreFreq && HalpPlatformMaxLeaf >= HALP_CPUID_PROCESSOR_FREQUENCY) {
+            uint64_t BaseFreq, Unused0, Unused1, Unused2;
+            __cpuid(HALP_CPUID_PROCESSOR_FREQUENCY, BaseFreq, Unused0, Unused1, Unused2);
+            CoreFreq = BaseFreq * 1000000 * RatioDenom / RatioNum;
         }
 
         /* If even that was not good, then just bail out. */
         if (!CoreFreq) {
             VidPrint(
-                VID_MESSAGE_DEBUG,
-                "Kernel HAL",
-                "CPUID leaf 15h has no core crystal clock frequency\n");
+                VID_MESSAGE_DEBUG, "Kernel HAL", "cannot acquire the TSC frequency via CPUID\n");
             break;
         }
 
@@ -102,7 +91,7 @@ void HalpInitializeTsc(void) {
     }
 
     /* Clean up the TSC to start in a clean slate. */
-    WriteMsr(HALP_TSC_MSR, 0);
+    WriteMsr(HALP_MSR_TSC, 0);
 
     VidPrint(
         VID_MESSAGE_DEBUG,

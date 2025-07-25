@@ -10,6 +10,12 @@
 extern "C" {
 #endif /* __cplusplus */
 
+extern char HalpPlatformManufacturerString[12];
+extern char HalpPlatformProcessorBrandString[48];
+extern uint32_t HalpPlatformMaxLeaf;
+extern uint32_t HalpPlatformMaxExtendedLeaf;
+extern uint64_t HalpPlatformFeatures;
+
 void HalpInitializeIdt(KeProcessor *Processor);
 void HalpInitializeGdt(KeProcessor *Processor);
 void HalpFlushGdt(void);

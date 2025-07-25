@@ -232,6 +232,11 @@ static void PutChar(char Character) {
     /* It's probably safe to use the size of 4 spaces? */
     const int TabSize = VidpFont.GlyphInfo[0x20].Width * 4;
 
+    if (VidpCursorX + VidpFont.GlyphInfo[(int)Character].Width > VidpWidth) {
+        VidpCursorX = 0;
+        VidpCursorY += VidpFont.Height;
+    }
+
     if (VidpCursorY + VidpFont.Height > VidpHeight) {
         ScrollUp();
         VidpCursorY -= VidpFont.Height;
@@ -245,11 +250,6 @@ static void PutChar(char Character) {
     } else {
         DrawCharacter(Character);
         VidpCursorX += VidpFont.GlyphInfo[(int)Character].Advance;
-    }
-
-    if (VidpCursorX >= VidpWidth) {
-        VidpCursorX = 0;
-        VidpCursorY += VidpFont.Height;
     }
 }
 
