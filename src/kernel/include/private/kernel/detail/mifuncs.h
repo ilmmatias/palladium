@@ -29,7 +29,7 @@ extern uint64_t MiTotalGraphicsPages;
 extern uint64_t MiTotalPtePages;
 extern uint64_t MiTotalPfnPages;
 extern uint64_t MiTotalPoolPages;
-extern RtAtomicSList MiPoolTagListHead[256];
+extern RtSList MiPoolTagListHead[256];
 
 void MiInitializeEarlyPageAllocator(KiLoaderBlock *LoaderBlock);
 void MiInitializePageAllocator(void);

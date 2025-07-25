@@ -14,7 +14,8 @@ static KeSpinLock Lock = {0};
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function allocates a the specified amount of pages from the pool space.
+ *     This function allocates a the specified amount of pages from the pool space. We expect to be
+ *     called at DISPATCH IRQL.
  *
  * PARAMETERS:
  *     Pages - How many pages we need.
@@ -31,18 +32,16 @@ void *MiAllocatePoolPages(uint32_t Pages) {
      * allocations), we have a special path (caching of recently freed entries). */
     if (Pages <= 4) {
         /* Start by checking in the per-processor list (as that's lock-free). */
-        KeIrql OldIrql = KeRaiseIrql(KE_IRQL_DISPATCH);
         KeProcessor *Processor = KeGetCurrentProcessor();
         RtSList *ListHeader = RtPopSList(&Processor->FreePoolPageListHead[Pages - 1]);
 
         /* And if that fails, try grabbing something out of the global list (that needs a lock). */
         if (ListHeader) {
             Processor->FreePoolPageListSize[Pages - 1]--;
-            KeLowerIrql(OldIrql);
         } else {
             KeAcquireSpinLockAtCurrentIrql(&Lock);
             ListHeader = RtPopSList(&FreeLists[Pages - 1]);
-            KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
+            KeReleaseSpinLockAtCurrentIrql(&Lock);
         }
 
         if (ListHeader) {
@@ -58,14 +57,14 @@ void *MiAllocatePoolPages(uint32_t Pages) {
     }
 
     /* Otherwise, we need to grab more virtual space (this needs the lock). */
-    KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Lock, KE_IRQL_DISPATCH);
+    KeAcquireSpinLockAtCurrentIrql(&Lock);
     uint64_t Index = RtFindClearBitsAndSet(&MiPoolBitmap, MiPoolBitmapHint, Pages);
     if (Index == (uint64_t)-1) {
-        KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
+        KeReleaseSpinLockAtCurrentIrql(&Lock);
         return NULL;
     } else {
         MiPoolBitmapHint = Index + Pages;
-        KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
+        KeReleaseSpinLockAtCurrentIrql(&Lock);
     }
 
     char *VirtualAddress = (char *)(MI_POOL_START + (Index << MM_PAGE_SHIFT));
@@ -96,7 +95,8 @@ void *MiAllocatePoolPages(uint32_t Pages) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function returns all pages belonging to the given allocation into the free list.
+ *     This function returns all pages belonging to the given allocation into the free list. We
+ *     expect to be called at DISPATCH IRQL.
  *
  * PARAMETERS:
  *     Base - First virtual address of the allocation.
@@ -117,17 +117,15 @@ uint32_t MiFreePoolPages(void *Base) {
      * uncapped, and return the memory (or part of it) if our memory usage is above a certain
      * point? */
     if (Pages <= 4) {
-        KeIrql OldIrql = KeRaiseIrql(KE_IRQL_DISPATCH);
         KeProcessor *Processor = KeGetCurrentProcessor();
 
         if (Processor->FreePoolPageListSize[Pages - 1] < MI_PROCESSOR_POOL_CACHE_MAX_SIZE) {
             RtPushSList(&Processor->FreePoolPageListHead[Pages - 1], Base);
             Processor->FreePoolPageListSize[Pages - 1]++;
-            KeLowerIrql(OldIrql);
         } else {
             KeAcquireSpinLockAtCurrentIrql(&Lock);
             RtPushSList(&FreeLists[Pages - 1], Base);
-            KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
+            KeReleaseSpinLockAtCurrentIrql(&Lock);
         }
 
         return Pages;
@@ -153,11 +151,11 @@ uint32_t MiFreePoolPages(void *Base) {
      * the lock). */
     HalpUnmapPages(Base, Pages << MM_PAGE_SHIFT);
 
-    KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Lock, KE_IRQL_DISPATCH);
     uint64_t Index = ((uint64_t)Base - MI_POOL_START) >> MM_PAGE_SHIFT;
+    KeAcquireSpinLockAndRaiseIrql(&Lock, KE_IRQL_DISPATCH);
     RtClearBits(&MiPoolBitmap, Index, Pages);
     MiPoolBitmapHint = Index;
-    KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
+    KeReleaseSpinLockAtCurrentIrql(&Lock);
 
     __atomic_fetch_sub(&MiTotalPoolPages, Pages, __ATOMIC_RELAXED);
     return Pages;

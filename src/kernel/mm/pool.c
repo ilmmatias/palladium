@@ -19,7 +19,7 @@ static KeSpinLock FreeBlockLock[MM_POOL_BLOCK_COUNT] = {};
 uint64_t *MiPoolBitmapBuffer = NULL;
 RtBitmap MiPoolBitmap = {};
 uint64_t MiPoolBitmapHint = 0;
-RtAtomicSList MiPoolTagListHead[256] = {};
+RtSList MiPoolTagListHead[256] = {};
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -148,9 +148,7 @@ void MiInitializePool(void) {
  *-----------------------------------------------------------------------------------------------*/
 void *MmAllocatePool(size_t Size, const char Tag[4]) {
     /* We should just crash right away if we're above DISPATCH. */
-    if (KeGetIrql() > KE_IRQL_DISPATCH) {
-        KeFatalError(KE_PANIC_IRQL_NOT_GREATER_OR_EQUAL, KeGetIrql(), KE_IRQL_DISPATCH, 0, 0);
-    }
+    KeIrql OldIrql = KeRaiseIrql(KE_IRQL_DISPATCH);
 
     if (!Size) {
         Size = 1;
@@ -162,12 +160,14 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
         uint32_t Pages = (Size + MM_PAGE_SIZE - 1) >> MM_PAGE_SHIFT;
         void *Base = MiAllocatePoolPages(Pages);
 
-        /* Tag the allocation and try to account for it in the pool tracker. */
-        memcpy(MI_PAGE_ENTRY(HalpGetPhysicalAddress(Base)).Tag, Tag, 4);
-        MiAddPoolTracker(Pages << MM_PAGE_SHIFT, Tag);
-
         if (Base) {
+            /* Tag the allocation and try to account for it in the pool tracker. */
+            memcpy(MI_PAGE_ENTRY(HalpGetPhysicalAddress(Base)).Tag, Tag, 4);
+            MiAddPoolTracker(Pages << MM_PAGE_SHIFT, Tag);
+            KeLowerIrql(OldIrql);
             memset(Base, 0, Pages << MM_PAGE_SHIFT);
+        } else {
+            KeLowerIrql(OldIrql);
         }
 
         return Base;
@@ -180,7 +180,6 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
     uint32_t HeadPages = GetHeadPages(Head);
     uint64_t HeadSize = GetHeadSize(Head);
     uint64_t FullSize = HeadSize + sizeof(BlockHeader);
-    KeIrql OldIrql = KeRaiseIrql(KE_IRQL_DISPATCH);
     KeProcessor *Processor = KeGetCurrentProcessor();
     if (Processor->FreePoolBlockListHead[Head].Next) {
         BlockHeader *Header = CONTAINING_RECORD(
@@ -191,10 +190,11 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
         }
 
         Processor->FreePoolBlockListSize[Head]--;
+
+        memcpy(Header->Tag, Tag, 4);
+        MiAddPoolTracker(FullSize, Tag);
         KeLowerIrql(OldIrql);
 
-        MiAddPoolTracker(FullSize, Tag);
-        memcpy(Header->Tag, Tag, 4);
         memset(Header + 1, 0, HeadSize);
         return Header + 1;
     }
@@ -208,13 +208,15 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
             KeFatalError(KE_PANIC_BAD_POOL_HEADER, (uint64_t)Header, Header->Head, Head, 0);
         }
 
-        KeReleaseSpinLockAndLowerIrql(&FreeBlockLock[Head], OldIrql);
-        MiAddPoolTracker(FullSize, Tag);
+        KeReleaseSpinLockAtCurrentIrql(&FreeBlockLock[Head]);
         memcpy(Header->Tag, Tag, 4);
+        MiAddPoolTracker(FullSize, Tag);
+        KeLowerIrql(OldIrql);
+
         memset(Header + 1, 0, HeadSize);
         return Header + 1;
     }
-    KeReleaseSpinLockAndLowerIrql(&FreeBlockLock[Head], OldIrql);
+    KeReleaseSpinLockAtCurrentIrql(&FreeBlockLock[Head]);
 
     /* Allocate some extra space, and carve it into a bunch of Head-sized elements. */
     char *StartAddress = MiAllocatePoolPages(HeadPages);
@@ -225,7 +227,7 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
 
     /* Split the pages into equal sized chunks; This can have some waste depending on the chosen
      * bucket sizes, so make sure to tune the min/max/shift values! */
-    OldIrql = KeAcquireSpinLockAndRaiseIrql(&FreeBlockLock[Head], KE_IRQL_DISPATCH);
+    KeAcquireSpinLockAtCurrentIrql(&FreeBlockLock[Head]);
     for (uint64_t i = 0; i < (HeadPages << MM_PAGE_SHIFT) / FullSize; i++) {
         BlockHeader *Header = (BlockHeader *)(StartAddress + i * FullSize);
         Header->Head = Head;
@@ -235,9 +237,11 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
     BlockHeader *Header =
         CONTAINING_RECORD(RtPopSList(&FreeBlockList[Head]), BlockHeader, ListHeader);
 
-    KeReleaseSpinLockAndLowerIrql(&FreeBlockLock[Head], OldIrql);
-    MiAddPoolTracker(FullSize, Tag);
+    KeReleaseSpinLockAtCurrentIrql(&FreeBlockLock[Head]);
     memcpy(Header->Tag, Tag, 4);
+    MiAddPoolTracker(FullSize, Tag);
+    KeLowerIrql(OldIrql);
+
     memset(Header + 1, 0, HeadSize);
     return Header + 1;
 }
@@ -255,9 +259,7 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
  *-----------------------------------------------------------------------------------------------*/
 void MmFreePool(void *Base, const char Tag[4]) {
     /* We should just crash right away if we're above DISPATCH. */
-    if (KeGetIrql() > KE_IRQL_DISPATCH) {
-        KeFatalError(KE_PANIC_IRQL_NOT_GREATER_OR_EQUAL, KeGetIrql(), KE_IRQL_DISPATCH, 0, 0);
-    }
+    KeIrql OldIrql = KeRaiseIrql(KE_IRQL_DISPATCH);
 
     /* MmAllocatePool guarantees anything that is inside the managed pool buckets is never going to
        be page aligned. */
@@ -282,6 +284,7 @@ void MmFreePool(void *Base, const char Tag[4]) {
         /* The remaining checks are directly done by MiFreePoolPages. */
         uint32_t Pages = MiFreePoolPages(Base);
         MiRemovePoolTracker(Pages << MM_PAGE_SHIFT, Tag);
+        KeLowerIrql(OldIrql);
         return;
     }
 
@@ -299,13 +302,12 @@ void MmFreePool(void *Base, const char Tag[4]) {
     /* If we haven't overflow the local cache yet, just directly push to it (as it doesn't need any
      * locks). */
     uint64_t FullSize = GetHeadSize(Header->Head) + 16;
-    KeIrql OldIrql = KeRaiseIrql(KE_IRQL_DISPATCH);
     KeProcessor *Processor = KeGetCurrentProcessor();
     if (Processor->FreePoolBlockListSize[Header->Head] < MI_PROCESSOR_POOL_CACHE_MAX_SIZE) {
         RtPushSList(&Processor->FreePoolBlockListHead[Header->Head], &Header->ListHeader);
-        KeLowerIrql(OldIrql);
         MiRemovePoolTracker(FullSize, Tag);
         Processor->FreePoolBlockListSize[Header->Head]++;
+        KeLowerIrql(OldIrql);
         return;
     }
 
@@ -313,6 +315,7 @@ void MmFreePool(void *Base, const char Tag[4]) {
      * (in case the whole segment is free). */
     KeAcquireSpinLockAtCurrentIrql(&FreeBlockLock[Header->Head]);
     RtPushSList(&FreeBlockList[Header->Head], &Header->ListHeader);
-    KeReleaseSpinLockAndLowerIrql(&FreeBlockLock[Header->Head], OldIrql);
+    KeReleaseSpinLockAtCurrentIrql(&FreeBlockLock[Header->Head]);
     MiRemovePoolTracker(FullSize, Tag);
+    KeLowerIrql(OldIrql);
 }
