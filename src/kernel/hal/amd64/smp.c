@@ -80,12 +80,6 @@ void HalpInitializeSmp(void) {
         RtInitializeAvlTree(&HalpProcessorList[i]->WaitTree, PspCompareWaitThreads);
         RtInitializeDList(&HalpProcessorList[i]->ThreadQueue);
         RtInitializeDList(&HalpProcessorList[i]->TerminationQueue);
-
-        /* There is no need to initialize the memory manager caches for the BSP; Actually, doing
-         * that would break things (because it's already in use!) */
-        if (i) {
-            RtInitializeDList(&HalpProcessorList[i]->FreePageListHead);
-        }
     }
 
     /* Now, we can start waking up everyone. */

@@ -10,7 +10,7 @@ static RtDList *LoaderDescriptors = NULL;
 
 RtDList MiMemoryDescriptorListHead;
 MiPageEntry *MiPageList = NULL;
-RtDList MiFreePageListHead;
+RtSList MiFreePageListHead;
 KeSpinLock MiPageListLock = {0};
 uint64_t MiTotalSystemPages = 0;
 uint64_t MiTotalReservedPages = 0;
@@ -172,7 +172,6 @@ void MiInitializePageAllocator(void) {
     MiTotalPfnPages = Pages;
 
     /* Setup the page allocator (marking the free pages as free). */
-    RtInitializeDList(&MiFreePageListHead);
     for (RtDList *ListHeader = LoaderDescriptors->Next; ListHeader != LoaderDescriptors;
          ListHeader = ListHeader->Next) {
         MiMemoryDescriptor *Entry = CONTAINING_RECORD(ListHeader, MiMemoryDescriptor, ListHeader);
@@ -193,18 +192,13 @@ void MiInitializePageAllocator(void) {
                 Group[i].Used = 0;
                 Group[i].PoolItem = 0;
                 Group[i].PoolBase = 0;
-                RtPushDList(&MiFreePageListHead, &Group[i].ListHeader);
+                RtPushSList(&MiFreePageListHead, &Group[i].ListHeader);
             }
         }
     }
 
-    /* Now MmAllocatePool (and MmAllocateSinglePage) are almost ready to be called; But they attempt
-     * to mess with the processor's local page cache, so we need to initialize it early for the boot
-     * processor (or, we'll probably crash really hard). */
-    RtInitializeDList(&KeGetCurrentProcessor()->FreePageListHead);
-
-    /* We're also forced to initialize the pool trackers before continuing (or we'll fail because
-     * MiPoolTracker will be a NULL pointer). */
+    /* We're forced to initialize the pool trackers before continuing (or we'll crash when trying to
+     * account for the allocation because MiPoolTracker will be a NULL pointer). */
     MiInitializePoolTracker();
 
     /* Now we should be free to allocate some pool memory and copy the memory descriptor list in its
@@ -258,7 +252,7 @@ void MiReleaseBootRegions(void) {
             Group[i].Used = 0;
             Group[i].PoolItem = 0;
             Group[i].PoolBase = 0;
-            RtPushDList(&MiFreePageListHead, &Group[i].ListHeader);
+            RtPushSList(&MiFreePageListHead, &Group[i].ListHeader);
         }
 
         HalpUnmapPages(
@@ -286,14 +280,14 @@ uint64_t MmAllocateSinglePage() {
         KeAcquireSpinLockAtCurrentIrql(&MiPageListLock);
 
         for (int i = 0; i < MI_PROCESSOR_PAGE_CACHE_BATCH_SIZE; i++) {
-            RtDList *ListHeader = RtPopDList(&MiFreePageListHead);
-            if (ListHeader == &MiFreePageListHead) {
+            RtSList *ListHeader = RtPopSList(&MiFreePageListHead);
+            if (!ListHeader) {
                 break;
             }
 
             /* The main allocation path is expected to check for the validity of the pages it pops,
              * so we just add them to the list here. */
-            RtAppendDList(&Processor->FreePageListHead, ListHeader);
+            RtPushSList(&Processor->FreePageListHead, ListHeader);
             Processor->FreePageListSize++;
             __atomic_add_fetch(&MiTotalCachedPages, 1, __ATOMIC_RELAXED);
             __atomic_sub_fetch(&MiTotalFreePages, 1, __ATOMIC_RELAXED);
@@ -304,8 +298,8 @@ uint64_t MmAllocateSinglePage() {
 
     /* Now we should just be able to pop from the local cache (if that fails, the system is out of
      * memory). */
-    RtDList *ListHeader = RtPopDList(&Processor->FreePageListHead);
-    if (ListHeader == &Processor->FreePageListHead) {
+    RtSList *ListHeader = RtPopSList(&Processor->FreePageListHead);
+    if (!ListHeader) {
         KeLowerIrql(OldIrql);
         return 0;
     } else {
@@ -348,7 +342,7 @@ void MmFreeSinglePage(uint64_t PhysicalAddress) {
     /* Update all stat, and check if we can just append this to the local cache. */
     Entry->Used = 0;
     if (Processor->FreePageListSize < MI_PROCESSOR_PAGE_CACHE_MAX_SIZE) {
-        RtAppendDList(&Processor->FreePageListHead, &Entry->ListHeader);
+        RtPushSList(&Processor->FreePageListHead, &Entry->ListHeader);
         Processor->FreePageListSize++;
         KeLowerIrql(OldIrql);
         __atomic_add_fetch(&MiTotalCachedPages, 1, __ATOMIC_RELAXED);
@@ -359,7 +353,7 @@ void MmFreeSinglePage(uint64_t PhysicalAddress) {
     /* Otherwise, append the page to the global free page list (we do need the global lock for
      * this). */
     KeAcquireSpinLockAtCurrentIrql(&MiPageListLock);
-    RtAppendDList(&MiFreePageListHead, &Entry->ListHeader);
+    RtPushSList(&MiFreePageListHead, &Entry->ListHeader);
     KeReleaseSpinLockAndLowerIrql(&MiPageListLock, OldIrql);
     __atomic_sub_fetch(&MiTotalUsedPages, 1, __ATOMIC_RELAXED);
     __atomic_add_fetch(&MiTotalFreePages, 1, __ATOMIC_RELAXED);

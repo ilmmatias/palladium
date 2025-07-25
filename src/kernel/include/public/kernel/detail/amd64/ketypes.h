@@ -32,7 +32,7 @@ typedef struct {
     uint64_t LowIrqlTicks;
     uint64_t IdleTicks;
     int EventType;
-    RtDList FreePageListHead;
+    RtSList FreePageListHead;
     uint64_t FreePageListSize;
     RtSList FreePoolPageListHead[4];
     uint64_t FreePoolPageListSize[4];

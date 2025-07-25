@@ -22,7 +22,7 @@ typedef struct {
 } MiMemoryDescriptor;
 
 typedef struct {
-    RtDList ListHeader;
+    RtSList ListHeader;
     union {
         struct {
             uint32_t Used : 1;
