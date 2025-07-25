@@ -115,9 +115,18 @@ void PspSwitchThreads(
         PspQueueThread(CurrentThread, false);
     }
 
-    /* Swap into the new thread; We should be back to lower the IRQL after another context switches
-     * back into us. */
+    /* Swap into the new thread; We should be back into the old thread when HalpSwitchContext
+     * returns. */
     HalpSwitchContext(&CurrentThread->ContextFrame, &TargetThread->ContextFrame);
+
+    /* Just check if any alerts have been queued for this thread; If so, lower to SIGNAL
+     * and process them first. */
+    if (CurrentThread->AlertList.Next) {
+        KeLowerIrql(KE_IRQL_ALERT);
+        PspProcessAlertQueue();
+    }
+
+    /* At the end of everything, lower back to the original IRQL. */
     KeLowerIrql(OldIrql);
 }
 
@@ -127,15 +136,15 @@ void PspSwitchThreads(
  *     the DISPATCH IRQL.
  *
  * PARAMETERS:
- *     InterruptFrame - Current processor state.
+ *     None.
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void PspProcessQueue(HalInterruptFrame *) {
+void PspProcessQueue(void) {
     KeIrql Irql = KeGetIrql();
     if (Irql != KE_IRQL_DISPATCH) {
-        KeFatalError(KE_PANIC_IRQL_NOT_DISPATCH, Irql, 0, 0, 0);
+        KeFatalError(KE_PANIC_IRQL_NOT_EQUAL, KE_IRQL_DISPATCH, Irql, 0, 0);
     }
 
     /* We shouldn't have anything to do if the initial thread still isn't running. */
@@ -166,10 +175,6 @@ void PspProcessQueue(HalInterruptFrame *) {
 
     /* Requeue any waiting threads that have expired (this can also be done at DISPATCH). */
     if (Processor->Ticks >= Processor->ClosestWaitTick) {
-        RtDList RequeueListHead;
-        uint64_t RequeueListSize = 0;
-        RtInitializeDList(&RequeueListHead);
-
         while (true) {
             /* Hold the processor lock while modifying the per-processor wait list. */
             KeAcquireSpinLockAtCurrentIrql(&Processor->Lock);
@@ -197,8 +202,7 @@ void PspProcessQueue(HalInterruptFrame *) {
             EvHeader *Event = Thread->WaitObject;
             if (!Event) {
                 Thread->State = PS_STATE_QUEUED;
-                RtAppendDList(&RequeueListHead, &Thread->ListHeader);
-                RequeueListSize++;
+                PspQueueThread(Thread, true);
                 continue;
             }
 
@@ -221,29 +225,13 @@ void PspProcessQueue(HalInterruptFrame *) {
                  * that can't happen anymore because we already unlinked), we can requeue the
                  * thread. */
                 Thread->State = PS_STATE_QUEUED;
-                RtAppendDList(&RequeueListHead, &Thread->ListHeader);
-                RequeueListSize++;
+                PspQueueThread(Thread, true);
             } while (false);
-        }
-
-        if (RequeueListHead.Next != &RequeueListHead) {
-            PspQueueThreadList(&RequeueListHead, RequeueListSize, true);
         }
 
         if (!RtQuerySizeAvlTree(&Processor->WaitTree)) {
             Processor->ClosestWaitTick = UINT64_MAX;
         }
-    }
-
-    /* For any PENDING_* threads, we need to finish executing whichever action got us to here. */
-    if (CurrentThread->State == PS_STATE_PENDING_SUSPEND) {
-        PspSuspendExecution(Processor, CurrentThread, PS_STATE_SUSPENDED, (KeIrql)-1);
-        return;
-    } else if (CurrentThread->State == PS_STATE_PENDING_TERMINATE) {
-        KeAcquireSpinLockAndRaiseIrql(&Processor->Lock, KE_IRQL_SYNCH);
-        RtAppendDList(&Processor->TerminationQueue, &CurrentThread->ListHeader);
-        PspSuspendExecution(Processor, CurrentThread, PS_STATE_TERMINATED, KE_IRQL_SYNCH);
-        KeFatalError(KE_PANIC_BAD_THREAD_STATE, PS_STATE_RUNNING, PS_STATE_TERMINATED, 0, 0);
     }
 
     /* We shouldn't have anything left to do if we haven't expired yet (or if we're the idle

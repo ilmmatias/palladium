@@ -26,7 +26,7 @@ typedef struct {
     RtDList ListHeader;
     void (*Routine)(void *);
     void *Context;
-} KeKernelSignal;
+} KeWork;
 
 typedef struct {
     uint64_t Size;

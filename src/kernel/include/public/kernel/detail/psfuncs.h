@@ -17,11 +17,12 @@ extern "C" {
 #endif /* __cplusplus */
 
 PsThread *PsCreateThread(uint64_t Flags, void (*EntryPoint)(void *), void *Parameter);
-bool PsTerminateThread(PsThread *Thread);
+[[noreturn]] void PsTerminateThread(void);
 void PsYieldThread(void);
-bool PsSuspendThread(PsThread *Thread);
-bool PsResumeThread(PsThread *Thread);
 void PsDelayThread(uint64_t Time);
+
+void PsInitializeAlert(PsAlert *Alert, void (*Routine)(void *), void *Context);
+bool PsQueueAlert(PsThread *Thread, PsAlert *Alert);
 
 #ifdef __cplusplus
 }

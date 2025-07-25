@@ -19,7 +19,7 @@ typedef struct {
     KeSpinLock Lock;
     uint32_t Number;
     uint32_t ApicId;
-    RtDList KernelSignalQueue;
+    RtDList WorkQueue;
     RtAvlTree WaitTree;
     uint64_t ClosestWaitTick;
     RtDList ThreadQueue;

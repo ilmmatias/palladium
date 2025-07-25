@@ -21,7 +21,6 @@ void PspCreateIdleThread(void);
 void PspCreateSystemThread(void);
 
 void PspQueueThread(PsThread *Thread, bool EventQueue);
-void PspQueueThreadList(RtDList *ThreadList, uint64_t ThreadCount, bool EventQueue);
 void PspSetupThreadWait(KeProcessor *Processor, PsThread *Thread, uint64_t Time);
 void PspSuspendExecution(
     KeProcessor *Processor,
@@ -36,6 +35,8 @@ void PspSwitchThreads(
     KeIrql OldIrql);
 
 RtAvlCompareResult PspCompareWaitThreads(RtAvlNode *FirstStruct, RtAvlNode *SecondStruct);
+
+void PspProcessAlertQueue(void);
 
 #ifdef __cplusplus
 }

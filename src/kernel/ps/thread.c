@@ -1,7 +1,7 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#include <kernel/ev.h>
+#include <kernel/evp.h>
 #include <kernel/halp.h>
 #include <kernel/ke.h>
 #include <kernel/mm.h>
@@ -84,37 +84,6 @@ static void QueueThreadIn(PsThread *Thread, KeProcessor *Processor, bool EventQu
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function queues the specified thread list under the specified processor.
- *
- * PARAMETERS:
- *     ThreadList - Which threads to add.
- *     ThreadCount - How many threads to add.
- *     Processor - Which processor to add the threads to.
- *     EventQueue - Set this to true if these threads were waiting for an event/signal.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-static void QueueThreadListIn(
-    RtDList *ThreadList,
-    uint64_t ThreadCount,
-    KeProcessor *Processor,
-    bool EventQueue) {
-    KeAcquireSpinLockAtCurrentIrql(&Processor->Lock);
-
-    if (EventQueue) {
-        RtSpliceHeadDList(&Processor->ThreadQueue, ThreadList);
-    } else {
-        RtSpliceTailDList(&Processor->ThreadQueue, ThreadList);
-    }
-
-    __atomic_add_fetch(&Processor->ThreadCount, ThreadCount, __ATOMIC_RELEASE);
-    __atomic_add_fetch(&PspGlobalThreadCount, ThreadCount, __ATOMIC_RELEASE);
-    KeReleaseSpinLockAtCurrentIrql(&Processor->Lock);
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
  *     This function finds a target processor and adds a thread to its queue; We expect to be at
  *     least raised to DISPATCH, and with no processor locks acquired.
  *
@@ -161,69 +130,6 @@ void PspQueueThread(PsThread *Thread, bool EventQueue) {
     }
 
     QueueThreadIn(Thread, HalpProcessorList[TargetIndex], EventQueue);
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function distributes a set of threads amonst the online processors; We expect to be at
- *     least raised to DISPATCH, and with no processor locks acquired.
- *
- * PARAMETERS:
- *     ThreadList - Which threads to add.
- *     EventQueue - Set this to true if these threads were waiting for an event/signal.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-void PspQueueThreadList(RtDList *ThreadList, uint64_t ThreadCount, bool EventQueue) {
-    /* Before doing anything too complex, just make sure we have more than one thread to split; If
-     * not, use the usual QueueThread() path. */
-    if (ThreadCount == 1) {
-        PspQueueThread(CONTAINING_RECORD(ThreadList->Next, PsThread, ListHeader), EventQueue);
-        return;
-    }
-
-    /* First, if the current inbalance isn't too bad, we want to place it in the current processor
-     * (as the processor's cache will probably be more warm/have more hits for the thread if we stay
-     * always on the same thread).  */
-    KeProcessor *Processor = KeGetCurrentProcessor();
-    uint64_t LocalThreadCount =
-        __atomic_load_n(&Processor->ThreadCount, __ATOMIC_ACQUIRE) + ThreadCount;
-    uint64_t GlobalThreadCount =
-        __atomic_load_n(&PspGlobalThreadCount, __ATOMIC_ACQUIRE) + ThreadCount;
-    if (LocalThreadCount < (GlobalThreadCount * PSP_LOAD_BALANCE_BIAS) / 100) {
-        QueueThreadListIn(ThreadList, ThreadCount, Processor, EventQueue);
-        return;
-    }
-
-    /* Otherwise, we'd rather place the threads in an idle processor, as long as the inbalance from
-     * doing so isn't going to become too great. */
-    uint32_t Index = KeGetFirstAffinitySetBit(&KiIdleProcessors);
-    if (Index != (uint32_t)-1 && ThreadCount < (GlobalThreadCount * PSP_LOAD_BALANCE_BIAS) / 100) {
-        QueueThreadListIn(ThreadList, ThreadCount, HalpProcessorList[Index], EventQueue);
-        return;
-    }
-
-    /* If all else fails, evenly spread all threads amongst the online processors. */
-    uint64_t SplitSize = ThreadCount / HalpOnlineProcessorCount;
-    uint64_t Remainder = ThreadCount % HalpOnlineProcessorCount;
-    for (uint32_t i = 0; i < HalpOnlineProcessorCount; i++) {
-        uint64_t GroupSize = SplitSize;
-        if (Remainder) {
-            GroupSize++;
-            Remainder--;
-        }
-
-        /* We're assuming ThreadCount is trustable, and that RtPopDList won't return an invalid
-         * value as long as within ThreadCount bounds. */
-        RtDList ListHead;
-        RtInitializeDList(&ListHead);
-        for (uint64_t i = 0; i < GroupSize; i++) {
-            RtAppendDList(&ListHead, RtPopDList(ThreadList));
-        }
-
-        QueueThreadListIn(&ListHead, GroupSize, HalpProcessorList[i], EventQueue);
-    }
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -330,149 +236,43 @@ PsThread *PsCreateThread(uint64_t Flags, void (*EntryPoint)(void *), void *Param
 }
 
 /*-------------------------------------------------------------------------------------------------
- * PURPOSE:
+ * PURPOSE:__ATOMIC_RELAXED
  *     This function marks the current thread for deletion, and yields out into the next thread.
  *
  * PARAMETERS:
- *     Thread - Which thread to terminate; Use PsGetCurrentThread() as the argument to terminate
- *              the current thread.
- *
- * RETURN VALUE:
- *     Does not return for local threads, and returns if the thread was properly terminated for
- *     remote threads.
- *-----------------------------------------------------------------------------------------------*/
-bool PsTerminateThread(PsThread *Thread) {
-    /* Raise to SYNCH (block device interrupts) and acquire the processor lock (to access its
-     * queue). */
-    KeIrql OldIrql = KeRaiseIrql(KE_IRQL_SYNCH);
-    KeProcessor *CurrentProcessor = KeGetCurrentProcessor();
-    KeProcessor *Processor = Thread->Processor;
-    KeAcquireSpinLockAtCurrentIrql(&Processor->Lock);
-
-    /* For local threads, make sure no other remote processor tried to suspend or terminate us
-     * after we raised the IRQL (but before we acquired the lock). */
-    PsThread *CurrentThread = CurrentProcessor->CurrentThread;
-    if (CurrentThread == Thread && (CurrentThread->State == PS_STATE_PENDING_SUSPEND ||
-                                    CurrentThread->State == PS_STATE_PENDING_TERMINATE)) {
-        KeReleaseSpinLockAndLowerIrql(&Processor->Lock, OldIrql);
-        return false;
-    }
-
-    /* Otherwise, local threads need to be RUNNING (it doesn't even make sense for them to reach
-     * this function if they aren't running). */
-    if (CurrentThread == Thread && CurrentThread->State != PS_STATE_RUNNING) {
-        KeFatalError(KE_PANIC_BAD_THREAD_STATE, CurrentThread->State, PS_STATE_RUNNING, 0, 0);
-    }
-
-    /* Remote threads are allowed to be in a few different states. Any other state is too unsafe
-     * to mess with. */
-    if (CurrentThread != Thread && Thread->State != PS_STATE_QUEUED &&
-        Thread->State != PS_STATE_RUNNING && Thread->State != PS_STATE_WAITING) {
-        KeReleaseSpinLockAndLowerIrql(&Processor->Lock, OldIrql);
-        return false;
-    }
-
-    /* For local threads, as we know we're RUNNING, we can just forcefully SwitchThreads while
-     * not requeueing ourselves. */
-    if (CurrentThread == Thread) {
-        RtAppendDList(&Processor->TerminationQueue, &CurrentThread->ListHeader);
-        PspSuspendExecution(Processor, CurrentThread, PS_STATE_TERMINATED, KE_IRQL_SYNCH);
-        KeFatalError(KE_PANIC_BAD_THREAD_STATE, PS_STATE_RUNNING, PS_STATE_TERMINATED, 0, 0);
-    }
-
-    /* For non-running remote threads, we can just unqueue and add to the termination-list; At
-     * some point, the target processor should finish the clean up. */
-    if (Thread->State == PS_STATE_QUEUED) {
-        RtUnlinkDList(&Thread->ListHeader);
-        __atomic_sub_fetch(&Processor->ThreadCount, 1, __ATOMIC_RELEASE);
-        __atomic_sub_fetch(&PspGlobalThreadCount, 1, __ATOMIC_RELEASE);
-        Thread->State = PS_STATE_TERMINATED;
-        RtAppendDList(&Processor->TerminationQueue, &Thread->ListHeader);
-        KeReleaseSpinLockAndLowerIrql(&Processor->Lock, OldIrql);
-    } else if (Thread->State == PS_STATE_WAITING) {
-        /* Waiting threads a bit different; They aren't running (so we don't need to use the
-         * transition state), but we do need to cleanup the waiting lists attached to it. */
-        Thread->State = PS_STATE_PENDING_TERMINATE;
-        RtUnlinkDList(&Thread->ListHeader);
-        KeReleaseSpinLockAtCurrentIrql(&Processor->Lock);
-
-        EvHeader *Event = Thread->WaitObject;
-        if (Event) {
-            /* Now with the processor lock released, acquire the event lock (to modify the
-             * per-event wait list). */
-            KeAcquireSpinLockAtCurrentIrql(&Event->Lock);
-
-            /* We might have been signaled right as we were acquiring the lock, otherwise, we
-             * can just unlink the event header. */
-            if (Thread->WaitListHeader.Prev->Next == &Thread->WaitListHeader) {
-                RtUnlinkDList(&Thread->WaitListHeader);
-            }
-
-            KeReleaseSpinLockAtCurrentIrql(&Event->Lock);
-        }
-
-        KeAcquireSpinLockAtCurrentIrql(&Processor->Lock);
-        RtAppendDList(&Processor->TerminationQueue, &Thread->ListHeader);
-        KeReleaseSpinLockAndLowerIrql(&Processor->Lock, OldIrql);
-    } else {
-        Thread->State = PS_STATE_PENDING_TERMINATE;
-        HalpNotifyProcessor(Processor);
-        KeReleaseSpinLockAndLowerIrql(&Processor->Lock, OldIrql);
-    }
-
-    return true;
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function delays the execution of the current thread until at least a certain amount
- *of time has passed.
- *
- * PARAMETERS:
- *     Time - How much time we want to sleep for (nanoseconds, the actual amount of time spent
- *            sleeping will be aligned to the timer tick period).
- *
- * RETURN VALUE:
  *     None.
+ *
+ * RETURN VALUE:
+ *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
-void PsDelayThread(uint64_t Time) {
-    /* Sleep(0) is just a YieldThread request (which did you do this instead of just calling
-     * YieldThread?). */
-    if (!Time) {
-        PsYieldThread();
-        return;
-    }
+[[noreturn]] void PsTerminateThread(void) {
+    /* Block the scheduler from interrupting us (by raising to SYNCH). */
+    KeRaiseIrql(KE_IRQL_SYNCH);
 
-    /* Raise to SYNCH (block device interrupts) and acquire the processor lock (to access the
-     * queue). */
-    KeIrql OldIrql = KeRaiseIrql(KE_IRQL_SYNCH);
+    /* Make sure the thread state is sane. */
     KeProcessor *Processor = KeGetCurrentProcessor();
-    KeAcquireSpinLockAtCurrentIrql(&Processor->Lock);
-
-    /* Make sure no other remote processor tried to suspend or terminate us after we raised the
-     * IRQL (but before we acquired the lock). */
     PsThread *CurrentThread = Processor->CurrentThread;
-    if (CurrentThread->State == PS_STATE_PENDING_SUSPEND ||
-        CurrentThread->State == PS_STATE_PENDING_TERMINATE) {
-        KeReleaseSpinLockAndLowerIrql(&Processor->Lock, OldIrql);
-        return;
-    }
-
-    /* Make sure that we're running, because if not, how did we even get here? */
     if (CurrentThread->State != PS_STATE_RUNNING) {
         KeFatalError(KE_PANIC_BAD_THREAD_STATE, CurrentThread->State, PS_STATE_RUNNING, 0, 0);
     }
 
-    /* Do the wait list manipulation (that also calculates the target ticks) as early as
-     * possible (so that we don't overshoot the wait too much). */
-    CurrentThread->WaitObject = NULL;
-    PspSetupThreadWait(Processor, CurrentThread, Time);
-    PspSuspendExecution(Processor, CurrentThread, PS_STATE_WAITING, OldIrql);
-
-    /* Just make sure we returned when we expected to. */
-    if (Processor->Ticks < CurrentThread->WaitTicks) {
-        KeFatalError(KE_PANIC_BAD_THREAD_STATE, PS_STATE_RUNNING, PS_STATE_WAITING, 0, 0);
+    /* Disable anyone from sending us alerts from now on (so that we can clean up the signal
+     * list). */
+    KeAcquireSpinLockAtCurrentIrql(&CurrentThread->AlertLock);
+    __atomic_store_n(&CurrentThread->AlertListBlocked, true, __ATOMIC_SEQ_CST);
+    while (CurrentThread->AlertList.Next) {
+        PsAlert *Alert =
+            CONTAINING_RECORD(RtPopSList(&CurrentThread->AlertList), PsAlert, ListHeader);
+        MmFreePool(Alert, MM_POOL_TAG_NONE);
     }
+    KeReleaseSpinLockAtCurrentIrql(&CurrentThread->AlertLock);
+
+    /* Mark ourselves for termination, and switch out (the next dispatch event should clean up the
+     * thread for us). */
+    KeAcquireSpinLockAtCurrentIrql(&Processor->Lock);
+    RtAppendDList(&Processor->TerminationQueue, &CurrentThread->ListHeader);
+    PspSuspendExecution(Processor, CurrentThread, PS_STATE_TERMINATED, KE_IRQL_SYNCH);
+    KeFatalError(KE_PANIC_BAD_THREAD_STATE, PS_STATE_RUNNING, PS_STATE_TERMINATED, 0, 0);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -480,7 +280,7 @@ void PsDelayThread(uint64_t Time) {
  *     This function tries to give up the remaining quantum in the thread, and switch out to the
  *     next thread.
  *     We won't switch to the idle thread, so when the queue is empty, this function will
- *instantly return!
+ *     instantly return!
  *
  * PARAMETERS:
  *     None.
@@ -489,28 +289,20 @@ void PsDelayThread(uint64_t Time) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void PsYieldThread(void) {
-    /* Raise to SYNCH (block device interrupts) and acquire the processor lock (to access the
-     * queue). */
+    /* Raise to SYNCH and acquire the processor lock (as we'll be messing with the
+     * scheduler queue). */
     KeIrql OldIrql = KeRaiseIrql(KE_IRQL_SYNCH);
     KeProcessor *Processor = KeGetCurrentProcessor();
     KeAcquireSpinLockAtCurrentIrql(&Processor->Lock);
 
-    /* Make sure no other remote processor tried to suspend or terminate us after we raised the
-     * IRQL (but before we acquired the lock). */
+    /* Make sure the thread state is sane. */
     PsThread *CurrentThread = Processor->CurrentThread;
-    if (CurrentThread->State == PS_STATE_PENDING_SUSPEND ||
-        CurrentThread->State == PS_STATE_PENDING_TERMINATE) {
-        KeReleaseSpinLockAndLowerIrql(&Processor->Lock, OldIrql);
-        return;
-    }
-
-    /* Make sure that we're running, because if not, how did we even get here? */
     if (CurrentThread->State != PS_STATE_RUNNING) {
         KeFatalError(KE_PANIC_BAD_THREAD_STATE, CurrentThread->State, PS_STATE_RUNNING, 0, 0);
     }
 
-    /* Check if we have any thread to switch into; Unlike SuspendThread, we act like IdleThread
-     * isn't a thing. */
+    /* Check if we have any thread to switch into (we don't bother to switch if nothing is
+     * available, as this thread would have been chosen to run next up anyways). */
     RtDList *ListHeader = RtPopDList(&Processor->ThreadQueue);
     if (ListHeader == &Processor->ThreadQueue) {
         KeSetAffinityBit(&KiIdleProcessors, Processor->Number);
@@ -530,99 +322,41 @@ void PsYieldThread(void) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function suspends the execution of a given thread. The thread will be in the
- *suspended state until PsResumeThread is called (or the thread is terminated).
+ *     This function delays the execution of the current thread until at least a certain amount
+ *     of time has passed.
  *
  * PARAMETERS:
- *     Thread - Which thread to suspend; If you want to (for some reason) suspend the current
- *              thread, just pass PsGetCurrentThread() to this.
+ *     Time - How much time we want to sleep for (nanoseconds, the actual amount of time spent
+ *            sleeping will be aligned to the timer tick period).
  *
  * RETURN VALUE:
- *     Returns true if we were to suspend the thread properly, or false otherwise.
+ *     None.
  *-----------------------------------------------------------------------------------------------*/
-bool PsSuspendThread(PsThread *Thread) {
-    /* Raise to SYNCH (block device interrupts) and acquire the processor lock (to access its
-     * queue). */
-    KeIrql OldIrql = KeRaiseIrql(KE_IRQL_SYNCH);
-    KeProcessor *CurrentProcessor = KeGetCurrentProcessor();
-    KeProcessor *Processor = Thread->Processor;
-    KeAcquireSpinLockAtCurrentIrql(&Processor->Lock);
-
-    /* For local threads, make sure no other remote processor tried to suspend or terminate us
-     * after we raised the IRQL (but before we acquired the lock). */
-    PsThread *CurrentThread = CurrentProcessor->CurrentThread;
-    if (CurrentThread == Thread && (CurrentThread->State == PS_STATE_PENDING_SUSPEND ||
-                                    CurrentThread->State == PS_STATE_PENDING_TERMINATE)) {
-        KeReleaseSpinLockAndLowerIrql(&Processor->Lock, OldIrql);
-        return false;
+void PsDelayThread(uint64_t Time) {
+    /* Sleep(0) is just a YieldThread request (which did you do this instead of just calling
+     * YieldThread?). */
+    if (!Time) {
+        PsYieldThread();
+        return;
     }
 
-    /* Local threads need to be RUNNING (otherwise, it doesn't even make sense for them to reach
-     * this function). */
-    if (CurrentThread == Thread && CurrentThread->State != PS_STATE_RUNNING) {
+    /* Raise to SYNCH and acquire the processor lock (as we'll be messing with the
+     * per-processor fields and the queue). */
+    KeIrql OldIrql = KeRaiseIrql(KE_IRQL_SYNCH);
+    KeProcessor *Processor = KeGetCurrentProcessor();
+    KeAcquireSpinLockAtCurrentIrql(&Processor->Lock);
+
+    /* Make sure the thread state is sane. */
+    PsThread *CurrentThread = Processor->CurrentThread;
+    if (CurrentThread->State != PS_STATE_RUNNING) {
         KeFatalError(KE_PANIC_BAD_THREAD_STATE, CurrentThread->State, PS_STATE_RUNNING, 0, 0);
     }
 
-    /* Remote threads are allowed to be either RUNNING or QUEUED. Any other state is too unsafe
-     * to mess with. */
-    if (CurrentThread != Thread && Thread->State != PS_STATE_QUEUED &&
-        Thread->State != PS_STATE_RUNNING) {
-        KeReleaseSpinLockAndLowerIrql(&Processor->Lock, OldIrql);
-        return false;
-    }
-
-    /* For local threads, as we know we're RUNNING, we can just forcefully SwitchThreads while
-     * not requeueing ourselves. */
-    if (CurrentThread == Thread) {
-        PspSuspendExecution(Processor, CurrentThread, PS_STATE_SUSPENDED, OldIrql);
-        return true;
-    }
-
-    /* Remote threads have two paths; If we're queued, we have literally nothing special
-     * required to be done, we just pop the thread out of the queue and mark it as suspended;
-     * For running threads, we need to mark them as pending suspension, and notify the remote
-     * processor that they need to swap threads. */
-    if (Thread->State == PS_STATE_QUEUED) {
-        RtUnlinkDList(&Thread->ListHeader);
-        __atomic_sub_fetch(&Processor->ThreadCount, 1, __ATOMIC_RELEASE);
-        __atomic_sub_fetch(&PspGlobalThreadCount, 1, __ATOMIC_RELEASE);
-        Thread->State = PS_STATE_SUSPENDED;
-        KeReleaseSpinLockAndLowerIrql(&Processor->Lock, OldIrql);
-    } else {
-        Thread->State = PS_STATE_PENDING_SUSPEND;
-        HalpNotifyProcessor(Processor);
-        KeReleaseSpinLockAndLowerIrql(&Processor->Lock, OldIrql);
-    }
-
-    return true;
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function resumes execution and requeues a previously suspended thread.
- *
- * PARAMETERS:
- *     Thread - Which thread to resume. The thread should be on the PS_STATE_SUSPENDED state.
- *
- * RETURN VALUE:
- *     Returns true if we were to resume the thread properly, or false otherwise.
- *-----------------------------------------------------------------------------------------------*/
-bool PsResumeThread(PsThread *Thread) {
-    /* Raise to SYNCH (block device interrupts) before messing with the queue functions. */
-    KeIrql OldIrql = KeRaiseIrql(KE_IRQL_SYNCH);
-
-    /* Don't bother with anything that isn't suspended yet. */
-    if (Thread->State != PS_STATE_SUSPENDED) {
-        KeLowerIrql(OldIrql);
-        return false;
-    }
-
-    /* At the end, we just need to requeue the thread (just like what we do on PsCreateThread).
-     */
-    Thread->State = PS_STATE_QUEUED;
-    PspQueueThread(Thread, false);
-    KeLowerIrql(OldIrql);
-    return true;
+    /* Do the wait list manipulation (that also calculates the target ticks) as early as
+     * possible (so that we don't overshoot the wait too much). */
+    CurrentThread->WaitObject = NULL;
+    PspSetupThreadWait(Processor, CurrentThread, Time);
+    PspSuspendExecution(Processor, CurrentThread, PS_STATE_WAITING, OldIrql);
 }
 
 /*-------------------------------------------------------------------------------------------------

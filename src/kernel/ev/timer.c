@@ -27,9 +27,9 @@ void EvpHandleTimer(HalInterruptFrame *InterruptFrame) {
         Processor->IdleTicks++;
     }
 
-    /* Check if we have any kernel signals to execute. */
+    /* Check if we have any dispatch-level work to execute. */
     bool NotifyProcessor = false;
-    if (Processor->KernelSignalQueue.Next != &Processor->KernelSignalQueue) {
+    if (Processor->WorkQueue.Next != &Processor->WorkQueue) {
         NotifyProcessor = true;
     }
 
@@ -52,6 +52,6 @@ void EvpHandleTimer(HalInterruptFrame *InterruptFrame) {
     /* And finally, if any of the conditions above were true, notify the current processor to run
      * the dispatch handler. */
     if (NotifyProcessor) {
-        HalpNotifyProcessor(Processor);
+        HalpNotifyProcessor(Processor, KE_IRQL_DISPATCH);
     }
 }

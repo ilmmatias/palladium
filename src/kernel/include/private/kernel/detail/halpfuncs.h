@@ -41,7 +41,7 @@ void HalpUnmapPages(void *VirtualAddress, uint64_t Size);
 
 void HalpBroadcastIpi(void);
 void HalpBroadcastFreeze(void);
-void HalpNotifyProcessor(KeProcessor *Processor);
+void HalpNotifyProcessor(KeProcessor *Processor, KeIrql TargetIrql);
 
 void *HalpEnterCriticalSection(void);
 void HalpLeaveCriticalSection(void *Context);

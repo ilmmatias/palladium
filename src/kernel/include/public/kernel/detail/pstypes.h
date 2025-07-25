@@ -16,6 +16,9 @@ typedef struct PsThread {
     RtDList ListHeader;
     RtDList WaitListHeader;
     RtAvlNode WaitTreeNode;
+    KeSpinLock AlertLock;
+    RtSList AlertList;
+    bool AlertListBlocked;
     uint8_t State;
     uint64_t ExpirationTicks;
     uint64_t WaitTicks;
@@ -26,5 +29,11 @@ typedef struct PsThread {
     char *AllocatedStack;
     HalContextFrame ContextFrame;
 } PsThread;
+
+typedef struct {
+    RtSList ListHeader;
+    void (*Routine)(void *);
+    void *Context;
+} PsAlert;
 
 #endif /* _KERNEL_DETAIL_PSTYPES_H_ */

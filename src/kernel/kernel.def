@@ -23,8 +23,8 @@ EXPORTS
     __stack_chk_fail
     __stack_chk_guard DATA
     KeFatalError
-    KeInitializeKernelSignal
-    KeQueueKernelSignal
+    KeInitializeWork
+    KeQueueWork
     KeRequestIpiRoutine
     KeSynchronizeProcessors
     KiFindAcpiTable
@@ -48,8 +48,8 @@ EXPORTS
 
     PsCreateThread
     PsDelayThread
-    PsResumeThread
-    PsSuspendThread
+    PsInitializeAlert
+    PsQueueAlert
     PsYieldThread
 
     VidGetColor

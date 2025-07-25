@@ -38,9 +38,9 @@ add_executable(kernel "kernel" YES
     ke/driver.c
     ke/entry.c
     ke/ipi.c
-    ke/kernelsignal.c
     ke/panic.c
     ke/stackcheck.c
+    ke/work.c
 
     mm/page.c
     mm/pool.c
@@ -53,6 +53,7 @@ add_executable(kernel "kernel" YES
     ob/signalobj.c
     ob/threadobj.c
 
+    ps/alert.c
     ps/idle.c
     ps/scheduler.c
     ps/thread.c

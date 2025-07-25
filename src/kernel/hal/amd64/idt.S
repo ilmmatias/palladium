@@ -17,8 +17,9 @@
 .extern HalpHandleTimer
 .extern HalpSendEoi
 .extern KiHandleIpi
-.extern KiProcessKernelSignalQueue
+.extern KiProcessWorkQueue
 .extern PspProcessQueue
+.extern PspProcessAlertQueue
 
 .global HalpDefaultInterruptHandlers
 HalpDefaultInterruptHandlers:
@@ -317,6 +318,19 @@ HalpSecurityTrapEntry:
 1:  jmp 1b
 .seh_endproc
 
+.seh_proc HalpAlertEntry
+.global HalpAlertEntry
+.align 16
+HalpAlertEntry:
+    ENTER_INTERRUPT (INTERRUPT_FLAGS_NONE)
+    mov $KE_IRQL_ALERT, %rcx
+    mov %rcx, %cr8
+    call HalpSendEoi
+    sti
+    call PspProcessAlertQueue
+    LEAVE_INTERRUPT
+.seh_endproc
+
 .seh_proc HalpDispatchEntry
 .global HalpDispatchEntry
 .align 16
@@ -326,9 +340,7 @@ HalpDispatchEntry:
     mov %rcx, %cr8
     call HalpSendEoi
     sti
-    mov %rsp, %rcx
-    call KiProcessKernelSignalQueue
-    mov %rsp, %rcx
+    call KiProcessWorkQueue
     call PspProcessQueue
     LEAVE_INTERRUPT
 .seh_endproc

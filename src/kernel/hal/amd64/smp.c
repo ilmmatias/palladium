@@ -76,7 +76,7 @@ void HalpInitializeSmp(void) {
         HalpProcessorList[i]->Number = i;
         HalpProcessorList[i]->ClosestWaitTick = UINT64_MAX;
 
-        RtInitializeDList(&HalpProcessorList[i]->KernelSignalQueue);
+        RtInitializeDList(&HalpProcessorList[i]->WorkQueue);
         RtInitializeAvlTree(&HalpProcessorList[i]->WaitTree, PspCompareWaitThreads);
         RtInitializeDList(&HalpProcessorList[i]->ThreadQueue);
         RtInitializeDList(&HalpProcessorList[i]->TerminationQueue);
@@ -157,14 +157,20 @@ void HalpBroadcastFreeze(void) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function notifies another processor that a dispatch level event has happend.
+ *     This function notifies another processor that some event has happend.
  *
  * PARAMETERS:
  *     Processor - Which processor to notify.
+ *     TargetIrql - At which IRQL the event happened (this defines which interrupt vector will be
+ *                  invoked).
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void HalpNotifyProcessor(KeProcessor *Processor) {
-    HalpSendIpi(Processor->ApicId, HALP_INT_DISPATCH_VECTOR, HALP_APIC_ICR_DELIVERY_FIXED);
+void HalpNotifyProcessor(KeProcessor *Processor, KeIrql TargetIrql) {
+    if (TargetIrql == KE_IRQL_ALERT) {
+        HalpSendIpi(Processor->ApicId, HALP_INT_ALERT_VECTOR, HALP_APIC_ICR_DELIVERY_FIXED);
+    } else {
+        HalpSendIpi(Processor->ApicId, HALP_INT_DISPATCH_VECTOR, HALP_APIC_ICR_DELIVERY_FIXED);
+    }
 }
