@@ -252,7 +252,8 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
  *
  * PARAMETERS:
  *     Base - Start of the block.
- *     Tag - Name/identifier attached to the block.
+ *     Tag - Name/identifier attached to the block. Set this to MM_POOL_TAG_NONE if you don't want
+ *           to validate the tag.
  *
  * RETURN VALUE:
  *     None.
@@ -272,7 +273,7 @@ void MmFreePool(void *Base, const char Tag[4]) {
         }
 
         MiPageEntry *Entry = &MI_PAGE_ENTRY(PhysicalAddress);
-        if (memcmp(Entry->Tag, Tag, 4)) {
+        if (memcmp(Tag, MM_POOL_TAG_NONE, 4) && memcmp(Entry->Tag, Tag, 4)) {
             KeFatalError(
                 KE_PANIC_BAD_POOL_HEADER,
                 (uint64_t)Base,
@@ -289,8 +290,8 @@ void MmFreePool(void *Base, const char Tag[4]) {
     }
 
     BlockHeader *Header = (BlockHeader *)Base - 1;
-    if (memcmp(Header->Tag, Tag, 4) || Header->Head >= MM_POOL_BLOCK_COUNT ||
-        Header->ListHeader.Next) {
+    if ((memcmp(Tag, MM_POOL_TAG_NONE, 4) && memcmp(Header->Tag, Tag, 4)) ||
+        Header->Head >= MM_POOL_BLOCK_COUNT || Header->ListHeader.Next) {
         KeFatalError(
             KE_PANIC_BAD_POOL_HEADER,
             (uint64_t)Header,
