@@ -13,15 +13,19 @@
  *
  * PARAMETERS:
  *     Alert - Pointer to the alert object structure.
+ *     Flags - Some flags specifiying behaviour for the alert object; You more than likely want to
+ *             just use PS_INIT_ALERT_DEFAULT.
  *     Routine - Which function should be executed when the alert is called.
  *     Context - Some opaque data to be passed into the alert routine.
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void PsInitializeAlert(PsAlert* Alert, void (*Routine)(void*), void* Context) {
+void PsInitializeAlert(PsAlert* Alert, uint64_t Flags, void (*Routine)(void*), void* Context) {
     Alert->Routine = Routine;
     Alert->Context = Context;
+    Alert->Queued = false;
+    Alert->PoolAllocated = (Flags & PS_INIT_ALERT_POOL_ALLOCATED) ? true : false;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -34,13 +38,17 @@ void PsInitializeAlert(PsAlert* Alert, void (*Routine)(void*), void* Context) {
  *     Alert - Pointer to the initialized alert object structure.
  *
  * RETURN VALUE:
- *     false if we failed to insert the alert (the thread probably got terminated), false
- *     otherwise.
+ *     false if we failed to insert the alert (the thread got terminated, or someone else already
+ *     queued this alert), false otherwise.
  *-----------------------------------------------------------------------------------------------*/
 bool PsQueueAlert(PsThread* Thread, PsAlert* Alert) {
+    bool ExpectedValue = false;
     KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Thread->AlertLock, KE_IRQL_DISPATCH);
     if (__atomic_load_n(&Thread->AlertListBlocked, __ATOMIC_RELAXED)) {
         KeReleaseSpinLockAndLowerIrql(&Thread->AlertLock, OldIrql);
+        return false;
+    } else if (!__atomic_compare_exchange_n(
+                   &Alert->Queued, &ExpectedValue, true, 0, __ATOMIC_RELEASE, __ATOMIC_ACQUIRE)) {
         return false;
     }
 
@@ -74,12 +82,12 @@ void PspProcessAlertQueue(void) {
         KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Thread->AlertLock, KE_IRQL_DISPATCH);
         RtSList* ListHeader = RtPopSList(&Thread->AlertList);
         KeReleaseSpinLockAndLowerIrql(&Thread->AlertLock, OldIrql);
-        if (ListHeader) {
-            /* We'll be assuming any alert data is dynamically allocated (TAG_NONE cleans up any
-             * data, no matter the tag). */
-            PsAlert* Alert = CONTAINING_RECORD(ListHeader, PsAlert, ListHeader);
-            Alert->Routine(Alert->Context);
-            MmFreePool(Alert, MM_POOL_TAG_NONE);
+        if (!ListHeader) {
+            continue;
         }
+
+        PsAlert* Alert = CONTAINING_RECORD(ListHeader, PsAlert, ListHeader);
+        __atomic_store_n(&Alert->Queued, false, __ATOMIC_RELEASE);
+        Alert->Routine(Alert->Context);
     }
 }

@@ -26,6 +26,7 @@ typedef struct {
     RtDList ListHeader;
     void (*Routine)(void *);
     void *Context;
+    bool Queued;
 } KeWork;
 
 typedef struct {

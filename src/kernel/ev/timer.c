@@ -51,7 +51,7 @@ void EvpHandleTimer(HalInterruptFrame *InterruptFrame) {
 
     /* And finally, if any of the conditions above were true, notify the current processor to run
      * the dispatch handler. */
-    if (NotifyProcessor) {
+    if (NotifyProcessor && InterruptFrame->Irql < KE_IRQL_DISPATCH) {
         HalpNotifyProcessor(Processor, KE_IRQL_DISPATCH);
     }
 }

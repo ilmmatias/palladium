@@ -42,6 +42,8 @@ typedef struct {
     RtSList ListHeader;
     void (*Routine)(void *);
     void *Context;
+    bool Queued;
+    bool PoolAllocated;
 } PsAlert;
 
 #endif /* _KERNEL_DETAIL_PSTYPES_H_ */

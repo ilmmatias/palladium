@@ -121,7 +121,7 @@ void PspSwitchThreads(
 
     /* Just check if any alerts have been queued for this thread; If so, lower to SIGNAL
      * and process them first. */
-    if (CurrentThread->AlertList.Next) {
+    if (CurrentThread->AlertList.Next && OldIrql < KE_IRQL_ALERT) {
         KeLowerIrql(KE_IRQL_ALERT);
         PspProcessAlertQueue();
     }

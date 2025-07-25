@@ -21,7 +21,7 @@ PsThread *PsCreateThread(uint64_t Flags, void (*EntryPoint)(void *), void *Param
 void PsYieldThread(void);
 void PsDelayThread(uint64_t Time);
 
-void PsInitializeAlert(PsAlert *Alert, void (*Routine)(void *), void *Context);
+void PsInitializeAlert(PsAlert *Alert, uint64_t Flags, void (*Routine)(void *), void *Context);
 bool PsQueueAlert(PsThread *Thread, PsAlert *Alert);
 
 #ifdef __cplusplus

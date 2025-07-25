@@ -207,7 +207,7 @@ void PspSuspendExecution(
  *
  * PARAMETERS:
  *     Flags - A set of flags to specify some default behaviour for the new thread. By default,
- *             if PS_CREATE_SUSPENDED isn't set, the thread will be automatically queued.
+ *             if PS_CREATE_THREAD_SUSPENDED isn't set, the thread will be automatically queued.
  *     EntryPoint - Where the thread should jump on first execution.
  *     Parameter - What to pass into the thread entry point.
  *
@@ -228,7 +228,7 @@ PsThread *PsCreateThread(uint64_t Flags, void (*EntryPoint)(void *), void *Param
 
     /* If the thread was requested to be initalized in the SUSPENDED state, we're pretty much
      * done; Otherwise, we need to raise the IRQL, and queue the thread. */
-    if (Flags & PS_CREATE_SUSPENDED) {
+    if (Flags & PS_CREATE_THREAD_SUSPENDED) {
         Thread->State = PS_STATE_SUSPENDED;
     } else {
         Thread->State = PS_STATE_QUEUED;
@@ -274,7 +274,9 @@ PsThread *PsCreateThread(uint64_t Flags, void (*EntryPoint)(void *), void *Param
     while (CurrentThread->AlertList.Next) {
         PsAlert *Alert =
             CONTAINING_RECORD(RtPopSList(&CurrentThread->AlertList), PsAlert, ListHeader);
-        MmFreePool(Alert, MM_POOL_TAG_NONE);
+        if (Alert->PoolAllocated) {
+            MmFreePool(Alert, MM_POOL_TAG_NONE);
+        }
     }
     KeReleaseSpinLockAtCurrentIrql(&CurrentThread->AlertLock);
 
@@ -385,7 +387,7 @@ void PspCreateSystemThread(void) {
     /* Clearing the affinity before creating the thread should make it go to the BSP. */
     KeInitializeAffinity(&KiIdleProcessors);
 
-    PsThread *Thread = PsCreateThread(PS_CREATE_DEFAULT, KiContinueSystemStartup, NULL);
+    PsThread *Thread = PsCreateThread(PS_CREATE_THREAD_DEFAULT, KiContinueSystemStartup, NULL);
     if (!Thread) {
         KeFatalError(
             KE_PANIC_KERNEL_INITIALIZATION_FAILURE,

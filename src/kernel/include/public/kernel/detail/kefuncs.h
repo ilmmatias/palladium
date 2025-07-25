@@ -19,7 +19,7 @@ extern "C" {
 void *KiFindAcpiTable(const char Signature[4], int Index);
 
 void KeInitializeWork(KeWork *Work, void (*Routine)(void *), void *Context);
-void KeQueueWork(KeWork *Work, bool HighPriority);
+bool KeQueueWork(KeWork *Work, bool HighPriority);
 
 void KeInitializeAffinity(KeAffinity *Mask);
 bool KeGetAffinityBit(KeAffinity *Mask, uint32_t Index);

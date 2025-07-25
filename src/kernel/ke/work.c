@@ -21,6 +21,7 @@
 void KeInitializeWork(KeWork* Work, void (*Routine)(void*), void* Context) {
     Work->Routine = Routine;
     Work->Context = Context;
+    Work->Queued = false;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -33,9 +34,16 @@ void KeInitializeWork(KeWork* Work, void (*Routine)(void*), void* Context) {
  *     HighPriority - Set this to true if this work should be executed as soon as possible.
  *
  * RETURN VALUE:
- *     None.
+ *     true if we queued successfully, or false if another processor/thread already queued this
+ *     object.
  *-----------------------------------------------------------------------------------------------*/
-void KeQueueWork(KeWork* Work, bool HighPriority) {
+bool KeQueueWork(KeWork* Work, bool HighPriority) {
+    bool ExpectedValue = false;
+    if (!__atomic_compare_exchange_n(
+            &Work->Queued, &ExpectedValue, true, 0, __ATOMIC_RELEASE, __ATOMIC_ACQUIRE)) {
+        return false;
+    }
+
     KeIrql OldIrql = KeRaiseIrql(KE_IRQL_MAX);
     KeProcessor* Processor = KeGetCurrentProcessor();
 
@@ -51,6 +59,8 @@ void KeQueueWork(KeWork* Work, bool HighPriority) {
     if (HighPriority) {
         HalpNotifyProcessor(Processor, KE_IRQL_DISPATCH);
     }
+
+    return true;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -75,6 +85,7 @@ void KiProcessWorkQueue(void) {
         KeIrql OldIrql = KeRaiseIrql(KE_IRQL_MAX);
         KeWork* Work = CONTAINING_RECORD(RtPopDList(&Processor->WorkQueue), KeWork, ListHeader);
         KeLowerIrql(OldIrql);
+        __atomic_store_n(&Work->Queued, false, __ATOMIC_RELEASE);
         Work->Routine(Work->Context);
     }
 }
