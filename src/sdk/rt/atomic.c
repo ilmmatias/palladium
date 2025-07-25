@@ -53,37 +53,35 @@ static RtSList *FetchNextHead(RtAtomicSList *Header) {
  *-----------------------------------------------------------------------------------------------*/
 RtSList *RtPopAtomicSList(RtAtomicSList *Header) {
     RtAtomicSList OldHeader, NewHeader;
+
     int RemainingAttempts = 1024;
+    while (--RemainingAttempts > 0) {
+        __atomic_load(Header, &OldHeader, __ATOMIC_ACQUIRE);
 
-retry:
-    __atomic_load(Header, &OldHeader, __ATOMIC_ACQUIRE);
-
-    do {
-        if (!OldHeader.Next) {
-            return NULL;
-        }
-
-        /* Dereferencing the old pointer needs to be done under an SEH block, as someone else might
-         * have preempted us, and freed the pointer before we had a chance to dereference (though
-         * this should be rare enough); Just make sure to limit the amount of retries (using the
-         * RemainingAttempts variable above). */
-        __try {
-            NewHeader.Next = FetchNextHead(&OldHeader);
-        } __except (
-            _exception_code() == RT_EXC_ACCESS_VIOLATION ? RT_EXC_EXECUTE_HANDLER
-                                                         : RT_EXC_CONTINUE_SEARCH) {
-            if (RemainingAttempts--) {
-                /* I think goto is the best/easiest way to do this? We could also use __leave and
-                 * some trickery, but I actualy think this is a bit easier to read. */
-                goto retry;
-            } else {
+        do {
+            if (!OldHeader.Next) {
                 return NULL;
             }
-        }
 
-        NewHeader.Tag = OldHeader.Tag + 1;
-    } while (!__atomic_compare_exchange(
-        Header, &OldHeader, &NewHeader, 0, __ATOMIC_RELEASE, __ATOMIC_ACQUIRE));
+            /* Dereferencing the old pointer needs to be done under an SEH block, as someone else
+             * might have preempted us, and freed the pointer before we had a chance to dereference
+             * (though this should be rare enough); Just make sure to limit the amount of retries
+             * (using the RemainingAttempts variable above). */
+            __try {
+                NewHeader.Next = FetchNextHead(&OldHeader);
+            } __except (
+                _exception_code() == RT_EXC_ACCESS_VIOLATION ? RT_EXC_EXECUTE_HANDLER
+                                                             : RT_EXC_CONTINUE_SEARCH) {
+                continue;
+            }
 
-    return OldHeader.Next;
+            NewHeader.Tag = OldHeader.Tag + 1;
+        } while (!__atomic_compare_exchange(
+            Header, &OldHeader, &NewHeader, 0, __ATOMIC_RELEASE, __ATOMIC_ACQUIRE));
+
+        OldHeader.Next->Next = NULL;
+        return OldHeader.Next;
+    }
+
+    return NULL;
 }
