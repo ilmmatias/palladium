@@ -47,12 +47,20 @@ static PsThread *TrySteal(KeProcessor *Processor) {
             continue;
         }
 
+        /* Just recheck the thread count to make sure we're not about to starve this processor (and
+         * make it go idle). */
+        if (__atomic_load_n(&TargetProcessor->ThreadCount, __ATOMIC_ACQUIRE) < 2) {
+            KeReleaseSpinLockAndLowerIrql(&TargetProcessor->Lock, OldIrql);
+            CurrentIndex = (CurrentIndex + 1) % HalpOnlineProcessorCount;
+            continue;
+        }
+
         /* Attempt to grab the victim thread; After this, we can then unlock (and lower the IRQL),
          * and return early if we already have something. */
         RtDList *TargetThread = RtTruncateDList(&TargetProcessor->ThreadQueue);
+        __atomic_sub_fetch(&TargetProcessor->ThreadCount, 1, __ATOMIC_RELEASE);
         KeReleaseSpinLockAndLowerIrql(&TargetProcessor->Lock, OldIrql);
         if (TargetThread != &TargetProcessor->ThreadQueue) {
-            __atomic_sub_fetch(&TargetProcessor->ThreadCount, 1, __ATOMIC_RELEASE);
             return CONTAINING_RECORD(TargetThread, PsThread, ListHeader);
         }
 
@@ -87,8 +95,8 @@ static PsThread *TrySteal(KeProcessor *Processor) {
             TargetThread = TrySteal(Processor);
         }
 
-        /* Do we have any threads available to swap into? If not, then loop back (pause and retry).
-         */
+        /* Do we have any threads available to swap into? If not, then loop back (pause and
+         * retry). */
         if (!TargetThread && Processor->ThreadQueue.Next == &Processor->ThreadQueue) {
             continue;
         }
