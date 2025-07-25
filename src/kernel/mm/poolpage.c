@@ -10,7 +10,8 @@ extern RtBitmap MiPoolBitmap;
 extern uint64_t MiPoolBitmapHint;
 
 static RtSList FreeLists[4] = {};
-static KeSpinLock Lock = {0};
+static KeSpinLock FreeListLock[4] = {0};
+static KeSpinLock BitmapLock = {0};
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -39,9 +40,9 @@ void *MiAllocatePoolPages(uint32_t Pages) {
         if (ListHeader) {
             Processor->FreePoolPageListSize[Pages - 1]--;
         } else {
-            KeAcquireSpinLockAtCurrentIrql(&Lock);
+            KeAcquireSpinLockAtCurrentIrql(&FreeListLock[Pages - 1]);
             ListHeader = RtPopSList(&FreeLists[Pages - 1]);
-            KeReleaseSpinLockAtCurrentIrql(&Lock);
+            KeReleaseSpinLockAtCurrentIrql(&FreeListLock[Pages - 1]);
         }
 
         if (ListHeader) {
@@ -56,15 +57,15 @@ void *MiAllocatePoolPages(uint32_t Pages) {
         }
     }
 
-    /* Otherwise, we need to grab more virtual space (this needs the lock). */
-    KeAcquireSpinLockAtCurrentIrql(&Lock);
+    /* Otherwise, we need to grab more virtual space (this needs the bitmap lock). */
+    KeAcquireSpinLockAtCurrentIrql(&BitmapLock);
     uint64_t Index = RtFindClearBitsAndSet(&MiPoolBitmap, MiPoolBitmapHint, Pages);
     if (Index == (uint64_t)-1) {
-        KeReleaseSpinLockAtCurrentIrql(&Lock);
+        KeReleaseSpinLockAtCurrentIrql(&BitmapLock);
         return NULL;
     } else {
         MiPoolBitmapHint = Index + Pages;
-        KeReleaseSpinLockAtCurrentIrql(&Lock);
+        KeReleaseSpinLockAtCurrentIrql(&BitmapLock);
     }
 
     char *VirtualAddress = (char *)(MI_POOL_START + (Index << MM_PAGE_SHIFT));
@@ -123,9 +124,9 @@ uint32_t MiFreePoolPages(void *Base) {
             RtPushSList(&Processor->FreePoolPageListHead[Pages - 1], Base);
             Processor->FreePoolPageListSize[Pages - 1]++;
         } else {
-            KeAcquireSpinLockAtCurrentIrql(&Lock);
+            KeAcquireSpinLockAtCurrentIrql(&FreeListLock[Pages - 1]);
             RtPushSList(&FreeLists[Pages - 1], Base);
-            KeReleaseSpinLockAtCurrentIrql(&Lock);
+            KeReleaseSpinLockAtCurrentIrql(&FreeListLock[Pages - 1]);
         }
 
         return Pages;
@@ -152,10 +153,10 @@ uint32_t MiFreePoolPages(void *Base) {
     HalpUnmapPages(Base, Pages << MM_PAGE_SHIFT);
 
     uint64_t Index = ((uint64_t)Base - MI_POOL_START) >> MM_PAGE_SHIFT;
-    KeAcquireSpinLockAndRaiseIrql(&Lock, KE_IRQL_DISPATCH);
+    KeAcquireSpinLockAtCurrentIrql(&BitmapLock);
     RtClearBits(&MiPoolBitmap, Index, Pages);
     MiPoolBitmapHint = Index;
-    KeReleaseSpinLockAtCurrentIrql(&Lock);
+    KeReleaseSpinLockAtCurrentIrql(&BitmapLock);
 
     __atomic_fetch_sub(&MiTotalPoolPages, Pages, __ATOMIC_RELAXED);
     return Pages;
