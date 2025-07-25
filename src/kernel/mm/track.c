@@ -35,15 +35,16 @@ void MiInitializePoolTracker(void) {
             0);
     }
 
-    /* Cleanup everything and add it all to the free tag list. */
+    /* Cleanup everything and add it all (but the first entry, which we'll be using up next) to the
+     * free tag list. */
     memset(Headers, 0, MM_PAGE_SIZE);
-    for (uint64_t i = 0; i < MM_PAGE_SIZE / sizeof(MiPoolTrackerHeader); i++) {
+    for (uint64_t i = 1; i < MM_PAGE_SIZE / sizeof(MiPoolTrackerHeader); i++) {
         RtPushSList(&FreeList, &Headers[i].ListHeader);
     }
 
     /* Followed by grabbing (and initialzing) the pool tracker itself. */
     uint8_t PoolTagHash = MiGetTagHash(MM_POOL_TAG_POOL);
-    PoolTracker = CONTAINING_RECORD(RtPopSList(&FreeList), MiPoolTrackerHeader, ListHeader);
+    PoolTracker = &Headers[0];
     memcpy(PoolTracker->Tag, MM_POOL_TAG_POOL, 4);
     PoolTracker->Allocations = 1;
     PoolTracker->AllocatedBytes = MM_PAGE_SIZE;
@@ -152,15 +153,16 @@ void MiAddPoolTracker(size_t Size, const char Tag[4]) {
         /* Cleanup everything by default. */
         memset(Headers, 0, MM_PAGE_SIZE);
 
-        /* Then lock the free list and add everything to it. */
+        /* Then lock the free list and add everything (but the entry we'll use) to it. */
         KeAcquireSpinLockAtCurrentIrql(&FreeListLock);
-        for (uint64_t i = 0; i < MM_PAGE_SIZE / sizeof(MiPoolTrackerHeader); i++) {
+        for (uint64_t i = 1; i < MM_PAGE_SIZE / sizeof(MiPoolTrackerHeader); i++) {
             RtPushSList(&FreeList, &Headers[i].ListHeader);
         }
 
-        /* Followed by grabbing the new tracker for the caller's tag (and releasing the lock). */
-        Match = CONTAINING_RECORD(RtPopSList(&FreeList), MiPoolTrackerHeader, ListHeader);
         KeReleaseSpinLockAtCurrentIrql(&FreeListLock);
+
+        /* And now we can grab and setup the caller's tag. */
+        Match = &Headers[0];
         memcpy(Match->Tag, Tag, 4);
         RtPushSList(&MiPoolTagListHead[Hash], &Match->ListHeader);
         KeReleaseSpinLockAtCurrentIrql(&TagListLock[Hash]);

@@ -228,16 +228,16 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
     /* Split the pages into equal sized chunks; This can have some waste depending on the chosen
      * bucket sizes, so make sure to tune the min/max/shift values! */
     KeAcquireSpinLockAtCurrentIrql(&FreeBlockLock[Head]);
-    for (uint64_t i = 0; i < (HeadPages << MM_PAGE_SHIFT) / FullSize; i++) {
+    for (uint64_t i = 1; i < (HeadPages << MM_PAGE_SHIFT) / FullSize; i++) {
         BlockHeader *Header = (BlockHeader *)(StartAddress + i * FullSize);
         Header->Head = Head;
         RtPushSList(&FreeBlockList[Head], &Header->ListHeader);
     }
 
-    BlockHeader *Header =
-        CONTAINING_RECORD(RtPopSList(&FreeBlockList[Head]), BlockHeader, ListHeader);
-
     KeReleaseSpinLockAtCurrentIrql(&FreeBlockLock[Head]);
+
+    /* The first block was skipped as it should be ours. */
+    BlockHeader *Header = (BlockHeader *)StartAddress;
     memcpy(Header->Tag, Tag, 4);
     MiAddPoolTracker(FullSize, Tag);
     KeLowerIrql(OldIrql);
