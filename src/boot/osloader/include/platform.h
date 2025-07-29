@@ -6,21 +6,40 @@
 
 #include <memory.h>
 
-#define OSLP_BOOT_MAGIC "OLDR"
-#define OSLP_BOOT_VERSION 0x0000'0000'00000003
+#if defined(ARCH_amd64)
+#include <amd64/platform.h>
+#endif /* ARCH_amd64 */
 
-typedef struct {
+#define OSLP_BOOT_MAGIC "OLDR"
+#define OSLP_BOOT_VERSION 0x0000'0000'00000004
+
+typedef struct __attribute__((packed)) {
     char Magic[4];
     uint64_t LoaderVersion;
     RtDList *MemoryDescriptorListHead;
     RtDList *BootDriverListHead;
-    void *AcpiTable;
-    uint32_t AcpiTableVersion;
+} OslpBootBasicData;
+
+typedef struct __attribute__((packed)) {
+    uint32_t Version;
+    void *RootPointer;
+    void *RootTable;
+    uint32_t RootTableSize;
+} OslpBootAcpiData;
+
+typedef struct __attribute__((packed)) {
     void *BackBuffer;
     void *FrontBuffer;
-    uint32_t FramebufferWidth;
-    uint32_t FramebufferHeight;
-    uint32_t FramebufferPitch;
+    uint32_t Width;
+    uint32_t Height;
+    uint32_t Pitch;
+} OslpBootGraphicsData;
+
+typedef struct {
+    OslpBootBasicData Basic;
+    OslpBootAcpiData Acpi;
+    OslpBootGraphicsData Graphics;
+    OslpBootArchData Arch;
 } OslpBootBlock;
 
 bool OslpCreateMemoryDescriptors(
@@ -46,7 +65,10 @@ void *OslpCreatePageMap(
     RtDList *MemoryDescriptorStack,
     RtDList *LoadedPrograms,
     uint64_t FrameBufferSize,
-    void *BackBuffer);
+    void *BackBufferPhys,
+    void *BackBufferVirt,
+    void *FrontBufferPhys,
+    void *FrontBufferVirt);
 
 [[noreturn]] void OslpTransferExecution(
     OslpBootBlock *BootBlock,

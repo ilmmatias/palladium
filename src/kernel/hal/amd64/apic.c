@@ -92,9 +92,8 @@ uint32_t HalpReadLapicId(void) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function parses the APIC/MADT table, collecting all information required to enable the
- *     Local APIC. and gets the system ready to handle interrupts
- *     (and other processors) using the Local APIC.
+ *     This function parses the APIC/MADT table, collecting all information required to initialize
+ *     (and talk to) the application processors.
  *
  * PARAMETERS:
  *     None.
@@ -102,8 +101,8 @@ uint32_t HalpReadLapicId(void) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void HalpInitializeApic(void) {
-    HalpMadtHeader *Madt = KiFindAcpiTable("APIC", 0);
+void HalpCollectApics(void) {
+    HalpMadtHeader *Madt = HalpFindEarlyAcpiTable("APIC");
     if (!Madt) {
         KeFatalError(
             KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
@@ -111,16 +110,6 @@ void HalpInitializeApic(void) {
             KE_PANIC_PARAMETER_TABLE_NOT_FOUND,
             0,
             0);
-    }
-
-    if (HalpPlatformFeatures & HALP_FEATURE_X2APIC) {
-        /* x2APIC uses MSRs instead of the LAPIC address, so Read/WriteRegister needs to know if we
-           enabled it. */
-        X2ApicEnabled = true;
-        VidPrint(VID_MESSAGE_INFO, "Kernel HAL", "using x2APIC mode\n");
-    } else {
-        /* We're assuming xAPIC is available, but we should probably check if so as well. */
-        VidPrint(VID_MESSAGE_INFO, "Kernel HAL", "using xAPIC mode\n");
     }
 
     char *Position = (char *)(Madt + 1);
@@ -204,9 +193,35 @@ void HalpInitializeApic(void) {
             KE_PANIC_PROCESSOR_LIMIT_EXCEEDED, HalpProcessorCount, KE_MAX_PROCESSORS, 0, 0);
     }
 
-    /* Default to the LAPIC address given in the MSR (if we're not using x2APIC). */
+    HalpUnmapEarlyMemory(Madt, Madt->Length);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function runs the minimum required global initialization for the local APIC to be
+ *     usable.
+ *
+ * PARAMETERS:
+ *     None.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void HalpInitializeApic(void) {
+    if (HalpPlatformFeatures & HALP_FEATURE_X2APIC) {
+        /* x2APIC uses MSRs instead of the LAPIC address, so Read/WriteRegister needs to know if we
+           enabled it. */
+        X2ApicEnabled = true;
+        VidPrint(VID_MESSAGE_INFO, "Kernel HAL", "using x2APIC mode\n");
+    } else {
+        VidPrint(VID_MESSAGE_INFO, "Kernel HAL", "using xAPIC mode\n");
+    }
+
+    /* We should be able to just use the physical address contained in the MSR (in case x2APIC is
+     * disabled), no need to parse the ACPI tables yet. */
     if (!X2ApicEnabled) {
-        LapicAddress = MmMapSpace(ReadMsr(HALP_MSR_APIC) & ~0xFFF, MM_PAGE_SIZE, MM_SPACE_IO);
+        LapicAddress = HalpMapEarlyMemory(
+            ReadMsr(HALP_MSR_APIC) & ~0xFFF, MM_PAGE_SIZE, MI_MAP_WRITE | MI_MAP_UC);
         if (!LapicAddress) {
             KeFatalError(
                 KE_PANIC_KERNEL_INITIALIZATION_FAILURE,

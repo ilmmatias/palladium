@@ -19,6 +19,18 @@ typedef struct __attribute__((packed)) {
     uint8_t Reserved[3];
 } RsdpHeader;
 
-bool OslpInitializeAcpi(void **AcpiTable, uint32_t *AcpiTableVersion);
+typedef struct __attribute__((packed)) {
+    char Signature[4];
+    uint32_t Length;
+    uint8_t Revision;
+    uint8_t Checksum;
+    char Unused[26];
+} SdtHeader;
+
+bool OslpInitializeAcpi(
+    void **AcpiRootPointer,
+    void **AcpiRootTable,
+    uint32_t *AcpiRootTableSize,
+    uint32_t *AcpiVersion);
 
 #endif /* _ACPI_H_ */

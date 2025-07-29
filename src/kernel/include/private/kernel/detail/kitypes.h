@@ -12,18 +12,33 @@
 #endif /* __has__include */
 /* clang-format on */
 
-typedef struct {
+typedef struct __attribute__((packed)) {
     char Magic[4];
     uint64_t LoaderVersion;
     RtDList *MemoryDescriptorListHead;
     RtDList *BootDriverListHead;
-    void *AcpiTable;
-    uint32_t AcpiTableVersion;
+} KiLoaderBasicData;
+
+typedef struct __attribute__((packed)) {
+    uint32_t Version;
+    void *RootPointer;
+    void *RootTable;
+    uint32_t RootTableSize;
+} KiLoaderAcpiData;
+
+typedef struct __attribute__((packed)) {
     void *BackBuffer;
     void *FrontBuffer;
-    uint32_t FramebufferWidth;
-    uint32_t FramebufferHeight;
-    uint32_t FramebufferPitch;
+    uint32_t Width;
+    uint32_t Height;
+    uint32_t Pitch;
+} KiLoaderGraphicsData;
+
+typedef struct {
+    KiLoaderBasicData Basic;
+    KiLoaderAcpiData Acpi;
+    KiLoaderGraphicsData Graphics;
+    KiLoaderArchData Arch;
 } KiLoaderBlock;
 
 #endif /* _KERNEL_DETAIL_KITYPES_H_ */

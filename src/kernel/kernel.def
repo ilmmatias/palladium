@@ -27,14 +27,11 @@ EXPORTS
     KeQueueWork
     KeRequestIpiRoutine
     KeSynchronizeProcessors
-    KiFindAcpiTable
 
     MmAllocatePool
     MmAllocateSinglePage
     MmFreePool
     MmFreeSinglePage
-    MmMapSpace
-    MmUnmapSpace
 
     ObCreateDirectory
     ObCreateObject

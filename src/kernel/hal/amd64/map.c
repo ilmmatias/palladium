@@ -4,11 +4,16 @@
 #include <kernel/halp.h>
 #include <kernel/ke.h>
 #include <kernel/mi.h>
+#include <rt/bitmap.h>
 #include <string.h>
+
+extern bool HalpSmpInitializationComplete;
 
 static KeSpinLock Lock = {0};
 
-extern bool HalpSmpInitializationComplete;
+static uint64_t EarlyMapBitmapBuffer[((HALP_EARLY_MAP_PAGES + 63) >> 6) << 3] = {};
+static RtBitmap EarlyMapBitmap = {};
+static uint64_t EarlyMapHint = 0;
 
 typedef struct {
     bool ReloadCr3;
@@ -466,35 +471,112 @@ void HalpUnmapPages(void *VirtualAddress, uint64_t Size) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function maps a range of physical addresses (assumed to be device/MMIO) into
- *     contiguous virtual memory.
+ *     This function initializes the early/temporary memory mapper.
+ *
+ * PARAMETERS:
+ *     LoaderBlock - Data prepared by the boot loader for us.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void HalpInitializeEarlyMap(KiLoaderBlock *) {
+    RtInitializeBitmap(&EarlyMapBitmap, EarlyMapBitmapBuffer, HALP_EARLY_MAP_PAGES);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function maps a range of physical addresses into contiguous virtual memory.
+ *     This function is guaranteed to not need any memory/page allocations, and can be used during
+ *     very early boot (such as when setting up the HAL, or the kernel debugger).
  *
  * PARAMETERS:
  *     PhysicalAddress - Source address, does not need to be aligned to MM_PAGE_SIZE.
  *     Size - Size in bytes of the region (also doesn't need to be aligned/a multiple of
  *            MM_PAGE_SIZE).
- *     Type - Memory type for the mapping.
+ *     Flags - How we want to map the region.
  *
  * RETURN VALUE:
  *     Pointer to the start of the virtual memory range on success, NULL otherwise.
  *-----------------------------------------------------------------------------------------------*/
-void *MmMapSpace(uint64_t PhysicalAddress, size_t Size, uint8_t Type) {
-    (void)Size;
-    (void)Type;
-    return (void *)(MI_VIRTUAL_OFFSET + PhysicalAddress);
+void *HalpMapEarlyMemory(uint64_t PhysicalAddress, size_t Size, int Flags) {
+    /* The PhysicalEnd calculation breaks on size 0, so, assume size 1 on that case. */
+    if (!Size) {
+        Size = 1;
+    }
+
+    uint64_t PhysicalStart = PhysicalAddress & ~(HALP_PT_SIZE - 1);
+    uint64_t PhysicalEnd = (PhysicalAddress + Size + HALP_PT_SIZE - 1) & ~(HALP_PT_SIZE - 1);
+    uint64_t Pages = (PhysicalEnd - PhysicalStart) >> HALP_PT_SHIFT;
+
+    /* Any operations on the kernel-side of the page tables need to be done under the lock (though
+     * this isn't really necessary before SMP initialization). */
+    KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Lock, KE_IRQL_DISPATCH);
+    uint64_t Index = RtFindClearBitsAndSet(&EarlyMapBitmap, EarlyMapHint, Pages);
+    if (Index == (uint64_t)-1) {
+        KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
+        return NULL;
+    }
+
+    /* As the loader already reserved the PML4/3/2 entries in the temp mapping area, we shouldn't
+     * need any checking. */
+    void *VirtualAddress = (char *)HALP_EARLY_MAP_START + (Index << MM_PAGE_SHIFT);
+    HalpPageFrame *Frame =
+        &HALP_PT_BASE[((uint64_t)VirtualAddress >> HALP_PT_SHIFT) & HALP_PT_MASK];
+    for (uint64_t Page = 0; Page < Pages; Page++) {
+        BuildFrame(&Frame[Page], PhysicalStart + (Page << HALP_PT_SHIFT), HALP_PT_LEVEL, Flags);
+    }
+
+    EarlyMapHint = Index + Pages;
+    KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
+    return (char *)VirtualAddress + (PhysicalAddress - PhysicalStart);
 }
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function unmaps physical address previously mapped by MmMapSpace, do not use this on
- *     normal heap pages!
+ *     This function unmaps physical addresses previously mapped by HalpMapEarlyMemory; Do not use
+ *     this on any other kind of virtual memory!
  *
  * PARAMETERS:
- *     VirtualAddress - Value previously returned by MmMapSpace.
+ *     VirtualAddress - Value previously returned by HalpMapEarlyMemory.
+ *     Size - Size in bytes of the region (also doesn't need to be aligned/a multiple of
+ *            MM_PAGE_SIZE).
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void MmUnmapSpace(void *VirtualAddress) {
-    (void)VirtualAddress;
+void HalpUnmapEarlyMemory(void *VirtualAddress, size_t Size) {
+    /* The VirtualEnd calculation breaks on size 0, so, assume size 1 on that case. */
+    if (!Size) {
+        Size = 1;
+    }
+
+    uint64_t VirtualStart = (uint64_t)VirtualAddress & ~(HALP_PT_SIZE - 1);
+    uint64_t VirtualEnd = ((uint64_t)VirtualAddress + Size + HALP_PT_SIZE) & ~(HALP_PT_SIZE - 1);
+    uint64_t Pages = (VirtualEnd - VirtualStart) >> HALP_PT_SHIFT;
+
+    /* Any operations on the kernel-side of the page tables need to be done under the lock (though
+     * this isn't really necessary before SMP initialization). */
+    KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Lock, KE_IRQL_DISPATCH);
+    EarlyMapHint = (VirtualStart - HALP_EARLY_MAP_START) >> HALP_PT_SHIFT;
+    RtClearBits(&EarlyMapBitmap, EarlyMapHint, Pages);
+
+    /* No need to do any deep frame cleaning/unmapping (PML4/3/2 stays mapped, only the PTEs should
+     * be changed). */
+    HalpPageFrame *Frame = &HALP_PT_BASE[(VirtualStart >> HALP_PT_SHIFT) & HALP_PT_MASK];
+    for (uint64_t Page = 0; Page < Pages; Page++) {
+        Frame[Page].Present = 0;
+    }
+
+    KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
+
+    /* No need for a broadcast if we're still too early in the initailization phase. */
+    IpiContext Context;
+    Context.ReloadCr3 = Pages >= 32;
+    Context.Start = VirtualStart;
+    Context.End = VirtualEnd;
+    if (HalpSmpInitializationComplete) {
+        KeRequestIpiRoutine(IpiRoutine, &Context);
+    } else {
+        IpiRoutine(&Context);
+    }
 }

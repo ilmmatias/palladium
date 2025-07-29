@@ -24,10 +24,7 @@ static uint64_t Frequency = 0;
 void HalpInitializeTsc(void) {
     /* Don't bother with TSC if it's not marked as invariant (essentially anything newer than the
      * Intel Core 2 series should support it, but still, it's good to check). */
-    if (!(HalpPlatformFeatures & HALP_FEATURE_TSC)) {
-        VidPrint(VID_MESSAGE_DEBUG, "Kernel HAL", "RDTSC is unavailable\n");
-        return;
-    } else if (!(HalpPlatformFeatures & HALP_FEATURE_INVARIANT_TSC)) {
+    if (!(HalpPlatformFeatures & HALP_FEATURE_INVTSC)) {
         VidPrint(VID_MESSAGE_DEBUG, "Kernel HAL", "invariant TSC is unavailable\n");
         return;
     }
@@ -70,21 +67,21 @@ void HalpInitializeTsc(void) {
 
     /* Otherwise, just calibrate it against the HPET. */
     if (!Frequency) {
-        uint64_t Ticks = (__uint128_t)(10 * EV_MILLISECS) * HalpGetHpetFrequency() / EV_SECS;
+        uint64_t Ticks = (__uint128_t)(1 * EV_MILLISECS) * HalGetTimerFrequency() / EV_SECS;
 
         for (int i = 0; i < 5; i++) {
             uint64_t StartTsc = __rdtsc();
-            uint64_t StartHpet = HalpGetHpetTicks();
+            uint64_t StartRef = HalGetTimerTicks();
 
-            while (HalpGetHpetTicks() < StartHpet + Ticks)
+            while (HalGetTimerTicks() < StartRef + Ticks)
                 ;
 
             uint64_t EndTsc = __rdtsc();
-            uint64_t EndHpet = HalpGetHpetTicks();
+            uint64_t EndRef = HalGetTimerTicks();
 
             uint64_t DeltaTsc = EndTsc - StartTsc;
-            uint64_t DeltaHpet = EndHpet - StartHpet;
-            Frequency += (__uint128_t)DeltaTsc * HalpGetHpetFrequency() / DeltaHpet;
+            uint64_t DeltaRef = EndRef - StartRef;
+            Frequency += (__uint128_t)DeltaTsc * HalGetTimerFrequency() / DeltaRef;
         }
 
         Frequency /= 5;

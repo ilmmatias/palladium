@@ -10,13 +10,19 @@
  *     This function tries searching for and saving the pointer into the root ACPI table.
  *
  * PARAMETERS:
- *     AcpiTable - Output; Where to store the pointer.
- *     AcpiTableVersion - Output; Where to store the version of the ACPI root table.
+ *     AcpiRootPointer - Output; Where to store the RSDP.
+ *     AcpiRootTable - Output; Where to store the RSDT/XSDT.
+ *     AcpiRootTableSize - Output; Size in bytes of the RSDT/XSDT.
+ *     AcpiVersion - Output; Where to store the version of the ACPI root table.
  *
  * RETURN VALUE:
  *     true on success, false if we didn't find the table.
  *-----------------------------------------------------------------------------------------------*/
-bool OslpInitializeAcpi(void **AcpiTable, uint32_t *AcpiTableVersion) {
+bool OslpInitializeAcpi(
+    void **AcpiRootPointer,
+    void **AcpiRootTable,
+    uint32_t *AcpiRootTableSize,
+    uint32_t *AcpiVersion) {
     bool Status = false;
 
     for (UINTN i = 0; i < gST->NumberOfTableEntries; i++) {
@@ -24,8 +30,9 @@ bool OslpInitializeAcpi(void **AcpiTable, uint32_t *AcpiTableVersion) {
 
         if (!memcmp(
                 &gST->ConfigurationTable[i].VendorGuid, &gEfiAcpi20TableGuid, sizeof(EFI_GUID))) {
-            *AcpiTable = (void *)(UINTN)Rsdp->XsdtAddress;
-            *AcpiTableVersion = 2;
+            *AcpiRootPointer = (void *)(UINTN)Rsdp;
+            *AcpiRootTable = (void *)(UINTN)Rsdp->XsdtAddress;
+            *AcpiVersion = 2;
             Status = true;
             /* ACPI 2.0 is our target, we can stop if we find it. */
             break;
@@ -33,8 +40,9 @@ bool OslpInitializeAcpi(void **AcpiTable, uint32_t *AcpiTableVersion) {
 
         if (!memcmp(
                 &gST->ConfigurationTable[i].VendorGuid, &gEfiAcpi10TableGuid, sizeof(EFI_GUID))) {
-            *AcpiTable = (void *)(UINTN)Rsdp->RsdtAddress;
-            *AcpiTableVersion = 1;
+            *AcpiRootPointer = (void *)(UINTN)Rsdp;
+            *AcpiRootTable = (void *)(UINTN)Rsdp->RsdtAddress;
+            *AcpiVersion = 1;
             Status = true;
         }
     }
@@ -45,5 +53,6 @@ bool OslpInitializeAcpi(void **AcpiTable, uint32_t *AcpiTableVersion) {
         OslPrint("The boot process cannot continue.\r\n");
     }
 
+    *AcpiRootTableSize = ((SdtHeader *)*AcpiRootTable)->Length;
     return Status;
 }

@@ -323,7 +323,7 @@ HalpSecurityTrapEntry:
 .align 16
 HalpAlertEntry:
     ENTER_INTERRUPT (INTERRUPT_FLAGS_NONE)
-    mov $KE_IRQL_ALERT, %rcx
+    mov $HALP_INT_ALERT_IRQL, %rcx
     mov %rcx, %cr8
     call HalpSendEoi
     sti
@@ -336,7 +336,7 @@ HalpAlertEntry:
 .align 16
 HalpDispatchEntry:
     ENTER_INTERRUPT (INTERRUPT_FLAGS_NONE)
-    mov $KE_IRQL_DISPATCH, %rcx
+    mov $HALP_INT_DISPATCH_IRQL, %rcx
     mov %rcx, %cr8
     call HalpSendEoi
     sti

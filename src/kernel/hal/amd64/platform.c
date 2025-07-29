@@ -63,10 +63,14 @@ static void CollectManufacturer(void) {
     VidPrint(
         VID_MESSAGE_DEBUG,
         "Kernel HAL",
-        "cpu manufacturer: %.12s\n",
+        "cpu manufacturer string: %.12s\n",
         HalpPlatformManufacturerString);
 
-    VidPrint(VID_MESSAGE_INFO, "Kernel HAL", "cpu name: %.48s\n", HalpPlatformProcessorBrandString);
+    VidPrint(
+        VID_MESSAGE_DEBUG,
+        "Kernel HAL",
+        "cpu branding string: %.48s\n",
+        HalpPlatformProcessorBrandString);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -90,7 +94,6 @@ static void CollectFeatures(void) {
         CHECK_FEATURE(HALP_FEATURE_VMX, Ecx, 5);
         CHECK_FEATURE(HALP_FEATURE_SSSE3, Ecx, 9);
         CHECK_FEATURE(HALP_FEATURE_FMA, Ecx, 12);
-        CHECK_FEATURE(HALP_FEATURE_CX16, Ecx, 13);
         CHECK_FEATURE(HALP_FEATURE_PCID, Ecx, 17);
         CHECK_FEATURE(HALP_FEATURE_SSE41, Ecx, 19);
         CHECK_FEATURE(HALP_FEATURE_SSE42, Ecx, 20);
@@ -103,7 +106,6 @@ static void CollectFeatures(void) {
         CHECK_FEATURE(HALP_FEATURE_F16C, Ecx, 29);
         CHECK_FEATURE(HALP_FEATURE_RDRAND, Ecx, 30);
         CHECK_FEATURE(HALP_FEATURE_HYPERVISOR, Ecx, 31);
-        CHECK_FEATURE(HALP_FEATURE_TSC, Edx, 4);
         CHECK_FEATURE(HALP_FEATURE_SSE, Edx, 25);
         CHECK_FEATURE(HALP_FEATURE_SSE2, Edx, 26);
     }
@@ -146,7 +148,7 @@ static void CollectFeatures(void) {
 
     if (HalpPlatformMaxExtendedLeaf >= HALP_CPUID_PPM_INFO) {
         __cpuid(HALP_CPUID_PPM_INFO, Eax, Ebx, Ecx, Edx);
-        CHECK_FEATURE(HALP_FEATURE_INVARIANT_TSC, Edx, 8);
+        CHECK_FEATURE(HALP_FEATURE_INVTSC, Edx, 8);
     }
 
     VidPrint(VID_MESSAGE_DEBUG, "Kernel HAL", "cpu feature mask: %016llx\n", HalpPlatformFeatures);
@@ -164,13 +166,6 @@ static void CollectFeatures(void) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void HalpInitializeBootStack(KiLoaderBlock *LoaderBlock) {
-    /* The BSP gets its KeGetCurrentProcessor() initialized here instead of
-     * HalpInitializeXProcessor (because we need it for early KeFatalError).
-     * Maybe we should create a function specifically for this? */
-    WriteMsr(HALP_MSR_KERNEL_GS_BASE, (uint64_t)&BootProcessor);
-    BootProcessor.StackBase = BootProcessor.SystemStack;
-    BootProcessor.StackLimit = BootProcessor.SystemStack + sizeof(BootProcessor.SystemStack);
-
     __asm__ volatile("mov %0, %%rax\n"
                      "mov %1, %%rcx\n"
                      "mov %2, %%rdx\n"
@@ -190,8 +185,53 @@ void HalpInitializeBootStack(KiLoaderBlock *LoaderBlock) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function runs any early arch-specific initialization routines required for the boot
- *     processor.
+ *     This function runs the bare minimal required arch/platform-specific initialization routines
+ *     required before initializing the rest of the kernel.
+ *
+ * PARAMETERS:
+ *     LoaderBlock - Data prepared by the boot loader for us.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void HalpInitializePlatform(KiLoaderBlock *LoaderBlock) {
+    VidPrint(VID_MESSAGE_INFO, "Kernel HAL", "initializing platform\n");
+
+    /* We're already safe to setup the stack base/limit (as we know for sure we're inside the
+     * system stack). */
+    WriteMsr(HALP_MSR_KERNEL_GS_BASE, (uint64_t)&BootProcessor);
+    BootProcessor.StackBase = BootProcessor.SystemStack;
+    BootProcessor.StackLimit = BootProcessor.SystemStack + sizeof(BootProcessor.SystemStack);
+
+    /* Collect the basic platform data. */
+    CollectManufacturer();
+    CollectFeatures();
+
+    /* Initialize the descriptor tables (after this we're safe to handle exceptions). */
+    HalpInitializeGdt(&BootProcessor);
+    HalpInitializeIdt(&BootProcessor);
+
+    /* We'll probably be needing to map some device memory next up, so set up the temporary
+     * mapper (and let's also map/save the ACPI tables as well, as that uses HalpMapEarlyMemory
+     * anyways). */
+    HalpInitializeEarlyMap(LoaderBlock);
+    HalpInitializeEarlyAcpi(LoaderBlock);
+
+    /* Setup the interrupt controller. */
+    HalpInitializeApic();
+    HalpEnableApic();
+    BootProcessor.ApicId = HalpReadLapicId();
+
+    /* Initialize the temporary timer using the loader's cycle counter; This is probably going to be
+     * overall quite useless (as we'll initialize the HPET or properly calibrate the TSC asap), but
+     * the kernel debugger probably wants this, so, oh well. */
+    HalpSetActiveTimer(LoaderBlock->Arch.CycleCounterFrequency, HalpGetTscTicks);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function runs any remaining HAL/arch-specific initialization routines required for the
+ *     boot processor.
  *
  * PARAMETERS:
  *     None.
@@ -200,24 +240,29 @@ void HalpInitializeBootStack(KiLoaderBlock *LoaderBlock) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void HalpInitializeBootProcessor(void) {
-    CollectManufacturer();
-    CollectFeatures();
-    HalpInitializeGdt(&BootProcessor);
-    HalpInitializeIdt(&BootProcessor);
+    /* Collect the data required for initializing the APs, and get the external interrupt
+     * controller online. */
+    HalpCollectApics();
     HalpInitializeIoapic();
-    HalpInitializeApic();
-    HalpEnableApic();
-    BootProcessor.ApicId = HalpReadLapicId();
+
+    /* Try initializing a better timer source than the dummy cycle counter based one from the
+     * loader. */
     HalpInitializeHpet();
     HalpInitializeTsc();
     HalpInitializeTimer();
+
+    /* Spin up all the application processors (and also finish setting up our per-processor
+     * struct). */
     HalpInitializeSmp();
+
+    /* Now the all of the processor block data is initialized, so it should be safe to start
+     * receiving the periodic interrupt (even if the scheduler is still off). */
     HalpInitializeApicTimer();
 }
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function runs any early arch-specific initialization routines required for the
+ *     This function runs any HAL/arch-specific initialization routines required for the
  *     secondary/application processors.
  *
  * PARAMETERS:
@@ -227,12 +272,21 @@ void HalpInitializeBootProcessor(void) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void HalpInitializeApplicationProcessor(KeProcessor *Processor) {
+    /* We're already safe to setup the stack base/limit (as we know for sure we're inside the
+     * system stack). */
     WriteMsr(HALP_MSR_KERNEL_GS_BASE, (uint64_t)Processor);
     Processor->StackBase = Processor->SystemStack;
     Processor->StackLimit = Processor->SystemStack + sizeof(Processor->SystemStack);
+
+    /* Initialize the descriptor tables (after this we're safe to handle exceptions). */
     HalpInitializeGdt(Processor);
     HalpInitializeIdt(Processor);
+
+    /* Setup the interrupt controller. */
     HalpEnableApic();
     Processor->ApicId = HalpReadLapicId();
+
+    /* Setup the periodic timer (the scheduler can be initialized after this, as the BSP already
+     * should have done most of the other required work). */
     HalpInitializeApicTimer();
 }

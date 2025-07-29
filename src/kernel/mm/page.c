@@ -70,7 +70,7 @@ uint64_t MiAllocateEarlyPages(uint32_t Pages) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void MiInitializeEarlyPageAllocator(KiLoaderBlock *LoaderBlock) {
-    LoaderDescriptors = LoaderBlock->MemoryDescriptorListHead;
+    LoaderDescriptors = LoaderBlock->Basic.MemoryDescriptorListHead;
 
     for (RtDList *ListHeader = LoaderDescriptors->Next; ListHeader != LoaderDescriptors;
          ListHeader = ListHeader->Next) {
@@ -102,7 +102,10 @@ void MiInitializeEarlyPageAllocator(KiLoaderBlock *LoaderBlock) {
         } else if (Entry->Type == MI_DESCR_GRAPHICS_BUFFER) {
             MiTotalGraphicsPages += Entry->PageCount;
             MiTotalUsedPages += Entry->PageCount;
-        } else if (Entry->Type == MI_DESCR_PAGE_MAP || Entry->Type == MI_DESCR_LOADED_PROGRAM) {
+        } else if (Entry->Type == MI_DESCR_PAGE_MAP) {
+            MiTotalPtePages += Entry->PageCount;
+            MiTotalUsedPages += Entry->PageCount;
+        } else if (Entry->Type == MI_DESCR_LOADED_PROGRAM) {
             MiTotalBootPages += Entry->PageCount;
             MiTotalUsedPages += Entry->PageCount;
         } else {
@@ -157,9 +160,8 @@ void MiInitializePageAllocator(void) {
             0);
     }
 
-    void *PageListBase = (void *)(MI_VIRTUAL_OFFSET + PhysicalAddress);
     if (!HalpMapContiguousPages(
-            PageListBase, PhysicalAddress, Pages << MM_PAGE_SHIFT, MI_MAP_WRITE)) {
+            (void *)MI_PFN_START, PhysicalAddress, Pages << MM_PAGE_SHIFT, MI_MAP_WRITE)) {
         KeFatalError(
             KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
             KE_PANIC_PARAMETER_PFN_INITIALIZATION_FAILURE,
@@ -168,7 +170,7 @@ void MiInitializePageAllocator(void) {
             0);
     }
 
-    MiPageList = PageListBase;
+    MiPageList = (void *)MI_PFN_START;
     MiTotalPfnPages = Pages;
 
     /* Setup the page allocator (marking the free pages as free). */

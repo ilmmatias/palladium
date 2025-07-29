@@ -59,19 +59,29 @@ OslMain(EFI_HANDLE *ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
         return EFI_LOAD_ERROR;
     }
 
-    void *AcpiTable = NULL;
-    uint32_t AcpiTableVersion = 0;
-    if (!OslpInitializeAcpi(&AcpiTable, &AcpiTableVersion)) {
+    void *AcpiRootPointer = NULL;
+    void *AcpiRootTable = NULL;
+    uint32_t AcpiRootTableSize = 0;
+    uint32_t AcpiVersion = 0;
+    if (!OslpInitializeAcpi(&AcpiRootPointer, &AcpiRootTable, &AcpiRootTableSize, &AcpiVersion)) {
         return EFI_LOAD_ERROR;
     }
 
-    void *BackBuffer = NULL;
-    void *FrontBuffer = NULL;
+    void *BackBufferPhys = NULL;
+    void *BackBufferVirt = NULL;
+    void *FrontBufferPhys = NULL;
+    void *FrontBufferVirt = NULL;
     uint32_t FramebufferWidth = 0;
     uint32_t FramebufferHeight = 0;
     uint32_t FramebufferPitch = 0;
     Status = OslpInitializeGraphics(
-        &BackBuffer, &FrontBuffer, &FramebufferWidth, &FramebufferHeight, &FramebufferPitch);
+        &BackBufferPhys,
+        &BackBufferVirt,
+        &FrontBufferPhys,
+        &FrontBufferVirt,
+        &FramebufferWidth,
+        &FramebufferHeight,
+        &FramebufferPitch);
     if (Status != EFI_SUCCESS) {
         return EFI_LOAD_ERROR;
     }
@@ -119,7 +129,7 @@ OslMain(EFI_HANDLE *ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
     UINT32 DescriptorVersion = 0;
     if (!OslpCreateMemoryDescriptors(
             &LoadedPrograms,
-            FrontBuffer,
+            FrontBufferPhys,
             FramebufferHeight * FramebufferPitch * 4,
             &MemoryDescriptorListHead,
             &MemoryDescriptorStack,
@@ -149,17 +159,20 @@ OslMain(EFI_HANDLE *ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
         return EFI_LOAD_ERROR;
     }
 
-    memcpy(BootBlock->Magic, OSLP_BOOT_MAGIC, 4);
-    BootBlock->LoaderVersion = OSLP_BOOT_VERSION;
-    BootBlock->MemoryDescriptorListHead = MemoryDescriptorListHead;
-    BootBlock->BootDriverListHead = ModuleListHead;
-    BootBlock->AcpiTable = AcpiTable;
-    BootBlock->AcpiTableVersion = AcpiTableVersion;
-    BootBlock->BackBuffer = BackBuffer;
-    BootBlock->FrontBuffer = FrontBuffer;
-    BootBlock->FramebufferWidth = FramebufferWidth;
-    BootBlock->FramebufferHeight = FramebufferHeight;
-    BootBlock->FramebufferPitch = FramebufferPitch;
+    memcpy(BootBlock->Basic.Magic, OSLP_BOOT_MAGIC, 4);
+    BootBlock->Basic.LoaderVersion = OSLP_BOOT_VERSION;
+    BootBlock->Basic.MemoryDescriptorListHead = MemoryDescriptorListHead;
+    BootBlock->Basic.BootDriverListHead = ModuleListHead;
+    BootBlock->Acpi.RootPointer = AcpiRootPointer;
+    BootBlock->Acpi.RootTable = AcpiRootTable;
+    BootBlock->Acpi.RootTableSize = AcpiRootTableSize;
+    BootBlock->Acpi.Version = AcpiVersion;
+    BootBlock->Graphics.BackBuffer = BackBufferVirt;
+    BootBlock->Graphics.FrontBuffer = FrontBufferVirt;
+    BootBlock->Graphics.Width = FramebufferWidth;
+    BootBlock->Graphics.Height = FramebufferHeight;
+    BootBlock->Graphics.Pitch = FramebufferPitch;
+    OslpInitializeArchBootData(BootBlock);
 
     /* All that's left before trying to transfer execution should be building the page map, so let's
      * leave that to the platform/arch specific function. */
@@ -168,7 +181,10 @@ OslMain(EFI_HANDLE *ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
         &MemoryDescriptorStack,
         &LoadedPrograms,
         FramebufferHeight * FramebufferPitch * 4,
-        BackBuffer);
+        BackBufferPhys,
+        BackBufferVirt,
+        FrontBufferPhys,
+        FrontBufferVirt);
     if (!PageMap) {
         return EFI_LOAD_ERROR;
     }

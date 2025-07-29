@@ -18,9 +18,15 @@
  *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
 static void InitializeBootProcessor(KiLoaderBlock *LoaderBlock) {
-    /* Stage 0 (BSP): Display initialization (for early debugging). */
+    /* Hello, World! We're essentially still fresh out of the loader land, so, take over the boot
+     * framebuffer, and get us to a basic state (where the kernel/HAL is managing the basic
+     * resources like exception/interrupt handling). */
     VidpInitialize(LoaderBlock);
+    MiInitializeEarlyPageAllocator(LoaderBlock);
+    HalpInitializePlatform(LoaderBlock);
 
+    /* Announce we're officially online (the HAL probably already printed some stuff, but this is
+     * the first point where attached debuggers will receive messages as well). */
 #ifdef NDEBUG
     VidPrint(
         VID_MESSAGE_INFO,
@@ -48,9 +54,7 @@ static void InitializeBootProcessor(KiLoaderBlock *LoaderBlock) {
         __clang_minor__,
         __clang_patchlevel__);
 
-    /* Stage 1 (BSP): Memory manager initialization; This won't mark the OSLOADER pages as free
-     * just yet. */
-    MiInitializeEarlyPageAllocator(LoaderBlock);
+    /* Get the memory manager fully online (MmAllocate* functions are available after this). */
     MiInitializePool();
     MiInitializePageAllocator();
     VidPrint(
@@ -59,17 +63,14 @@ static void InitializeBootProcessor(KiLoaderBlock *LoaderBlock) {
         "booting with %llu MiB of memory\n",
         MiTotalSystemPages * MM_PAGE_SIZE / 1048576);
 
-    /* Stage 2 (BSP): Save all the remaining data that we care about from the loader block. After
-     * this, the stack trace on KeFatalError will start working properly (as it depends on the
-     * module data to unwind). */
+    /* The loader data will become inaccessible once we release/unmap all the remaining OSLOADER
+     * regions, so save the required remaining data. After this, the stack trace on KeFatalError
+     * will start working properly (as it depends on the module data to unwind). */
     KiSaveBootStartDrivers(LoaderBlock);
-    KiSaveAcpiData(LoaderBlock);
-
-    /* Stage 3 (BSP): Release and unmap all OSLOADER memory regions; Everything we need should have
-     * already been copied to kernel land, so this should be safe. */
     MiReleaseBootRegions();
 
-    /* Stage 4 (BSP): Early platform/arch initialization. */
+    /* It should now be safe to wrap up the HAL initialization (which will also bring up the
+     * secondary processors). */
     HalpInitializeBootProcessor();
     if (HalpOnlineProcessorCount == 1) {
         VidPrint(VID_MESSAGE_INFO, "Kernel", "1 processor online\n");
@@ -77,7 +78,8 @@ static void InitializeBootProcessor(KiLoaderBlock *LoaderBlock) {
         VidPrint(VID_MESSAGE_INFO, "Kernel", "%u processors online\n", HalpOnlineProcessorCount);
     }
 
-    /* Stage 5 (BSP): Scheduler initialization. */
+    /* At last, get the scheduler up so that we can get out of the system/boot stack, and into the
+     * initial system thread. */
     PspCreateIdleThread();
     PspCreateSystemThread();
 }
@@ -94,10 +96,9 @@ static void InitializeBootProcessor(KiLoaderBlock *LoaderBlock) {
  *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
 static void InitializeApplicationProcessor(KeProcessor *Processor) {
-    /* Stage 0 (AP): Early platform/arch initialization. */
+    /* Application processors are a bit boring; The BSP already initialized everything, so we just
+     * need to get our HAL stuff up, and the idle thread. */
     HalpInitializeApplicationProcessor(Processor);
-
-    /* Stage 1 (AP): Scheduler initialization. */
     PspCreateIdleThread();
 }
 
@@ -146,8 +147,8 @@ static void InitializeApplicationProcessor(KeProcessor *Processor) {
  *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
 [[noreturn]] void KiContinueSystemStartup(void *) {
-    /* Stage 6 (BSP): Initialize all boot drivers; We can't load anything further than this without
-       them. */
+    /* Get all of the required boot modules up; This should let us load the remaining drivers from
+     * the disk. */
     KiRunBootStartDrivers();
 
     while (true) {

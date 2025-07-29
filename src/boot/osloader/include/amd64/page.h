@@ -6,6 +6,9 @@
 
 #include <stdint.h>
 
+#define EARLY_KERNEL_MAP_START 0xFFFF800000000000
+#define EARLY_KERNEL_MAP_SIZE 0x1000000
+
 typedef union {
     struct __attribute__((packed)) {
         uint64_t Present : 1;

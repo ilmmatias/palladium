@@ -21,6 +21,7 @@ void HalpInitializeGdt(KeProcessor *Processor);
 void HalpFlushGdt(void);
 void HalpUpdateTss(void);
 
+void HalpCollectApics(void);
 void HalpInitializeApic(void);
 void HalpEnableApic(void);
 uint64_t HalpReadLapicRegister(uint32_t Number);
@@ -42,6 +43,7 @@ void HalpInitializeTsc(void);
 uint64_t HalpGetTscFrequency(void);
 uint64_t HalpGetTscTicks(void);
 
+void HalpSetActiveTimer(uint64_t Frequency, uint64_t (*GetTicks)(void));
 void HalpInitializeTimer(void);
 void HalpInitializeApicTimer(void);
 

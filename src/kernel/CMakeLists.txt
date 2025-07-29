@@ -5,6 +5,7 @@ project(os/kernel)
 
 if(ARCH STREQUAL "amd64")
     set(SOURCES
+        hal/${ARCH}/acpi.c
         hal/${ARCH}/apic.c
         hal/${ARCH}/context.c
         hal/${ARCH}/context.S
@@ -33,7 +34,6 @@ add_executable(kernel "kernel" YES
 
     hal/timer.c
 
-    ke/acpi.c
     ke/affinity.c
     ke/driver.c
     ke/entry.c

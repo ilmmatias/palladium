@@ -23,11 +23,11 @@ extern bool VidpUseLock;
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void VidpInitialize(KiLoaderBlock *LoaderBlock) {
-    VidpBackBuffer = LoaderBlock->BackBuffer;
-    VidpFrontBuffer = LoaderBlock->FrontBuffer;
-    VidpWidth = LoaderBlock->FramebufferWidth;
-    VidpHeight = LoaderBlock->FramebufferHeight;
-    VidpPitch = LoaderBlock->FramebufferPitch;
+    VidpBackBuffer = LoaderBlock->Graphics.BackBuffer;
+    VidpFrontBuffer = LoaderBlock->Graphics.FrontBuffer;
+    VidpWidth = LoaderBlock->Graphics.Width;
+    VidpHeight = LoaderBlock->Graphics.Height;
+    VidpPitch = LoaderBlock->Graphics.Pitch;
     VidResetDisplay();
 }
 

@@ -23,8 +23,8 @@ RtDList KiModuleListHead = {};
  *-----------------------------------------------------------------------------------------------*/
 void KiSaveBootStartDrivers(KiLoaderBlock *LoaderBlock) {
     RtInitializeDList(&KiModuleListHead);
-    for (RtDList *ListHeader = LoaderBlock->BootDriverListHead->Next;
-         ListHeader != LoaderBlock->BootDriverListHead;
+    for (RtDList *ListHeader = LoaderBlock->Basic.BootDriverListHead->Next;
+         ListHeader != LoaderBlock->Basic.BootDriverListHead;
          ListHeader = ListHeader->Next) {
         KeModule *SourceModule = CONTAINING_RECORD(ListHeader, KeModule, ListHeader);
         KeModule *TargetModule = MmAllocatePool(sizeof(KeModule), MM_POOL_TAG_LDR);

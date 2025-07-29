@@ -16,8 +16,6 @@
 extern "C" {
 #endif /* __cplusplus */
 
-void *KiFindAcpiTable(const char Signature[4], int Index);
-
 void KeInitializeWork(KeWork *Work, void (*Routine)(void *), void *Context);
 bool KeQueueWork(KeWork *Work, bool HighPriority);
 

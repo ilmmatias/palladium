@@ -30,6 +30,14 @@ typedef union {
 typedef struct __attribute__((packed)) {
     char Signature[4];
     uint32_t Length;
+    uint8_t Revision;
+    uint8_t Checksum;
+    char Unused[26];
+} HalpSdtHeader;
+
+typedef struct __attribute__((packed)) {
+    char Signature[4];
+    uint32_t Length;
     char Unused[28];
     uint32_t LapicAddress;
     uint32_t Flags;

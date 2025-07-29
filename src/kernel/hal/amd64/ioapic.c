@@ -53,7 +53,7 @@ static void WriteIoapicRegister(HalpIoapicEntry *Entry, uint8_t Number, uint32_t
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void HalpInitializeIoapic(void) {
-    HalpMadtHeader *Madt = KiFindAcpiTable("APIC", 0);
+    HalpMadtHeader *Madt = HalpFindEarlyAcpiTable("APIC");
     if (!Madt) {
         KeFatalError(
             KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
@@ -81,8 +81,8 @@ void HalpInitializeIoapic(void) {
 
                 Entry->Id = Record->Ioapic.IoapicId;
                 Entry->GsiBase = Record->Ioapic.GsiBase;
-                Entry->VirtualAddress =
-                    MmMapSpace(Record->Ioapic.Address, MM_PAGE_SIZE, MM_SPACE_IO);
+                Entry->VirtualAddress = HalpMapEarlyMemory(
+                    Record->Ioapic.Address, MM_PAGE_SIZE, MI_MAP_WRITE | MI_MAP_UC);
                 if (!Entry->VirtualAddress) {
                     KeFatalError(
                         KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
@@ -143,6 +143,8 @@ void HalpInitializeIoapic(void) {
 
         Position += Record->Length;
     }
+
+    HalpUnmapEarlyMemory(Madt, Madt->Length);
 }
 
 /*-------------------------------------------------------------------------------------------------

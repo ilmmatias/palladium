@@ -281,6 +281,58 @@ static bool MapRange(
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
+ *     This function ensures that all PTEs inside a given range of virtual addresses will be
+ *     readable/writable by the kernel (so that the kernel can map memory without allocating extra
+ *     physical memory).
+ *
+ * PARAMETERS:
+ *     MemoryDescriptorListHead - Head of the memory descriptor list.
+ *     MemoryDescriptorStack - Head of the descriptor entry stack.
+ *     PageMap - Root PML4 pointer.
+ *     VirtualAddress - Start address of the target range.
+ *     Size - How many bytes the range has.
+ *
+ * RETURN VALUE:
+ *     true on success, false otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+static bool EnsureRange(
+    RtDList *MemoryDescriptorListHead,
+    RtDList *MemoryDescriptorStack,
+    PageFrame *PageMap,
+    uint64_t VirtualAddress,
+    uint64_t Size) {
+    /* We really should only be called with 2MiB-aligned addresses as the base, but we do run some
+     * manual PrepareLevel()s if the start address is unaligned. */
+    while (Size && (VirtualAddress & (SIZE_2MB - 1))) {
+        if (!PrepareLevel(
+                MemoryDescriptorListHead, MemoryDescriptorStack, PageMap, VirtualAddress, 3)) {
+            return false;
+        }
+
+        VirtualAddress += SIZE_4KB;
+        Size -= SIZE_4KB;
+    }
+
+    /* Afterwards, we can just PrepareLevel() in the first page of each PDE block. */
+    while (Size) {
+        if (!PrepareLevel(
+                MemoryDescriptorListHead, MemoryDescriptorStack, PageMap, VirtualAddress, 3)) {
+            return false;
+        }
+
+        VirtualAddress += SIZE_2MB;
+        if (Size >= SIZE_2MB) {
+            Size -= SIZE_2MB;
+        } else {
+            Size = 0;
+        }
+    }
+
+    return true;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
  *     This function creates the page map, and maps everything we need into memory (loaded
  *     programs/modules, frontbuffer, backbuffer, etc).
  *
@@ -288,7 +340,10 @@ static bool MapRange(
  *     MemoryDescriptorListHead - Head of the memory descriptor list.
  *     MemoryDescriptorStack - Head of the descriptor entry stack.
  *     LoadedPrograms - Head of the loaded programs list; We need this to get the page flags.
- *     BackBuffer - Physical address of the back buffer.
+ *     BackBufferPhys - Physical address of the back buffer.
+ *     BackBufferVirt - Virtual address of the back buffer.
+ *     FrontBufferPhys - Physical address of the front buffer.
+ *     FrontBufferVirt - Virtual address of the front buffer.
  *
  * RETURN VALUE:
  *     Either the allocated page map, or NULL if we failed.
@@ -298,7 +353,10 @@ void *OslpCreatePageMap(
     RtDList *MemoryDescriptorStack,
     RtDList *LoadedPrograms,
     uint64_t FrameBufferSize,
-    void *BackBuffer) {
+    void *BackBufferPhys,
+    void *BackBufferVirt,
+    void *FrontBufferPhys,
+    void *FrontBufferVirt) {
     EFI_PHYSICAL_ADDRESS PhysicalAddress = 0;
     EFI_STATUS Status = gBS->AllocatePages(AllocateAnyPages, EfiLoaderData, 1, &PhysicalAddress);
     if (Status != EFI_SUCCESS) {
@@ -396,72 +454,40 @@ void *OslpCreatePageMap(
         }
     }
 
-    /* Map all FIRMWARE descriptors into high memory (as read+write+exec). */
-    for (RtDList *ListHeader = MemoryDescriptorListHead->Next;
-         ListHeader != MemoryDescriptorListHead;
-         ListHeader = ListHeader->Next) {
-        OslpMemoryDescriptor *Descriptor =
-            CONTAINING_RECORD(ListHeader, OslpMemoryDescriptor, ListHeader);
-
-        if (Descriptor->Type != PAGE_TYPE_FIRMWARE_PERMANENT) {
-            continue;
-        }
-
-        if (!MapRange(
-                MemoryDescriptorListHead,
-                MemoryDescriptorStack,
-                PageMap,
-                0xFFFF800000000000 + (Descriptor->BasePage << EFI_PAGE_SHIFT),
-                Descriptor->BasePage << EFI_PAGE_SHIFT,
-                Descriptor->PageCount << EFI_PAGE_SHIFT,
-                PAGE_FLAGS_WRITE | PAGE_FLAGS_EXEC)) {
-            OslPrint("The system ran out of memory while creating the boot page map.\r\n");
-            OslPrint("The boot process cannot continue.\r\n");
-            return NULL;
-        }
-    }
-
-    /* Map the display's back buffer (aligning the size up to the nearest 2MiB). */
-    uint64_t BackBufferSize = (FrameBufferSize + SIZE_2MB - 1) & ~(SIZE_2MB - 1);
-    if (!MapRange(
+    /* Setup the PML4/3/2 entries for the early kernel mapping area (as the kernel expects to be
+     * able to not allocate any extra pages to mess with it). */
+    if (!EnsureRange(
             MemoryDescriptorListHead,
             MemoryDescriptorStack,
             PageMap,
-            0xFFFF800000000000 + (uint64_t)BackBuffer,
-            (uint64_t)BackBuffer,
-            BackBufferSize,
-            PAGE_FLAGS_WRITE | PAGE_FLAGS_WC)) {
+            EARLY_KERNEL_MAP_START,
+            EARLY_KERNEL_MAP_SIZE)) {
         OslPrint("The system ran out of memory while creating the boot page map.\r\n");
         OslPrint("The boot process cannot continue.\r\n");
         return NULL;
     }
 
-    /* Find the effective memory size, and map all of it into high memory as R+W (anything that
-     * needs different flags has already been mapped/carved out). */
-    uint64_t MaxAddress = 0;
-    for (RtDList *ListHeader = MemoryDescriptorListHead->Next;
-         ListHeader != MemoryDescriptorListHead;
-         ListHeader = ListHeader->Next) {
-        OslpMemoryDescriptor *Descriptor =
-            CONTAINING_RECORD(ListHeader, OslpMemoryDescriptor, ListHeader);
-        uint64_t End = (Descriptor->BasePage + Descriptor->PageCount) << EFI_PAGE_SHIFT;
-        if (End > MaxAddress) {
-            MaxAddress = End;
-        }
-    }
-
-    /* Align the size up to either 2MiB or 1GiB (depending on what we have available). */
-    MaxAddress = HasHugePages ? (MaxAddress + SIZE_1GB - 1) & ~(SIZE_1GB - 1)
-                              : (MaxAddress + SIZE_2MB - 1) & ~(SIZE_2MB - 1);
-
+    /* Map both of the display buffers (aligning the size up to the nearest 2MiB). */
+    uint64_t AlignedFrameBufferSize = (FrameBufferSize + SIZE_2MB - 1) & ~(SIZE_2MB - 1);
     if (!MapRange(
             MemoryDescriptorListHead,
             MemoryDescriptorStack,
             PageMap,
-            0xFFFF800000000000,
-            0,
-            MaxAddress,
-            PAGE_FLAGS_WRITE)) {
+            (uint64_t)BackBufferVirt,
+            (uint64_t)BackBufferPhys,
+            AlignedFrameBufferSize,
+            PAGE_FLAGS_WRITE | PAGE_FLAGS_WC)) {
+        OslPrint("The system ran out of memory while creating the boot page map.\r\n");
+        OslPrint("The boot process cannot continue.\r\n");
+        return NULL;
+    } else if (!MapRange(
+                   MemoryDescriptorListHead,
+                   MemoryDescriptorStack,
+                   PageMap,
+                   (uint64_t)FrontBufferVirt,
+                   (uint64_t)FrontBufferPhys,
+                   AlignedFrameBufferSize,
+                   PAGE_FLAGS_WRITE)) {
         OslPrint("The system ran out of memory while creating the boot page map.\r\n");
         OslPrint("The boot process cannot continue.\r\n");
         return NULL;

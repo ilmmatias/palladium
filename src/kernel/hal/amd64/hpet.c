@@ -88,7 +88,7 @@ void HalpHandleTimer(void) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void HalpInitializeHpet(void) {
-    HpetHeader *Hpet = KiFindAcpiTable("HPET", 0);
+    HpetHeader *Hpet = HalpFindEarlyAcpiTable("HPET");
     if (!Hpet) {
         KeFatalError(
             KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
@@ -98,7 +98,7 @@ void HalpInitializeHpet(void) {
             0);
     }
 
-    HpetAddress = MmMapSpace(Hpet->Address, MM_PAGE_SIZE, MM_SPACE_IO);
+    HpetAddress = HalpMapEarlyMemory(Hpet->Address, MM_PAGE_SIZE, MI_MAP_WRITE | MI_MAP_UC);
     if (!HpetAddress) {
         KeFatalError(
             KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
@@ -129,6 +129,9 @@ void HalpInitializeHpet(void) {
     WriteHpetRegister(HPET_VAL_REG, 0);
     WriteHpetRegister(HPET_CFG_REG, (Reg & ~HPET_CFG_MASK) | HPET_CFG_INT_ENABLE);
 
+    /* The TSC calibration wants a good/precise timer if it can't use CPUID, so set us up as the
+     * active timer for now. */
+    HalpSetActiveTimer(Frequency, HalpGetHpetTicks);
     VidPrint(
         VID_MESSAGE_DEBUG,
         "Kernel HAL",
@@ -136,6 +139,8 @@ void HalpInitializeHpet(void) {
         Width,
         Frequency / 1000000,
         (Frequency % 1000000) / 10000);
+
+    HalpUnmapEarlyMemory(Hpet, Hpet->Length);
 }
 
 /*-------------------------------------------------------------------------------------------------

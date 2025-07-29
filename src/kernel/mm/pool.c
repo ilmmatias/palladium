@@ -117,9 +117,8 @@ void MiInitializePool(void) {
             0);
     }
 
-    MiPoolBitmapBuffer = (uint64_t *)(MI_VIRTUAL_OFFSET + PhysicalAddress);
     if (!HalpMapContiguousPages(
-            MiPoolBitmapBuffer, PhysicalAddress, Pages << MM_PAGE_SHIFT, MI_MAP_WRITE)) {
+            (void *)MI_POOL_BITMAP_START, PhysicalAddress, Pages << MM_PAGE_SHIFT, MI_MAP_WRITE)) {
         KeFatalError(
             KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
             KE_PANIC_PARAMETER_POOL_INITIALIZATION_FAILURE,
@@ -130,6 +129,7 @@ void MiInitializePool(void) {
 
     /* And clear up the bitmap (as, unlike MmAllocatePool, doing Allocate+MapPages doesn't clean the
      * memory). */
+    MiPoolBitmapBuffer = (void *)MI_POOL_BITMAP_START;
     RtInitializeBitmap(&MiPoolBitmap, MiPoolBitmapBuffer, PoolPages);
     RtClearAllBits(&MiPoolBitmap);
 }

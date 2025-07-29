@@ -9,8 +9,26 @@
 bool HalpTscActive = false;
 bool HalpTimerInitialized = false;
 
-static uint64_t Frequency = 0;
-static uint64_t (*GetTicks)(void) = NULL;
+static uint64_t ActiveFrequency = 0;
+static uint64_t (*ActiveTicks)(void) = NULL;
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function forcefully sets the active timer source to the given frequency and GetTicks
+ *     callback. You probably don't want to call this (except for very early boot), as
+ *     HalpInitializeTimer() will choose a good timer source automatically.
+ *
+ * PARAMETERS:
+ *     Frequency - Frequency of the timer.
+ *     GetTicks - Callback to get the current timer ticks.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void HalpSetActiveTimer(uint64_t Frequency, uint64_t (*GetTicks)(void)) {
+    ActiveFrequency = Frequency;
+    ActiveTicks = GetTicks;
+}
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -30,13 +48,11 @@ void HalpInitializeTimer(void) {
          * access, and is guaranteed to be 64-bits). */
         HalpTscActive = true;
         Source = "TSC";
-        Frequency = HalpGetTscFrequency();
-        GetTicks = HalpGetTscTicks;
+        HalpSetActiveTimer(HalpGetTscFrequency(), HalpGetTscTicks);
     } else {
         /* Otherwise, fallback to the HPET (which is slower, but also works). */
         Source = "HPET";
-        Frequency = HalpGetHpetFrequency();
-        GetTicks = HalpGetHpetTicks;
+        HalpSetActiveTimer(HalpGetHpetFrequency(), HalpGetHpetTicks);
     }
 
     /* Print the frequency in MHz (we'd expect the performance counter to have at least a 1MHz
@@ -47,8 +63,8 @@ void HalpInitializeTimer(void) {
         "Kernel HAL",
         "using %s as the timer source (frequency = %llu.%02llu MHz)\n",
         Source,
-        Frequency / 1000000,
-        (Frequency % 1000000) / 10000);
+        ActiveFrequency / 1000000,
+        (ActiveFrequency % 1000000) / 10000);
 
     HalpTimerInitialized = true;
 }
@@ -98,7 +114,7 @@ void HalpInitializeApicTimer(void) {
  *     Frequency of the timer.
  *-----------------------------------------------------------------------------------------------*/
 uint64_t HalGetTimerFrequency(void) {
-    return Frequency;
+    return ActiveFrequency;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -114,5 +130,5 @@ uint64_t HalGetTimerFrequency(void) {
  *     many nanoseconds have elapsed.
  *-----------------------------------------------------------------------------------------------*/
 uint64_t HalGetTimerTicks(void) {
-    return GetTicks();
+    return ActiveTicks();
 }

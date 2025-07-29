@@ -9,8 +9,10 @@
  *     This function configures the video card into a mode Palalladium can use (32bpp, linear).
  *
  * PARAMETERS:
- *     BackBuffer - Output; Physical address of the frame/backbuffer.
- *     FrontBuffer - Output; Physical address of the double/frontbuffer.
+ *     BackBufferPhys - Output; Physical address of the frame/backbuffer.
+ *     BackBufferVirt - Output; Virtual address of the frame/backbuffer.
+ *     FrontBufferPhys - Output; Physical address of the double/frontbuffer.
+ *     FrontBufferVirt - Output; Virtual address of the double/frontbuffer.
  *     FramebufferWidth - Output; Vertical resolution of the display.
  *     FramebufferHeight - Output; Horizontal resolution of the display.
  *     FramebufferPitch - Output; How many pixels we need to skip to go into the next line.
@@ -19,8 +21,10 @@
  *     EFI_SUCCESS if all went well, whichever error happened otherwise.
  *-----------------------------------------------------------------------------------------------*/
 EFI_STATUS OslpInitializeGraphics(
-    void **BackBuffer,
-    void **FrontBuffer,
+    void **BackBufferPhys,
+    void **BackBufferVirt,
+    void **FrontBufferPhys,
+    void **FrontBufferVirt,
     uint32_t *FramebufferWidth,
     uint32_t *FramebufferHeight,
     uint32_t *FramebufferPitch) {
@@ -81,16 +85,30 @@ EFI_STATUS OslpInitializeGraphics(
         return Status;
     }
 
-    *BackBuffer = (void *)Gop->Mode->FrameBufferBase;
+    *BackBufferPhys = (void *)Gop->Mode->FrameBufferBase;
     *FramebufferWidth = Gop->Mode->Info->HorizontalResolution;
     *FramebufferHeight = Gop->Mode->Info->VerticalResolution;
     *FramebufferPitch = Gop->Mode->Info->PixelsPerScanLine * 4;
 
     uint64_t FrameBufferSize = *FramebufferHeight * *FramebufferPitch * 4;
     uint64_t FrontBufferSize = (FrameBufferSize + SIZE_2MB - 1) & ~(SIZE_2MB - 1);
-    *FrontBuffer = OslAllocatePages(FrontBufferSize, SIZE_2MB);
-    if (!*FrontBuffer) {
+    *FrontBufferPhys = OslAllocatePages(FrontBufferSize, SIZE_2MB);
+    if (!*FrontBufferPhys) {
         OslPrint("Failed to allocate the display buffer.\r\n");
+        OslPrint("The boot process cannot continue.\r\n");
+        return Status;
+    }
+
+    *BackBufferVirt = OslAllocateVirtualAddress(FrontBufferSize >> EFI_PAGE_SHIFT);
+    if (!*BackBufferVirt) {
+        OslPrint("Failed to allocate space for mapping the display buffers.\r\n");
+        OslPrint("The boot process cannot continue.\r\n");
+        return Status;
+    }
+
+    *FrontBufferVirt = OslAllocateVirtualAddress(FrontBufferSize >> EFI_PAGE_SHIFT);
+    if (!*FrontBufferVirt) {
+        OslPrint("Failed to allocate space for mapping the display buffers.\r\n");
         OslPrint("The boot process cannot continue.\r\n");
         return Status;
     }

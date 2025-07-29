@@ -4,7 +4,7 @@
 #include <console.h>
 #include <cpuid.h>
 #include <crt_impl/rand.h>
-#include <stdint.h>
+#include <platform.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -63,9 +63,8 @@ bool OslpInitializeArchEntropy(void) {
  *-----------------------------------------------------------------------------------------------*/
 bool OslpCheckArchSupport(void) {
     /* x86-64 machines are guaranteed to have a base level of support (so, we don't need to check
-     * for some things if we reached this point). The only feature is we need to check for now is
-     * cmpxchg16b (as we're UEFI only, this should be supported on any processor running us; we
-     * use it for atomic SList operations) */
+     * for some things if we reached this point). We probably don't need to check for RDTSC nor
+     * APIC support either (but we still do, at least for now). */
 
     uint32_t Eax, Ebx, Ecx, Edx;
     __cpuid(1, Eax, Ebx, Ecx, Edx);
@@ -73,7 +72,36 @@ bool OslpCheckArchSupport(void) {
         OslPrint("Your processor does not support the CMPXCHG16B instruction.\r\n");
         OslPrint("The boot process cannot continue.\r\n");
         return false;
+    } else if (!(Edx & bit_TSC)) {
+        OslPrint("Your processor does not support the RDTSC instruction.\r\n");
+        OslPrint("The boot process cannot continue.\r\n");
+        return false;
+    } else if (!(Edx & bit_APIC)) {
+        OslPrint("Your processor does not support APIC operation.\r\n");
+        OslPrint("The boot process cannot continue.\r\n");
+        return false;
     }
 
     return true;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function initializes the arch-specific boot block fields.
+ *
+ * PARAMETERS:
+ *     BootBlock - Which structure to initialize.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void OslpInitializeArchBootData(OslpBootBlock* BootBlock) {
+    /* This is our initial (rough) estimate, essentially used only for small delays during the boot
+     * process. It should get superseded by either the HPET, another timer, or a more properly
+     * calibrated TSC frequency (if we have an invariant TSC) when the kernel gets further in its
+     * initialization process. */
+    uint64_t StartTsc = __rdtsc();
+    gBS->Stall(5000);
+    uint64_t EndTsc = __rdtsc();
+    BootBlock->Arch.CycleCounterFrequency = (EndTsc - StartTsc) * (1000000 / 5000);
 }

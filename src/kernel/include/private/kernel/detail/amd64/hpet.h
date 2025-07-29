@@ -27,7 +27,9 @@
 #define HPET_TIMER_MASK (HPET_TIMER_INT_ENABLE | HPET_TIMER_32B_ENABLE | HPET_TIMER_FSB_ENABLE)
 
 typedef struct __attribute__((packed)) {
-    char Unused[36];
+    char Signature[4];
+    uint32_t Length;
+    char Unused[28];
     uint8_t HardwareId;
     uint8_t ComparatorCount : 5;
     uint8_t CounterSize : 1;

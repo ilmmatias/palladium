@@ -12,10 +12,6 @@
 
 #define MM_PAGE_SIZE (1ull << (MM_PAGE_SHIFT))
 
-#define MM_SPACE_NORMAL 0
-#define MM_SPACE_IO 1
-#define MM_SPACE_GRAPHICS 2
-
 #define MM_POOL_TAG_NONE "\0\0\0\0"
 #define MM_POOL_TAG_ACPI "ACPI"
 #define MM_POOL_TAG_APIC "APIC"

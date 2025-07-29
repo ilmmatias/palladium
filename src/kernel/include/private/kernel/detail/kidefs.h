@@ -12,8 +12,4 @@
 #endif /* __has__include */
 /* clang-format on */
 
-#define KI_ACPI_NONE 0
-#define KI_ACPI_RDST 1
-#define KI_ACPI_XSDT 2
-
 #endif /* _KERNEL_DETAIL_KIDEFS_H_ */
