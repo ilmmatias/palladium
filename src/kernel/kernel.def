@@ -17,8 +17,10 @@ EXPORTS
     HalGetTimerFrequency
     HalGetTimerTicks
     HalInitializeInterruptData
+    HalReadPciConfigurationSpace
     HalReleaseInterruptData
     HalWaitTimer
+    HalWritePciConfigurationSpace
 
     __stack_chk_fail
     __stack_chk_guard DATA

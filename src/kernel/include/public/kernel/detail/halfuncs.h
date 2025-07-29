@@ -28,6 +28,21 @@ void HalDeleteInterrupt(HalInterrupt *Interrupt);
 bool HalEnableInterrupt(HalInterrupt *Interrupt);
 void HalDisableInterrupt(HalInterrupt *Interrupt);
 
+void HalReadPciConfigurationSpace(
+    uint32_t Bus,
+    uint32_t Slot,
+    uint32_t Function,
+    uint32_t Offset,
+    void *Buffer,
+    size_t Size);
+void HalWritePciConfigurationSpace(
+    uint32_t Bus,
+    uint32_t Slot,
+    uint32_t Function,
+    uint32_t Offset,
+    const void *Buffer,
+    size_t Size);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

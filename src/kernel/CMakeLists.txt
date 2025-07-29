@@ -16,6 +16,7 @@ if(ARCH STREQUAL "amd64")
         hal/${ARCH}/idt.S
         hal/${ARCH}/ioapic.c
         hal/${ARCH}/map.c
+        hal/${ARCH}/pci.c
         hal/${ARCH}/platform.c
         hal/${ARCH}/smp.c
         hal/${ARCH}/smp.S
