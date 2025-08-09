@@ -16,6 +16,7 @@
 
 /* And these with the values in halp.h. */
 #define HALP_INT_ALERT_IRQL 2
+#define HALP_INT_FASTFAIL_IRQL 2
 #define HALP_INT_DISPATCH_IRQL 3
 #define HALP_INT_TIMER_IRQL 13
 #define HALP_INT_IPI_IRQL 14

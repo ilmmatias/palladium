@@ -3,8 +3,7 @@
 
 set(USER_SOURCES
     ${SOURCES}
-
-    compiler/stackcheck.c
+    ${COMPILER_SOURCES}
 
     os/__acquire_lock.c
     os/__allocate_pages.c
@@ -83,3 +82,7 @@ target_compile_options(ucrt_exe_startup PRIVATE $<$<COMPILE_LANGUAGE:C>:-ffreest
 
 add_library(ucrt_dll_startup "nostdlib" OBJECT ${USER_DLL_STARTUP_SOURCES})
 target_compile_options(ucrt_dll_startup PRIVATE $<$<COMPILE_LANGUAGE:C>:-ffreestanding>)
+
+add_library(ucrt_compiler "nostdlib" OBJECT ${COMPILER_SOURCES})
+target_include_directories(ucrt_compiler PRIVATE include)
+target_compile_options(ucrt_compiler PRIVATE $<$<COMPILE_LANGUAGE:C>:-ffreestanding>)

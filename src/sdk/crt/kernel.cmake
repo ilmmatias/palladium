@@ -4,3 +4,7 @@
 add_library(kcrt "knostdlib" STATIC ${SOURCES})
 target_include_directories(kcrt PUBLIC include)
 target_compile_options(kcrt PRIVATE $<$<COMPILE_LANGUAGE:C>:-ffreestanding>)
+
+add_library(kcrt_compiler "knostdlib" STATIC ${COMPILER_SOURCES})
+target_include_directories(kcrt_compiler PRIVATE include)
+target_compile_options(kcrt_compiler PRIVATE $<$<COMPILE_LANGUAGE:C>:-ffreestanding>)

@@ -6,13 +6,11 @@ project(os/sdk/crt)
 if(ARCH STREQUAL "amd64")
     set(SOURCES
         string/amd64/memcpy.S
-        string/amd64/memset.S
-    )
+        string/amd64/memset.S)
 else()
     set(SOURCES
         string/memcpy.c
-        string/memset.c
-    )
+        string/memset.c)
 endif()
 
 set(SOURCES
@@ -82,6 +80,13 @@ set(SOURCES
     string/strspn.c
     string/strstr.c
     string/strtok.c)
+
+# Unlike MSVC (which is happy with breaking the C/C++ standard a bit), Clang doesn't really like us
+# casting the address of things when assigning the fields of the load config table, so we're
+# forced to use assembly (in specific for the __guard_flags, when we add support for it).
+set(COMPILER_SOURCES
+    compiler/loadconfig.S
+    compiler/stackcheck.c)
 
 include(kernel.cmake)
 include(user.cmake)

@@ -1,11 +1,9 @@
 /* SPDX-FileCopyrightText: (C) 2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#include <crt_impl/os.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include <stdint.h>
 
-uintptr_t __stack_chk_guard = 0xC54FEB976538ECF0;
+uintptr_t __stack_chk_guard = (uintptr_t)0xEB976538ECF0;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -18,12 +16,6 @@ uintptr_t __stack_chk_guard = 0xC54FEB976538ECF0;
  *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
 [[noreturn]] void __stack_chk_fail(void) {
-    static const char* str = "stack smashing detected\n";
-
-    if (stderr) {
-        size_t wrote;
-        __write_file(stderr->handle, str, sizeof(str), &wrote);
-    }
-
-    __terminate_process(EXIT_FAILURE);
+    /* TODO: Add a header containing the valid fast fail codes. */
+    __fastfail(0);
 }

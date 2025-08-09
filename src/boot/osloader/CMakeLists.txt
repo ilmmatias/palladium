@@ -23,7 +23,6 @@ add_executable(osloader "bstdlib" NO
     loader.c
     main.c
     memory.c
-    stackcheck.c
 )
 
 target_include_directories(osloader PRIVATE include)

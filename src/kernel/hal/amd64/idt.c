@@ -38,6 +38,7 @@ extern void HalpHypervisorInjectionTrapEntry(void);
 extern void HalpVmmCommunicationTrapEntry(void);
 extern void HalpSecurityTrapEntry(void);
 extern void HalpAlertEntry(void);
+extern void HalpFastFailEntry(void);
 extern void HalpDispatchEntry(void);
 extern void HalpTimerEntry(void);
 extern void HalpIpiEntry(void);
@@ -351,6 +352,8 @@ void HalpInitializeIdt(KeProcessor *Processor) {
            rules like enabling interrupts before enabling). */
         else if (i == HALP_INT_ALERT_VECTOR) {
             Base = (uint64_t)HalpAlertEntry;
+        } else if (i == HALP_INT_FASTFAIL_VECTOR) {
+            Base = (uint64_t)HalpFastFailEntry;
         } else if (i == HALP_INT_DISPATCH_VECTOR) {
             Base = (uint64_t)HalpDispatchEntry;
         } else if (i == HALP_INT_TIMER_VECTOR) {

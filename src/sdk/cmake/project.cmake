@@ -6,21 +6,22 @@ function(add_executable target type has_lib)
 
     if(NOT (type STREQUAL "nostdlib" OR type STREQUAL "knostdlib"))
         if(type STREQUAL "kcrt")
-            target_link_libraries(${target} PRIVATE kcrt)
+            target_link_libraries(${target} PRIVATE kcrt kcrt_compiler)
         elseif(type STREQUAL "kstdlib")
-            target_link_libraries(${target} PRIVATE kcrt krt)
+            target_link_libraries(${target} PRIVATE kcrt kcrt_compiler krt)
         elseif(type STREQUAL "bstdlib")
-            target_link_libraries(${target} PRIVATE kcrt brt)
+            target_link_libraries(${target} PRIVATE kcrt kcrt_compiler brt)
         elseif(type STREQUAL "kernel")
             target_link_libraries(${target} PRIVATE kcrt krt)
+            target_link_libraries(${target} PUBLIC kcrt_compiler)
             target_include_directories(${target} INTERFACE $<TARGET_PROPERTY:kcrt,INCLUDE_DIRECTORIES>)
             target_include_directories(${target} INTERFACE $<TARGET_PROPERTY:krt,INCLUDE_DIRECTORIES>)
         elseif(type STREQUAL "osapi")
             target_link_libraries(${target} PRIVATE osapi)
         elseif(type STREQUAL "ucrt")
-            target_link_libraries(${target} PRIVATE osapi ucrt ucrt_exe_startup)
+            target_link_libraries(${target} PRIVATE osapi ucrt ucrt_exe_startup ucrt_compiler)
         else()
-            target_link_libraries(${target} PRIVATE osapi ucrt ucrt_exe_startup urt)
+            target_link_libraries(${target} PRIVATE osapi ucrt ucrt_exe_startup ucrt_compiler urt)
         endif()
     endif()
 
@@ -55,6 +56,7 @@ function(add_executable target type has_lib)
     	${target}
     	PRIVATE
     	--target=${TARGET_${ARCH}}-w64-mingw32
+        -Wl,--disable-tsaware
     	-fuse-ld=lld
     	/usr/local/lib/baremetal/libclang_rt.builtins-${TARGET_${ARCH}}.a)
 
@@ -73,21 +75,22 @@ function(add_library target type)
 
     if(NOT (type STREQUAL "nostdlib" OR type STREQUAL "knostdlib"))
         if(type STREQUAL "kcrt")
-            target_link_libraries(${target} PRIVATE kcrt)
+            target_link_libraries(${target} PRIVATE kcrt kcrt_compiler)
         elseif(type STREQUAL "kstdlib")
-            target_link_libraries(${target} PRIVATE kcrt krt)
+            target_link_libraries(${target} PRIVATE kcrt kcrt_compiler krt)
         elseif(type STREQUAL "bstdlib")
-            target_link_libraries(${target} PRIVATE kcrt brt)
+            target_link_libraries(${target} PRIVATE kcrt kcrt_compiler brt)
         elseif(type STREQUAL "kernel")
             target_link_libraries(${target} PRIVATE kcrt krt)
+            target_link_libraries(${target} PUBLIC kcrt_compiler)
             target_include_directories(${target} INTERFACE $<TARGET_PROPERTY:kcrt,INCLUDE_DIRECTORIES>)
             target_include_directories(${target} INTERFACE $<TARGET_PROPERTY:krt,INCLUDE_DIRECTORIES>)
         elseif(type STREQUAL "osapi")
             target_link_libraries(${target} PRIVATE osapi)
         elseif(type STREQUAL "ucrt")
-            target_link_libraries(${target} PRIVATE osapi ucrt ucrt_dll_startup)
+            target_link_libraries(${target} PRIVATE osapi ucrt ucrt_dll_startup ucrt_compiler)
         else()
-            target_link_libraries(${target} PRIVATE osapi ucrt ucrt_dll_startup urt)
+            target_link_libraries(${target} PRIVATE osapi ucrt ucrt_dll_startup ucrt_compiler urt)
         endif()
     endif()
 
@@ -123,6 +126,7 @@ function(add_library target type)
         	PRIVATE
         	--target=${TARGET_${ARCH}}-w64-mingw32
             -Wl,--out-implib,${CMAKE_CURRENT_BINARY_DIR}/${target}.lib
+            -Wl,--disable-tsaware
         	-fuse-ld=lld
         	/usr/local/lib/baremetal/libclang_rt.builtins-${TARGET_${ARCH}}.a)
     

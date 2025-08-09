@@ -14,6 +14,7 @@
 #error "Undefined ARCH for the sdk module!"
 #endif
 
+#define PE_IMAGE_REL_BASED_ABSOLUTE 0
 #define PE_IMAGE_REL_BASED_HIGH 1
 #define PE_IMAGE_REL_BASED_LOW 2
 #define PE_IMAGE_REL_BASED_HIGHLOW 3
@@ -176,6 +177,64 @@ typedef struct __attribute__((packed)) {
     uint32_t NameRva;
     uint32_t ImportAddressTableRva;
 } PeImportHeader;
+
+typedef struct __attribute__((packed)) {
+    uint32_t Size;
+    uint32_t TimeDateStamp;
+    uint16_t MajorVersion;
+    uint16_t MinorVersion;
+    uint32_t GlobalFlagsClear;
+    uint32_t GlobalFlagsSet;
+    uint32_t CriticalSectionDefaultTimeout;
+    uintptr_t DeCommitFreeBlockThreshold;
+    uintptr_t DeCommitTotalFreeThreshold;
+    uintptr_t LockPrefixTable;
+    uintptr_t MaximumAllocationSize;
+    uintptr_t VirtualMemoryThreshold;
+    uintptr_t ProcessAffinityMask;
+    uint32_t ProcessHeapFlags;
+    uint16_t CsdVersion;
+    uint16_t DependentLoadFlags;
+    uintptr_t EditList;
+    uintptr_t SecurityCookie;
+    uintptr_t SeHandlerTable;
+    uintptr_t SeHandlerCount;
+    uintptr_t GuardCfCheckFunctionPointer;
+    uintptr_t GuardCfDispatchFunctionPointer;
+    uintptr_t GuardCfFunctionTable;
+    uintptr_t GuardCfFunctionCount;
+    uint32_t GuardFlags;
+    struct {
+        uint16_t Flags;
+        uint16_t Catalog;
+        uint32_t CatalogOffset;
+        uint32_t Reserved;
+    } CodeIntegrity;
+    uintptr_t GuardAddressTakenIatEntryTable;
+    uintptr_t GuardAddressTakenIatEntryCount;
+    uintptr_t GuardLongJumpTargetTable;
+    uintptr_t GuardLongJumpTargetCount;
+    uintptr_t DynamicValueRelocTable;
+    uintptr_t ChPeMetadataPointer;
+    uintptr_t GuardRfFailureRoutine;
+    uintptr_t GuardRfFailureRoutineFunctionPointer;
+    uint32_t DynamicValueRelocTableOffset;
+    uint16_t DynamicValueRelocTableSection;
+    uint16_t Reserved2;
+    uintptr_t GuardRfVerifyStackPointerFunctionPointer;
+    uint32_t HotPatchTableOffset;
+    uint32_t Reserved3;
+    uintptr_t EnclaveConfigurationPointer;
+    uintptr_t VolatileMetadataPointer;
+    uintptr_t GuardEhContinuationTable;
+    uintptr_t GuardEhContinuationCount;
+    uintptr_t GuardXfgCheckFunctionPointer;
+    uintptr_t GuardXfgDispatchFunctionPointer;
+    uintptr_t GuardXfgTableDispatchFunctionPointer;
+    uintptr_t CastGuardOsDeterminedFailureMode;
+    uintptr_t GuardMemcpyFunctionPointer;
+    uintptr_t UmaFunctionPointers;
+} PeLoadConfigHeader;
 
 typedef struct __attribute__((packed)) {
     uint32_t PageRva;

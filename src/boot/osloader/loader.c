@@ -183,17 +183,31 @@ bool OslLoadExecutable(RtDList *LoadedPrograms, const char *ImageName, const cha
                 (char *)ThisProgram->PhysicalAddress + NamePointers[i];
             ThisProgram->ExportTable[i].Address =
                 Header->ImageBase + AddressTable[ExportOrdinals[i]];
-
-            /* If we happen to find the stack guard symbol (which should have been exported by the
-             * kernel), randomize it. */
-            if (!strcmp(ThisProgram->ExportTable[i].Name, "__stack_chk_guard")) {
-                *(uintptr_t *)((uintptr_t)ThisProgram->PhysicalAddress +
-                               AddressTable[ExportOrdinals[i]]) = (uintptr_t)__rand64();
-            }
         }
     } else {
         ThisProgram->ExportTableSize = 0;
         ThisProgram->ExportTable = NULL;
+    }
+
+    /* Anything compiled with SSP/GS support (which really is just anything with the default
+     * compiler options for us) should be exporting the pointer to their stack cookie in their load
+     * config table, which we can randomize; Just a word of caution: This is necessary for Windows
+     * DLLs/images built with GS support, as they validate that the stack cookie isn't the default
+     * value. This is also why we mask off the high 16-bits of the value, as otherwise these images
+     * don't like it either. */
+    if (Header->DataDirectories.LoadConfigTable.Size) {
+        PeLoadConfigHeader *LoadConfigHeader =
+            (PeLoadConfigHeader *)((char *)ThisProgram->PhysicalAddress +
+                                   Header->DataDirectories.LoadConfigTable.VirtualAddress);
+        uintptr_t *CookiePtr = (uintptr_t *)((char *)ThisProgram->PhysicalAddress +
+                                             LoadConfigHeader->SecurityCookie - ExpectedBase);
+        uintptr_t DefaultSecurityCookie = *CookiePtr;
+        uintptr_t NewSecurityCookie = __rand64() & 0xFFFFFFFFFFFF;
+        if (NewSecurityCookie == DefaultSecurityCookie) {
+            *CookiePtr = NewSecurityCookie + 1;
+        } else {
+            *CookiePtr = NewSecurityCookie;
+        }
     }
 
     /* We should have loaded the whole file, so it's safe to free the buffer. */
@@ -357,6 +371,8 @@ void OslFixupRelocations(RtDList *LoadedPrograms) {
                 void *Offset = BaseAddress + (*(BlockRelocations++) & 0xFFF);
 
                 switch (Type) {
+                    case PE_IMAGE_REL_BASED_ABSOLUTE:
+                        break;
                     case PE_IMAGE_REL_BASED_HIGH:
                         *((uint16_t *)Offset) += ThisProgram->BaseDiff >> 16;
                         break;
@@ -373,6 +389,10 @@ void OslFixupRelocations(RtDList *LoadedPrograms) {
                         break;
                     case PE_IMAGE_REL_BASED_DIR64:
                         *((uint64_t *)Offset) += ThisProgram->BaseDiff;
+                        break;
+                    default:
+                        OslPrint("Unhandled relocation type %hu\r\n", Type);
+                        OslPrint("The system may not boot correctly\r\n");
                         break;
                 }
             }

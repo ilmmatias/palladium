@@ -40,7 +40,6 @@ add_executable(kernel "kernel" YES
     ke/entry.c
     ke/ipi.c
     ke/panic.c
-    ke/stackcheck.c
     ke/work.c
 
     mm/page.c

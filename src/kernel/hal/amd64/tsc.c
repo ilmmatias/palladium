@@ -67,7 +67,7 @@ void HalpInitializeTsc(void) {
 
     /* Otherwise, just calibrate it against the HPET. */
     if (!Frequency) {
-        uint64_t Ticks = (__uint128_t)(1 * EV_MILLISECS) * HalGetTimerFrequency() / EV_SECS;
+        uint64_t Ticks = (__uint128_t)(10 * EV_MILLISECS) * HalGetTimerFrequency() / EV_SECS;
 
         for (int i = 0; i < 5; i++) {
             uint64_t StartTsc = __rdtsc();

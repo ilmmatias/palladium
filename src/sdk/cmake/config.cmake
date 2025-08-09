@@ -26,7 +26,7 @@ set(CMAKE_RC_FLAGS "--target=${TARGET_${ARCH}}-w64-mingw32")
 set(CMAKE_C_FLAGS_DEBUG "-Og -g -glldb -gcolumn-info")
 set(CMAKE_C_FLAGS_RELEASE "-O2 -DNDEBUG")
 set(CMAKE_C_FLAGS_MINSIZEREL "-Os -DNDEBUG")
-set(CMAKE_C_FLAGS_RELWITHDEBINFO "-O2 -g -glldb -gcolumn-info -DNDEBUG")
+set(CMAKE_C_FLAGS_RELWITHDEBINFO "-O2 -g -glldb -gcolumn-info")
 
 # No flags needs to be passed to when creating .def files (for now at least).
 set(CMAKE_LINK_DEF_FILE_FLAG "")

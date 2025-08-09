@@ -331,6 +331,17 @@ HalpAlertEntry:
     LEAVE_INTERRUPT
 .seh_endproc
 
+.seh_proc HalpFastFailEntry
+.global HalpFastFailEntry
+.align 16
+HalpFastFailEntry:
+    ENTER_INTERRUPT (INTERRUPT_FLAGS_NONE)
+    mov %rsp, %rcx
+    mov $RT_EXC_SECURITY_CHECK_FAILURE, %rdx
+    call HalpDispatchTrap
+1:  jmp 1b
+.seh_endproc
+
 .seh_proc HalpDispatchEntry
 .global HalpDispatchEntry
 .align 16
