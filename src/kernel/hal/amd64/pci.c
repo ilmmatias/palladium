@@ -2,7 +2,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <kernel/hal.h>
-#include <kernel/intrin.h>
+#include <os/intrin.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:

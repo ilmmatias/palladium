@@ -3,8 +3,8 @@
 
 #include <kernel/evp.h>
 #include <kernel/halp.h>
-#include <kernel/intrin.h>
 #include <kernel/vid.h>
+#include <os/intrin.h>
 
 bool HalpTscActive = false;
 bool HalpTimerInitialized = false;

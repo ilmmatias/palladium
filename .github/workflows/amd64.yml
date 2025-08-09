@@ -68,6 +68,9 @@ jobs:
         mcopy -i build.target/fat.img build.target/boot/osloader/osloader.exe ::/EFI/BOOT/BOOTX64.EFI
         mcopy -i build.target/fat.img build.target/kernel/kernel.exe ::/EFI/PALLADIUM/KERNEL.EXE
         mcopy -i build.target/fat.img build.target/drivers/acpi/acpi.sys ::/EFI/PALLADIUM/ACPI.SYS
+        echo "Kernel=KERNEL.EXE" > build.target/boot.cfg
+        echo "BootDriver=ACPI.SYS" >> build.target/boot.cfg
+        mcopy -i build.target/fat.img build.target/boot.cfg ::/EFI/PALLADIUM/BOOT.CFG
 
     - name: Build ISO image
       run: |

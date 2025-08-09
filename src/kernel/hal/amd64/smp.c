@@ -3,10 +3,10 @@
 
 #include <kernel/ev.h>
 #include <kernel/halp.h>
-#include <kernel/intrin.h>
 #include <kernel/ke.h>
 #include <kernel/mm.h>
 #include <kernel/psp.h>
+#include <os/intrin.h>
 #include <string.h>
 
 extern void HalpApplicationProcessorEntry(void);

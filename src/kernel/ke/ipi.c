@@ -2,8 +2,8 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <kernel/halp.h>
-#include <kernel/intrin.h>
 #include <kernel/ke.h>
+#include <os/intrin.h>
 
 static KeSpinLock Lock = {0};
 static void (*TargetRoutine)(void *) = NULL;

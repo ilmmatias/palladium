@@ -6,11 +6,11 @@
 
 #include <stdint.h>
 
-#if defined(ARCH_amd64)
-#include <rt/amd64/context.h>
+#if __has_include(ARCH_MAKE_INCLUDE_PATH(rt, context.h))
+#include ARCH_MAKE_INCLUDE_PATH(rt, context.h)
 #else
-#error "Undefined ARCH for the rt module!"
-#endif
+#error "Undefined ARCH for the CRT module!"
+#endif /* __has_include */
 
 #ifdef __cplusplus
 extern "C" {

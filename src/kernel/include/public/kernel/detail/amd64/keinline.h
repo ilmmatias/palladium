@@ -4,8 +4,8 @@
 #ifndef _KERNEL_DETAIL_AMD64_KEINLINE_H_
 #define _KERNEL_DETAIL_AMD64_KEINLINE_H_
 
-#include <kernel/detail/amd64/intrininline.h>
 #include <kernel/detail/amd64/ketypes.h>
+#include <os/amd64/intrin.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:

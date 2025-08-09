@@ -8,11 +8,11 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#if defined(ARCH_amd64)
-#include <crt_impl/amd64/os.h>
+#if __has_include(ARCH_MAKE_INCLUDE_PATH(crt_impl, os.h))
+#include ARCH_MAKE_INCLUDE_PATH(crt_impl, os.h)
 #else
 #error "Undefined ARCH for the CRT module!"
-#endif /* ARCH */
+#endif /* __has_include */
 
 #define __PAGE_SIZE (1ull << (__PAGE_SHIFT))
 

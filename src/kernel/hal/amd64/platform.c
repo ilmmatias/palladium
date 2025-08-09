@@ -3,9 +3,9 @@
 
 #include <cpuid.h>
 #include <kernel/halp.h>
-#include <kernel/intrin.h>
 #include <kernel/ke.h>
 #include <kernel/vid.h>
+#include <os/intrin.h>
 #include <string.h>
 
 /* Macro to help with checking the feature bits from CPUID (just to make the code a bit more

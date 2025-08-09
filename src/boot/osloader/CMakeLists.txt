@@ -14,6 +14,7 @@ endif()
 add_executable(osloader "bstdlib" NO
     ${SOURCES}
     acpi.c
+    config.c
     console.c
     descriptors.c
     entropy.c

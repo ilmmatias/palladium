@@ -86,11 +86,11 @@ typedef int (*RtExceptionRoutine)(
 typedef int (*RtExceptionFilter)(RtExceptionPointers *ExceptionPointers, uint64_t EstablisherFrame);
 typedef void (*RtTerminationHandler)(int AbnormalTermination, uint64_t EstablisherFrame);
 
-#if defined(ARCH_amd64)
-#include <rt/amd64/unwind.h>
+#if __has_include(ARCH_MAKE_INCLUDE_PATH(rt, unwind.h))
+#include ARCH_MAKE_INCLUDE_PATH(rt, unwind.h)
 #else
-#error "Undefined ARCH for the rt module!"
-#endif
+#error "Undefined ARCH for the CRT module!"
+#endif /* __has_include */
 
 #ifdef __cplusplus
 extern "C" {

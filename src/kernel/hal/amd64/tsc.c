@@ -4,8 +4,8 @@
 #include <cpuid.h>
 #include <kernel/ev.h>
 #include <kernel/halp.h>
-#include <kernel/intrin.h>
 #include <kernel/vid.h>
+#include <os/intrin.h>
 #include <stdint.h>
 
 static uint64_t Frequency = 0;

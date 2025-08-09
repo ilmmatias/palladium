@@ -2,12 +2,16 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <acpi.h>
+#include <config.h>
 #include <console.h>
+#include <ctype.h>
 #include <entropy.h>
 #include <file.h>
 #include <graphics.h>
 #include <loader.h>
+#include <os/intrin.h>
 #include <platform.h>
+#include <stdio.h>
 #include <string.h>
 #include <support.h>
 
@@ -26,175 +30,240 @@ EFI_RUNTIME_SERVICES *gRT = NULL;
  *     SystemTable - Pointer to the EFI system table.
  *
  * RETURN VALUE:
- *     Does not return on success.
+ *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
-EFI_STATUS
-OslMain(EFI_HANDLE *ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
-    /* Save up any required EFI variables (so that we don't need to pass ImageHandle and
-     * SystemTable around). */
-    gIH = ImageHandle;
-    gST = SystemTable;
-    gBS = SystemTable->BootServices;
-    gRT = SystemTable->RuntimeServices;
+EFI_STATUS OslMain(EFI_HANDLE *ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
+    do {
+        /* Save up any required EFI variables (so that we don't need to pass ImageHandle and
+         * SystemTable around). */
+        gIH = ImageHandle;
+        gST = SystemTable;
+        gBS = SystemTable->BootServices;
+        gRT = SystemTable->RuntimeServices;
 
-    /* Get rid of the watchdog timer (just to be sure). */
-    gBS->SetWatchdogTimer(0, 0, 0, NULL);
+        /* Get rid of the watchdog timer (just to be sure). */
+        gBS->SetWatchdogTimer(0, 0, 0, NULL);
 
-    /* Run the basic compatibility checks against the host system. */
-    if (!OslpCheckArchSupport()) {
-        return EFI_LOAD_ERROR;
-    }
+        /* Run the basic compatibility checks against the host system. */
+        if (!OslpCheckArchSupport()) {
+            break;
+        }
 
-    /* Get the RNG ready for randomizing the virtual memory load addresses. */
-    OslpInitializeEntropy();
+        /* Get the RNG ready for randomizing the virtual memory load addresses. */
+        OslpInitializeEntropy();
 
-    /* Initialize all required subsystems. */
-    EFI_STATUS Status = OslpInitializeRootVolume();
-    if (Status != EFI_SUCCESS) {
-        return EFI_LOAD_ERROR;
-    }
+        /* Initialize all required subsystems. */
+        EFI_STATUS Status = OslpInitializeRootVolume();
+        if (Status != EFI_SUCCESS) {
+            break;
+        }
 
-    Status = OslpInitializeVirtualAllocator();
-    if (Status != EFI_SUCCESS) {
-        return EFI_LOAD_ERROR;
-    }
+        Status = OslpInitializeVirtualAllocator();
+        if (Status != EFI_SUCCESS) {
+            break;
+        }
 
-    void *AcpiRootPointer = NULL;
-    void *AcpiRootTable = NULL;
-    uint32_t AcpiRootTableSize = 0;
-    uint32_t AcpiVersion = 0;
-    if (!OslpInitializeAcpi(&AcpiRootPointer, &AcpiRootTable, &AcpiRootTableSize, &AcpiVersion)) {
-        return EFI_LOAD_ERROR;
-    }
+        void *AcpiRootPointer = NULL;
+        void *AcpiRootTable = NULL;
+        uint32_t AcpiRootTableSize = 0;
+        uint32_t AcpiVersion = 0;
+        if (!OslpInitializeAcpi(
+                &AcpiRootPointer, &AcpiRootTable, &AcpiRootTableSize, &AcpiVersion)) {
+            break;
+        }
 
-    void *BackBufferPhys = NULL;
-    void *BackBufferVirt = NULL;
-    void *FrontBufferPhys = NULL;
-    void *FrontBufferVirt = NULL;
-    uint32_t FramebufferWidth = 0;
-    uint32_t FramebufferHeight = 0;
-    uint32_t FramebufferPitch = 0;
-    Status = OslpInitializeGraphics(
-        &BackBufferPhys,
-        &BackBufferVirt,
-        &FrontBufferPhys,
-        &FrontBufferVirt,
-        &FramebufferWidth,
-        &FramebufferHeight,
-        &FramebufferPitch);
-    if (Status != EFI_SUCCESS) {
-        return EFI_LOAD_ERROR;
-    }
+        void *BackBufferPhys = NULL;
+        void *BackBufferVirt = NULL;
+        void *FrontBufferPhys = NULL;
+        void *FrontBufferVirt = NULL;
+        uint32_t FramebufferWidth = 0;
+        uint32_t FramebufferHeight = 0;
+        uint32_t FramebufferPitch = 0;
+        Status = OslpInitializeGraphics(
+            &BackBufferPhys,
+            &BackBufferVirt,
+            &FrontBufferPhys,
+            &FrontBufferVirt,
+            &FramebufferWidth,
+            &FramebufferHeight,
+            &FramebufferPitch);
+        if (Status != EFI_SUCCESS) {
+            break;
+        }
 
-    /* Let's get the actual boot process started; Load up KERNEL.EXE plus all boot drivers. */
-    RtDList LoadedPrograms;
-    RtInitializeDList(&LoadedPrograms);
+        /* Let's get the actual boot process started; There should be a configuration file in the
+         * fixed/known path telling us what we need to load. */
+        OslConfig Config;
+        if (!OslLoadConfigFile("\\EFI\\PALLADIUM\\BOOT.CFG", &Config)) {
+            break;
+        }
 
-    /* TODO: Load up the kernel+boot driver paths using another method (UEFI command line? Or maybe
-     * a config file?). */
-    if (!OslLoadExecutable(&LoadedPrograms, "kernel.exe", "\\EFI\\PALLADIUM\\KERNEL.EXE") ||
-        !OslLoadExecutable(&LoadedPrograms, "acpi.sys", "\\EFI\\PALLADIUM\\ACPI.SYS")) {
-        return EFI_LOAD_ERROR;
-    }
+        RtDList LoadedPrograms;
+        RtInitializeDList(&LoadedPrograms);
 
-    if (!OslFixupImports(&LoadedPrograms)) {
-        return EFI_LOAD_ERROR;
-    }
+        /* The parser gives us only the relative paths, so we need to manually mount the full path
+         * for the kernel (using the known/default prefix). */
+        size_t ModuleNameLength = strlen(Config.Kernel);
+        char *ModulePath = NULL;
+        Status = gBS->AllocatePool(EfiLoaderData, ModuleNameLength + 16, (VOID **)&ModulePath);
+        if (Status != EFI_SUCCESS) {
+            OslPrint("Failed to load a kernel/driver file.\r\n");
+            OslPrint("The system ran out of memory while loading %s.\r\n", Config.Kernel);
+            OslPrint("The boot process cannot continue.\r\n");
+            break;
+        } else {
+            snprintf(ModulePath, ModuleNameLength + 16, "\\EFI\\PALLADIUM\\%s", Config.Kernel);
+        }
 
-    OslFixupRelocations(&LoadedPrograms);
+        /* The module name is fixed though (always kernel.exe, as that's what every driver
+         * expects). */
+        if (!OslLoadExecutable(&LoadedPrograms, "kernel.exe", ModulePath)) {
+            break;
+        }
 
-    /* Create the target/kernel module entry list (this is what the kernel will have access, as the
-     * LoadedPrograms list is internal to us). */
-    RtDList *ModuleListHead = OslCreateKernelModuleList(&LoadedPrograms);
-    if (!ModuleListHead) {
-        return EFI_LOAD_ERROR;
-    }
+        /* The boot drivers do need some extra work for both the full path (just like the kernel)
+         * and for the module name (always the lowercase version of the given name). */
+        bool Failed = false;
+        for (size_t i = 0; i < Config.BootDriverCount; i++) {
+            ModuleNameLength = strlen(Config.BootDrivers[i]);
+            Status = gBS->AllocatePool(EfiLoaderData, ModuleNameLength + 16, (VOID **)&ModulePath);
+            if (Status != EFI_SUCCESS) {
+                OslPrint("Failed to load a kernel/driver file.\r\n");
+                OslPrint(
+                    "The system ran out of memory while loading %s.\r\n", Config.BootDrivers[i]);
+                OslPrint("The boot process cannot continue.\r\n");
+                Failed = true;
+                break;
+            }
 
-    /* We need to create a small (8KiB) temporary stack (for use during the kernel BSP
-     * initialization, as the current UEFI stack probably won't be mapped in). */
-    void *BootStack = OslAllocatePages(SIZE_8KB, SIZE_4KB);
-    if (!BootStack) {
-        OslPrint("Failed to allocate space for the boot stack.\r\n");
-        OslPrint("The boot process cannot continue.\r\n");
-        return EFI_LOAD_ERROR;
-    }
+            /* As the received module name is already in all caps, we can just append it to the full
+             * path. */
+            snprintf(
+                ModulePath, ModuleNameLength + 16, "\\EFI\\PALLADIUM\\%s", Config.BootDrivers[i]);
 
-    /* Let's try to build the memory descriptors now (we still have some allocations left
-     * to do, but let's guess it's safe to do it now).*/
-    RtDList *MemoryDescriptorListHead = NULL;
-    RtDList MemoryDescriptorStack = {};
-    UINTN MemoryMapSize = 0;
-    EFI_MEMORY_DESCRIPTOR *MemoryMap = NULL;
-    UINTN DescriptorSize = 0;
-    UINT32 DescriptorVersion = 0;
-    if (!OslpCreateMemoryDescriptors(
-            &LoadedPrograms,
-            FrontBufferPhys,
-            FramebufferHeight * FramebufferPitch * 4,
-            &MemoryDescriptorListHead,
-            &MemoryDescriptorStack,
-            &MemoryMapSize,
-            &MemoryMap,
-            &DescriptorSize,
-            &DescriptorVersion)) {
-        return EFI_LOAD_ERROR;
-    }
+            /* And then follow by making it lowercase (to use as the module name we'll pass to the
+             * kernel). */
+            for (size_t j = 0; j < ModuleNameLength; j++) {
+                Config.BootDrivers[i][j] = tolower(Config.BootDrivers[i][j]);
+            }
 
-    /* We can now wrap up by filling the boot block, and creating the page map. */
-    OslpBootBlock *BootBlock = NULL;
-    Status = gBS->AllocatePool(EfiLoaderData, sizeof(OslpBootBlock), (VOID **)&BootBlock);
-    if (Status != EFI_SUCCESS) {
-        OslPrint("Failed to allocate space for the boot block.\r\n");
-        OslPrint("The boot process cannot continue.\r\n");
-        return EFI_LOAD_ERROR;
-    }
+            if (!OslLoadExecutable(&LoadedPrograms, Config.BootDrivers[i], ModulePath)) {
+                Failed = true;
+                break;
+            }
+        }
 
-    /* All important allocations from now on need to update the descriptor list manually! */
-    if (!OslpUpdateMemoryDescriptors(
+        /* Maybe we should just goto instead of doing this flag thingy? */
+        if (Failed) {
+            break;
+        }
+
+        /* Validate that no invalid imports exist. */
+        if (!OslFixupImports(&LoadedPrograms)) {
+            break;
+        }
+
+        /* And wrap up by relocating tthe base address of all modules (from their desired base to
+         * our chosen virtual address). */
+        OslFixupRelocations(&LoadedPrograms);
+
+        /* Create the target/kernel module entry list (this is what the kernel will have access, as
+         * the LoadedPrograms list is internal to us). */
+        RtDList *ModuleListHead = OslCreateKernelModuleList(&LoadedPrograms);
+        if (!ModuleListHead) {
+            break;
+        }
+
+        /* We need to create a small (8KiB) temporary stack (for use during the kernel BSP
+         * initialization, as the current UEFI stack probably won't be mapped in). */
+        void *BootStack = OslAllocatePages(SIZE_8KB, SIZE_4KB);
+        if (!BootStack) {
+            OslPrint("Failed to allocate space for the boot stack.\r\n");
+            OslPrint("The boot process cannot continue.\r\n");
+            break;
+        }
+
+        /* Let's try to build the memory descriptors now (we still have some allocations left
+         * to do, but let's guess it's safe to do it now).*/
+        RtDList *MemoryDescriptorListHead = NULL;
+        RtDList MemoryDescriptorStack = {};
+        UINTN MemoryMapSize = 0;
+        EFI_MEMORY_DESCRIPTOR *MemoryMap = NULL;
+        UINTN DescriptorSize = 0;
+        UINT32 DescriptorVersion = 0;
+        if (!OslpCreateMemoryDescriptors(
+                &LoadedPrograms,
+                FrontBufferPhys,
+                FramebufferHeight * FramebufferPitch * 4,
+                &MemoryDescriptorListHead,
+                &MemoryDescriptorStack,
+                &MemoryMapSize,
+                &MemoryMap,
+                &DescriptorSize,
+                &DescriptorVersion)) {
+            break;
+        }
+
+        /* We can now wrap up by filling the boot block, and creating the page map. */
+        OslpBootBlock *BootBlock = NULL;
+        Status = gBS->AllocatePool(EfiLoaderData, sizeof(OslpBootBlock), (VOID **)&BootBlock);
+        if (Status != EFI_SUCCESS) {
+            OslPrint("Failed to allocate space for the boot block.\r\n");
+            OslPrint("The boot process cannot continue.\r\n");
+            break;
+        }
+
+        /* All important allocations from now on need to update the descriptor list manually! */
+        if (!OslpUpdateMemoryDescriptors(
+                MemoryDescriptorListHead,
+                &MemoryDescriptorStack,
+                PAGE_TYPE_OSLOADER_TEMPORARY,
+                (uint64_t)BootBlock >> EFI_PAGE_SHIFT,
+                (sizeof(OslpBootBlock) + EFI_PAGE_SIZE - 1) >> EFI_PAGE_SHIFT)) {
+            break;
+        }
+
+        memcpy(BootBlock->Basic.Magic, OSLP_BOOT_MAGIC, 4);
+        BootBlock->Basic.LoaderVersion = OSLP_BOOT_VERSION;
+        BootBlock->Basic.MemoryDescriptorListHead = MemoryDescriptorListHead;
+        BootBlock->Basic.BootDriverListHead = ModuleListHead;
+        BootBlock->Acpi.RootPointer = AcpiRootPointer;
+        BootBlock->Acpi.RootTable = AcpiRootTable;
+        BootBlock->Acpi.RootTableSize = AcpiRootTableSize;
+        BootBlock->Acpi.Version = AcpiVersion;
+        BootBlock->Graphics.BackBuffer = BackBufferVirt;
+        BootBlock->Graphics.FrontBuffer = FrontBufferVirt;
+        BootBlock->Graphics.Width = FramebufferWidth;
+        BootBlock->Graphics.Height = FramebufferHeight;
+        BootBlock->Graphics.Pitch = FramebufferPitch;
+        OslpInitializeArchBootData(BootBlock);
+
+        /* All that's left before trying to transfer execution should be building the page map, so
+         * let's leave that to the platform/arch specific function. */
+        void *PageMap = OslpCreatePageMap(
             MemoryDescriptorListHead,
             &MemoryDescriptorStack,
-            PAGE_TYPE_OSLOADER_TEMPORARY,
-            (uint64_t)BootBlock >> EFI_PAGE_SHIFT,
-            (sizeof(OslpBootBlock) + EFI_PAGE_SIZE - 1) >> EFI_PAGE_SHIFT)) {
-        return EFI_LOAD_ERROR;
+            &LoadedPrograms,
+            FramebufferHeight * FramebufferPitch * 4,
+            BackBufferPhys,
+            BackBufferVirt,
+            FrontBufferPhys,
+            FrontBufferVirt);
+        if (!PageMap) {
+            break;
+        }
+
+        OslpTransferExecution(
+            BootBlock,
+            (void *)((char *)BootStack + SIZE_8KB),
+            PageMap,
+            MemoryMapSize,
+            MemoryMap,
+            DescriptorSize,
+            DescriptorVersion);
+    } while (false);
+
+    while (true) {
+        StopProcessor();
     }
-
-    memcpy(BootBlock->Basic.Magic, OSLP_BOOT_MAGIC, 4);
-    BootBlock->Basic.LoaderVersion = OSLP_BOOT_VERSION;
-    BootBlock->Basic.MemoryDescriptorListHead = MemoryDescriptorListHead;
-    BootBlock->Basic.BootDriverListHead = ModuleListHead;
-    BootBlock->Acpi.RootPointer = AcpiRootPointer;
-    BootBlock->Acpi.RootTable = AcpiRootTable;
-    BootBlock->Acpi.RootTableSize = AcpiRootTableSize;
-    BootBlock->Acpi.Version = AcpiVersion;
-    BootBlock->Graphics.BackBuffer = BackBufferVirt;
-    BootBlock->Graphics.FrontBuffer = FrontBufferVirt;
-    BootBlock->Graphics.Width = FramebufferWidth;
-    BootBlock->Graphics.Height = FramebufferHeight;
-    BootBlock->Graphics.Pitch = FramebufferPitch;
-    OslpInitializeArchBootData(BootBlock);
-
-    /* All that's left before trying to transfer execution should be building the page map, so let's
-     * leave that to the platform/arch specific function. */
-    void *PageMap = OslpCreatePageMap(
-        MemoryDescriptorListHead,
-        &MemoryDescriptorStack,
-        &LoadedPrograms,
-        FramebufferHeight * FramebufferPitch * 4,
-        BackBufferPhys,
-        BackBufferVirt,
-        FrontBufferPhys,
-        FrontBufferVirt);
-    if (!PageMap) {
-        return EFI_LOAD_ERROR;
-    }
-
-    OslpTransferExecution(
-        BootBlock,
-        (void *)((char *)BootStack + SIZE_8KB),
-        PageMap,
-        MemoryMapSize,
-        MemoryMap,
-        DescriptorSize,
-        DescriptorVersion);
 }

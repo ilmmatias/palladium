@@ -2,10 +2,10 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <kernel/halp.h>
-#include <kernel/intrin.h>
 #include <kernel/ke.h>
 #include <kernel/mm.h>
 #include <kernel/vid.h>
+#include <os/intrin.h>
 
 RtSList HalpLapicListHead = {};
 

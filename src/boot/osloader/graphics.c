@@ -41,7 +41,7 @@ EFI_STATUS OslpInitializeGraphics(
     UINT32 PreferredWidth = 1024;
     UINT32 PreferredHeight = 768;
     EFI_EDID_ACTIVE_PROTOCOL *EdidActive = NULL;
-    Status = gBS->HandleProtocol(Gop, &gEfiEdidActiveProtocolGuid, (VOID **)EdidActive);
+    Status = gBS->HandleProtocol(Gop, &gEfiEdidActiveProtocolGuid, (VOID **)&EdidActive);
     if (Status == EFI_SUCCESS) {
         PreferredWidth = EdidActive->Edid[0x38] | ((EdidActive->Edid[0x3A] & 0xF0) << 4);
         PreferredHeight = EdidActive->Edid[0x3B] | ((EdidActive->Edid[0x3D] & 0xF0) << 4);

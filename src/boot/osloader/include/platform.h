@@ -6,9 +6,11 @@
 
 #include <memory.h>
 
-#if defined(ARCH_amd64)
-#include <amd64/platform.h>
-#endif /* ARCH_amd64 */
+#if __has_include(ARCH_MAKE_INCLUDE_PATH_WITHOUT_PREFIX(platform.h))
+#include ARCH_MAKE_INCLUDE_PATH_WITHOUT_PREFIX(platform.h)
+#else
+#error "Undefined ARCH for the CRT module!"
+#endif /* __has_include */
 
 #define OSLP_BOOT_MAGIC "OLDR"
 #define OSLP_BOOT_VERSION 0x0000'0000'00000004

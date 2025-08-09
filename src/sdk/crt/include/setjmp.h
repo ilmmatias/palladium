@@ -6,11 +6,11 @@
 
 #include <crt_impl/common.h>
 
-#if defined(ARCH_amd64)
-#include <crt_impl/amd64/setjmp.h>
+#if __has_include(ARCH_MAKE_INCLUDE_PATH(crt_impl, setjmp.h))
+#include ARCH_MAKE_INCLUDE_PATH(crt_impl, setjmp.h)
 #else
 #error "Undefined ARCH for the CRT module!"
-#endif /* ARCH */
+#endif /* __has_include */
 
 #define __STDC_VERSION_SETJMP_H__ 202311L
 

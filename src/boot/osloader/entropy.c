@@ -27,7 +27,7 @@ void OslpInitializeEntropy(void) {
      * 0. */
     uint64_t Seed = 0;
     EFI_RNG_PROTOCOL *Rng = NULL;
-    if (gBS->LocateProtocol(&gEfiRngProtocolGuid, NULL, (VOID **)Rng) == EFI_SUCCESS &&
+    if (gBS->LocateProtocol(&gEfiRngProtocolGuid, NULL, (VOID **)&Rng) == EFI_SUCCESS &&
         Rng->GetRNG(Rng, NULL, 8, (UINT8 *)&Seed) == EFI_SUCCESS) {
         __srand64(Seed);
         return;

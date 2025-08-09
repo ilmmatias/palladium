@@ -45,6 +45,7 @@ function(add_executable target type has_lib)
         --target=${TARGET_${ARCH}}-w64-mingw32
         -DARCH_${ARCH}
         -DARCH_MAKE_INCLUDE_PATH\(PREFIX,SUFFIX\)=<PREFIX/${ARCH}/SUFFIX>
+        -DARCH_MAKE_INCLUDE_PATH_WITHOUT_PREFIX\(SUFFIX\)=<${ARCH}/SUFFIX>
         -fstack-protector-strong
         -mno-stack-arg-probe
         -fexceptions

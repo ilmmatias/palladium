@@ -6,11 +6,11 @@
 
 #include <stdint.h>
 
-#if defined(ARCH_amd64)
-#include <crt_impl/amd64/fenv.h>
+#if __has_include(ARCH_MAKE_INCLUDE_PATH(crt_impl, fenv.h))
+#include ARCH_MAKE_INCLUDE_PATH(crt_impl, fenv.h)
 #else
 #error "Undefined ARCH for the CRT module!"
-#endif /* ARCH */
+#endif /* __has_include */
 
 #define __STDC_VERSION_FENV_H__ 202311L
 

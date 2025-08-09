@@ -55,11 +55,12 @@ EFI_STATUS OslpInitializeRootVolume(void) {
  * PARAMETERS:
  *     Path - Path relative to the root; This needs to be in the UEFI format (using
  *            backslashes/Windows-like).
+ *     Size - Where to store the size of the file.
  *
  * RETURN VALUE:
  *     Either a buffer allocated using gBS->AllocatePool containing all the file data, or NULL.
  *-----------------------------------------------------------------------------------------------*/
-void *OslReadFile(const char *Path) {
+void *OslReadFile(const char *Path, uint64_t *Size) {
     size_t PathSize = strlen(Path);
     CHAR16 Path16[strlen(Path) + 1];
     Path16[PathSize] = 0;
@@ -106,16 +107,16 @@ void *OslReadFile(const char *Path) {
     /* Now we just need to allocate enough space for the destination buffer, and we should be
      * ready to go. */
     void *Buffer = NULL;
-    UINT64 BufferSize = FileInfo->FileSize;
+    *Size = FileInfo->FileSize;
     gBS->FreePool(FileInfo);
 
-    Status = gBS->AllocatePool(EfiLoaderData, BufferSize, &Buffer);
+    Status = gBS->AllocatePool(EfiLoaderData, *Size, &Buffer);
     if (Status != EFI_SUCCESS) {
         Handle->Close(Handle);
         return NULL;
     }
 
-    Status = Handle->Read(Handle, &BufferSize, Buffer);
+    Status = Handle->Read(Handle, Size, Buffer);
     if (Status != EFI_SUCCESS) {
         gBS->FreePool(Buffer);
         Handle->Close(Handle);

@@ -1,10 +1,8 @@
 /* SPDX-FileCopyrightText: (C) 2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#ifndef _KERNEL_DETAIL_AMD64_INTRININLINE_H_
-#define _KERNEL_DETAIL_AMD64_INTRININLINE_H_
-
-#include <stdint.h>
+#ifndef _OS_AMD64_INTRIN_H_
+#define _OS_AMD64_INTRIN_H_
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -102,4 +100,4 @@ static inline void WritePortDWord(uint16_t Port, uint32_t Data) {
     __asm__ volatile("outl %0, %1" : : "a"(Data), "Nd"(Port) : "memory");
 }
 
-#endif /* _KERNEL_DETAIL_AMD64_INTRININLINE_H_ */
+#endif /* _OS_AMD64_INTRIN_H_ */
