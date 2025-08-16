@@ -20,6 +20,13 @@ extern "C" {
 void VidpInitialize(KiLoaderBlock *LoaderBlock);
 void VidpAcquireOwnership(void);
 
+KeIrql VidpAcquireSpinLock(void);
+void VidpReleaseSpinLock(KeIrql OldIrql);
+
+void VidpFlush(void);
+void VidpPutChar(char Character);
+void VidpPutString(const char *String);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

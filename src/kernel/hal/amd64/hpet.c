@@ -3,9 +3,9 @@
 
 #include <kernel/detail/amd64/hpet.h>
 #include <kernel/halp.h>
+#include <kernel/kd.h>
 #include <kernel/ke.h>
 #include <kernel/mm.h>
-#include <kernel/vid.h>
 
 extern bool HalpTimerInitialized;
 extern bool HalpTscActive;
@@ -132,9 +132,8 @@ void HalpInitializeHpet(void) {
     /* The TSC calibration wants a good/precise timer if it can't use CPUID, so set us up as the
      * active timer for now. */
     HalpSetActiveTimer(Frequency, HalpGetHpetTicks);
-    VidPrint(
-        VID_MESSAGE_DEBUG,
-        "Kernel HAL",
+    KdPrint(
+        KD_TYPE_TRACE,
         "found a %d-bits HPET (frequency = %llu.%02llu MHz)\n",
         Width,
         Frequency / 1000000,

@@ -3,7 +3,7 @@
 
 #include <kernel/evp.h>
 #include <kernel/halp.h>
-#include <kernel/vid.h>
+#include <kernel/kd.h>
 #include <os/intrin.h>
 
 bool HalpTscActive = false;
@@ -58,9 +58,8 @@ void HalpInitializeTimer(void) {
     /* Print the frequency in MHz (we'd expect the performance counter to have at least a 1MHz
      * frequency; If it's less than that, it will still hopefully show up the fractional part
      * though). */
-    VidPrint(
-        VID_MESSAGE_INFO,
-        "Kernel HAL",
+    KdPrint(
+        KD_TYPE_DEBUG,
         "using %s as the timer source (frequency = %llu.%02llu MHz)\n",
         Source,
         ActiveFrequency / 1000000,

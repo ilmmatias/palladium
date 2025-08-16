@@ -75,10 +75,10 @@ static KeSpinLock Lock = {0};
     VidpAcquireOwnership();
     VidSetColor(VID_COLOR_PANIC);
     VidResetDisplay();
-    VidPrintSimple("*** STOP: %s\n", Messages[Message]);
+    VidPrint("*** STOP: %s\n", Messages[Message]);
 
     /* Dump all available parameters. */
-    VidPrintSimple(
+    VidPrint(
         "*** PARAMETERS: %016llx, %016llx, %016llx, %016llx\n",
         Parameter1,
         Parameter2,
@@ -94,7 +94,7 @@ static KeSpinLock Lock = {0};
         int CapturedFrames = RtCaptureStackTrace(Frames, 32, 1);
 
         if (CapturedFrames) {
-            VidPrintSimple("*** STACK TRACE:\n");
+            VidPrint("*** STACK TRACE:\n");
 
             for (int Frame = 0; Frame < CapturedFrames; Frame++) {
                 KiDumpSymbol(Frames[Frame]);
@@ -106,7 +106,7 @@ static KeSpinLock Lock = {0};
         /* Maybe we should add some output flag/signal to RtCaptureStackTrace so we know when
          * there is probably more frames avaliable? For now, this should be enough though. */
         if (CapturedFrames >= 32) {
-            VidPrintSimple("(more frames may follow...)\n");
+            VidPrint("(more frames may follow...)\n");
         }
     } else {
         VidPutString("*** STACK TRACE NOT AVAILABLE\n");

@@ -106,7 +106,7 @@ void KiDumpSymbol(void *Address) {
     }
 
     if (ListHeader == &KiModuleListHead) {
-        VidPrintSimple("0x%016llx - ??\n", Offset);
+        VidPrint("0x%016llx - ??\n", Offset);
         return;
     }
 
@@ -122,7 +122,7 @@ void KiDumpSymbol(void *Address) {
     CoffSymbol *Closest = NULL;
     uint64_t ClosestAddress = 0;
     if (!Header->PointerToSymbolTable) {
-        VidPrintSimple(
+        VidPrint(
             "0x%016llx - %s+%#llx\n",
             Offset,
             Image->ImageName,
@@ -151,7 +151,7 @@ void KiDumpSymbol(void *Address) {
         Symbol += Symbol->NumberOfAuxSymbols + 1;
     }
 
-    VidPrintSimple("0x%016llx - %s!", Offset, Image->ImageName);
+    VidPrint("0x%016llx - %s!", Offset, Image->ImageName);
 
     if (!Closest->Name[0] && !Closest->Name[1] && !Closest->Name[2] && !Closest->Name[3]) {
         VidPutString(Strings + *((uint32_t *)Closest + 1));
@@ -161,5 +161,5 @@ void KiDumpSymbol(void *Address) {
         }
     }
 
-    VidPrintSimple("+%#llx\n", Offset - ClosestAddress);
+    VidPrint("+%#llx\n", Offset - ClosestAddress);
 }

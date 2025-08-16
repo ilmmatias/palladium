@@ -13,7 +13,15 @@
 #endif /* __has__include */
 /* clang-format on */
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 void EvpWakeSingleThread(EvHeader *Header);
 void EvpWakeAllThreads(EvHeader *Header);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif /* _KERNEL_DETAIL_EVPFUNCS_H_ */

@@ -35,6 +35,8 @@ add_executable(kernel "kernel" YES
 
     hal/timer.c
 
+    kd/print.c
+
     ke/affinity.c
     ke/driver.c
     ke/entry.c

@@ -12,6 +12,10 @@
 #endif /* __has__include */
 /* clang-format on */
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 EvSignal *EvCreateSignal(void);
 void EvSetSignal(EvSignal *Signal);
 void EvClearSignal(EvSignal *Signal);
@@ -22,5 +26,9 @@ bool EvAcquireMutex(EvMutex *Mutex, uint64_t Timeout);
 void EvReleaseMutex(EvMutex *Mutex);
 
 bool EvWaitForObject(void *Object, uint64_t Timeout);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif /* _KERNEL_DETAIL_EVFUNCS_H_ */

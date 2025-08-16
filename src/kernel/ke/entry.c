@@ -6,6 +6,7 @@
 #include <kernel/mi.h>
 #include <kernel/psp.h>
 #include <kernel/vidp.h>
+#include <kernel/kdp.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -28,16 +29,14 @@ static void InitializeBootProcessor(KiLoaderBlock *LoaderBlock) {
     /* Announce we're officially online (the HAL probably already printed some stuff, but this is
      * the first point where attached debuggers will receive messages as well). */
 #ifdef NDEBUG
-    VidPrint(
-        VID_MESSAGE_INFO,
-        "Kernel",
+    KdPrint(
+        KD_TYPE_INFO,
         "palladium kernel for %s, git commit %s, release build\n",
         KE_ARCH,
         KE_GIT_HASH);
 #else
-    VidPrint(
-        VID_MESSAGE_INFO,
-        "Kernel",
+    KdPrint(
+        KD_TYPE_INFO,
         "palladium kernel for %s, git commit %s, debug build\n",
         KE_ARCH,
         KE_GIT_HASH);
@@ -45,9 +44,8 @@ static void InitializeBootProcessor(KiLoaderBlock *LoaderBlock) {
 
     /* We only support clang for now, but maybe we should add GCC support + extend this code to
      * handle it in the future? */
-    VidPrint(
-        VID_MESSAGE_INFO,
-        "Kernel",
+    KdPrint(
+        KD_TYPE_INFO,
         "built on %s using Clang %d.%d.%d\n",
         __DATE__,
         __clang_major__,
@@ -57,10 +55,9 @@ static void InitializeBootProcessor(KiLoaderBlock *LoaderBlock) {
     /* Get the memory manager fully online (MmAllocate* functions are available after this). */
     MiInitializePool();
     MiInitializePageAllocator();
-    VidPrint(
-        VID_MESSAGE_INFO,
-        "Kernel",
-        "booting with %llu MiB of memory\n",
+    KdPrint(
+        KD_TYPE_INFO,
+        "managing %llu MiB of memory\n",
         MiTotalSystemPages * MM_PAGE_SIZE / 1048576);
 
     /* The loader data will become inaccessible once we release/unmap all the remaining OSLOADER
@@ -73,9 +70,9 @@ static void InitializeBootProcessor(KiLoaderBlock *LoaderBlock) {
      * secondary processors). */
     HalpInitializeBootProcessor();
     if (HalpOnlineProcessorCount == 1) {
-        VidPrint(VID_MESSAGE_INFO, "Kernel", "1 processor online\n");
+        KdPrint(KD_TYPE_INFO, "1 processor online\n");
     } else {
-        VidPrint(VID_MESSAGE_INFO, "Kernel", "%u processors online\n", HalpOnlineProcessorCount);
+        KdPrint(KD_TYPE_INFO, "%u processors online\n", HalpOnlineProcessorCount);
     }
 
     /* At last, get the scheduler up so that we can get out of the system/boot stack, and into the

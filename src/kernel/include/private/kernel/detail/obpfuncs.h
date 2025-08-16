@@ -12,11 +12,19 @@
 #endif /* __has__include */
 /* clang-format on */
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 extern ObType ObpDirectoryType;
 extern ObType ObpMutexType;
 extern ObType ObpSignalType;
 extern ObType ObpThreadType;
 
 void ObpInitializeRootDirectory(void);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif /* _KERNEL_DETAIL_OBPFUNCS_H_ */

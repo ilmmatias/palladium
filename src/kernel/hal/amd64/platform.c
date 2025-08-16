@@ -3,8 +3,8 @@
 
 #include <cpuid.h>
 #include <kernel/halp.h>
+#include <kernel/kd.h>
 #include <kernel/ke.h>
-#include <kernel/vid.h>
 #include <os/intrin.h>
 #include <string.h>
 
@@ -60,17 +60,8 @@ static void CollectManufacturer(void) {
         strcpy(HalpPlatformProcessorBrandString, "(unavailable)");
     }
 
-    VidPrint(
-        VID_MESSAGE_DEBUG,
-        "Kernel HAL",
-        "cpu manufacturer string: %.12s\n",
-        HalpPlatformManufacturerString);
-
-    VidPrint(
-        VID_MESSAGE_DEBUG,
-        "Kernel HAL",
-        "cpu branding string: %.48s\n",
-        HalpPlatformProcessorBrandString);
+    KdPrint(KD_TYPE_TRACE, "cpu manufacturer string: %.12s\n", HalpPlatformManufacturerString);
+    KdPrint(KD_TYPE_TRACE, "cpu branding string: %.48s\n", HalpPlatformProcessorBrandString);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -151,7 +142,7 @@ static void CollectFeatures(void) {
         CHECK_FEATURE(HALP_FEATURE_INVTSC, Edx, 8);
     }
 
-    VidPrint(VID_MESSAGE_DEBUG, "Kernel HAL", "cpu feature mask: %016llx\n", HalpPlatformFeatures);
+    KdPrint(KD_TYPE_TRACE, "cpu feature mask: %016llx\n", HalpPlatformFeatures);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -195,7 +186,7 @@ void HalpInitializeBootStack(KiLoaderBlock *LoaderBlock) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void HalpInitializePlatform(KiLoaderBlock *LoaderBlock) {
-    VidPrint(VID_MESSAGE_INFO, "Kernel HAL", "initializing platform\n");
+    KdPrint(KD_TYPE_DEBUG, "initializing platform\n");
 
     /* We're already safe to setup the stack base/limit (as we know for sure we're inside the
      * system stack). */

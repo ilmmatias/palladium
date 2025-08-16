@@ -8,9 +8,9 @@
 
 extern const VidpFontData VidpFont;
 
-static bool PendingFullFlush = false;
-static uint16_t FlushY = 0;
-static uint16_t FlushLines = 0;
+bool VidpPendingFullFlush = false;
+uint16_t VidpFlushY = 0;
+uint16_t VidpFlushLines = 0;
 
 char *VidpBackBuffer = NULL;
 char *VidpFrontBuffer = NULL;
@@ -36,7 +36,7 @@ bool VidpUseLock = true;
  * RETURN VALUE:
  *     IRQL used for releasing the lock.
  *-----------------------------------------------------------------------------------------------*/
-static KeIrql AcquireSpinLock(void) {
+KeIrql VidpAcquireSpinLock(void) {
     if (VidpUseLock) {
         return KeAcquireSpinLockAndRaiseIrql(&VidpLock, KE_IRQL_DISPATCH);
     } else {
@@ -54,7 +54,7 @@ static KeIrql AcquireSpinLock(void) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-static void ReleaseSpinLock(KeIrql OldIrql) {
+void VidpReleaseSpinLock(KeIrql OldIrql) {
     if (VidpUseLock) {
         KeReleaseSpinLockAndLowerIrql(&VidpLock, OldIrql);
     }
@@ -72,12 +72,12 @@ static void ReleaseSpinLock(KeIrql OldIrql) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-static void Flush(void) {
+void VidpFlush(void) {
     memcpy(
-        VidpBackBuffer + FlushY * VidpPitch,
-        VidpFrontBuffer + FlushY * VidpPitch,
-        FlushLines * VidpPitch);
-    PendingFullFlush = false;
+        VidpBackBuffer + VidpFlushY * VidpPitch,
+        VidpFrontBuffer + VidpFlushY * VidpPitch,
+        VidpFlushLines * VidpPitch);
+    VidpPendingFullFlush = false;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -103,9 +103,9 @@ static void ScrollUp(void) {
         }
     }
 
-    PendingFullFlush = true;
-    FlushY = 0;
-    FlushLines = VidpHeight;
+    VidpPendingFullFlush = true;
+    VidpFlushY = 0;
+    VidpFlushLines = VidpHeight;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -201,7 +201,7 @@ static void DrawCharacter(char Character) {
  *-----------------------------------------------------------------------------------------------*/
 void VidResetDisplay(void) {
     /* While the color/attribute is left untouched, the cursor is always reset to 0;0. */
-    KeIrql OldIrql = AcquireSpinLock();
+    KeIrql OldIrql = VidpAcquireSpinLock();
     VidpCursorX = 0;
     VidpCursorY = 0;
 
@@ -211,10 +211,10 @@ void VidResetDisplay(void) {
         }
     }
 
-    FlushY = 0;
-    FlushLines = VidpHeight;
-    Flush();
-    ReleaseSpinLock(OldIrql);
+    VidpFlushY = 0;
+    VidpFlushLines = VidpHeight;
+    VidpFlush();
+    VidpReleaseSpinLock(OldIrql);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -228,7 +228,7 @@ void VidResetDisplay(void) {
  * RETURN VALUE:
  *     None.
  *------------------------------------------------------------------------------------------------*/
-static void PutChar(char Character) {
+void VidpPutChar(char Character) {
     /* It's probably safe to use the size of 4 spaces? */
     const int TabSize = VidpFont.GlyphInfo[0x20].Width * 4;
 
@@ -263,29 +263,9 @@ static void PutChar(char Character) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-static void PutString(const char *String) {
+void VidpPutString(const char *String) {
     while (*String) {
-        PutChar(*(String++));
-    }
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     Wrapper around VidPutChar for __vprint.
- *
- * PARAMETERS:
- *     Buffer - What we need to display.
- *     Size - Size of that data; The data is not required to be NULL terminated, so this need to be
- *            taken into account!
- *     Context - Always NULL for us.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-static void PutBuffer(const void *buffer, int size, void *context) {
-    (void)context;
-    for (int i = 0; i < size; i++) {
-        PutChar(((const char *)buffer)[i]);
+        VidpPutChar(*(String++));
     }
 }
 
@@ -300,17 +280,17 @@ static void PutBuffer(const void *buffer, int size, void *context) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void VidPutChar(char Character) {
-    KeIrql OldIrql = AcquireSpinLock();
+    KeIrql OldIrql = VidpAcquireSpinLock();
 
-    FlushY = VidpCursorY;
-    PutChar(Character);
+    VidpFlushY = VidpCursorY;
+    VidpPutChar(Character);
 
-    if (!PendingFullFlush) {
-        FlushLines = VidpCursorY - FlushY + VidpFont.Height;
+    if (!VidpPendingFullFlush) {
+        VidpFlushLines = VidpCursorY - VidpFlushY + VidpFont.Height;
     }
 
-    Flush();
-    ReleaseSpinLock(OldIrql);
+    VidpFlush();
+    VidpReleaseSpinLock(OldIrql);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -324,24 +304,24 @@ void VidPutChar(char Character) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void VidPutString(const char *String) {
-    KeIrql OldIrql = AcquireSpinLock();
+    KeIrql OldIrql = VidpAcquireSpinLock();
 
-    FlushY = VidpCursorY;
-    PutString(String);
+    VidpFlushY = VidpCursorY;
+    VidpPutString(String);
 
-    if (!PendingFullFlush) {
-        FlushLines = VidpCursorY - FlushY + VidpFont.Height;
+    if (!VidpPendingFullFlush) {
+        VidpFlushLines = VidpCursorY - VidpFlushY + VidpFont.Height;
     }
 
-    Flush();
-    ReleaseSpinLock(OldIrql);
+    VidpFlush();
+    VidpReleaseSpinLock(OldIrql);
 }
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function outputs a non-prefixed message into the screen (we're the kernel equivalent
- *     of vprintf); For most cases, you probably want VidPrintSimple instead of this, but you can
- *     use this to "rename" the VidPrintSimple function, if your driver needs/wants that.
+ *     This function outputs a message into the screen (we're the kernel equivalent of vprintf).
+ *     For most cases, you probably want VidPrint instead of this, but you can use this to
+ *     "rename" the VidPrint function, if your driver needs/wants that.
  *
  * PARAMETERS
  *     Message - Format string; Works the same as printf().
@@ -350,24 +330,15 @@ void VidPutString(const char *String) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void VidPrintSimpleVariadic(const char *Message, va_list Arguments) {
-    KeIrql OldIrql = AcquireSpinLock();
-
-    FlushY = VidpCursorY;
-    __vprintf(Message, Arguments, NULL, PutBuffer);
-
-    if (!PendingFullFlush) {
-        FlushLines = VidpCursorY - FlushY + VidpFont.Height;
-    }
-
-    Flush();
-    ReleaseSpinLock(OldIrql);
+void VidPrintVariadic(const char *Message, va_list Arguments) {
+    char Buffer[512];
+    vsnprintf(Buffer, sizeof(Buffer), Message, Arguments);
+    VidPutString(Buffer);
 }
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function outputs a non-prefixed message into the screen (we're the kernel equivalent
- *     of printf).
+ *     This function outputs a message into the screen (we're the kernel equivalent of printf).
  *
  * PARAMETERS:
  *     Message - Format string; Works the same as printf().
@@ -376,105 +347,9 @@ void VidPrintSimpleVariadic(const char *Message, va_list Arguments) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void VidPrintSimple(const char *Message, ...) {
+void VidPrint(const char *Message, ...) {
     va_list Arguments;
     va_start(Arguments, Message);
-    VidPrintSimpleVariadic(Message, Arguments);
-    va_end(Arguments);
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function outputs a prefixed message (in the format <Subsystem> <Type>: <Message>) into
- *     the screen; For most cases, you probably want VidPrint instead of this, but you can use this
- *     to "rename" the VidPrint function, if your driver needs/wants that.
- *
- * PARAMETERS:
- *     Type - Type of the message; This is used to set up the prefix and its color.
- *     Prefix - Name of the driver/module (to be attached to the start of the message).
- *     Message - Format string; Works the same as printf().
- *     Arguments - Variadic arguments.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-void VidPrintVariadic(int Type, const char *Prefix, const char *Message, va_list Arguments) {
-    /* Make sure this specific type of message wasn't disabled at compile time. */
-    switch (Type) {
-        case VID_MESSAGE_TRACE:
-            if (!VID_ENABLE_MESSAGE_TRACE) {
-                return;
-            }
-
-            break;
-        case VID_MESSAGE_DEBUG:
-            if (!VID_ENABLE_MESSAGE_DEBUG) {
-                return;
-            }
-
-            break;
-        case VID_MESSAGE_INFO:
-            if (!VID_ENABLE_MESSAGE_INFO) {
-                return;
-            }
-
-            break;
-    }
-
-    KeIrql OldIrql = AcquireSpinLock();
-    uint32_t OriginalForeground = VidpForeground;
-
-    const char *Suffix;
-    switch (Type) {
-        case VID_MESSAGE_ERROR:
-            VidpForeground = 0xFF0000;
-            Suffix = " Error: ";
-            break;
-        case VID_MESSAGE_TRACE:
-            VidpForeground = 0x00FF00;
-            Suffix = " Trace: ";
-            break;
-        case VID_MESSAGE_DEBUG:
-            VidpForeground = 0xFFFF00;
-            Suffix = " Debug: ";
-            break;
-        default:
-            VidpForeground = 0x0000FF;
-            Suffix = " Info: ";
-            break;
-    }
-
-    FlushY = VidpCursorY;
-    PutString(Prefix);
-    PutString(Suffix);
-    VidpForeground = OriginalForeground;
-    __vprintf(Message, Arguments, NULL, PutBuffer);
-
-    if (!PendingFullFlush) {
-        FlushLines = VidpCursorY - FlushY + VidpFont.Height;
-    }
-
-    Flush();
-    ReleaseSpinLock(OldIrql);
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function outputs a prefixed message (in the format <Subsystem> <Type>: <Message>) into
- *     the screen.
- *
- * PARAMETERS:
- *     Type - Type of the message; Depending on how the kernel was built, the message won't show.
- *     Prefix - Name of the driver/module (to be attached to the start of the message).
- *     Message - Format string; Works the same as printf().
- *     ... - Variadic arguments.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-void VidPrint(int Type, const char *Prefix, const char *Message, ...) {
-    va_list Arguments;
-    va_start(Arguments, Message);
-    VidPrintVariadic(Type, Prefix, Message, Arguments);
+    VidPrintVariadic(Message, Arguments);
     va_end(Arguments);
 }

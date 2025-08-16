@@ -2,9 +2,9 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <kernel/halp.h>
+#include <kernel/kd.h>
 #include <kernel/ke.h>
 #include <kernel/mm.h>
-#include <kernel/vid.h>
 
 static RtSList IoapicListHead = {};
 static RtSList IoapicOverrideListHead = {};
@@ -100,9 +100,8 @@ void HalpInitializeIoapic(void) {
                 }
 
                 RtPushSList(&IoapicListHead, &Entry->ListHeader);
-                VidPrint(
-                    VID_MESSAGE_DEBUG,
-                    "Kernel HAL",
+                KdPrint(
+                    KD_TYPE_TRACE,
                     "found IOAPIC %hhu (GSI base %u, size %u)\n",
                     Entry->Id,
                     Entry->GsiBase,
@@ -130,9 +129,8 @@ void HalpInitializeIoapic(void) {
                 Entry->PinPolarity = (Record->IoapicSourceOverride.Flags & 2) != 0;
                 Entry->TriggerMode = (Record->IoapicSourceOverride.Flags & 8) != 0;
                 RtPushSList(&IoapicOverrideListHead, &Entry->ListHeader);
-                VidPrint(
-                    VID_MESSAGE_DEBUG,
-                    "Kernel HAL",
+                KdPrint(
+                    KD_TYPE_TRACE,
                     "added IOAPIC redir (IRQ %hhu, GSI %hhu) to the list\n",
                     Entry->Irq,
                     Entry->Gsi);

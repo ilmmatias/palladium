@@ -26,11 +26,8 @@ void VidGetCursor(uint16_t *X, uint16_t *Y);
 
 void VidPutChar(char Character);
 void VidPutString(const char *String);
-void VidPrintSimpleVariadic(const char *Message, va_list Arguments);
-__attribute__((format(printf, 1, 2))) void VidPrintSimple(const char *Message, ...);
-void VidPrintVariadic(int Type, const char *Prefix, const char *Message, va_list Arguments);
-__attribute__((format(printf, 3, 4))) void
-VidPrint(int Type, const char *Prefix, const char *Message, ...);
+void VidPrintVariadic(const char *Message, va_list Arguments);
+__attribute__((format(printf, 1, 2))) void VidPrint(const char *Message, ...);
 
 #ifdef __cplusplus
 }

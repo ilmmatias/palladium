@@ -2,9 +2,9 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <kernel/halp.h>
+#include <kernel/kd.h>
 #include <kernel/ke.h>
 #include <kernel/mm.h>
-#include <kernel/vid.h>
 #include <os/intrin.h>
 
 RtSList HalpLapicListHead = {};
@@ -138,12 +138,8 @@ void HalpCollectApics(void) {
                 Entry->AcpiId = Record->Lapic.AcpiId;
                 Entry->IsX2Apic = false;
                 RtPushSList(&HalpLapicListHead, &Entry->ListHeader);
-                VidPrint(
-                    VID_MESSAGE_DEBUG,
-                    "Kernel HAL",
-                    "found LAPIC %u (ACPI ID %u)\n",
-                    Entry->ApicId,
-                    Entry->AcpiId);
+                KdPrint(
+                    KD_TYPE_TRACE, "found LAPIC %u (ACPI ID %u)\n", Entry->ApicId, Entry->AcpiId);
 
                 HalpProcessorCount++;
                 break;
@@ -170,12 +166,8 @@ void HalpCollectApics(void) {
                 Entry->AcpiId = Record->X2Apic.AcpiId;
                 Entry->IsX2Apic = true;
                 RtPushSList(&HalpLapicListHead, &Entry->ListHeader);
-                VidPrint(
-                    VID_MESSAGE_DEBUG,
-                    "Kernel HAL",
-                    "found x2APIC %u (ACPI ID %u)\n",
-                    Entry->ApicId,
-                    Entry->AcpiId);
+                KdPrint(
+                    KD_TYPE_TRACE, "found x2APIC %u (ACPI ID %u)\n", Entry->ApicId, Entry->AcpiId);
 
                 HalpProcessorCount++;
                 break;
@@ -212,9 +204,9 @@ void HalpInitializeApic(void) {
         /* x2APIC uses MSRs instead of the LAPIC address, so Read/WriteRegister needs to know if we
            enabled it. */
         X2ApicEnabled = true;
-        VidPrint(VID_MESSAGE_INFO, "Kernel HAL", "using x2APIC mode\n");
+        KdPrint(KD_TYPE_DEBUG, "using x2APIC mode\n");
     } else {
-        VidPrint(VID_MESSAGE_INFO, "Kernel HAL", "using xAPIC mode\n");
+        KdPrint(KD_TYPE_DEBUG, "using xAPIC mode\n");
     }
 
     /* We should be able to just use the physical address contained in the MSR (in case x2APIC is

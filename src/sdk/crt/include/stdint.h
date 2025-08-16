@@ -55,33 +55,33 @@
 #define SIG_ATOMIC_WIDTH __SIG_ATOMIC_WIDTH__
 #define SIZE_WIDTH __SIZE_WIDTH__
 #define WCHAR_WIDTH __WCHAR_WIDTH__
-#define WINT_WIDTH __WINT_WIDTH____
+#define WINT_WIDTH __WINT_WIDTH__
 
-/* Minimal values of exact-width signed integer types. */
+/* Minimum values of exact-width signed integer types. */
 #define INT8_MIN (-__INT8_MAX__ - 1)
 #define INT16_MIN (-__INT16_MAX__ - 1)
 #define INT32_MIN (-__INT32_MAX__ - 1)
 #define INT64_MIN (-__INT64_MAX__ - 1)
 
-/* Minimal values of minimum-width signed integer types. */
+/* Minimum values of minimum-width signed integer types. */
 #define INT_LEAST8_MIN (-__INT_LEAST8_MAX__ - 1)
 #define INT_LEAST16_MIN (-__INT_LEAST16_MAX__ - 1)
 #define INT_LEAST32_MIN (-__INT_LEAST32_MAX__ - 1)
 #define INT_LEAST64_MIN (-__INT_LEAST64_MAX__ - 1)
 
-/* Minimal values of fastest minimum-width signed integer types. */
+/* Minimum values of fastest minimum-width signed integer types. */
 #define INT_FAST8_MIN (-__INT_FAST8_MAX__ - 1)
 #define INT_FAST16_MIN (-__INT_FAST16_MAX__ - 1)
 #define INT_FAST32_MIN (-__INT_FAST32_MAX__ - 1)
 #define INT_FAST64_MIN (-__INT_FAST64_MAX__ - 1)
 
-/* Minimal values of integer types capable of holding object pointers. */
+/* Minimum values of integer types capable of holding object pointers. */
 #define INTPTR_MIN (-__INTPTR_MAX__ - 1)
 
-/* Minimal values of greatest-width integer types. */
+/* Minimum values of greatest-width integer types. */
 #define INTMAX_MIN (-__INTMAX_MAX__ - 1)
 
-/* Minimal values of other integer types. */
+/* Minimum values of other integer types. */
 #define PTRDIFF_MIN (-__PTRDIFF_MAX__ - 1)
 #define SIG_ATOMIC_MIN (-__SIG_ATOMIC_MAX__ - 1)
 
@@ -91,7 +91,7 @@
 #define WCHAR_MIN __WCHAR_MIN__
 #else
 #define WCHAR_MIN (-__WCHAR_MAX__ - 1)
-#endif
+#endif /* __WCHAR_UNSIGNED__ */
 
 #ifdef __WINT_UNSIGNED__
 #define WINT_MIN 0
@@ -99,53 +99,53 @@
 #define WINT_MIN __WINT_MIN__
 #else
 #define WINT_MIN (-__WINT_MAX__ - 1)
-#endif
+#endif /* __WINT_UNSIGNED__ */
 
-/* Maximal values of exact-width signed integer types. */
+/* Maximum values of exact-width signed integer types. */
 #define INT8_MAX __INT8_MAX__
 #define INT16_MAX __INT16_MAX__
 #define INT32_MAX __INT32_MAX__
 #define INT64_MAX __INT64_MAX__
 
-/* Maximal values of exact-width unsigned integer types. */
+/* Maximum values of exact-width unsigned integer types. */
 #define UINT8_MAX __UINT8_MAX__
 #define UINT16_MAX __UINT16_MAX__
 #define UINT32_MAX __UINT32_MAX__
 #define UINT64_MAX __UINT64_MAX__
 
-/* Maximal values of minimum-width signed integer types. */
+/* Maximum values of minimum-width signed integer types. */
 #define INT_LEAST8_MAX __INT_LEAST8_MAX__
 #define INT_LEAST16_MAX __INT_LEAST16_MAX__
 #define INT_LEAST32_MAX __INT_LEAST32_MAX__
 #define INT_LEAST64_MAX __INT_LEAST64_MAX__
 
-/* Maximal values of minimum-width unsigned integer types. */
+/* Maximum values of minimum-width unsigned integer types. */
 #define UINT_LEAST8_MAX __UINT_LEAST8_MAX__
 #define UINT_LEAST16_MAX __UINT_LEAST16_MAX__
 #define UINT_LEAST32_MAX __UINT_LEAST32_MAX__
 #define UINT_LEAST64_MAX __UINT_LEAST64_MAX__
 
-/* Maximal values of fastest minimum-width signed integer types. */
+/* Maximum values of fastest minimum-width signed integer types. */
 #define INT_LEAST8_MAX __INT_LEAST8_MAX__
 #define INT_LEAST16_MAX __INT_LEAST16_MAX__
 #define INT_LEAST32_MAX __INT_LEAST32_MAX__
 #define INT_LEAST64_MAX __INT_LEAST64_MAX__
 
-/* Maximal values of fastest minimum-width unsigned integer types. */
+/* Maximum values of fastest minimum-width unsigned integer types. */
 #define UINT_FAST8_MAX __UINT_FAST8_MAX__
 #define UINT_FAST16_MAX __UINT_FAST16_MAX__
 #define UINT_FAST32_MAX __UINT_FAST32_MAX__
 #define UINT_FAST64_MAX __UINT_FAST64_MAX__
 
-/* Maximal values of integer types capable of holding object pointers. */
+/* Maximum values of integer types capable of holding object pointers. */
 #define INTPTR_MAX __INTPTR_MAX__
 #define UINTPTR_MAX __UINTPTR_MAX__
 
-/* Maximal values of greatest-width integer types. */
+/* Maximum values of greatest-width integer types. */
 #define INTMAX_MAX __INTMAX_MAX__
 #define UINTMAX_MAX __UINTMAX_MAX__
 
-/* Maximal values of other integer types. */
+/* Maximum values of other integer types. */
 #define PTRDIFF_MAX __PTRDIFF_MAX__
 #define SIG_ATOMIC_MAX __SIG_ATOMIC_MAX__
 #define WCHAR_MAX __WCHAR_MAX__

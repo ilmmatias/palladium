@@ -1,9 +1,9 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
+#include <kernel/kd.h>
 #include <kernel/ke.h>
 #include <kernel/mi.h>
-#include <kernel/vid.h>
 #include <string.h>
 
 static RtSList FreeList = {};
@@ -142,11 +142,7 @@ void MiAddPoolTracker(size_t Size, const char Tag[4]) {
         MiPoolTrackerHeader *Headers = MiAllocatePoolPages(1);
         if (!Headers) {
             KeReleaseSpinLockAtCurrentIrql(&TagListLock[Hash]);
-            VidPrint(
-                VID_MESSAGE_ERROR,
-                "Kernel Pool",
-                "failed to allocate the pool tracker for \"%4s\"\n",
-                Tag);
+            KdPrint(KD_TYPE_DEBUG, "failed to allocate the pool tracker for \"%4s\"\n", Tag);
             return;
         }
 

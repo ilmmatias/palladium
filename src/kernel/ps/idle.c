@@ -3,9 +3,9 @@
 
 #include <crt_impl/rand.h>
 #include <kernel/halp.h>
+#include <kernel/kd.h>
 #include <kernel/mi.h>
 #include <kernel/psp.h>
-#include <kernel/vid.h>
 
 extern KeAffinity KiIdleProcessors;
 
@@ -111,9 +111,8 @@ static PsThread *TrySteal(KeProcessor *Processor) {
                  * We're idle so this really shouldn't have happened, but whatever, just unlock and
                  * keep on spinning. */
                 KeReleaseSpinLockAndLowerIrql(&Processor->Lock, OldIrql);
-                VidPrint(
-                    VID_MESSAGE_DEBUG,
-                    "Kernel Scheduler",
+                KdPrint(
+                    KD_TYPE_DEBUG,
                     "processor %u got its new thread stolen while idle\n",
                     Processor->Number);
                 continue;

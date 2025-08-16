@@ -4,7 +4,7 @@
 #include <cpuid.h>
 #include <kernel/ev.h>
 #include <kernel/halp.h>
-#include <kernel/vid.h>
+#include <kernel/kd.h>
 #include <os/intrin.h>
 #include <stdint.h>
 
@@ -25,7 +25,7 @@ void HalpInitializeTsc(void) {
     /* Don't bother with TSC if it's not marked as invariant (essentially anything newer than the
      * Intel Core 2 series should support it, but still, it's good to check). */
     if (!(HalpPlatformFeatures & HALP_FEATURE_INVTSC)) {
-        VidPrint(VID_MESSAGE_DEBUG, "Kernel HAL", "invariant TSC is unavailable\n");
+        KdPrint(KD_TYPE_DEBUG, "invariant TSC is unavailable\n");
         return;
     }
 
@@ -34,16 +34,14 @@ void HalpInitializeTsc(void) {
      * processors, so not really that widely supported). */
     do {
         if (HalpPlatformMaxLeaf < HALP_CPUID_TSC_FREQUENCY) {
-            VidPrint(
-                VID_MESSAGE_DEBUG, "Kernel HAL", "cannot acquire the TSC frequency via CPUID\n");
+            KdPrint(KD_TYPE_DEBUG, "cannot acquire the TSC frequency via CPUID\n");
             break;
         }
 
         uint64_t RatioDenom, RatioNum, CoreFreq, Unused;
         __cpuid(HALP_CPUID_TSC_FREQUENCY, RatioDenom, RatioNum, CoreFreq, Unused);
         if (!RatioNum) {
-            VidPrint(
-                VID_MESSAGE_DEBUG, "Kernel HAL", "cannot acquire the TSC frequency via CPUID\n");
+            KdPrint(KD_TYPE_DEBUG, "cannot acquire the TSC frequency via CPUID\n");
             break;
         }
 
@@ -57,8 +55,7 @@ void HalpInitializeTsc(void) {
 
         /* If even that was not good, then just bail out. */
         if (!CoreFreq) {
-            VidPrint(
-                VID_MESSAGE_DEBUG, "Kernel HAL", "cannot acquire the TSC frequency via CPUID\n");
+            KdPrint(KD_TYPE_DEBUG, "cannot acquire the TSC frequency via CPUID\n");
             break;
         }
 
@@ -90,9 +87,8 @@ void HalpInitializeTsc(void) {
     /* Clean up the TSC to start in a clean slate. */
     WriteMsr(HALP_MSR_TSC, 0);
 
-    VidPrint(
-        VID_MESSAGE_DEBUG,
-        "Kernel HAL",
+    KdPrint(
+        KD_TYPE_TRACE,
         "found an invariant TSC (frequency = %llu.%02llu MHz)\n",
         Frequency / 1000000,
         (Frequency % 1000000) / 10000);
