@@ -1,3 +1,5 @@
+// clang-format off
+
 /** @file
   Simple Text Out protocol from the UEFI 2.0 specification.
 

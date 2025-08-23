@@ -1,3 +1,5 @@
+// clang-format off
+
 /** @file
   Processor or Compiler specific defines and types.
 

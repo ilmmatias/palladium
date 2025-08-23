@@ -1,3 +1,5 @@
+// clang-format off
+
 /** @file
   Support for PCI 2.2 standard.
 

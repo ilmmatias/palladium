@@ -1,3 +1,5 @@
+// clang-format off
+
 /** @file
   Include file that supports UEFI.
 

@@ -1,3 +1,5 @@
+// clang-format off
+
 /** @file
   GUIDs used for ACPI entries in the EFI system table
 

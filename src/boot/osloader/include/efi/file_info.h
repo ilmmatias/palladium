@@ -1,3 +1,5 @@
+// clang-format off
+
 /** @file
   Provides a GUID and a data structure that can be used with EFI_FILE_PROTOCOL.SetInfo()
   and EFI_FILE_PROTOCOL.GetInfo() to set or get generic file information.

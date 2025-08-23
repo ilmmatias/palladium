@@ -1,3 +1,5 @@
+// clang-format off
+
 /** @file
   EFI PCI I/O Protocol provides the basic Memory, I/O, PCI configuration,
   and DMA interfaces that a driver uses to access its PCI controller.

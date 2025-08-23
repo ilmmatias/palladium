@@ -1,3 +1,5 @@
+// clang-format off
+
 /** @file
   Graphics Output Protocol from the UEFI 2.0 specification.
 

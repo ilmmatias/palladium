@@ -1,3 +1,5 @@
+// clang-format off
+
 /** @file
   EFI_RNG_PROTOCOL as defined in UEFI 2.4.
   The UEFI Random Number Generator Protocol is used to provide random bits for use

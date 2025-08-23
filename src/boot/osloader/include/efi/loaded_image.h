@@ -1,3 +1,5 @@
+// clang-format off
+
 /** @file
   UEFI 2.0 Loaded image protocol definition.
 

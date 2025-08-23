@@ -1,3 +1,5 @@
+// clang-format off
+
 /** @file
   SimpleFileSystem protocol as defined in the UEFI 2.0 specification.
 

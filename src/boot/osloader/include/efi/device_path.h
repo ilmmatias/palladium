@@ -1,3 +1,5 @@
+// clang-format off
+
 /** @file
   The device path protocol as defined in UEFI 2.0.
 
