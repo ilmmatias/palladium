@@ -35,6 +35,7 @@ add_library(kernel "kernel" SHARED
 
     hal/timer.c
 
+    kd/device.c
     kd/print.c
 
     ke/affinity.c
