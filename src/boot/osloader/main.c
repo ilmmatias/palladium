@@ -117,8 +117,11 @@ EFI_STATUS OslMain(EFI_HANDLE *ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
 
         /* The module name is fixed though (always kernel.exe, as that's what every driver
          * expects). */
-        if (!OslLoadExecutable(&LoadedPrograms, "kernel.exe", ModulePath)) {
+        OslpLoadedProgram *Program = OslLoadExecutable("kernel.exe", ModulePath);
+        if (!Program) {
             break;
+        } else {
+            RtAppendDList(&LoadedPrograms, &Program->ListHeader);
         }
 
         /* The boot drivers do need some extra work for both the full path (just like the kernel)
@@ -147,10 +150,13 @@ EFI_STATUS OslMain(EFI_HANDLE *ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
                 Config.BootDrivers[i][j] = tolower(Config.BootDrivers[i][j]);
             }
 
-            if (!OslLoadExecutable(&LoadedPrograms, Config.BootDrivers[i], ModulePath)) {
+            Program = OslLoadExecutable(Config.BootDrivers[i], ModulePath);
+            if (!Program) {
                 Failed = true;
                 break;
             }
+
+            RtAppendDList(&LoadedPrograms, &Program->ListHeader);
         }
 
         /* Maybe we should just goto instead of doing this flag thingy? */

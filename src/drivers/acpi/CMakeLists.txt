@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 project(os/drivers/acpi)
-add_executable(acpi "knostdlib" YES
+add_library(acpi "knostdlib" SHARED
     ${SOURCES}
 
     acpi.def

@@ -20,9 +20,10 @@
  *     ImagePath - Full path where the executable is.
  *
  * RETURN VALUE:
- *     true on success, false otherwise.
+ *     Either a pointer into an structure containing information about the loaded program, or
+ *     NULL on failure.
  *-----------------------------------------------------------------------------------------------*/
-bool OslLoadExecutable(RtDList *LoadedPrograms, const char *ImageName, const char *ImagePath) {
+OslpLoadedProgram *OslLoadExecutable(const char *ImageName, const char *ImagePath) {
     OslPrint("loading up %s\r\n", ImagePath);
 
     /* Preload the entire file (to prevent multiple small reads). */
@@ -32,7 +33,7 @@ bool OslLoadExecutable(RtDList *LoadedPrograms, const char *ImageName, const cha
         OslPrint("Failed to open a kernel/driver file.\r\n");
         OslPrint("Couldn't find %s on the boot/root volume.\r\n", ImagePath);
         OslPrint("The boot process cannot continue.\r\n");
-        return false;
+        return NULL;
     }
 
     /* The PE data is prefixed with a MZ header and a MS-DOS stub; The offset into the PE data is
@@ -43,12 +44,12 @@ bool OslLoadExecutable(RtDList *LoadedPrograms, const char *ImageName, const cha
     /* Following the information at https://learn.microsoft.com/en-us/windows/win32/debug/pe-format
        for the implementation. */
     if (memcmp(Header->Signature, PE_SIGNATURE, 4) || Header->Machine != PE_MACHINE ||
-        (Header->Characteristics & 0x2000) || Header->Magic != 0x20B || Header->Subsystem != 1 ||
+        !(Header->Characteristics & 0x2000) || Header->Magic != 0x20B || Header->Subsystem != 1 ||
         (Header->DllCharacteristics & 0x160) != 0x160) {
         OslPrint("Failed to load a kernel/driver file.\r\n");
         OslPrint("The file at %s doesn't seem to be a valid for this architecture.\r\n", ImagePath);
         OslPrint("The boot process cannot continue.\r\n");
-        return false;
+        return NULL;
     }
 
     /* Calculate the size (and were to put) the symbol table; Loading up all sections to the proper
@@ -68,7 +69,7 @@ bool OslLoadExecutable(RtDList *LoadedPrograms, const char *ImageName, const cha
         OslPrint("Failed to load a kernel/driver file.\r\n");
         OslPrint("The system ran out of memory while loading %s.\r\n", ImagePath);
         OslPrint("The boot process cannot continue.\r\n");
-        return false;
+        return NULL;
     }
 
     ThisProgram->Name = ImageName;
@@ -80,7 +81,7 @@ bool OslLoadExecutable(RtDList *LoadedPrograms, const char *ImageName, const cha
         OslPrint("Failed to load a kernel/driver file.\r\n");
         OslPrint("The system ran out of memory while loading %s.\r\n", ImagePath);
         OslPrint("The boot process cannot continue.\r\n");
-        return false;
+        return NULL;
     }
 
     ThisProgram->PhysicalAddress =
@@ -89,7 +90,7 @@ bool OslLoadExecutable(RtDList *LoadedPrograms, const char *ImageName, const cha
         OslPrint("Failed to load a kernel/driver file.\r\n");
         OslPrint("The system ran out of memory while loading %s.\r\n", ImagePath);
         OslPrint("The boot process cannot continue.\r\n");
-        return false;
+        return NULL;
     }
 
     ThisProgram->VirtualAddress = OslAllocateVirtualAddress(ImagePages);
@@ -97,7 +98,7 @@ bool OslLoadExecutable(RtDList *LoadedPrograms, const char *ImageName, const cha
         OslPrint("Failed to load a kernel/driver file.\r\n");
         OslPrint("The system ran out of virtual memory while loading %s.\r\n", ImagePath);
         OslPrint("The boot process cannot continue.\r\n");
-        return false;
+        return NULL;
     }
 
     /* Cleanup the page flags array. */
@@ -175,7 +176,7 @@ bool OslLoadExecutable(RtDList *LoadedPrograms, const char *ImageName, const cha
             OslPrint("Failed to load a kernel/driver file.\r\n");
             OslPrint("The system ran out of memory while loading %s.\r\n", ImagePath);
             OslPrint("The boot process cannot continue.\r\n");
-            return false;
+            return NULL;
         }
 
         for (uint32_t i = 0; i < ExportHeader->NumberOfNamePointers; i++) {
@@ -212,8 +213,7 @@ bool OslLoadExecutable(RtDList *LoadedPrograms, const char *ImageName, const cha
 
     /* We should have loaded the whole file, so it's safe to free the buffer. */
     gBS->FreePool(Buffer);
-    RtAppendDList(LoadedPrograms, &ThisProgram->ListHeader);
-    return true;
+    return ThisProgram;
 }
 
 /*-------------------------------------------------------------------------------------------------
