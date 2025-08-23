@@ -6,6 +6,7 @@
 
 #include <kernel/detail/kdfuncs.h>
 #include <kernel/detail/kdptypes.h>
+#include <kernel/detail/kitypes.h>
 
 /* clang-format off */
 #if __has_include(ARCH_MAKE_INCLUDE_PATH(kernel/detail, kdpfuncs.h))
