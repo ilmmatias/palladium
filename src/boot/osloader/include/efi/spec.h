@@ -17,7 +17,10 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 #define _EFI_SPEC_H_
 
 #include <efi/types.h>
+
+/* All these headers depend on just efi/types.h, so they need to be included afterwards. */
 #include <efi/device_path.h>
+#include <efi/pci.h>
 #include <efi/simple_text_in.h>
 #include <efi/simple_text_in_ex.h>
 #include <efi/simple_text_out.h>
@@ -214,6 +217,10 @@ typedef enum {
   EfiUnacceptedMemoryType,
   EfiMaxMemoryType
 } EFI_MEMORY_TYPE;
+
+/* pci_io.h annoyingly enough depends on ALLOCATE_TYPE and MEMORY_TYPE, so, here it sits,
+ * kinda out of place. */
+#include <efi/pci_io.h>
 
 ///
 /// Definition of an EFI memory descriptor.

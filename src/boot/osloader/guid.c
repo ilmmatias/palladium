@@ -28,6 +28,9 @@ EFI_GUID gEfiGraphicsOutputProtocolGuid = EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID;
 EFI_GUID gEfiLoadedImageProtocolGuid = EFI_LOADED_IMAGE_PROTOCOL_GUID;
 EFI_GUID gEfiLoadedImageDevicePathProtocolGuid = EFI_LOADED_IMAGE_DEVICE_PATH_PROTOCOL_GUID;
 
+/* efi/pci_io.h */
+EFI_GUID gEfiPciIoProtocolGuid = EFI_PCI_IO_PROTOCOL_GUID;
+
 /* efi/rng.h */
 EFI_GUID gEfiRngProtocolGuid = EFI_RNG_PROTOCOL_GUID;
 EFI_GUID gEfiRngAlgorithmSp80090Hash256Guid = EFI_RNG_ALGORITHM_SP800_90_HASH_256_GUID;

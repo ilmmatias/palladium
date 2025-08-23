@@ -8,6 +8,7 @@
 #include <stdint.h>
 
 EFI_STATUS OslpInitializeRootVolume(void);
+bool OslFindFile(const char *Path);
 void *OslReadFile(const char *Path, uint64_t *Size);
 
 #endif /* _FILE_H_ */

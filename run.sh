@@ -41,8 +41,30 @@ for driver in $BOOT_DRIVERS; do
     fi
 done
 
+# Copy in any KDNET drivers (these need to be directly extracted from a valid Windows
+# installation).
+for driver in $BOOT_DEBUG_DRIVERS; do
+    if [[ ! -f $BOOT_DEBUG_DRIVER_PREFIX/$driver ]]; then
+        printf "Skipping invalid driver ${driver^^} in \$BOOT_DEBUG_DRIVERS...\n"
+    else
+        mcopy -i $IMAGE_NAME $BOOT_DEBUG_DRIVER_PREFIX/$driver ::/EFI/PALLADIUM/${driver^^}
+    fi
+done
+
 # Build the boot config (append new stuff to this section as needed).
 echo "Kernel=KERNEL.EXE" > boot.cfg
+
+if [[ "${BOOT_DEBUG_ENABLED}" == "true" ]]; then
+    echo "DebugEnabled=true" >> "boot.cfg"
+fi
+
+if [[ -n "${BOOT_DEBUG_ADDRESS}" ]]; then
+    echo "DebugAddress=${BOOT_DEBUG_ADDRESS}" >> "boot.cfg"
+fi
+
+if [[ -n "${BOOT_DEBUG_PORT}" ]]; then
+    echo "DebugPort=${BOOT_DEBUG_PORT}" >> "boot.cfg"
+fi
 
 for driver in "${VALID_BOOT_DRIVERS[@]}"; do
     echo "BootDriver=${driver^^}.SYS" >> boot.cfg

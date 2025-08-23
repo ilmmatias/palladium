@@ -165,6 +165,12 @@ bool OslLoadConfigFile(const char *Path, OslConfig *Config) {
     /* Pre-initialize with some sane data (but very basic and probably insufficient, except for
      * Config->Kernel, which I guess should more than likely stay as KERNEL.EXE for most setups) */
     Config->Kernel = "KERNEL.EXE";
+    Config->DebugEnabled = false;
+    Config->DebugAddress[0] = 10;
+    Config->DebugAddress[1] = 0;
+    Config->DebugAddress[2] = 2;
+    Config->DebugAddress[3] = 15;
+    Config->DebugPort = 50005;
     Config->BootDriverCount = 0;
     Config->BootDrivers = NULL;
 
@@ -260,6 +266,22 @@ bool OslLoadConfigFile(const char *Path, OslConfig *Config) {
          * anyways. */
         if (!strcmp(Name, "KERNEL")) {
             Config->Kernel = Value;
+        } else if (!strcmp(Name, "DEBUGENABLED")) {
+            Config->DebugEnabled = !strcmp(Value, "TRUE");
+        } else if (!strcmp(Name, "DEBUGADDRESS")) {
+            if (sscanf(
+                    Value,
+                    "%hhu.%hhu.%hhu.%hhu",
+                    &Config->DebugAddress[0],
+                    &Config->DebugAddress[1],
+                    &Config->DebugAddress[2],
+                    &Config->DebugAddress[3]) != 4) {
+                OslPrint("Invalid debug address at line %zu in the file %s.\r\n", LineNumber, Path);
+            }
+        } else if (!strcmp(Name, "DEBUGPORT")) {
+            if (sscanf(Value, "%hu", &Config->DebugPort) != 1) {
+                OslPrint("Invalid debug port at line %zu in the file %s.\r\n", LineNumber, Path);
+            }
         } else if (!strcmp(Name, "BOOTDRIVER")) {
             if (Config->BootDriverCount >= Config->BootDriverCapacity &&
                 !ExpandBootDriverCapacity(Config)) {

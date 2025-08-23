@@ -10,6 +10,8 @@
 #include <graphics.h>
 #include <loader.h>
 #include <os/intrin.h>
+#include <os/pe.h>
+#include <pci.h>
 #include <platform.h>
 #include <stdio.h>
 #include <string.h>
@@ -122,6 +124,90 @@ EFI_STATUS OslMain(EFI_HANDLE *ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
             break;
         } else {
             RtAppendDList(&LoadedPrograms, &Program->ListHeader);
+        }
+
+        /* Proceed by loading up the correct KDNET extensibility DLL (we automatically find it by
+         * iterating over the ethernet PCI devices). TODO: Should this section be in a separate file
+         * instead? */
+        UINTN SegmentNumber = 0;
+        UINTN BusNumber = 0;
+        UINTN DeviceNumber = 0;
+        UINTN FunctionNumber = 0;
+        OslpLoadedProgram *KdnetDll = NULL;
+        void *KdnetDllInitializer = NULL;
+        if (Config.DebugEnabled) {
+            EFI_PCI_IO_PROTOCOL **Devices = NULL;
+            UINTN DeviceCount = OslFindPciDevicesByClass(PCI_CLASS_NETWORK, &Devices);
+            if (!DeviceCount) {
+                OslPrint("Failed to load the KDNET module.\r\n");
+                OslPrint("Couldn't find a valid PCI network card.\r\n");
+                OslPrint("The boot process cannot continue.\r\n");
+                break;
+            }
+
+            bool Failed = false;
+            char KdnetDllPath[32];
+            for (UINTN i = 0; i < DeviceCount; i++) {
+                EFI_PCI_IO_PROTOCOL *PciIo = Devices[i];
+                PCI_TYPE00 Header;
+
+                Status = PciIo->Pci.Read(
+                    PciIo, EfiPciIoWidthUint32, 0, sizeof(PCI_TYPE00) / sizeof(uint32_t), &Header);
+                if (Status != EFI_SUCCESS) {
+                    continue;
+                }
+
+                Status = PciIo->GetLocation(
+                    PciIo, &SegmentNumber, &BusNumber, &DeviceNumber, &FunctionNumber);
+                if (Status != EFI_SUCCESS) {
+                    continue;
+                }
+
+                /* VendorId is always 16-bits, so it's guaranteed to take 4 characters at most (we
+                 * can just fix the buffer size, as we know the prefix size as well). */
+                snprintf(KdnetDllPath, 32, "\\EFI\\PALLADIUM\\KD_02_%04X.DLL", Header.Hdr.VendorId);
+                if (!OslFindFile(KdnetDllPath)) {
+                    continue;
+                }
+
+                /* Maybe we should extract the proper module name rather than use kdstub.dll? */
+                KdnetDll = OslLoadExecutable("kdstub.dll", KdnetDllPath);
+                Failed = KdnetDll == NULL;
+                break;
+            }
+
+            if (Failed) {
+                break;
+            }
+
+            /* With DebugEnabled, KDNET needs to be loaded, and as we don't have anything like
+             * KDSTUB (at least not yet), so we just fail if we can't find it. */
+            if (!KdnetDll) {
+                OslPrint("Failed to load the KDNET module.\r\n");
+                OslPrint("Couldn't find a valid PCI network card.\r\n");
+                OslPrint("The boot process cannot continue.\r\n");
+                break;
+            }
+
+            /* KDNET extensibility DLLs are guaranteed to have no imports, and only a single export
+             * (KdInitializeLibrary); If we find any other setup, the module is probably invalid. */
+            uint32_t Offset = *(uint32_t *)((char *)KdnetDll->PhysicalAddress + 0x3C);
+            PeHeader *ExecHeader = (PeHeader *)((char *)KdnetDll->PhysicalAddress + Offset);
+            if (KdnetDll->ExportTableSize != 1 ||
+                strcmp(KdnetDll->ExportTable[0].Name, "KdInitializeLibrary") ||
+                ExecHeader->DataDirectories.ImportTable.Size) {
+                OslPrint("Failed to load the KDNET module.\r\n");
+                OslPrint("The extensibility module %s is not valid.\r\n", KdnetDllPath);
+                OslPrint("The boot process cannot continue.\r\n");
+                break;
+            }
+
+            /* Make sure to mark the entry-point as invalid/not runnable, because it probably
+             * isn't. */
+            KdnetDllInitializer = (void *)KdnetDll->ExportTable[0].Address;
+            KdnetDll->EntryPoint = NULL;
+            RtAppendDList(&LoadedPrograms, &KdnetDll->ListHeader);
+            gBS->FreePool(Devices);
         }
 
         /* The boot drivers do need some extra work for both the full path (just like the kernel)
@@ -242,6 +328,14 @@ EFI_STATUS OslMain(EFI_HANDLE *ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
         BootBlock->Graphics.Width = FramebufferWidth;
         BootBlock->Graphics.Height = FramebufferHeight;
         BootBlock->Graphics.Pitch = FramebufferPitch;
+        BootBlock->Debug.Enabled = Config.DebugEnabled;
+        memcpy(BootBlock->Debug.Address, Config.DebugAddress, 4);
+        BootBlock->Debug.Port = Config.DebugPort;
+        BootBlock->Debug.SegmentNumber = SegmentNumber;
+        BootBlock->Debug.BusNumber = BusNumber;
+        BootBlock->Debug.DeviceNumber = DeviceNumber;
+        BootBlock->Debug.FunctionNumber = FunctionNumber;
+        BootBlock->Debug.Initializer = KdnetDllInitializer;
         OslpInitializeArchBootData(BootBlock);
 
         /* All that's left before trying to transfer execution should be building the page map, so

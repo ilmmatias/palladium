@@ -13,7 +13,7 @@
 #endif /* __has_include */
 
 #define OSLP_BOOT_MAGIC "OLDR"
-#define OSLP_BOOT_VERSION 0x0000'0000'00000004
+#define OSLP_BOOT_VERSION 0x0000'0000'00000005
 
 typedef struct __attribute__((packed)) {
     char Magic[4];
@@ -37,10 +37,22 @@ typedef struct __attribute__((packed)) {
     uint32_t Pitch;
 } OslpBootGraphicsData;
 
-typedef struct {
+typedef struct __attribute__((packed)) {
+    bool Enabled;
+    uint8_t Address[4];
+    uint16_t Port;
+    uint32_t SegmentNumber;
+    uint32_t BusNumber;
+    uint32_t DeviceNumber;
+    uint32_t FunctionNumber;
+    void *Initializer;
+} OslpBootDebugData;
+
+typedef struct __attribute__((packed)) {
     OslpBootBasicData Basic;
     OslpBootAcpiData Acpi;
     OslpBootGraphicsData Graphics;
+    OslpBootDebugData Debug;
     OslpBootArchData Arch;
 } OslpBootBlock;
 

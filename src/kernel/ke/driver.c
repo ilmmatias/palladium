@@ -71,7 +71,9 @@ void KiRunBootStartDrivers(void) {
     RtDList *ListHeader = KiModuleListHead.Next->Next;
     while (ListHeader != &KiModuleListHead) {
         KeModule *Module = CONTAINING_RECORD(ListHeader, KeModule, ListHeader);
-        ((void (*)(void))Module->EntryPoint)();
+        if (Module->EntryPoint) {
+            ((void (*)(void))Module->EntryPoint)();
+        }
         ListHeader = ListHeader->Next;
     }
 }

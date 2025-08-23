@@ -9,6 +9,9 @@
 
 typedef struct {
     char *Kernel;
+    bool DebugEnabled;
+    uint8_t DebugAddress[4];
+    uint16_t DebugPort;
     size_t BootDriverCapacity;
     size_t BootDriverCount;
     char **BootDrivers;

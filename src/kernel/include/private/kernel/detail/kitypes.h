@@ -34,10 +34,22 @@ typedef struct __attribute__((packed)) {
     uint32_t Pitch;
 } KiLoaderGraphicsData;
 
-typedef struct {
+typedef struct __attribute__((packed)) {
+    bool Enabled;
+    uint8_t Address[4];
+    uint16_t Port;
+    uint32_t SegmentNumber;
+    uint32_t BusNumber;
+    uint32_t DeviceNumber;
+    uint32_t FunctionNumber;
+    void *Initializer;
+} KiLoaderDebugData;
+
+typedef struct __attribute__((packed)) {
     KiLoaderBasicData Basic;
     KiLoaderAcpiData Acpi;
     KiLoaderGraphicsData Graphics;
+    KiLoaderDebugData Debug;
     KiLoaderArchData Arch;
 } KiLoaderBlock;
 

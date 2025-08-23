@@ -50,6 +50,40 @@ EFI_STATUS OslpInitializeRootVolume(void) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
+ *     This function checks if the specified file exists.
+ *
+ * PARAMETERS:
+ *     Path - Path relative to the root; This needs to be in the UEFI format (using
+ *            backslashes/Windows-like).
+ *
+ * RETURN VALUE:
+ *     true/false depending on if the file exists or not.
+ *-----------------------------------------------------------------------------------------------*/
+bool OslFindFile(const char *Path) {
+    size_t PathSize = strlen(Path);
+    CHAR16 Path16[strlen(Path) + 1];
+    Path16[PathSize] = 0;
+    for (size_t i = 0; i < PathSize; i++) {
+        Path16[i] = Path[i];
+    }
+
+    EFI_FILE_HANDLE Handle = NULL;
+    EFI_STATUS Status = OslpRootVolume->Open(
+        OslpRootVolume,
+        &Handle,
+        Path16,
+        EFI_FILE_MODE_READ,
+        EFI_FILE_READ_ONLY | EFI_FILE_HIDDEN | EFI_FILE_SYSTEM);
+    if (Status == EFI_SUCCESS) {
+        Handle->Close(Handle);
+        return true;
+    } else {
+        return false;
+    }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
  *     This function opens a file relative to the boot volume root, and reads all its contents.
  *
  * PARAMETERS:
