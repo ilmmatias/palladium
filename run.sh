@@ -104,9 +104,31 @@ QEMU_OVMF_CODE_FLAGS="-drive if=pflash,format=raw,unit=0,file=code.bin,readonly=
 QEMU_OVMF_VARS_FLAGS="-drive if=pflash,format=raw,unit=1,file=vars.bin"
 QEMU_DISK_FLAGS="-cdrom $ISO_NAME"
 QEMU_EXTRA_FLAGS="-no-reboot -no-shutdown"
+
+# Only enable networking if debugging is enabled too.
+# (And also make sure to adjust hostfwd depending on BOOT_DEBUG_PORT!)
+if [[ "${BOOT_DEBUG_ENABLED}" == "true" ]]; then
+    if [[ -n "${BOOT_DEBUG_PORT}" ]]; then
+        QEMU_NETWORK_FLAGS="-netdev user,id=net0,hostfwd=udp::${BOOT_DEBUG_PORT}-:${BOOT_DEBUG_PORT}"
+    else
+        QEMU_NETWORK_FLAGS="-netdev user,id=net0,hostfwd=tcp::50005-:50005"
+    fi
+
+    if [[ -n "${BOOT_DEBUG_DEVICE}" ]]; then
+        QEMU_NETWORK_FLAGS="$QEMU_NETWORK_FLAGS -device ${BOOT_DEBUG_DEVICE},netdev=net0"
+    else
+        QEMU_NETWORK_FLAGS="$QEMU_NETWORK_FLAGS -device e1000,netdev=net0"
+    fi
+
+    QEMU_NETWORK_FLAGS="$QEMU_NETWORK_FLAGS -object filter-dump,id=f0,netdev=net0,file=net0.pcap"
+else
+    QEMU_NETWORK_FLAGS=""
+fi
+
 $QEMU_BINARY \
     $QEMU_BASIC_FLAGS \
     $QEMU_OVMF_CODE_FLAGS $QEMU_OVMF_VARS_FLAGS \
     $QEMU_DISK_FLAGS \
+    $QEMU_NETWORK_FLAGS \
     $QEMU_EXTRA_FLAGS \
     $*
