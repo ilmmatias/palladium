@@ -35,11 +35,16 @@ add_library(kernel "kernel" SHARED
 
     hal/timer.c
 
+    kd/arp.c
     kd/device.c
+    kd/ethernet.c
     kd/export.c
     kd/import.c
     kd/initialize.c
+    kd/ip.c
     kd/print.c
+    kd/protocol.c
+    kd/udp.c
 
     ke/affinity.c
     ke/driver.c

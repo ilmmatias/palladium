@@ -23,6 +23,38 @@ void KdpInitializeDeviceDescriptor(KiLoaderBlock *LoaderBlock);
 void KdpInitializeExports(void);
 void KdpInitializeImports(void);
 
+void KdpParseEthernetFrame(KdpEthernetHeader *EthFrame, uint32_t Length);
+
+uint32_t KdpSendArpPacket(
+    uint16_t Type,
+    uint8_t DestinationEthernetAddress[6],
+    uint8_t DestinationHardwareAddress[6],
+    uint8_t DestinationProtocolAddress[4]);
+void KdpParseArpFrame(KdpArpHeader *ArpFrame, uint32_t Length);
+
+uint16_t KdpCalculateIpChecksum(KdpIpHeader *Header);
+void KdpParseIpFrame(uint8_t SourceHardwareAddress[6], KdpIpHeader *IpFrame, uint32_t Length);
+
+uint32_t KdpSendUdpPacket(
+    uint8_t DestinationHardwareAddress[6],
+    uint8_t DestinationProtocolAddress[4],
+    uint16_t SourcePort,
+    uint16_t DestinationPort,
+    void *Buffer,
+    size_t Size);
+void KdpParseUdpFrame(
+    uint8_t SourceHardwareAddress[6],
+    uint8_t SourceProtocolAddress[4],
+    KdpUdpHeader *UdpFrame,
+    uint32_t Length);
+
+void KdpParseDebugPacket(
+    uint8_t SourceHardwareAddress[6],
+    uint8_t SourceProtocolAddress[4],
+    uint16_t SourcePort,
+    KdpDebugPacket *Packet,
+    uint32_t Length);
+
 uint32_t KdpInitializeController(KdpExtensibilityData *KdNet);
 void KdpShutdownController(void *Adapter);
 void KdpSetHibernateRange(void);

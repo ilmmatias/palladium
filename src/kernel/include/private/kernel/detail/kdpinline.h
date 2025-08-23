@@ -12,4 +12,46 @@
 #endif /* __has__include */
 /* clang-format on */
 
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function swaps the given word from network order into the host integer order
+ *     (or vice-versa).
+ *
+ * PARAMETERS:
+ *     Value - What we should swap.
+ *
+ * RETURN VALUE:
+ *     Swapped value.
+ *-----------------------------------------------------------------------------------------------*/
+static inline uint16_t KdpSwapNetworkOrder16(uint16_t Value) {
+#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+    return Value;
+#elif __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+    return __builtin_bswap16(Value);
+#else
+#error "Undefined byte order for the kernel module"
+#endif
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function swaps the given dword from network order into the host integer order
+ *     (or vice-versa).
+ *
+ * PARAMETERS:
+ *     Value - What we should swap.
+ *
+ * RETURN VALUE:
+ *     Swapped value.
+ *-----------------------------------------------------------------------------------------------*/
+static inline uint32_t KdpSwapNetworkOrder32(uint32_t Value) {
+#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+    return Value;
+#elif __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+    return __builtin_bswap32(Value);
+#else
+#error "Undefined byte order for the kernel module"
+#endif
+}
+
 #endif /* _KERNEL_DETAIL_KDPINLINE_H_ */

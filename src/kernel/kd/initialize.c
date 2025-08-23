@@ -14,10 +14,18 @@ extern uint16_t *KdpDebugErrorString;
 extern uint32_t KdpDebugHardwareId;
 
 bool KdpDebugEnabled = false;
+bool KdpDebugConnected = false;
 void *KdpDebugAdapter = NULL;
 KdpExtensibilityData KdpDebugData = {};
 
 uint8_t KdpDebuggeeHardwareAddress[6] = {0};
+uint8_t KdpDebuggeeProtocolAddress[4] = {0};
+uint16_t KdpDebuggeePort = 0;
+
+uint8_t KdpDebuggerHardwareAddress[6] = {0};
+uint8_t KdpDebuggerProtocolAddress[4] = {0};
+uint16_t KdpDebuggerPort = 0;
+bool KdpDebuggerConnected = false;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -146,5 +154,46 @@ void KdpInitializeDebugger(KiLoaderBlock *LoaderBlock) {
             (uint64_t)KdpDebugHardwareId);
     }
 
-    KdPrint(KD_TYPE_INFO, "debugger enabled\n");
+    /* Now our receive/send packet functions should be online. Wait until the remote debugger
+     * connects to us. */
+    memcpy(KdpDebuggeeProtocolAddress, LoaderBlock->Debug.Address, 4);
+    KdpDebuggeePort = LoaderBlock->Debug.Port;
+
+    KdPrint(
+        KD_TYPE_INFO,
+        "waiting for connection at %hhu.%hhu.%hhu.%hhu:%hu\n",
+        KdpDebuggeeProtocolAddress[0],
+        KdpDebuggeeProtocolAddress[1],
+        KdpDebuggeeProtocolAddress[2],
+        KdpDebuggeeProtocolAddress[3],
+        KdpDebuggeePort);
+
+    while (!KdpDebuggerConnected) {
+        /* Wait for any incoming packet. */
+        uint32_t Handle = 0;
+        void *Packet = NULL;
+        uint32_t Length = 0;
+        uint32_t Status = KdpGetRxPacket(KdpDebugAdapter, &Handle, &Packet, &Length);
+        if (Status) {
+            continue;
+        }
+
+        /* Attempt to parse the ethernet frame (which hopefully contains either an ARP request for
+         * us, or an UDP message requesting the debugger connection). */
+        KdpParseEthernetFrame(Packet, Length);
+
+        /* Return the resources back to the ethernet controller. */
+        KdpReleaseRxPacket(KdpDebugAdapter, Handle);
+    }
+
+    KdPrint(
+        KD_TYPE_INFO,
+        "connected to %hhu.%hhu.%hhu.%hhu:%hu\n",
+        KdpDebuggerProtocolAddress[0],
+        KdpDebuggerProtocolAddress[1],
+        KdpDebuggerProtocolAddress[2],
+        KdpDebuggerProtocolAddress[3],
+        KdpDebuggerPort);
+
+    KdpDebugConnected = true;
 }

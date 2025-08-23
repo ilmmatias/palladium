@@ -243,4 +243,52 @@ typedef uint32_t (*KdpInitializeLibraryFn)(
     char *LoaderOptions,
     KdpDebugDeviceDescriptor *Device);
 
+/* Now comes some ethernet-related types. */
+
+typedef struct __attribute__((packed)) {
+    uint8_t DestinationAddress[6];
+    uint8_t SourceAddress[6];
+    uint16_t Type;
+} KdpEthernetHeader;
+
+typedef struct __attribute__((packed)) {
+    uint16_t HardwareType;
+    uint16_t ProtocolType;
+    uint8_t HardwareAddressLength;
+    uint8_t ProtocolAddressLength;
+    uint16_t Operation;
+    uint8_t SourceHardwareAddress[6];
+    uint8_t SourceProtocolAddress[4];
+    uint8_t DestinationHardwareAddress[6];
+    uint8_t DestinationProtocolAddress[4];
+} KdpArpHeader;
+
+typedef struct __attribute__((packed)) {
+    uint8_t Length : 4;
+    uint8_t Version : 4;
+    uint8_t TypeOfService;
+    uint16_t TotalLength;
+    uint16_t Identifier;
+    uint16_t FragmentOffset : 13;
+    uint16_t Flags : 3;
+    uint8_t TimeToLive;
+    uint8_t Protocol;
+    uint16_t HeaderChecksum;
+    uint8_t SourceAddress[4];
+    uint8_t DestinationAddress[4];
+} KdpIpHeader;
+
+typedef struct __attribute__((packed)) {
+    uint16_t SourcePort;
+    uint16_t DestinationPort;
+    uint16_t Length;
+    uint16_t Checksum;
+} KdpUdpHeader;
+
+/* And finally our custom debugger protocol types (which slot right on top of UDP). */
+
+typedef struct __attribute__((packed)) {
+    uint8_t Type;
+} KdpDebugPacket;
+
 #endif /* _KERNEL_DETAIL_KDPTYPES_H_ */

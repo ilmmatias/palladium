@@ -9,6 +9,8 @@
 
 extern KdpExtensibilityExports KdpDebugExports;
 
+static bool BlockRecursion = false;
+
 KdpExtensibilityImports KdpDebugImports = {};
 uint32_t KdpDebugErrorStatus = 0;
 uint16_t *KdpDebugErrorString = NULL;
@@ -459,10 +461,19 @@ static uint64_t ReadCycleCounter(uint64_t *Frequency) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 static void Printf(char *Format, ...) {
+    /* KdPrint calls the debugger, so make sure to handle recursion properly! */
+    if (BlockRecursion) {
+        return;
+    } else {
+        BlockRecursion = true;
+    }
+
     va_list Arguments;
     va_start(Arguments, Format);
     KdPrintVariadic(KD_TYPE_TRACE, Format, Arguments);
     va_end(Arguments);
+
+    BlockRecursion = false;
 }
 
 /*-------------------------------------------------------------------------------------------------
