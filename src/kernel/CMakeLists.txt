@@ -38,6 +38,7 @@ add_library(kernel "kernel" SHARED
     kd/device.c
     kd/export.c
     kd/import.c
+    kd/initialize.c
     kd/print.c
 
     ke/affinity.c

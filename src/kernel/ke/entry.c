@@ -2,11 +2,11 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <kernel/halp.h>
+#include <kernel/kdp.h>
 #include <kernel/ki.h>
 #include <kernel/mi.h>
 #include <kernel/psp.h>
 #include <kernel/vidp.h>
-#include <kernel/kdp.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -25,6 +25,10 @@ static void InitializeBootProcessor(KiLoaderBlock *LoaderBlock) {
     VidpInitialize(LoaderBlock);
     MiInitializeEarlyPageAllocator(LoaderBlock);
     HalpInitializePlatform(LoaderBlock);
+
+    /* If requested, initialize the debugger as early as possible (should be doable now that the
+     * early HAL stuff is up). */
+    KdpInitializeDebugger(LoaderBlock);
 
     /* Announce we're officially online (the HAL probably already printed some stuff, but this is
      * the first point where attached debuggers will receive messages as well). */
@@ -56,9 +60,7 @@ static void InitializeBootProcessor(KiLoaderBlock *LoaderBlock) {
     MiInitializePool();
     MiInitializePageAllocator();
     KdPrint(
-        KD_TYPE_INFO,
-        "managing %llu MiB of memory\n",
-        MiTotalSystemPages * MM_PAGE_SIZE / 1048576);
+        KD_TYPE_INFO, "managing %llu MiB of memory\n", MiTotalSystemPages * MM_PAGE_SIZE / 1048576);
 
     /* The loader data will become inaccessible once we release/unmap all the remaining OSLOADER
      * regions, so save the required remaining data. After this, the stack trace on KeFatalError
