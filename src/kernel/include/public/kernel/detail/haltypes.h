@@ -23,4 +23,34 @@ typedef struct {
     void *HandlerContext;
 } HalInterrupt;
 
+typedef struct __attribute__((packed)) {
+    uint16_t VendorId;
+    uint16_t DeviceId;
+    uint16_t Command;
+    uint16_t Status;
+    uint8_t RevisionId;
+    uint8_t ProgIf;
+    uint8_t SubClass;
+    uint8_t Class;
+    uint8_t CacheLineSize;
+    uint8_t LatencyTimer;
+    uint8_t HeaderType;
+    uint8_t Bist;
+    union {
+        struct __attribute__((packed)) {
+            uint32_t BarAddress[6];
+            uint32_t CardbusCisPointer;
+            uint16_t SubsystemVendorId;
+            uint16_t SubsystemId;
+            uint32_t ExpansionRomBaseAddress;
+            uint8_t CapabilitiesPointer;
+            uint8_t Reserved[7];
+            uint8_t InterruptLine;
+            uint8_t InterruptPin;
+            uint8_t MinGrant;
+            uint8_t MaxLatency;
+        } Type0;
+    };
+} HalPciHeader;
+
 #endif /* _KERNEL_DETAIL_HALTYPES_H_ */
