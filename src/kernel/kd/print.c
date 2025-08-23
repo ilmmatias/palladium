@@ -85,7 +85,7 @@ void KdPrintVariadic(int Type, const char *Message, va_list Arguments) {
  *     enabled to do so).
  *
  * PARAMETERS:
- *     Type - Which kind of message this is ( his defines the prefix we prepend to the message).
+ *     Type - Which kind of message this is (this defines the prefix we prepend to the message).
  *     Message - Format string; Works the same as printf().
  *     ... - Variadic arguments.
  *

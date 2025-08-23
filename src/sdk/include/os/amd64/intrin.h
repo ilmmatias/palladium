@@ -70,34 +70,34 @@ static inline void StopProcessor(void) {
    and return what we've read from the port, while the out* functions also take the value to be
    written. */
 
-static inline uint8_t ReadPortByte(uint16_t Port) {
+static inline uint8_t ReadPortByte(uintptr_t Port) {
     uint8_t Result;
-    __asm__ volatile("inb %1, %0" : "=a"(Result) : "Nd"(Port) : "memory");
+    __asm__ volatile("inb %1, %0" : "=a"(Result) : "Nd"((uint16_t)Port) : "memory");
     return Result;
 }
 
-static inline uint16_t ReadPortWord(uint16_t Port) {
+static inline uint16_t ReadPortWord(uintptr_t Port) {
     uint16_t Result;
-    __asm__ volatile("inw %1, %0" : "=a"(Result) : "Nd"(Port) : "memory");
+    __asm__ volatile("inw %1, %0" : "=a"(Result) : "Nd"((uint16_t)Port) : "memory");
     return Result;
 }
 
-static inline uint32_t ReadPortDWord(uint16_t Port) {
+static inline uint32_t ReadPortDWord(uintptr_t Port) {
     uint32_t Result;
-    __asm__ volatile("inl %1, %0" : "=a"(Result) : "Nd"(Port) : "memory");
+    __asm__ volatile("inl %1, %0" : "=a"(Result) : "Nd"((uint16_t)Port) : "memory");
     return Result;
 }
 
-static inline void WritePortByte(uint16_t Port, uint8_t Data) {
-    __asm__ volatile("outb %0, %1" : : "a"(Data), "Nd"(Port) : "memory");
+static inline void WritePortByte(uintptr_t Port, uint8_t Data) {
+    __asm__ volatile("outb %0, %1" : : "a"(Data), "Nd"((uint16_t)Port) : "memory");
 }
 
-static inline void WritePortWord(uint16_t Port, uint16_t Data) {
-    __asm__ volatile("outw %0, %1" : : "a"(Data), "Nd"(Port) : "memory");
+static inline void WritePortWord(uintptr_t Port, uint16_t Data) {
+    __asm__ volatile("outw %0, %1" : : "a"(Data), "Nd"((uint16_t)Port) : "memory");
 }
 
-static inline void WritePortDWord(uint16_t Port, uint32_t Data) {
-    __asm__ volatile("outl %0, %1" : : "a"(Data), "Nd"(Port) : "memory");
+static inline void WritePortDWord(uintptr_t Port, uint32_t Data) {
+    __asm__ volatile("outl %0, %1" : : "a"(Data), "Nd"((uint16_t)Port) : "memory");
 }
 
 #endif /* _OS_AMD64_INTRIN_H_ */
