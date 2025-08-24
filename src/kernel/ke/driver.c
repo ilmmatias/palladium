@@ -1,6 +1,7 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
+#include <kernel/kdp.h>
 #include <kernel/ki.h>
 #include <kernel/mi.h>
 #include <kernel/vid.h>
@@ -109,6 +110,7 @@ void KiDumpSymbol(void *Address) {
 
     if (ListHeader == &KiModuleListHead) {
         VidPrint("0x%016llx - ??\n", Offset);
+        KdpPrint(KDP_ANSI_FG_RED "0x%016llx - ??" KDP_ANSI_RESET "\n", Offset);
         return;
     }
 
@@ -126,6 +128,11 @@ void KiDumpSymbol(void *Address) {
     if (!Header->PointerToSymbolTable) {
         VidPrint(
             "0x%016llx - %s+%#llx\n",
+            Offset,
+            Image->ImageName,
+            Offset - (uint64_t)Image->ImageBase);
+        KdpPrint(
+            KDP_ANSI_FG_RED "0x%016llx - %s+%#llx" KDP_ANSI_RESET "\n",
             Offset,
             Image->ImageName,
             Offset - (uint64_t)Image->ImageBase);
@@ -153,15 +160,22 @@ void KiDumpSymbol(void *Address) {
         Symbol += Symbol->NumberOfAuxSymbols + 1;
     }
 
-    VidPrint("0x%016llx - %s!", Offset, Image->ImageName);
-
-    if (!Closest->Name[0] && !Closest->Name[1] && !Closest->Name[2] && !Closest->Name[3]) {
-        VidPutString(Strings + *((uint32_t *)Closest + 1));
+    /* Should we keep this here I wonder; We should have enough stack space for it, but still, maybe
+     * consider doing something else? */
+    char NameBuffer[256];
+    if (!memcmp(Closest->Name, "\0\0\0\0", 4)) {
+        strncpy(NameBuffer, Strings + *((uint32_t *)Closest + 1), sizeof(NameBuffer));
     } else {
-        for (int i = 0; i < 8 && Closest->Name[i]; i++) {
-            VidPutChar(Closest->Name[i]);
-        }
+        strncpy(NameBuffer, Closest->Name, 8);
+        NameBuffer[8] = 0;
     }
 
-    VidPrint("+%#llx\n", Offset - ClosestAddress);
+    VidPrint(
+        "0x%016llx - %s!%s+%#llx\n", Offset, Image->ImageName, NameBuffer, Offset - ClosestAddress);
+    KdpPrint(
+        KDP_ANSI_FG_RED "0x%016llx - %s!%s+%#llx" KDP_ANSI_RESET "\n",
+        Offset,
+        Image->ImageName,
+        NameBuffer,
+        Offset - ClosestAddress);
 }

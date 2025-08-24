@@ -79,19 +79,6 @@ void KdpParseArpFrame(KdpArpHeader *ArpFrame, uint32_t Length) {
         return;
     }
 
-    KdPrint(
-        KD_TYPE_TRACE,
-        "operation = %u, %hhu.%hhu.%hhu.%hhu vs %hhu.%hhu.%hhu.%hhu\n",
-        KdpSwapNetworkOrder16(ArpFrame->Operation),
-        ArpFrame->DestinationProtocolAddress[0],
-        ArpFrame->DestinationProtocolAddress[1],
-        ArpFrame->DestinationProtocolAddress[2],
-        ArpFrame->DestinationProtocolAddress[3],
-        KdpDebuggeeProtocolAddress[0],
-        KdpDebuggeeProtocolAddress[1],
-        KdpDebuggeeProtocolAddress[2],
-        KdpDebuggeeProtocolAddress[3]);
-
     /* We don't maintain any ARP tables ourselves, so we only care about ARP requests asking for our
      * IP. */
     if (KdpSwapNetworkOrder16(ArpFrame->Operation) != 1 ||

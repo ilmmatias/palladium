@@ -29,8 +29,8 @@ static char Buffer[512] = {0};
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function outputs a message into the debugger (echoing it back into the screen if
- *     enabled to do so). You probably want KdPrint instead of this.
+ *     This function outputs a prefixed message into the debugger and the screen (if enabled to do
+ *     so). You probably want KdPrint instead of this.
  *
  * PARAMETERS:
  *     Type - Which kind of message this is (this defines the prefix we prepend to the message).
@@ -63,25 +63,25 @@ void KdPrintVariadic(int Type, const char *Message, va_list Arguments) {
     const char *ColorPrefix = NULL;
     const char *Prefix = NULL;
     if (Type == KD_TYPE_ERROR) {
-        ColorPrefix = "\033[38;5;196m";
+        ColorPrefix = KDP_ANSI_FG_RED;
         Prefix = "* error: ";
         if (KD_ECHO_ENABLED) {
             VidpForeground = 0xFF0000;
         }
     } else if (Type == KD_TYPE_TRACE) {
-        ColorPrefix = "\033[38;5;46m";
+        ColorPrefix = KDP_ANSI_FG_GREEN;
         Prefix = "* trace: ";
         if (KD_ECHO_ENABLED) {
             VidpForeground = 0x00FF00;
         }
     } else if (Type == KD_TYPE_DEBUG) {
-        ColorPrefix = "\033[38;5;226m";
+        ColorPrefix = KDP_ANSI_FG_YELLOW;
         Prefix = "* debug: ";
         if (KD_ECHO_ENABLED) {
             VidpForeground = 0xFFFF00;
         }
     } else {
-        ColorPrefix = "\033[38;5;51m";
+        ColorPrefix = KDP_ANSI_FG_BLUE;
         Prefix = "* info: ";
         if (KD_ECHO_ENABLED) {
             VidpForeground = 0x00FFFF;
@@ -97,8 +97,8 @@ void KdPrintVariadic(int Type, const char *Message, va_list Arguments) {
 
     /* And the main message on gray-white foreground + black background. */
     int Offset = sizeof(KdpDebugPacket);
-    Offset +=
-        snprintf(Buffer + Offset, sizeof(Buffer) - Offset, "%s%s\033[0m", ColorPrefix, Prefix);
+    Offset += snprintf(
+        Buffer + Offset, sizeof(Buffer) - Offset, "%s%s" KDP_ANSI_RESET, ColorPrefix, Prefix);
     int Size = vsnprintf(Buffer + Offset, sizeof(Buffer) - Offset, Message, Arguments);
 
     if (KD_ECHO_ENABLED) {
@@ -131,7 +131,7 @@ void KdPrintVariadic(int Type, const char *Message, va_list Arguments) {
             KdpDebuggeePort,
             KdpDebuggerPort,
             Buffer,
-            Offset + Size + 1);
+            Offset + Size);
     }
 
     KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
@@ -139,8 +139,8 @@ void KdPrintVariadic(int Type, const char *Message, va_list Arguments) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function outputs a message into the debugger (echoing it back into the screen if
- *     enabled to do so).
+ *     This function outputs a prefixed message into the debugger and the screen (if enabled to do
+ *     so).
  *
  * PARAMETERS:
  *     Type - Which kind of message this is (this defines the prefix we prepend to the message).
@@ -154,5 +154,65 @@ void KdPrint(int Type, const char *Message, ...) {
     va_list Arguments;
     va_start(Arguments, Message);
     KdPrintVariadic(Type, Message, Arguments);
+    va_end(Arguments);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function outputs a non-prefixed message only into the debugger (it doesn't echo it to
+ *     the screen, even if echoing is enabled). Unlike KdPrint (which can be used when SMP is on),
+ *     this should only be called after other processors have been frozen (as we don't acquire any
+ *     locks). You probably want KdpPrint instead of this.
+ *
+ * PARAMETERS:
+ *     Message - Format string; Works the same as printf().
+ *     Arguments - Variadic arguments.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void KdpPrintVariadic(const char *Message, va_list Arguments) {
+    /* Don't bother if the debugger isn't connected. */
+    if (!KdpDebugConnected) {
+        return;
+    }
+
+    /* Mount the packet headers in the start of our buffer. */
+    KdpDebugPacket *Packet = (KdpDebugPacket *)Buffer;
+    Packet->Type = KDP_DEBUG_PACKET_PRINT;
+
+    /* And plug in the message using vsnprintf in the remainder of the buffer. */
+    int Size = vsnprintf(
+        (char *)(Packet + 1), sizeof(Buffer) - sizeof(KdpDebugPacket), Message, Arguments);
+
+    /* We now just broadcast the packet to the debugger (and yes, we do ignore any errors we
+     * encounter). */
+    KdpSendUdpPacket(
+        KdpDebuggerHardwareAddress,
+        KdpDebuggerProtocolAddress,
+        KdpDebuggeePort,
+        KdpDebuggerPort,
+        Buffer,
+        sizeof(KdpDebugPacket) + Size);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function outputs a non-prefixed message only into the debugger (it doesn't echo it to
+ *     the screen, even if echoing is enabled). Unlike KdPrint (which can be used when SMP is on),
+ *     this should only be called after other processors have been frozen (as we don't acquire any
+ *     locks).
+ *
+ * PARAMETERS:
+ *     Message - Format string; Works the same as printf().
+ *     ... - Variadic arguments.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void KdpPrint(const char *Message, ...) {
+    va_list Arguments;
+    va_start(Arguments, Message);
+    KdpPrintVariadic(Message, Arguments);
     va_end(Arguments);
 }

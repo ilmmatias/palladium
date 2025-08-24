@@ -55,6 +55,9 @@ void KdpParseDebugPacket(
     KdpDebugPacket *Packet,
     uint32_t Length);
 
+void KdpPrintVariadic(const char *Message, va_list Arguments);
+__attribute__((format(printf, 1, 2))) void KdpPrint(const char *Message, ...);
+
 uint32_t KdpInitializeController(KdpExtensibilityData *KdNet);
 void KdpShutdownController(void *Adapter);
 void KdpSetHibernateRange(void);

@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <kernel/halp.h>
+#include <kernel/kdp.h>
 #include <kernel/ki.h>
 #include <kernel/vidp.h>
 #include <rt/except.h>
@@ -76,10 +77,17 @@ static KeSpinLock Lock = {0};
     VidSetColor(VID_COLOR_PANIC);
     VidResetDisplay();
     VidPrint("*** STOP: %s\n", Messages[Message]);
+    KdpPrint(KDP_ANSI_FG_RED "*** STOP: %s" KDP_ANSI_RESET "\n", Messages[Message]);
 
     /* Dump all available parameters. */
     VidPrint(
         "*** PARAMETERS: %016llx, %016llx, %016llx, %016llx\n",
+        Parameter1,
+        Parameter2,
+        Parameter3,
+        Parameter4);
+    KdpPrint(
+        KDP_ANSI_FG_RED "*** PARAMETERS: %016llx, %016llx, %016llx, %016llx" KDP_ANSI_RESET "\n",
         Parameter1,
         Parameter2,
         Parameter3,
@@ -95,21 +103,25 @@ static KeSpinLock Lock = {0};
 
         if (CapturedFrames) {
             VidPrint("*** STACK TRACE:\n");
+            KdpPrint(KDP_ANSI_FG_RED "*** STACK TRACE:" KDP_ANSI_RESET "\n");
 
             for (int Frame = 0; Frame < CapturedFrames; Frame++) {
                 KiDumpSymbol(Frames[Frame]);
             }
         } else {
             VidPutString("*** STACK TRACE NOT AVAILABLE\n");
+            KdpPrint(KDP_ANSI_FG_RED "*** STACK TRACE NOT AVAILABLE" KDP_ANSI_RESET "\n");
         }
 
         /* Maybe we should add some output flag/signal to RtCaptureStackTrace so we know when
          * there is probably more frames avaliable? For now, this should be enough though. */
         if (CapturedFrames >= 32) {
             VidPrint("(more frames may follow...)\n");
+            KdpPrint(KDP_ANSI_FG_RED "(more frames may follow...)" KDP_ANSI_RESET "\n");
         }
     } else {
         VidPutString("*** STACK TRACE NOT AVAILABLE\n");
+        KdpPrint(KDP_ANSI_FG_RED "*** STACK TRACE NOT AVAILABLE" KDP_ANSI_RESET "\n");
     }
 
     while (true) {

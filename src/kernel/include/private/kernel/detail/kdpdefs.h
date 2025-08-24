@@ -56,4 +56,13 @@
 #define KDP_DEBUG_PACKET_CONNECT_ACK 1
 #define KDP_DEBUG_PACKET_PRINT 2
 
+/* Should this be in here, or somewhere else? */
+
+#define KDP_ANSI_FG_RED "\033[38;5;196m"
+#define KDP_ANSI_FG_GREEN "\033[38;5;46m"
+#define KDP_ANSI_FG_YELLOW "\033[38;5;226m"
+#define KDP_ANSI_FG_BLUE "\033[38;5;51m"
+
+#define KDP_ANSI_RESET "\033[0m"
+
 #endif /* _KERNEL_DETAIL_KDPDEFS_H_ */
