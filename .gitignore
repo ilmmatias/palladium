@@ -1,3 +1,4 @@
 .vscode
 _root
 build.*
+__pycache__

@@ -30,6 +30,8 @@ void HalpInitializeApplicationProcessor(KeProcessor *Processor);
 /* I'm not fully sure, should this be here? Initializing/using the kernel debugging stuff is
  * probably going to need this, so probably? */
 void HalpInitializeEarlyMap(KiLoaderBlock *LoaderBlock);
+void *HalpMapDebuggerMemory(uint64_t PhysicalAddress, size_t Size, int Flags);
+void HalpUnmapDebuggerMemory(void *VirtualAddress, size_t Size);
 void *HalpMapEarlyMemory(uint64_t PhysicalAddress, size_t Size, int Flags);
 void HalpUnmapEarlyMemory(void *VirtualAddress, size_t Size);
 

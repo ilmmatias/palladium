@@ -39,6 +39,7 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     bool Enabled;
+    bool EchoEnabled;
     uint8_t Address[4];
     uint16_t Port;
     uint32_t SegmentNumber;

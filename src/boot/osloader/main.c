@@ -329,6 +329,7 @@ EFI_STATUS OslMain(EFI_HANDLE *ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
         BootBlock->Graphics.Height = FramebufferHeight;
         BootBlock->Graphics.Pitch = FramebufferPitch;
         BootBlock->Debug.Enabled = Config.DebugEnabled;
+        BootBlock->Debug.EchoEnabled = Config.DebugEchoEnabled;
         memcpy(BootBlock->Debug.Address, Config.DebugAddress, 4);
         BootBlock->Debug.Port = Config.DebugPort;
         BootBlock->Debug.SegmentNumber = SegmentNumber;

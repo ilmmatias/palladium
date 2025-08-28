@@ -166,6 +166,7 @@ bool OslLoadConfigFile(const char *Path, OslConfig *Config) {
      * Config->Kernel, which I guess should more than likely stay as KERNEL.EXE for most setups) */
     Config->Kernel = "KERNEL.EXE";
     Config->DebugEnabled = false;
+    Config->DebugEchoEnabled = false;
     Config->DebugAddress[0] = 10;
     Config->DebugAddress[1] = 0;
     Config->DebugAddress[2] = 2;
@@ -268,6 +269,8 @@ bool OslLoadConfigFile(const char *Path, OslConfig *Config) {
             Config->Kernel = Value;
         } else if (!strcmp(Name, "DEBUGENABLED")) {
             Config->DebugEnabled = !strcmp(Value, "TRUE");
+        } else if (!strcmp(Name, "DEBUGECHOENABLED")) {
+            Config->DebugEchoEnabled = !strcmp(Value, "TRUE");
         } else if (!strcmp(Name, "DEBUGADDRESS")) {
             if (sscanf(
                     Value,

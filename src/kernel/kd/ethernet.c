@@ -8,13 +8,14 @@
  *     This function handles a received ethernet packet.
  *
  * PARAMETERS:
+ *     State - Current execution state (initialization or break/panic).
  *     EthFrame - Header of the packet.
  *     Length - Size of the packet.
  *
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void KdpParseEthernetFrame(KdpEthernetHeader *EthFrame, uint32_t Length) {
+void KdpParseEthernetFrame(int State, KdpEthernetHeader *EthFrame, uint32_t Length) {
     if (Length < sizeof(KdpEthernetHeader)) {
         KdPrint(KD_TYPE_TRACE, "ignoring invalid ethernet packet of size %u\n", Length);
         return;
@@ -25,12 +26,16 @@ void KdpParseEthernetFrame(KdpEthernetHeader *EthFrame, uint32_t Length) {
     switch (KdpSwapNetworkOrder16(EthFrame->Type)) {
         case 0x0800:
             KdpParseIpFrame(
+                State,
                 EthFrame->SourceAddress,
                 (void *)(EthFrame + 1),
                 Length - sizeof(KdpEthernetHeader));
             break;
         case 0x0806:
-            KdpParseArpFrame((void *)(EthFrame + 1), Length - sizeof(KdpEthernetHeader));
+            if (State == KDP_STATE_EARLY) {
+                KdpParseArpFrame((void *)(EthFrame + 1), Length - sizeof(KdpEthernetHeader));
+            }
+
             break;
     }
 }

@@ -13,7 +13,7 @@ static KeSpinLock Lock = {0};
 
 static uint64_t EarlyMapBitmapBuffer[((HALP_EARLY_MAP_PAGES + 63) >> 6) << 3] = {};
 static RtBitmap EarlyMapBitmap = {};
-static uint64_t EarlyMapHint = 0;
+static uint64_t EarlyMapHint = 2;
 
 typedef struct {
     bool ReloadCr3;
@@ -480,7 +480,99 @@ void HalpUnmapPages(void *VirtualAddress, uint64_t Size) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void HalpInitializeEarlyMap(KiLoaderBlock *) {
+    /* The first two pages are reseved for mapping physical addresses on the debugger handlers.
+     * We reserve two, as even though the max buffer size is below the page size, it might overflow
+     * into the next page if the physical address is above a certain threshold. */
     RtInitializeBitmap(&EarlyMapBitmap, EarlyMapBitmapBuffer, HALP_EARLY_MAP_PAGES);
+    RtSetBits(&EarlyMapBitmap, 0, 2);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function maps a range of physical addresses into contiguous virtual memory, using the
+ *     reserved debugger mapping virtual region. This should only be called by the debugger read
+ *     memory handlers, as it expects all processors to be frozen (and only the debugger running).
+ *     There is a limit of two pages when mapping, meaning that if mapping N bytes starting at the
+ *     specified physical address offset would need more than two pages, this operation will fail.
+ *     This operation will also fail if HalpMapDebuggerMemory has already been called without a
+ *     matching HalpUnmapDebuggerMemory.
+ *
+ * PARAMETERS:
+ *     PhysicalAddress - Source address, does not need to be aligned to MM_PAGE_SIZE.
+ *     Size - Size in bytes of the region (also doesn't need to be aligned/a multiple of
+ *            MM_PAGE_SIZE).
+ *     Flags - How we want to map the region.
+ *
+ * RETURN VALUE:
+ *     Pointer to the start of the virtual memory range on success, NULL otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+void *HalpMapDebuggerMemory(uint64_t PhysicalAddress, size_t Size, int Flags) {
+    /* The PhysicalEnd calculation breaks on size 0, so, assume size 1 on that case. */
+    if (!Size) {
+        Size = 1;
+    }
+
+    /* Block anything that needs more pages than we have reserved. */
+    uint64_t PhysicalStart = PhysicalAddress & ~(HALP_PT_SIZE - 1);
+    uint64_t PhysicalEnd = (PhysicalAddress + Size + HALP_PT_SIZE - 1) & ~(HALP_PT_SIZE - 1);
+    uint64_t Pages = (PhysicalEnd - PhysicalStart) >> HALP_PT_SHIFT;
+    if (Pages > 2) {
+        return NULL;
+    }
+
+    /* And block too if the pages are already used by someone else. */
+    void *VirtualAddress = (char *)HALP_EARLY_MAP_START;
+    HalpPageFrame *Frame =
+        &HALP_PT_BASE[((uint64_t)VirtualAddress >> HALP_PT_SHIFT) & HALP_PT_MASK];
+    if (Frame[0].Present || Frame[1].Present) {
+        return NULL;
+    }
+
+    for (uint64_t Page = 0; Page < Pages; Page++) {
+        BuildFrame(&Frame[Page], PhysicalStart + (Page << HALP_PT_SHIFT), HALP_PT_LEVEL, Flags);
+    }
+
+    return (char *)VirtualAddress + (PhysicalAddress - PhysicalStart);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function unmaps physical addresses previously mapped by HalpMapDebuggerMemory; Do not
+ *     use this on any other kind of virtual memory!
+ *
+ * PARAMETERS:
+ *     VirtualAddress - Value previously returned by HalpMapDebuggerMemory.
+ *     Size - Size in bytes of the region (also doesn't need to be aligned/a multiple of
+ *            MM_PAGE_SIZE).
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void HalpUnmapDebuggerMemory(void *VirtualAddress, size_t Size) {
+    /* The VirtualEnd calculation breaks on size 0, so, assume size 1 on that case. */
+    if (!Size) {
+        Size = 1;
+    }
+
+    uint64_t VirtualStart = (uint64_t)VirtualAddress & ~(HALP_PT_SIZE - 1);
+    uint64_t VirtualEnd = ((uint64_t)VirtualAddress + Size + HALP_PT_SIZE) & ~(HALP_PT_SIZE - 1);
+    uint64_t Pages = (VirtualEnd - VirtualStart) >> HALP_PT_SHIFT;
+    if (Pages > 2) {
+        return;
+    }
+
+    HalpPageFrame *Frame = &HALP_PT_BASE[(VirtualStart >> HALP_PT_SHIFT) & HALP_PT_MASK];
+    for (uint64_t Page = 0; Page < Pages; Page++) {
+        Frame[Page].Present = 0;
+    }
+
+    /* Everyone should be frozen, so just rely on the other processors doing a CR3 reload once they
+     * unfreeze. */
+    IpiContext Context;
+    Context.ReloadCr3 = Pages >= 32;
+    Context.Start = VirtualStart;
+    Context.End = VirtualEnd;
+    IpiRoutine(&Context);
 }
 
 /*-------------------------------------------------------------------------------------------------

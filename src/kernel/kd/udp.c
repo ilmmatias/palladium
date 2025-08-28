@@ -85,6 +85,7 @@ uint32_t KdpSendUdpPacket(
  *     This function handles a received UDP packet.
  *
  * PARAMETERS:
+ *     State - Current execution state (initialization or break/panic).
  *     SourceHardwareAddress - MAC address of who sent us this packet.
  *     SourceProtocolAddress - IP(v4) address of who sent us this packet.
  *     UdpFrame - Header of the packet.
@@ -94,6 +95,7 @@ uint32_t KdpSendUdpPacket(
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void KdpParseUdpFrame(
+    int State,
     uint8_t SourceHardwareAddress[6],
     uint8_t SourceProtocolAddress[4],
     KdpUdpHeader *UdpFrame,
@@ -110,6 +112,7 @@ void KdpParseUdpFrame(
     }
 
     KdpParseDebugPacket(
+        State,
         SourceHardwareAddress,
         SourceProtocolAddress,
         KdpSwapNetworkOrder16(UdpFrame->SourcePort),

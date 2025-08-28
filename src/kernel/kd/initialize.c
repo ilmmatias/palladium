@@ -14,6 +14,7 @@ extern uint16_t *KdpDebugErrorString;
 extern uint32_t KdpDebugHardwareId;
 
 bool KdpDebugEnabled = false;
+bool KdpDebugEchoEnabled = true;
 bool KdpDebugConnected = false;
 void *KdpDebugAdapter = NULL;
 KdpExtensibilityData KdpDebugData = {};
@@ -60,8 +61,68 @@ static void DumpErrorString(void) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function initializes the kernel debugger (and synchronizes it with a host debugger) if
- *     requested in the configuration file.
+ *     This function enters a loop waiting for any messages coming from the debug ethernet device.
+ *
+ * PARAMETERS:
+ *     State - Current execution state (initialization or break/panic).
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void KdpEnterReceiveLoop(int State) {
+    /* Should KdpInitializeDebugger do this, so is it proper for us to do it? */
+    if (State == KDP_STATE_EARLY) {
+        KdPrint(
+            KD_TYPE_INFO,
+            "waiting for connection at %hhu.%hhu.%hhu.%hhu:%hu\n",
+            KdpDebuggeeProtocolAddress[0],
+            KdpDebuggeeProtocolAddress[1],
+            KdpDebuggeeProtocolAddress[2],
+            KdpDebuggeeProtocolAddress[3],
+            KdpDebuggeePort);
+    }
+
+    while (true) {
+        /* Early initialization has a condition to exit this loop (KdpDebuggerConnected switching to
+         * true), but late/break receive loops just run forever (at least until we allow unbreaking
+         * the execution). */
+        if (State == KDP_STATE_EARLY && KdpDebuggerConnected) {
+            break;
+        }
+
+        /* Wait for any incoming packet. */
+        uint32_t Handle = 0;
+        void *Packet = NULL;
+        uint32_t Length = 0;
+        uint32_t Status = KdpGetRxPacket(KdpDebugAdapter, &Handle, &Packet, &Length);
+        if (Status) {
+            continue;
+        }
+
+        /* Attempt to parse the ethernet frame (which hopefully contains either an ARP request, or a
+         * valid debug packet). */
+        KdpParseEthernetFrame(State, Packet, Length);
+
+        /* Return the resources back to the ethernet controller. */
+        KdpReleaseRxPacket(KdpDebugAdapter, Handle);
+    }
+
+    if (State == KDP_STATE_EARLY) {
+        KdPrint(
+            KD_TYPE_INFO,
+            "connected to %hhu.%hhu.%hhu.%hhu:%hu\n",
+            KdpDebuggerProtocolAddress[0],
+            KdpDebuggerProtocolAddress[1],
+            KdpDebuggerProtocolAddress[2],
+            KdpDebuggerProtocolAddress[3],
+            KdpDebuggerPort);
+    }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function initializes the kernel debugger (and synchronizes it with a host debugger)
+ *if requested in the configuration file.
  *
  * PARAMETERS:
  *     LoaderBlock - Data prepared by the boot loader for us.
@@ -158,42 +219,14 @@ void KdpInitializeDebugger(KiLoaderBlock *LoaderBlock) {
      * connects to us. */
     memcpy(KdpDebuggeeProtocolAddress, LoaderBlock->Debug.Address, 4);
     KdpDebuggeePort = LoaderBlock->Debug.Port;
+    KdpEnterReceiveLoop(KDP_STATE_EARLY);
 
-    KdPrint(
-        KD_TYPE_INFO,
-        "waiting for connection at %hhu.%hhu.%hhu.%hhu:%hu\n",
-        KdpDebuggeeProtocolAddress[0],
-        KdpDebuggeeProtocolAddress[1],
-        KdpDebuggeeProtocolAddress[2],
-        KdpDebuggeeProtocolAddress[3],
-        KdpDebuggeePort);
-
-    while (!KdpDebuggerConnected) {
-        /* Wait for any incoming packet. */
-        uint32_t Handle = 0;
-        void *Packet = NULL;
-        uint32_t Length = 0;
-        uint32_t Status = KdpGetRxPacket(KdpDebugAdapter, &Handle, &Packet, &Length);
-        if (Status) {
-            continue;
-        }
-
-        /* Attempt to parse the ethernet frame (which hopefully contains either an ARP request for
-         * us, or an UDP message requesting the debugger connection). */
-        KdpParseEthernetFrame(Packet, Length);
-
-        /* Return the resources back to the ethernet controller. */
-        KdpReleaseRxPacket(KdpDebugAdapter, Handle);
+    /* From now on, we respect the echo enabled settings (as the debugger is online, and can receive
+     * the messages even if we don't print them out in the display). */
+    if (!LoaderBlock->Debug.EchoEnabled) {
+        KdPrint(KD_TYPE_INFO, "debug echoing disabled\n");
+        KdpDebugEchoEnabled = false;
     }
-
-    KdPrint(
-        KD_TYPE_INFO,
-        "connected to %hhu.%hhu.%hhu.%hhu:%hu\n",
-        KdpDebuggerProtocolAddress[0],
-        KdpDebuggerProtocolAddress[1],
-        KdpDebuggerProtocolAddress[2],
-        KdpDebuggerProtocolAddress[3],
-        KdpDebuggerPort);
 
     KdpDebugConnected = true;
 }

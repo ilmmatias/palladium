@@ -23,7 +23,11 @@ void KdpInitializeDeviceDescriptor(KiLoaderBlock *LoaderBlock);
 void KdpInitializeExports(void);
 void KdpInitializeImports(void);
 
-void KdpParseEthernetFrame(KdpEthernetHeader *EthFrame, uint32_t Length);
+void KdpAcquireOwnership(void);
+void KdpReleaseOwnership(void);
+void KdpEnterReceiveLoop(int State);
+
+void KdpParseEthernetFrame(int State, KdpEthernetHeader *EthFrame, uint32_t Length);
 
 uint32_t KdpSendArpPacket(
     uint16_t Type,
@@ -33,7 +37,11 @@ uint32_t KdpSendArpPacket(
 void KdpParseArpFrame(KdpArpHeader *ArpFrame, uint32_t Length);
 
 uint16_t KdpCalculateIpChecksum(KdpIpHeader *Header);
-void KdpParseIpFrame(uint8_t SourceHardwareAddress[6], KdpIpHeader *IpFrame, uint32_t Length);
+void KdpParseIpFrame(
+    int State,
+    uint8_t SourceHardwareAddress[6],
+    KdpIpHeader *IpFrame,
+    uint32_t Length);
 
 uint32_t KdpSendUdpPacket(
     uint8_t DestinationHardwareAddress[6],
@@ -43,20 +51,19 @@ uint32_t KdpSendUdpPacket(
     void *Buffer,
     size_t Size);
 void KdpParseUdpFrame(
+    int State,
     uint8_t SourceHardwareAddress[6],
     uint8_t SourceProtocolAddress[4],
     KdpUdpHeader *UdpFrame,
     uint32_t Length);
 
 void KdpParseDebugPacket(
+    int State,
     uint8_t SourceHardwareAddress[6],
     uint8_t SourceProtocolAddress[4],
     uint16_t SourcePort,
     KdpDebugPacket *Packet,
     uint32_t Length);
-
-void KdpPrintVariadic(const char *Message, va_list Arguments);
-__attribute__((format(printf, 1, 2))) void KdpPrint(const char *Message, ...);
 
 uint32_t KdpInitializeController(KdpExtensibilityData *KdNet);
 void KdpShutdownController(void *Adapter);

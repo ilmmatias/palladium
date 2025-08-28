@@ -110,7 +110,7 @@ void KiDumpSymbol(void *Address) {
 
     if (ListHeader == &KiModuleListHead) {
         VidPrint("0x%016llx - ??\n", Offset);
-        KdpPrint(KDP_ANSI_FG_RED "0x%016llx - ??" KDP_ANSI_RESET "\n", Offset);
+        KdPrint(KD_TYPE_NONE, KDP_ANSI_FG_RED "0x%016llx - ??" KDP_ANSI_RESET "\n", Offset);
         return;
     }
 
@@ -131,7 +131,8 @@ void KiDumpSymbol(void *Address) {
             Offset,
             Image->ImageName,
             Offset - (uint64_t)Image->ImageBase);
-        KdpPrint(
+        KdPrint(
+            KD_TYPE_NONE,
             KDP_ANSI_FG_RED "0x%016llx - %s+%#llx" KDP_ANSI_RESET "\n",
             Offset,
             Image->ImageName,
@@ -172,7 +173,8 @@ void KiDumpSymbol(void *Address) {
 
     VidPrint(
         "0x%016llx - %s!%s+%#llx\n", Offset, Image->ImageName, NameBuffer, Offset - ClosestAddress);
-    KdpPrint(
+    KdPrint(
+        KD_TYPE_NONE,
         KDP_ANSI_FG_RED "0x%016llx - %s!%s+%#llx" KDP_ANSI_RESET "\n",
         Offset,
         Image->ImageName,

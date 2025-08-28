@@ -58,6 +58,10 @@ if [[ "${BOOT_DEBUG_ENABLED}" == "true" ]]; then
     echo "DebugEnabled=true" >> "boot.cfg"
 fi
 
+if [[ "${BOOT_DEBUG_ECHO_ENABLED}" == "true" ]]; then
+    echo "DebugEchoEnabled=true" >> "boot.cfg"
+fi
+
 if [[ -n "${BOOT_DEBUG_ADDRESS}" ]]; then
     echo "DebugAddress=${BOOT_DEBUG_ADDRESS}" >> "boot.cfg"
 fi

@@ -50,11 +50,24 @@
 #define KDP_TRANSMIT_ASYNC 0x80000000
 #define KDP_HANDLE_FLAGS (KDP_TRANSMIT_LAST | KDP_TRANSMIT_HANDLE | KDP_TRANSMIT_ASYNC)
 
+/* Valid states for the debugger receive functions; Really only two matter (and exist), early
+ * initialization (we need to receive ARP+any incoming debug connect packets), and execution break
+ * (we need to receive any incoming non-connect debug packets from the saved IP+port). */
+
+#define KDP_STATE_EARLY 0
+#define KDP_STATE_LATE 1
+
 /* Defines related to our custom debugger protocol. */
 
-#define KDP_DEBUG_PACKET_CONNECT_REQ 0
-#define KDP_DEBUG_PACKET_CONNECT_ACK 1
-#define KDP_DEBUG_PACKET_PRINT 2
+#define KDP_DEBUG_PACKET_CONNECT_REQ 0x00
+#define KDP_DEBUG_PACKET_PRINT 0x01
+#define KDP_DEBUG_PACKET_BREAK 0x02
+#define KDP_DEBUG_PACKET_READ_PHYSICAL_REQ 0x03
+#define KDP_DEBUG_PACKET_READ_VIRTUAL_REQ 0x04
+
+#define KDP_DEBUG_PACKET_CONNECT_ACK 0x80
+#define KDP_DEBUG_PACKET_READ_PHYSICAL_ACK 0x83
+#define KDP_DEBUG_PACKET_READ_VIRTUAL_ACK 0x84
 
 /* Should this be in here, or somewhere else? */
 

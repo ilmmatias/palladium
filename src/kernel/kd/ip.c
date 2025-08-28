@@ -36,6 +36,7 @@ uint16_t KdpCalculateIpChecksum(KdpIpHeader *Header) {
  *     This function handles a received IP(v4) packet.
  *
  * PARAMETERS:
+ *     State - Current execution state (initialization or break/panic).
  *     SourceHardwareAddress - MAC address of who sent us this packet.
  *     IpFrame - Header of the packet.
  *     Length - Size of the packet.
@@ -43,7 +44,11 @@ uint16_t KdpCalculateIpChecksum(KdpIpHeader *Header) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void KdpParseIpFrame(uint8_t SourceHardwareAddress[6], KdpIpHeader *IpFrame, uint32_t Length) {
+void KdpParseIpFrame(
+    int State,
+    uint8_t SourceHardwareAddress[6],
+    KdpIpHeader *IpFrame,
+    uint32_t Length) {
     if (Length < sizeof(KdpIpHeader)) {
         KdPrint(KD_TYPE_TRACE, "ignoring invalid IP packet of size %u\n", Length);
         return;
@@ -69,6 +74,7 @@ void KdpParseIpFrame(uint8_t SourceHardwareAddress[6], KdpIpHeader *IpFrame, uin
 
     /* If all is well, pass forward to the UDP handler. */
     KdpParseUdpFrame(
+        State,
         SourceHardwareAddress,
         IpFrame->SourceAddress,
         (void *)(IpFrame + 1),
