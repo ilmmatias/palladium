@@ -17,19 +17,20 @@ jobs:
     steps:
     - name: Install basic packages
       run: |
-        sudo apt install -y build-essential cmake lld ninja-build mkisofs mtools
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake lld ninja-build mkisofs mtools
 
     - name: Install LLVM
       run: |
         wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
-        sudo add-apt-repository -y "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-20 main"
-        sudo apt install -y clang-20 lld-20 llvm-20 libclang-20-dev
+        sudo add-apt-repository -y "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-21 main"
+        sudo apt-get install -y clang-21 lld-21 llvm-21 libclang-21-dev
 
     - name: Checkout llvm-project
       uses: actions/checkout@v3
       with:
         repository: llvm/llvm-project
-        ref: llvmorg-20.1.1
+        ref: llvmorg-21.1.0
         path: llvm-project
 
     - name: Checkout palladium
@@ -42,7 +43,7 @@ jobs:
         PALLADIUM_PATH=${{github.workspace}}/palladium \
         COMPILER_RT_PATH=${{github.workspace}}/llvm-project/compiler-rt \
         COMPILER_RT_TARGET=x86_64 \
-        LLVM_SUFFIX=-20 \
+        LLVM_SUFFIX=-21 \
         palladium/build-compiler-rt.sh
 
     - name: Configure Target
@@ -53,7 +54,7 @@ jobs:
           -G Ninja \
           -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
           -DARCH=amd64 \
-          -DLLVM_SUFFIX=-20
+          -DLLVM_SUFFIX=-21
 
     - name: Build Target
       run: cmake --build build.target --config ${{env.BUILD_TYPE}}
