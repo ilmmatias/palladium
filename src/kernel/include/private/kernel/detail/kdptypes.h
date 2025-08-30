@@ -297,6 +297,19 @@ typedef struct __attribute__((packed)) {
     uint8_t ItemSize;
     uint32_t ItemCount;
     uint32_t Length;
-} KdpDebugReadPhysicalPacket, KdpDebugReadVirtualPacket;
+} KdpDebugReadAddressPacket;
+
+typedef struct __attribute__((packed)) {
+    uint8_t Type;
+    uint64_t Address;
+    uint8_t Size;
+} KdpDebugReadPortReqPacket;
+
+typedef struct __attribute__((packed)) {
+    uint8_t Type;
+    uint64_t Address;
+    uint8_t Size;
+    uint32_t Value;
+} KdpDebugReadPortAckPacket;
 
 #endif /* _KERNEL_DETAIL_KDPTYPES_H_ */

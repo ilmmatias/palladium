@@ -23,12 +23,10 @@ def KdpHandleReadMemoryAck(PacketType: int, Data: bytes) -> None:
     if PacketType == protocol.KDP_DEBUG_PACKET_READ_PHYSICAL_ACK:
         ExpectedState = protocol.KDP_STATE_READ_PHYSICAL
         PacketCommand = "rp"
-        PacketFormat = protocol.KDP_DEBUG_PACKET_READ_PHYSICAL_FORMAT
         MemoryType = "physical"
     else:
         ExpectedState = protocol.KDP_STATE_READ_VIRTUAL
         PacketCommand = "rv"
-        PacketFormat = protocol.KDP_DEBUG_PACKET_READ_VIRTUAL_FORMAT
         MemoryType = "virtual"
 
     # Should we be indeed printing something to the command window in this case?
@@ -48,7 +46,7 @@ def KdpHandleReadMemoryAck(PacketType: int, Data: bytes) -> None:
             f"received corrupted `{PacketCommand}` acknowledgement\n")
         return
 
-    IncomingStruct = struct.unpack(PacketFormat, Data[:18])
+    IncomingStruct = struct.unpack(protocol.KDP_DEBUG_PACKET_READ_ADDRESS_FORMAT, Data[:18])
     Address: int = IncomingStruct[1]
     ItemSize: int = IncomingStruct[2]
     ItemCount: int = IncomingStruct[3]
@@ -76,6 +74,70 @@ def KdpHandleReadMemoryAck(PacketType: int, Data: bytes) -> None:
 
 #--------------------------------------------------------------------------------------------------
 # PURPOSE:
+#     This function handles the received `ip` data from the kernel.
+#
+# PARAMETERS:
+#     Data - What we got back.
+#
+# RETURN VALUE:
+#     None.
+#--------------------------------------------------------------------------------------------------
+def KdpHandleReadPortAck(Data: bytes) -> None:
+    if protocol.KdpCurrentState != protocol.KDP_STATE_READ_PORT:
+        interface.KdPrint(
+            interface.KD_DEST_COMMAND,
+            interface.KD_TYPE_ERROR,
+            f"received unexpected `ip` acknowledgement\n")
+        return
+
+    protocol.KdpCurrentState = protocol.KDP_STATE_NONE
+
+    if len(Data) != 14:
+        interface.KdPrint(
+            interface.KD_DEST_COMMAND,
+            interface.KD_TYPE_ERROR,
+            f"received corrupted `ip` acknowledgement\n")
+        return
+
+    IncomingStruct = struct.unpack(protocol.KDP_DEBUG_PACKET_READ_PORT_ACK_FORMAT, Data[:14])
+    Address: int = IncomingStruct[1]
+    ItemSize: int = IncomingStruct[2]
+    ItemValue: int = IncomingStruct[3]
+
+    # Early short-circuit if the kernel failed to read the port.
+    if not ItemSize:
+        interface.KdPrint(
+            interface.KD_DEST_COMMAND,
+            interface.KD_TYPE_ERROR,
+            f"failed to read the specified port\n")
+        return
+
+    # Parameter validation (just to ensure no one can break us by manually sending bad packets).
+    SizeMap = {1: "02x", 2: "04x", 4: "08x"}
+    if ItemSize not in SizeMap:
+        interface.KdPrint(
+            interface.KD_DEST_COMMAND,
+            interface.KD_TYPE_ERROR,
+            f"received corrupted `ip` acknowledgement\n")
+        return
+
+    try:
+        interface.KdPrint(
+            interface.KD_DEST_COMMAND,
+            interface.KD_TYPE_INFO,
+            f"showing data contained in the port 0x{Address:x}\n")
+        interface.KdPrint(
+            interface.KD_DEST_COMMAND,
+            interface.KD_TYPE_NONE,
+            f"{Address:016x}: {ItemValue:{SizeMap[ItemSize]}}\n")
+    except:
+        interface.KdPrint(
+            interface.KD_DEST_COMMAND,
+            interface.KD_TYPE_ERROR,
+            f"received corrupted `ip` acknowledgement\n")
+
+#--------------------------------------------------------------------------------------------------
+# PURPOSE:
 #     This function handles parsing an incoming debug packet.
 #
 # PARAMETERS:
@@ -100,6 +162,8 @@ def KdHandleIncomingPacket(Socket: socket.socket) -> tuple[bool, bool, int]:
         elif PacketType == protocol.KDP_DEBUG_PACKET_READ_PHYSICAL_ACK or \
              PacketType == protocol.KDP_DEBUG_PACKET_READ_VIRTUAL_ACK:
             KdpHandleReadMemoryAck(PacketType, Data)
+        elif PacketType == protocol.KDP_DEBUG_PACKET_READ_PORT_ACK:
+            KdpHandleReadPortAck(Data)
         else:
             interface.KdPrint(
                 interface.KD_DEST_COMMAND,

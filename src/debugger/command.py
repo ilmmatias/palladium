@@ -64,6 +64,9 @@ commands:
                                  [target] can be either `k` (kernel) or `c` (command)
     h                          - show this help dialog
     help                       - alias to `h`
+    ip/<size> <address>        - tries to read some data at the specified port address
+                                 <size> can be `b` (8-bits), `w` (16-bits), or `d` (32-bits)
+                                 <adderss> should be a hexadecimal value
     q                          - closes this application
     quit                       - alias to `q`
     rp/<size>[count] <address> - tries to read some data at the specified physical address
@@ -85,6 +88,53 @@ commands:
         interface.KD_DEST_COMMAND,
         interface.KD_TYPE_INFO,
         f"showing the help dialog\n{HelpText.strip()}\n")
+
+#--------------------------------------------------------------------------------------------------
+# PURPOSE:
+#     This function handles sending a `read port` request to the kernel.
+#
+# PARAMETERS:
+#     Socket - What socket we're using.
+#     DebuggeeProtocolAddress - IP(v4) address of the debuggee.
+#     DebuggeePort - Target UDP port of the debuggee.
+#     InputTokens - What we read from the user.
+#
+# RETURN VALUE:
+#     None.
+#--------------------------------------------------------------------------------------------------
+def KdpHandleReadPortRequest(
+    Socket: socket.socket,
+    DebuggeeProtocolAddress: str,
+    DebuggeePort: int,
+    InputTokens: list[str]) -> None:
+    try:
+        # ip/A B
+        #     A -> b(yte) / w(ord) / d(word).
+        #     B -> Address.
+        if len(InputTokens) != 2 or len(InputTokens[0]) != 4:
+            raise ValueError("expected format: ip/<size> <address>")
+
+        ItemSize = InputTokens[0][3]
+        SizeMap = {"b": 1, "w": 2, "d": 4}
+        if ItemSize not in SizeMap:
+            raise ValueError(f"expected format: ip/<size> <address>")
+
+        ItemSize = SizeMap[ItemSize]
+        Address = int(InputTokens[1], 16)
+    except ValueError as ExceptionData:
+        interface.KdPrint(
+            interface.KD_DEST_COMMAND,
+            interface.KD_TYPE_ERROR,
+            f"{ExceptionData}\n")
+        return
+
+    protocol.KdpCurrentState = protocol.KDP_STATE_READ_PORT
+    Packet = struct.pack(
+            protocol.KDP_DEBUG_PACKET_READ_PORT_REQ_FORMAT,
+            protocol.KDP_DEBUG_PACKET_READ_PORT_REQ,
+            Address,
+            ItemSize)
+    Socket.sendto(Packet, (DebuggeeProtocolAddress, DebuggeePort))
 
 #--------------------------------------------------------------------------------------------------
 # PURPOSE:
@@ -138,7 +188,7 @@ def KdpHandleReadMemoryRequest(
     if RequestName == "rp":
         protocol.KdpCurrentState = protocol.KDP_STATE_READ_PHYSICAL
         Packet = struct.pack(
-            protocol.KDP_DEBUG_PACKET_READ_PHYSICAL_FORMAT,
+            protocol.KDP_DEBUG_PACKET_READ_ADDRESS_FORMAT,
             protocol.KDP_DEBUG_PACKET_READ_PHYSICAL_REQ,
             Address,
             ItemSize,
@@ -147,7 +197,7 @@ def KdpHandleReadMemoryRequest(
     else:
         protocol.KdpCurrentState = protocol.KDP_STATE_READ_VIRTUAL
         Packet = struct.pack(
-            protocol.KDP_DEBUG_PACKET_READ_VIRTUAL_FORMAT,
+            protocol.KDP_DEBUG_PACKET_READ_ADDRESS_FORMAT,
             protocol.KDP_DEBUG_PACKET_READ_VIRTUAL_REQ,
             Address,
             ItemSize,
@@ -176,14 +226,16 @@ def KdHandleInput(
     InputLine: str) -> None:
     InputTokens = InputLine.split()
 
-    if InputTokens[0] == "el" or InputTokens[0].startswith("el/"):
+    CommandName = InputTokens[0].split("/")[0]
+    if CommandName == "el":
         KdpHandleExportLogRequest(InputTokens)
-    elif InputTokens[0] == "h" or InputTokens[0] == "help":
+    elif CommandName == "h" or CommandName == "help":
         KdpHandleHelpRequest()
-    elif InputTokens[0] == "q" or InputTokens[0] == "quit":
+    elif CommandName == "ip":
+        KdpHandleReadPortRequest(Socket, DebuggeeProtocolAddress, DebuggeePort, InputTokens)
+    elif CommandName == "q" or CommandName == "quit":
         return True
-    elif InputTokens[0] == "rp" or InputTokens[0].startswith("rp/") or \
-         InputTokens[0] == "rv" or InputTokens[0].startswith("rv/"):
+    elif CommandName == "rp" or CommandName == "rv":
         KdpHandleReadMemoryRequest(Socket, DebuggeeProtocolAddress, DebuggeePort, InputTokens)
     else:
         interface.KdPrint(

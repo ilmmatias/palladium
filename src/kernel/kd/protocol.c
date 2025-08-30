@@ -3,6 +3,8 @@
 
 #include <kernel/halp.h>
 #include <kernel/kdp.h>
+#include <os/intrin.h>
+#include <rt/except.h>
 #include <string.h>
 
 extern void *KdpDebugAdapter;
@@ -87,8 +89,8 @@ static void ParseEarlyPacket(
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-static void ParseReadPhysicalPacket(KdpDebugReadPhysicalPacket *Packet, uint32_t Length) {
-    if (Length < sizeof(KdpDebugReadPhysicalPacket)) {
+static void ParseReadPhysicalPacket(KdpDebugReadAddressPacket *Packet, uint32_t Length) {
+    if (Length < sizeof(KdpDebugReadAddressPacket)) {
         KdPrint(KD_TYPE_TRACE, "ignoring invalid debug `rp` packet of size %u\n", Length);
         return;
     }
@@ -118,12 +120,12 @@ static void ParseReadPhysicalPacket(KdpDebugReadPhysicalPacket *Packet, uint32_t
         return;
     }
 
-    KdpDebugReadPhysicalPacket *ResponsePacket = (KdpDebugReadPhysicalPacket *)Buffer;
-    memcpy(ResponsePacket, Packet, sizeof(KdpDebugReadPhysicalPacket));
+    KdpDebugReadAddressPacket *ResponsePacket = (KdpDebugReadAddressPacket *)Buffer;
+    memcpy(ResponsePacket, Packet, sizeof(KdpDebugReadAddressPacket));
     ResponsePacket->Type = KDP_DEBUG_PACKET_READ_PHYSICAL_ACK;
 
     /* Don't bother with anything that overflows our response buffer. */
-    if (Packet->Length > sizeof(Buffer) - sizeof(KdpDebugReadPhysicalPacket)) {
+    if (Packet->Length > sizeof(Buffer) - sizeof(KdpDebugReadAddressPacket)) {
         ResponsePacket->ItemSize = 0;
         KdpSendUdpPacket(
             KdpDebuggerHardwareAddress,
@@ -131,7 +133,7 @@ static void ParseReadPhysicalPacket(KdpDebugReadPhysicalPacket *Packet, uint32_t
             KdpDebuggeePort,
             KdpDebuggerPort,
             ResponsePacket,
-            sizeof(KdpDebugReadPhysicalPacket));
+            sizeof(KdpDebugReadAddressPacket));
         return;
     }
 
@@ -149,7 +151,7 @@ static void ParseReadPhysicalPacket(KdpDebugReadPhysicalPacket *Packet, uint32_t
             KdpDebuggeePort,
             KdpDebuggerPort,
             ResponsePacket,
-            sizeof(KdpDebugReadPhysicalPacket));
+            sizeof(KdpDebugReadAddressPacket));
         return;
     }
 
@@ -161,7 +163,7 @@ static void ParseReadPhysicalPacket(KdpDebugReadPhysicalPacket *Packet, uint32_t
         KdpDebuggeePort,
         KdpDebuggerPort,
         ResponsePacket,
-        sizeof(KdpDebugReadPhysicalPacket) + Packet->Length);
+        sizeof(KdpDebugReadAddressPacket) + Packet->Length);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -175,8 +177,8 @@ static void ParseReadPhysicalPacket(KdpDebugReadPhysicalPacket *Packet, uint32_t
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-static void ParseReadVirtualPacket(KdpDebugReadVirtualPacket *Packet, uint32_t Length) {
-    if (Length < sizeof(KdpDebugReadVirtualPacket)) {
+static void ParseReadVirtualPacket(KdpDebugReadAddressPacket *Packet, uint32_t Length) {
+    if (Length < sizeof(KdpDebugReadAddressPacket)) {
         KdPrint(KD_TYPE_TRACE, "ignoring invalid debug `rv` packet of size %u\n", Length);
         return;
     }
@@ -206,12 +208,12 @@ static void ParseReadVirtualPacket(KdpDebugReadVirtualPacket *Packet, uint32_t L
         return;
     }
 
-    KdpDebugReadVirtualPacket *ResponsePacket = (KdpDebugReadVirtualPacket *)Buffer;
-    memcpy(ResponsePacket, Packet, sizeof(KdpDebugReadVirtualPacket));
+    KdpDebugReadAddressPacket *ResponsePacket = (KdpDebugReadAddressPacket *)Buffer;
+    memcpy(ResponsePacket, Packet, sizeof(KdpDebugReadAddressPacket));
     ResponsePacket->Type = KDP_DEBUG_PACKET_READ_VIRTUAL_ACK;
 
     /* Don't bother with anything that overflows our response buffer. */
-    if (Packet->Length > sizeof(Buffer) - sizeof(KdpDebugReadVirtualPacket)) {
+    if (Packet->Length > sizeof(Buffer) - sizeof(KdpDebugReadAddressPacket)) {
         ResponsePacket->ItemSize = 0;
         KdpSendUdpPacket(
             KdpDebuggerHardwareAddress,
@@ -219,7 +221,7 @@ static void ParseReadVirtualPacket(KdpDebugReadVirtualPacket *Packet, uint32_t L
             KdpDebuggeePort,
             KdpDebuggerPort,
             ResponsePacket,
-            sizeof(KdpDebugReadVirtualPacket));
+            sizeof(KdpDebugReadAddressPacket));
         return;
     }
 
@@ -243,7 +245,7 @@ static void ParseReadVirtualPacket(KdpDebugReadVirtualPacket *Packet, uint32_t L
                 KdpDebuggeePort,
                 KdpDebuggerPort,
                 ResponsePacket,
-                sizeof(KdpDebugReadVirtualPacket));
+                sizeof(KdpDebugReadAddressPacket));
             return;
         }
 
@@ -256,7 +258,7 @@ static void ParseReadVirtualPacket(KdpDebugReadVirtualPacket *Packet, uint32_t L
                 KdpDebuggeePort,
                 KdpDebuggerPort,
                 ResponsePacket,
-                sizeof(KdpDebugReadVirtualPacket));
+                sizeof(KdpDebugReadAddressPacket));
             return;
         }
 
@@ -274,7 +276,59 @@ static void ParseReadVirtualPacket(KdpDebugReadVirtualPacket *Packet, uint32_t L
         KdpDebuggeePort,
         KdpDebuggerPort,
         ResponsePacket,
-        sizeof(KdpDebugReadVirtualPacket) + Packet->Length);
+        sizeof(KdpDebugReadAddressPacket) + Packet->Length);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function handles a received request to read a system port.
+ *
+ * PARAMETERS:
+ *     Packet - Header of the packet.
+ *     Length - Size of the packet.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+static void ParseReadPortPacket(KdpDebugReadPortReqPacket *Packet, uint32_t Length) {
+    if (Length < sizeof(KdpDebugReadPortReqPacket)) {
+        KdPrint(KD_TYPE_TRACE, "ignoring invalid debug `rp` packet of size %u\n", Length);
+        return;
+    }
+
+    /* Does it make sense to support something like ReadPortQWord? Does any architecture even
+     * really implements this? */
+    if (Packet->Size != 1 && Packet->Size != 2 && Packet->Size != 4) {
+        KdPrint(
+            KD_TYPE_TRACE, "ignoring invalid debug `rp` packet with item size %u\n", Packet->Size);
+        return;
+    }
+
+    KdpDebugReadPortAckPacket *ResponsePacket = (KdpDebugReadPortAckPacket *)Buffer;
+    memcpy(ResponsePacket, Packet, sizeof(KdpDebugReadPortReqPacket));
+    ResponsePacket->Type = KDP_DEBUG_PACKET_READ_PORT_ACK;
+
+    /* I'm not sure if we need __try here? We probably do for MMIO==PIO, but do we need it for
+     * x86/true PIO? */
+    __try {
+        if (Packet->Size == 1) {
+            ResponsePacket->Value = ReadPortByte(Packet->Address);
+        } else if (Packet->Size == 2) {
+            ResponsePacket->Value = ReadPortWord(Packet->Address);
+        } else {
+            ResponsePacket->Value = ReadPortDWord(Packet->Address);
+        }
+    } __except (RT_EXC_EXECUTE_HANDLER) {
+        ResponsePacket->Size = 0;
+    }
+
+    KdpSendUdpPacket(
+        KdpDebuggerHardwareAddress,
+        KdpDebuggerProtocolAddress,
+        KdpDebuggeePort,
+        KdpDebuggerPort,
+        ResponsePacket,
+        sizeof(KdpDebugReadPortAckPacket));
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -315,9 +369,11 @@ static void ParseLatePacket(
     }
 
     if (Packet->Type == KDP_DEBUG_PACKET_READ_PHYSICAL_REQ) {
-        ParseReadPhysicalPacket((KdpDebugReadPhysicalPacket *)Packet, Length);
+        ParseReadPhysicalPacket((KdpDebugReadAddressPacket *)Packet, Length);
     } else if (Packet->Type == KDP_DEBUG_PACKET_READ_VIRTUAL_REQ) {
-        ParseReadVirtualPacket((KdpDebugReadVirtualPacket *)Packet, Length);
+        ParseReadVirtualPacket((KdpDebugReadAddressPacket *)Packet, Length);
+    } else if (Packet->Type == KDP_DEBUG_PACKET_READ_PORT_REQ) {
+        ParseReadPortPacket((KdpDebugReadPortReqPacket *)Packet, Length);
     } else {
         KdPrint(KD_TYPE_TRACE, "ignoring invalid debug packet of type %u\n", Packet->Type);
     }
