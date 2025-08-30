@@ -44,7 +44,7 @@ def KdpHandleReadMemoryAck(PacketType: int, Data: bytes) -> None:
     if protocol.KdpCurrentState != ExpectedState:
         interface.KdPrint(
             interface.KD_DEST_COMMAND,
-            interface.KD_TYPE_ERROR,
+            interface.KD_TYPE_NONE,
             f"received unexpected `{PacketCommand}` acknowledgement\n")
         return
 
@@ -53,7 +53,7 @@ def KdpHandleReadMemoryAck(PacketType: int, Data: bytes) -> None:
     if len(Data) < 18:
         interface.KdPrint(
             interface.KD_DEST_COMMAND,
-            interface.KD_TYPE_ERROR,
+            interface.KD_TYPE_NONE,
             f"received corrupted `{PacketCommand}` acknowledgement\n")
         return
 
@@ -67,7 +67,7 @@ def KdpHandleReadMemoryAck(PacketType: int, Data: bytes) -> None:
     if not ItemSize:
         interface.KdPrint(
             interface.KD_DEST_COMMAND,
-            interface.KD_TYPE_ERROR,
+            interface.KD_TYPE_NONE,
             f"failed to read the specified {MemoryType} memory range\n")
         return
 
@@ -78,7 +78,7 @@ def KdpHandleReadMemoryAck(PacketType: int, Data: bytes) -> None:
        len(Data) - 18 < Length:
             interface.KdPrint(
                 interface.KD_DEST_COMMAND,
-                interface.KD_TYPE_ERROR,
+                interface.KD_TYPE_NONE,
                 f"received corrupted `{PacketCommand}` acknowledgement\n")
             return
 
@@ -101,7 +101,7 @@ def KdpHandleReadPortAck(Data: bytes) -> None:
     if protocol.KdpCurrentState != protocol.KDP_STATE_READ_PORT:
         interface.KdPrint(
             interface.KD_DEST_COMMAND,
-            interface.KD_TYPE_ERROR,
+            interface.KD_TYPE_NONE,
             f"received unexpected `ip` acknowledgement\n")
         return
 
@@ -110,7 +110,7 @@ def KdpHandleReadPortAck(Data: bytes) -> None:
     if len(Data) != 14:
         interface.KdPrint(
             interface.KD_DEST_COMMAND,
-            interface.KD_TYPE_ERROR,
+            interface.KD_TYPE_NONE,
             f"received corrupted `ip` acknowledgement\n")
         return
 
@@ -123,7 +123,7 @@ def KdpHandleReadPortAck(Data: bytes) -> None:
     if not ItemSize:
         interface.KdPrint(
             interface.KD_DEST_COMMAND,
-            interface.KD_TYPE_ERROR,
+            interface.KD_TYPE_NONE,
             f"failed to read the specified port\n")
         return
 
@@ -132,15 +132,11 @@ def KdpHandleReadPortAck(Data: bytes) -> None:
     if ItemSize not in SizeMap:
         interface.KdPrint(
             interface.KD_DEST_COMMAND,
-            interface.KD_TYPE_ERROR,
+            interface.KD_TYPE_NONE,
             f"received corrupted `ip` acknowledgement\n")
         return
 
     try:
-        interface.KdPrint(
-            interface.KD_DEST_COMMAND,
-            interface.KD_TYPE_INFO,
-            f"showing data contained in the port 0x{Address:x}\n")
         interface.KdPrint(
             interface.KD_DEST_COMMAND,
             interface.KD_TYPE_NONE,
@@ -148,7 +144,7 @@ def KdpHandleReadPortAck(Data: bytes) -> None:
     except:
         interface.KdPrint(
             interface.KD_DEST_COMMAND,
-            interface.KD_TYPE_ERROR,
+            interface.KD_TYPE_NONE,
             f"received corrupted `ip` acknowledgement\n")
 
 #--------------------------------------------------------------------------------------------------
@@ -182,7 +178,7 @@ def KdHandleIncomingPacket(Socket: socket.socket) -> tuple[bool, bool, int]:
         else:
             interface.KdPrint(
                 interface.KD_DEST_COMMAND,
-                interface.KD_TYPE_TRACE,
+                interface.KD_TYPE_NONE,
                 f"ignoring invalid debug packet of type {PacketType}")
     except socket.timeout:
         pass

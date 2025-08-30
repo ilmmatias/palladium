@@ -44,7 +44,7 @@ def KdpHandleDisassembleMemoryRequest(
     except ValueError as ExceptionData:
         interface.KdPrint(
             interface.KD_DEST_COMMAND,
-            interface.KD_TYPE_ERROR,
+            interface.KD_TYPE_NONE,
             f"{ExceptionData}\n")
         return
 
@@ -84,17 +84,24 @@ def KdpHandleExportLogRequest(InputTokens: list[str]) -> None:
     #     A -> k(ernel) / c(ommand).
     #     B -> Path to save the buffer.
 
-    if len(InputTokens) != 2 or \
-       (InputTokens[0].startswith("el/") and len(InputTokens[0]) != 4):
-        raise ValueError("expected format: el[/target] <path>")
-
-    if InputTokens[0].startswith("el/"):
-        TargetMap = {"k": interface.KD_DEST_KERNEL, "c": interface.KD_DEST_COMMAND}
-        if InputTokens[0][3] not in TargetMap:
+    try:
+        if len(InputTokens) != 2 or \
+           (InputTokens[0].startswith("el/") and len(InputTokens[0]) != 4):
             raise ValueError("expected format: el[/target] <path>")
-        Target = TargetMap[InputTokens[0][3]]
-    else:
-        Target = interface.KdpSelectedOutput
+
+        if InputTokens[0].startswith("el/"):
+            TargetMap = {"k": interface.KD_DEST_KERNEL, "c": interface.KD_DEST_COMMAND}
+            if InputTokens[0][3] not in TargetMap:
+                raise ValueError("expected format: el[/target] <path>")
+            Target = TargetMap[InputTokens[0][3]]
+        else:
+            Target = interface.KdpSelectedOutput
+    except ValueError as ExceptionData:
+        interface.KdPrint(
+            interface.KD_DEST_COMMAND,
+            interface.KD_TYPE_NONE,
+            f"{ExceptionData}\n")
+        return
 
     Path = InputTokens[1]
     interface.KdExportBuffer(Target, Path)
@@ -156,8 +163,8 @@ commands:
 """
     interface.KdPrint(
         interface.KD_DEST_COMMAND,
-        interface.KD_TYPE_INFO,
-        f"showing the help dialog\n{HelpText.strip()}\n")
+        interface.KD_TYPE_NONE,
+        f"{HelpText.strip()}\n")
 
 #--------------------------------------------------------------------------------------------------
 # PURPOSE:
@@ -194,7 +201,7 @@ def KdpHandleReadPortRequest(
     except ValueError as ExceptionData:
         interface.KdPrint(
             interface.KD_DEST_COMMAND,
-            interface.KD_TYPE_ERROR,
+            interface.KD_TYPE_NONE,
             f"{ExceptionData}\n")
         return
 
@@ -251,7 +258,7 @@ def KdpHandleReadMemoryRequest(
     except ValueError as ExceptionData:
         interface.KdPrint(
             interface.KD_DEST_COMMAND,
-            interface.KD_TYPE_ERROR,
+            interface.KD_TYPE_NONE,
             f"{ExceptionData}\n")
         return
 
@@ -295,8 +302,10 @@ def KdHandleInput(
     DebuggeePort: int,
     InputLine: str) -> None:
     InputTokens = InputLine.split()
-
     CommandName = InputTokens[0].split("/")[0]
+
+    interface.KdPrint(interface.KD_DEST_COMMAND, interface.KD_TYPE_NONE, f"kd> {InputLine}\n")
+
     if CommandName == "dp" or CommandName == "dv":
         KdpHandleDisassembleMemoryRequest(
             Socket,
@@ -316,7 +325,7 @@ def KdHandleInput(
     else:
         interface.KdPrint(
             interface.KD_DEST_COMMAND,
-            interface.KD_TYPE_ERROR,
+            interface.KD_TYPE_NONE,
             f"invalid command `{InputLine}`\n")
 
     return False

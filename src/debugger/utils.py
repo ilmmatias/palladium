@@ -30,16 +30,10 @@ def KdpPrintDisassemblyData(Kind: str, Payload: bytes, Address: int, Length: int
     if not Parameters:
         interface.KdPrint(
             interface.KD_DEST_COMMAND,
-            interface.KD_TYPE_ERROR,
+            interface.KD_TYPE_NONE,
             f"current architecture `{protocol.KdpCurrentArchitecture}` " +
             "is unsupported for the disassembler!\n")
         return
-
-    interface.KdPrint(
-        interface.KD_DEST_COMMAND,
-        interface.KD_TYPE_INFO,
-        f"disassembling data contained in the {Kind} range " +
-        f"0x{Address:x} - 0x{(Address + Length):x}\n")
 
     Disassembler = capstone.Cs(Parameters[0], Parameters[1])
     for (CurrentAddress, _, Mnemonic, Operands) in Disassembler.disasm_lite(Payload, Address):
@@ -78,12 +72,6 @@ def KdpPrintMemoryData(
 
     UnpackFormat, ItemFormat, ItemsPerLine = FormatMap[ItemSize]
     BytesPerLine = ItemsPerLine * ItemSize
-
-    interface.KdPrint(
-        interface.KD_DEST_COMMAND,
-        interface.KD_TYPE_INFO,
-        f"showing data contained in the {Kind} range " +
-        f"0x{Address:x} - 0x{(Address + Length):x}\n")
 
     for i in range(0, len(Payload), BytesPerLine):
         # Unpack all items inside the current chunk (so we can later join them).
