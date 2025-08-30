@@ -298,6 +298,85 @@ def KdHandleIncomingPacket(Socket: socket.socket) -> tuple[bool, bool, int]:
 
 #--------------------------------------------------------------------------------------------------
 # PURPOSE:
+#     This function handles an `el` (export log) request.
+#
+# PARAMETERS:
+#     InputTokens - What we read from the user.
+#
+# RETURN VALUE:
+#     None.
+#--------------------------------------------------------------------------------------------------
+def KdpHandleExportLogRequest(InputTokens: list[str]) -> None:
+    # el/A B
+    #     A -> k(ernel) / c(ommand).
+    #     B -> Path to save the buffer.
+
+    if len(InputTokens) != 2 or \
+       (InputTokens[0].startswith("el/") and len(InputTokens[0]) != 4):
+        raise ValueError("expected format: el[/target] <path>")
+
+    if InputTokens[0].startswith("el/"):
+        TargetMap = {"k": interface.KD_DEST_KERNEL, "c": interface.KD_DEST_COMMAND}
+        if InputTokens[0][3] not in TargetMap:
+            raise ValueError("expected format: el[/target] <path>")
+        Target = TargetMap[InputTokens[0][3]]
+    else:
+        Target = interface.KdpSelectedOutput
+
+    Path = InputTokens[1]
+    interface.KdExportBuffer(Target, Path)
+
+#--------------------------------------------------------------------------------------------------
+# PURPOSE:
+#     This function handles a help request.
+#
+# PARAMETERS:
+#     None.
+#
+# RETURN VALUE:
+#     None.
+#--------------------------------------------------------------------------------------------------
+def KdpHandleHelpRequest() -> None:
+    HelpText = """
+keyboard controls:
+    tab                        - swap focus between the kernel and output logs
+    up/down                    - scroll the focused log one line up/down
+    page up/down               - scroll the focused log one page up/down
+    ctrl+c                     - closes this application
+
+mouse controls:
+    scroll up/down             - scroll the focused log up/down
+
+commands:
+    el[/target] <path>         - save the specified log to a file
+                                 by default, the focused log will be saved
+                                 [target] can be either `k` (kernel) or `c` (command)
+    h                          - show this help dialog
+    help                       - alias to `h`
+    q                          - closes this application
+    quit                       - alias to `q`
+    rp/<size>[count] <address> - tries to read some data at the specified physical address
+                                 by default, 128 bytes of data will be read
+                                 <size> can be `b` (8-bits), `w` (16-bits), `d` (32-bits),
+                                 or `q` (64-bits)
+                                 [count] is how many elements (each with the specified <size>)
+                                 should be read
+                                 <address> should be a hexadecimal value
+    rv/<size>[count] <address> - tries to read some data at the specified virtual address
+                                 by default, 128 bytes of data will be read
+                                 <size> can be `b` (8-bits), `w` (16-bits), `d` (32-bits),
+                                 or `q` (64-bits)
+                                 [count] is how many elements (each with the specified <size>)
+                                 should be read
+                                 <address> should be a hexadecimal value
+"""
+    interface.KdPrint(
+        interface.KD_DEST_COMMAND,
+        interface.KD_TYPE_INFO,
+        f"showing the help dialog\n{HelpText.strip()}\n")
+
+#--------------------------------------------------------------------------------------------------
+# PURPOSE:
 #     This function handles sending a `rp` (read physical) request to the kernel.
 #
 # PARAMETERS:
@@ -425,7 +504,7 @@ def KdpHandleReadVirtualRequest(
 #     InputLine - What we read from the user.
 #
 # RETURN VALUE:
-#     None.
+#     True/False depending on if we should continue the execution.
 #--------------------------------------------------------------------------------------------------
 def KdHandleInput(
     Socket: socket.socket,
@@ -434,7 +513,13 @@ def KdHandleInput(
     InputLine: str) -> None:
     InputTokens = InputLine.split()
 
-    if InputTokens[0] == "rp" or InputTokens[0].startswith("rp/"):
+    if InputTokens[0] == "el" or InputTokens[0].startswith("el/"):
+        KdpHandleExportLogRequest(InputTokens)
+    elif InputTokens[0] == "h" or InputTokens[0] == "help":
+        KdpHandleHelpRequest()
+    elif InputTokens[0] == "q" or InputTokens[0] == "quit":
+        return False
+    elif InputTokens[0] == "rp" or InputTokens[0].startswith("rp/"):
         KdpHandleReadPhysicalRequest(Socket, DebuggeeProtocolAddress, DebuggeePort, InputTokens)
     elif InputTokens[0] == "rv" or InputTokens[0].startswith("rv/"):
         KdpHandleReadVirtualRequest(Socket, DebuggeeProtocolAddress, DebuggeePort, InputTokens)
@@ -443,3 +528,5 @@ def KdHandleInput(
             interface.KD_DEST_COMMAND,
             interface.KD_TYPE_ERROR,
             f"invalid command `{InputLine}`\n")
+
+    return True

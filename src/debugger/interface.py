@@ -115,8 +115,8 @@ def KdpRefreshInterface() -> None:
 
     # As we reintialized the pad as well, we need to reappend all the current text
     # (and then scroll to the correct position).
-    for (Line, Attribute) in KdpKernelOutputBuffer:
-        KdpKernelOutputWindow.addstr(Line, Attribute)
+    for (Part, Attribute) in KdpKernelOutputBuffer:
+        KdpKernelOutputWindow.addstr(Part, Attribute)
     KdpScrollWindow(
         KdpKernelOutputWindow,
         KdpKernelOutputHeight,
@@ -163,8 +163,8 @@ def KdpRefreshInterface() -> None:
         SelectedAttribute if KdpSelectedOutput == KD_DEST_COMMAND else UnselectedAttribute)
     KdpCommandOutputContainer.refresh()
 
-    for (Line, Attribute) in KdpCommandOutputBuffer:
-        KdpCommandOutputWindow.addstr(Line, Attribute)
+    for (Part, Attribute) in KdpCommandOutputBuffer:
+        KdpCommandOutputWindow.addstr(Part, Attribute)
     KdpScrollWindow(
         KdpCommandOutputWindow,
         KdpCommandOutputHeight,
@@ -400,19 +400,21 @@ def KdpPrint(Destination: int, Message: str) -> None:
                 KdpCommandOutputBuffer.append((Part, CurrentAttribute))
 
     if Destination == KD_DEST_KERNEL:
+        CurrentLine, _ = KdpKernelOutputWindow.getyx()
         KdpKernelOutputCurrentPosition = KdpScrollWindow(
             KdpKernelOutputWindow,
             KdpKernelOutputHeight,
             KdpKernelOutputRefreshCoords,
-            KdpKernelOutputCurrentPosition,
-            1)
+            CurrentLine,
+            0)
     else:
+        CurrentLine, _ = KdpCommandOutputWindow.getyx()
         KdpCommandOutputCurrentPosition = KdpScrollWindow(
             KdpCommandOutputWindow,
             KdpCommandOutputHeight,
             KdpCommandOutputRefreshCoords,
-            KdpCommandOutputCurrentPosition,
-            1)
+            CurrentLine,
+            0)
 
 #--------------------------------------------------------------------------------------------------
 # PURPOSE:
@@ -545,3 +547,36 @@ def KdReadInput(
         KdpInputWindow.refresh()
 
     return (PromptState, InputLine, False)
+
+#--------------------------------------------------------------------------------------------------
+# PURPOSE:
+#     This function exports the contents of the specified output window into a file.
+#
+# PARAMETERS:
+#     Target - Which buffer to save (KD_DEST_KERNEL for the kernel buffer, KD_DEST_COMMAND for
+#              the command buffer).
+#     Path - Where to save the contents.
+#
+# RETURN VALUE:
+#     None.
+#--------------------------------------------------------------------------------------------------
+def KdExportBuffer(Target: int, Path: str) -> None:
+    if Target == KD_DEST_KERNEL:
+        BufferText = "".join(Part for Part, _ in KdpKernelOutputBuffer)
+        TargetName = "kernel"
+    else:
+        BufferText = "".join(Part for Part, _ in KdpCommandOutputBuffer)
+        TargetName = "command"
+
+    try:
+        with open(Path, "w", encoding="utf-8") as File:
+            File.write(BufferText)
+        KdPrint(
+            KD_DEST_COMMAND,
+            KD_TYPE_INFO,
+            f"exported the contents of the {TargetName} log to `{Path}`\n")
+    except IOError as ExceptionData:
+        KdPrint(
+            KD_DEST_COMMAND,
+            KD_TYPE_ERROR,
+            f"failed to save specified buffer to `{Path}`: {ExceptionData}\n")
