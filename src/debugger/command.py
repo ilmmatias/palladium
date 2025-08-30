@@ -143,7 +143,7 @@ commands:
     help                       - alias to `h`
     ip/<size> <address>        - tries to read some data at the specified port address
                                  <size> can be `b` (8-bits), `w` (16-bits), or `d` (32-bits)
-                                 <adderss> should be a hexadecimal value
+                                 <address> should be a hexadecimal value
     q                          - closes this application
     quit                       - alias to `q`
     rp/<size>[count] <address> - tries to read some data at the specified physical address

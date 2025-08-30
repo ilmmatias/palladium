@@ -139,10 +139,7 @@ static void ParseReadPhysicalPacket(KdpDebugReadAddressPacket *Packet, uint32_t 
     }
 
     /* And let's attempt to map using the early mapping engine (as it should be safe to use at any
-     * time); Just a small problem, TODO: How do we check if this is a valid physical address?
-     * Actually, what happens if we map and access a bad physical address, does it fault? Does it
-     * just return non-sense (like all 0s or all Fs)? We really should handle this properly, as
-     * we can't afford to fault again here. */
+     * time). */
     void *VirtualAddress = HalpMapDebuggerMemory(Packet->Address, Packet->Length, 0);
     if (!VirtualAddress) {
         ResponsePacket->ItemSize = 0;
@@ -156,7 +153,22 @@ static void ParseReadPhysicalPacket(KdpDebugReadAddressPacket *Packet, uint32_t 
         return;
     }
 
-    memcpy(ResponsePacket + 1, VirtualAddress, Packet->Length);
+    /* Now this is kinda important: We might still crash if we access invalid physical memory, so
+     * we need to use SEH here (no way around it unfortunately). */
+    __try {
+        memcpy(ResponsePacket + 1, VirtualAddress, Packet->Length);
+    } __except (RT_EXC_EXECUTE_HANDLER) {
+        ResponsePacket->ItemSize = 0;
+        KdpSendUdpPacket(
+            KdpDebuggerHardwareAddress,
+            KdpDebuggerProtocolAddress,
+            KdpDebuggeePort,
+            KdpDebuggerPort,
+            ResponsePacket,
+            sizeof(KdpDebugReadAddressPacket));
+        return;
+    }
+
     HalpUnmapDebuggerMemory(VirtualAddress, Packet->Length);
     KdpSendUdpPacket(
         KdpDebuggerHardwareAddress,
@@ -263,7 +275,22 @@ static void ParseReadVirtualPacket(KdpDebugReadAddressPacket *Packet, uint32_t L
             return;
         }
 
-        memcpy(Payload, VirtualAddress, RegionLength);
+        /* Now this is kinda important: We might still crash if we access invalid physical memory,
+         * so we need to use SEH here (no way around it unfortunately). */
+        __try {
+            memcpy(Payload, VirtualAddress, RegionLength);
+        } __except (RT_EXC_EXECUTE_HANDLER) {
+            ResponsePacket->ItemSize = 0;
+            KdpSendUdpPacket(
+                KdpDebuggerHardwareAddress,
+                KdpDebuggerProtocolAddress,
+                KdpDebuggeePort,
+                KdpDebuggerPort,
+                ResponsePacket,
+                sizeof(KdpDebugReadAddressPacket));
+            return;
+        }
+
         HalpUnmapDebuggerMemory(VirtualAddress, RegionLength);
 
         Payload += RegionLength;
