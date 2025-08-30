@@ -30,11 +30,17 @@ KDP_COLOR_YELLOW = 226
 KDP_COLOR_BLUE = 51
 KDP_COLOR_GREY = 250
 
+# Layout constants.
+KDP_VERTICAL_SPLIT = 0
+KDP_HORIZONTAL_SPLIT = 1
+KDP_VERTICAL_SPLIT_THRESHOLD = 172
+
 # Internal context.
 KdpScreen: curses.window = None
 KdpScreenWidth: int = 0
 KdpScreenHeight: int = 0
 
+KdpCurrentLayout: int = 0
 KdpSelectedOutput: int = KD_DEST_KERNEL
 
 KdpKernelOutputContainer: curses.window = None
@@ -43,6 +49,7 @@ KdpKernelOutputWidth: int = 0
 KdpKernelOutputHeight: int = 0
 KdpKernelOutputMaxLines: int = 16384
 KdpKernelOutputCurrentPosition: int = 0
+KdpKernelOutputRefreshCoords: tuple[int, int, int, int] = ()
 
 KdpCommandOutputContainer: curses.window = None
 KdpCommandOutputWindow: curses.window = None
@@ -50,10 +57,118 @@ KdpCommandOutputWidth: int = 0
 KdpCommandOutputHeight: int = 0
 KdpCommandOutputMaxLines: int = 16384
 KdpCommandOutputCurrentPosition: int = 0
+KdpCommandOutputRefreshCoords: tuple[int, int, int, int] = ()
 
 KdpInputWindow: curses.window = None
 KdpInputWidth: int = 0
 KdpInputHeight: int = 0
+
+#--------------------------------------------------------------------------------------------------
+# PURPOSE:
+#     This function refreshes the debugger interface after a screen resize.
+#
+# PARAMETERS:
+#     None.
+#
+# RETURN VALUE:
+#     None.
+#--------------------------------------------------------------------------------------------------
+def KdpRefreshInterface() -> None:
+    # Regrab the screen dimensions (they did just change).
+    global KdpScreen, KdpScreenWidth, KdpScreenHeight
+    KdpScreenHeight, KdpScreenWidth = KdpScreen.getmaxyx()
+    KdpScreen.clear()
+
+    # Use a vertical split only if we can safely fit the `rp`/`rv` command output (without
+    # line breaks) when doing so.
+    global KdpCurrentLayout
+    if KdpScreenWidth > KDP_VERTICAL_SPLIT_THRESHOLD:
+        KdpCurrentLayout = KDP_VERTICAL_SPLIT
+    else:
+        KdpCurrentLayout = KDP_HORIZONTAL_SPLIT
+
+    SelectedAttribute = curses.A_BOLD | curses.color_pair(KDP_COLOR_BLUE)
+    UnselectedAttribute = curses.A_BOLD
+
+    # Reinitialize most of the available area as a scrollable output for the kernel output.
+    global KdpKernelOutputContainer, KdpKernelOutputWindow, KdpKernelOutputRefreshCoords
+    global KdpKernelOutputWidth, KdpKernelOutputHeight, KdpKernelOutputMaxLines
+    if KdpCurrentLayout == KDP_VERTICAL_SPLIT:
+        KdpKernelOutputWidth = KdpScreenWidth // 2
+        KdpKernelOutputHeight = KdpScreenHeight - 1
+    else:
+        KdpKernelOutputWidth = KdpScreenWidth
+        KdpKernelOutputHeight = (KdpScreenHeight - 1) // 2
+
+    KdpKernelOutputContainer = curses.newwin(KdpKernelOutputHeight, KdpKernelOutputWidth, 0, 0)
+    KdpKernelOutputRefreshCoords = (1, 1, KdpKernelOutputHeight - 2, KdpKernelOutputWidth - 2)
+    KdpKernelOutputWindow.resize(KdpKernelOutputMaxLines, KdpKernelOutputWidth - 2)
+    KdpKernelOutputContainer.box()
+    KdpKernelOutputContainer.addstr(
+        0,
+        2,
+        " Kernel Output ",
+        SelectedAttribute if KdpSelectedOutput == KD_DEST_KERNEL else UnselectedAttribute)
+    KdpKernelOutputContainer.refresh()
+    KdpScrollWindow(
+        KdpKernelOutputWindow,
+        KdpKernelOutputHeight,
+        KdpKernelOutputRefreshCoords,
+        KdpKernelOutputCurrentPosition,
+        0)
+
+    # And most of the remaining area as a scrollable output for the command line output.
+    global KdpCommandOutputContainer, KdpCommandOutputWindow, KdpCommandOutputRefreshCoords
+    global KdpCommandOutputWidth, KdpCommandOutputHeight, KdpCommandOutputMaxLines
+    if KdpCurrentLayout == KDP_VERTICAL_SPLIT:
+        KdpCommandOutputWidth = KdpScreenWidth - KdpKernelOutputWidth
+        KdpCommandOutputHeight = KdpScreenHeight - 1
+        KdpCommandOutputContainer = curses.newwin(
+            KdpCommandOutputHeight,
+            KdpCommandOutputWidth,
+            0,
+            KdpKernelOutputWidth)
+        KdpCommandOutputRefreshCoords = (
+            1,
+            KdpKernelOutputWidth + 1,
+            KdpCommandOutputHeight - 2,
+            KdpScreenWidth - 2)
+    else:
+        KdpCommandOutputWidth = KdpScreenWidth
+        KdpCommandOutputHeight = (KdpScreenHeight - 1) - KdpKernelOutputHeight
+        KdpCommandOutputContainer = curses.newwin(
+            KdpCommandOutputHeight,
+            KdpCommandOutputWidth,
+            KdpKernelOutputHeight,
+            0)
+        KdpCommandOutputRefreshCoords = (
+            KdpKernelOutputHeight + 1,
+            1,
+            KdpScreenHeight - 3,
+            KdpScreenWidth - 2)
+
+    KdpCommandOutputWindow.resize(KdpCommandOutputMaxLines, KdpCommandOutputWidth - 2)
+    KdpCommandOutputContainer.box()
+    KdpCommandOutputContainer.addstr(
+        0,
+        2,
+        " Command Output ",
+        SelectedAttribute if KdpSelectedOutput == KD_DEST_COMMAND else UnselectedAttribute)
+    KdpCommandOutputContainer.refresh()
+    KdpScrollWindow(
+        KdpCommandOutputWindow,
+        KdpCommandOutputHeight,
+        KdpCommandOutputRefreshCoords,
+        KdpCommandOutputCurrentPosition,
+        0)
+
+    # And reinitialize the last line as the input area.
+    global KdpInputWindow, KdpInputWidth, KdpInputHeight
+    KdpInputWidth = KdpScreenWidth
+    KdpInputHeight = 1
+    KdpInputWindow = curses.newwin(KdpInputHeight, KdpInputWidth, KdpScreenHeight - 1, 0)
+    KdpInputWindow.keypad(True)
+    KdpInputWindow.nodelay(True)
 
 #--------------------------------------------------------------------------------------------------
 # PURPOSE:
@@ -67,9 +182,8 @@ KdpInputHeight: int = 0
 #--------------------------------------------------------------------------------------------------
 def KdpInitializeInterface() -> None:
     # Initialize the main screen (containing all of the area).
-    global KdpScreen, KdpScreenWidth, KdpScreenHeight
+    global KdpScreen
     KdpScreen = curses.initscr()
-    KdpScreenHeight, KdpScreenWidth = KdpScreen.getmaxyx()
 
     # Setup the default (n)curses parameters.
     curses.cbreak()
@@ -86,43 +200,11 @@ def KdpInitializeInterface() -> None:
     curses.init_pair(KDP_COLOR_BLUE, KDP_COLOR_BLUE, -1)
     curses.init_pair(KDP_COLOR_GREY, KDP_COLOR_GREY, -1)
 
-    # Reinitialize most of the available area as a scrollable output for the kernel output.
-    global KdpKernelOutputContainer, KdpKernelOutputWindow
-    global KdpKernelOutputWidth, KdpKernelOutputHeight, KdpKernelOutputMaxLines
-    KdpKernelOutputWidth = KdpScreenWidth // 2
-    KdpKernelOutputHeight = KdpScreenHeight - 1
-    KdpKernelOutputContainer = curses.newwin(KdpKernelOutputHeight, KdpKernelOutputWidth, 0, 0)
-    KdpKernelOutputWindow = curses.newpad(KdpKernelOutputMaxLines, KdpKernelOutputWidth - 2)
-    KdpKernelOutputContainer.box()
-    KdpKernelOutputContainer.attrset(curses.A_BOLD | curses.color_pair(KDP_COLOR_BLUE))
-    KdpKernelOutputContainer.addstr(0, 2, " Kernel Output ")
-    KdpKernelOutputContainer.attrset(curses.A_NORMAL)
-    KdpKernelOutputContainer.refresh()
-
-    # And most of the remaining area as a scrollable output for the command line output.
-    global KdpCommandOutputContainer, KdpCommandOutputWindow
-    global KdpCommandOutputWidth, KdpCommandOutputHeight, KdpCommandOutputMaxLines
-    KdpCommandOutputWidth = KdpScreenWidth - KdpKernelOutputWidth
-    KdpCommandOutputHeight = KdpScreenHeight - 1
-    KdpCommandOutputContainer = curses.newwin(
-        KdpCommandOutputHeight,
-        KdpCommandOutputWidth,
-        0,
-        KdpKernelOutputWidth)
-    KdpCommandOutputWindow = curses.newpad(
-        KdpCommandOutputMaxLines,
-        KdpCommandOutputWidth - 2)
-    KdpCommandOutputContainer.box()
-    KdpCommandOutputContainer.addstr(0, 2, " Command Output ", curses.A_BOLD)
-    KdpCommandOutputContainer.refresh()
-
-    # And reinitialize the last line as the input area.
-    global KdpInputWindow, KdpInputWidth, KdpInputHeight
-    KdpInputWidth = KdpScreenWidth
-    KdpInputHeight = 1
-    KdpInputWindow = curses.newwin(KdpInputHeight, KdpInputWidth, KdpScreenHeight - 1, 0)
-    KdpInputWindow.keypad(True)
-    KdpInputWindow.nodelay(True)
+    # Initialize the scrollable areas/pads for the kernel and command outputs.
+    global KdpKernelOutputWindow, KdpCommandOutputWindow
+    KdpKernelOutputWindow = curses.newpad(KdpKernelOutputMaxLines, 1)
+    KdpCommandOutputWindow = curses.newpad(KdpCommandOutputMaxLines, 1)
+    KdpRefreshInterface()
 
     # For now, signal to the user that no input can be given (as we're waiting for a connection).
     KdChangeInputMessage("waiting for connection...")
@@ -161,13 +243,11 @@ def KdpShutdownInterface() -> None:
 def KdpScrollWindow(
     Window: curses.window,
     Height: int,
-    XOffset: int,
-    YOffset: int,
-    XMax: int,
-    YMax: int,
+    RefreshCoords: tuple[int, int, int, int],
     CurrentPosition: int,
     Delta: int) -> int:
     CurrentLine, _ = Window.getyx()
+    YBegin, XBegin, YEnd, XEnd = RefreshCoords
 
     if Delta < 0:
         CurrentPosition = max(0, CurrentPosition + Delta)
@@ -175,7 +255,7 @@ def KdpScrollWindow(
         MaxPosition = max(0, CurrentLine - Height + 2)
         CurrentPosition = min(MaxPosition, CurrentPosition + Delta)
 
-    Window.refresh(CurrentPosition, 0, YOffset, XOffset, YMax, XMax)
+    Window.refresh(CurrentPosition, 0, YBegin, XBegin, YEnd, XEnd)
 
     return CurrentPosition
 
@@ -247,20 +327,14 @@ def KdpUpdateScroll(Key: int) -> bool:
         KdpKernelOutputCurrentPosition = KdpScrollWindow(
             KdpKernelOutputWindow,
             KdpKernelOutputHeight,
-            1,
-            1,
-            KdpKernelOutputWidth - 2,
-            KdpKernelOutputHeight - 2,
+            KdpKernelOutputRefreshCoords,
             KdpKernelOutputCurrentPosition,
             Delta)
     else:
         KdpCommandOutputCurrentPosition = KdpScrollWindow(
             KdpCommandOutputWindow,
             KdpCommandOutputHeight,
-            KdpKernelOutputWidth + 1,
-            1,
-            KdpScreenWidth - 2,
-            KdpCommandOutputHeight - 2,
+            KdpCommandOutputRefreshCoords,
             KdpCommandOutputCurrentPosition,
             Delta)
 
@@ -317,20 +391,14 @@ def KdpPrint(Destination: int, Message: str) -> None:
         KdpKernelOutputCurrentPosition = KdpScrollWindow(
             KdpKernelOutputWindow,
             KdpKernelOutputHeight,
-            1,
-            1,
-            KdpKernelOutputWidth - 2,
-            KdpKernelOutputHeight - 2,
+            KdpKernelOutputRefreshCoords,
             KdpKernelOutputCurrentPosition,
             1)
     else:
         KdpCommandOutputCurrentPosition = KdpScrollWindow(
             KdpCommandOutputWindow,
             KdpCommandOutputHeight,
-            KdpKernelOutputWidth + 1,
-            1,
-            KdpScreenWidth - 2,
-            KdpCommandOutputHeight - 2,
+            KdpCommandOutputRefreshCoords,
             KdpCommandOutputCurrentPosition,
             1)
 
@@ -426,7 +494,19 @@ def KdReadInput(
     if Key == -1:
         return (PromptState, InputLine, False)
 
-    # Otherwise, try handling scrolling (this happens even if input is disabled).
+    # Handle resizing (as we need to adjust the sizing of the kernel and command output areas).
+    if Key == curses.KEY_RESIZE:
+        CurrentPrompt = KdpInputWindow.instr(0, 0).decode().strip()
+        KdpRefreshInterface()
+        if AllowInput:
+            KdpInputWindow.clear()
+            KdpInputWindow.addstr(CurrentPrompt)
+            KdpInputWindow.refresh()
+        else:
+            KdChangeInputMessage(CurrentPrompt)
+        return (PromptState, InputLine, False)
+
+    # Also try handling scrolling (this happens even if input is disabled).
     if KdpUpdateScroll(Key) or not AllowInput:
         # Just make sure to return the cursor to the input line if KdpUpdateScroll did anything.
         if AllowInput:

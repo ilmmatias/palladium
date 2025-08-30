@@ -53,7 +53,7 @@ def main() -> int:
     # Create the UDP socket and attempt doing a handshake with the debuggee.
     try:
         Socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        Socket.settimeout(1.0)
+        Socket.settimeout(0.01)
     except Exception as ExceptionData:
         print(f"error: failed to create the UDP socket: {ExceptionData}")
         return 1
@@ -61,20 +61,25 @@ def main() -> int:
     # Get the TUI online before anything else.
     interface.KdpInitializeInterface()
 
-    (Connected, Status) = protocol.KdEstablishConnection(
-        Socket,
-        DebuggeeProtocolAddress,
-        DebuggeePort)
-    if not Connected:
-        if Status == 0:
-            interface.KdpShutdownInterface()
-        Socket.close()
-        return Status
+    while True:
+        # One pass of input handling (input not allowed yet, but we do handle
+        # scroll-related events and resizing).
+        _ = interface.KdReadInput(False, False, "", "")
+
+        # And one pass of network related handling.
+        (Connected, Status) = protocol.KdEstablishConnection(
+            Socket,
+            DebuggeeProtocolAddress,
+            DebuggeePort)
+        if Connected:
+            break
+        elif Status != protocol.KD_STATUS_TIMEOUT:
+            if Status == 0:
+                interface.KdpShutdownInterface()
+            Socket.close()
+            return Status
 
     interface.KdChangeInputMessage("target system is running...")
-
-    # TODO: Can this fault? If yes, we need to wrap it around a try...
-    Socket.settimeout(0.01)
 
     # TODO: We should probably add a periodic ping to check if the connection is still active?
     PromptState = False

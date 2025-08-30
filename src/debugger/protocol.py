@@ -6,6 +6,11 @@ import struct
 
 from . import interface
 
+# Status codes for KdEstabilishConnection.
+KD_STATUS_TIMEOUT = -1
+KD_STATUS_SUCCESS = 0
+KD_STATUS_FAILURE = 1
+
 # Definitions related to our custom debugger protocol.
 KDP_DEBUG_PACKET_CONNECT_REQ = 0x00
 KDP_DEBUG_PACKET_PRINT = 0x01
@@ -62,15 +67,15 @@ def KdEstablishConnection(
             Data, _ = Socket.recvfrom(2048)
             PacketType: int = struct.unpack(KDP_DEBUG_PACKET_FORMAT, Data[:1])[0]
             if PacketType == KDP_DEBUG_PACKET_CONNECT_ACK:
-                return (True, 0)
+                return (True, KD_STATUS_SUCCESS)
         except socket.timeout:
-            pass
+            return (False, KD_STATUS_TIMEOUT)
         except KeyboardInterrupt:
-            return (False, 0)
+            return (False, KD_STATUS_SUCCESS)
         except Exception as ExceptionData:
             interface.KdpShutdownInterface()
             print(f"error: {ExceptionData}")
-            return (False, 1)
+            return (False, KD_STATUS_FAILURE)
 
 #--------------------------------------------------------------------------------------------------
 # PURPOSE:
