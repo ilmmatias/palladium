@@ -43,6 +43,7 @@ KdpScreenHeight: int = 0
 KdpCurrentLayout: int = 0
 KdpSelectedOutput: int = KD_DEST_KERNEL
 
+KdpKernelOutputBuffer: list[tuple[str, int]] = []
 KdpKernelOutputContainer: curses.window = None
 KdpKernelOutputWindow: curses.window = None
 KdpKernelOutputWidth: int = 0
@@ -51,6 +52,7 @@ KdpKernelOutputMaxLines: int = 16384
 KdpKernelOutputCurrentPosition: int = 0
 KdpKernelOutputRefreshCoords: tuple[int, int, int, int] = ()
 
+KdpCommandOutputBuffer: list[tuple[str, int]] = []
 KdpCommandOutputContainer: curses.window = None
 KdpCommandOutputWindow: curses.window = None
 KdpCommandOutputWidth: int = 0
@@ -101,8 +103,8 @@ def KdpRefreshInterface() -> None:
         KdpKernelOutputHeight = (KdpScreenHeight - 1) // 2
 
     KdpKernelOutputContainer = curses.newwin(KdpKernelOutputHeight, KdpKernelOutputWidth, 0, 0)
+    KdpKernelOutputWindow = curses.newpad(KdpKernelOutputMaxLines, KdpKernelOutputWidth - 2)
     KdpKernelOutputRefreshCoords = (1, 1, KdpKernelOutputHeight - 2, KdpKernelOutputWidth - 2)
-    KdpKernelOutputWindow.resize(KdpKernelOutputMaxLines, KdpKernelOutputWidth - 2)
     KdpKernelOutputContainer.box()
     KdpKernelOutputContainer.addstr(
         0,
@@ -110,6 +112,11 @@ def KdpRefreshInterface() -> None:
         " Kernel Output ",
         SelectedAttribute if KdpSelectedOutput == KD_DEST_KERNEL else UnselectedAttribute)
     KdpKernelOutputContainer.refresh()
+
+    # As we reintialized the pad as well, we need to reappend all the current text
+    # (and then scroll to the correct position).
+    for (Line, Attribute) in KdpKernelOutputBuffer:
+        KdpKernelOutputWindow.addstr(Line, Attribute)
     KdpScrollWindow(
         KdpKernelOutputWindow,
         KdpKernelOutputHeight,
@@ -147,7 +154,7 @@ def KdpRefreshInterface() -> None:
             KdpScreenHeight - 3,
             KdpScreenWidth - 2)
 
-    KdpCommandOutputWindow.resize(KdpCommandOutputMaxLines, KdpCommandOutputWidth - 2)
+    KdpCommandOutputWindow = curses.newpad(KdpCommandOutputMaxLines, KdpCommandOutputWidth - 2)
     KdpCommandOutputContainer.box()
     KdpCommandOutputContainer.addstr(
         0,
@@ -155,6 +162,9 @@ def KdpRefreshInterface() -> None:
         " Command Output ",
         SelectedAttribute if KdpSelectedOutput == KD_DEST_COMMAND else UnselectedAttribute)
     KdpCommandOutputContainer.refresh()
+
+    for (Line, Attribute) in KdpCommandOutputBuffer:
+        KdpCommandOutputWindow.addstr(Line, Attribute)
     KdpScrollWindow(
         KdpCommandOutputWindow,
         KdpCommandOutputHeight,
@@ -384,8 +394,10 @@ def KdpPrint(Destination: int, Message: str) -> None:
         elif Part:
             if Destination == KD_DEST_KERNEL:
                 KdpKernelOutputWindow.addstr(Part, CurrentAttribute)
+                KdpKernelOutputBuffer.append((Part, CurrentAttribute))
             else:
                 KdpCommandOutputWindow.addstr(Part, CurrentAttribute)
+                KdpCommandOutputBuffer.append((Part, CurrentAttribute))
 
     if Destination == KD_DEST_KERNEL:
         KdpKernelOutputCurrentPosition = KdpScrollWindow(
