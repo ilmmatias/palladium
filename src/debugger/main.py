@@ -5,17 +5,11 @@ import argparse
 import ipaddress
 import socket
 
+from . import command
+from . import connection
 from . import interface
 from . import protocol
-
-# Definitions related to our custom debugger protocol.
-KDP_DEBUG_PACKET_CONNECT_REQ = 0
-KDP_DEBUG_PACKET_CONNECT_ACK = 1
-KDP_DEBUG_PACKET_PRINT = 2
-KDP_DEBUG_PACKET_BREAK = 3
-
-# Format for the custom debugger protocol structure.
-KDP_DEBUG_PACKET_FORMAT = "<B"
+from . import receiver
 
 #--------------------------------------------------------------------------------------------------
 # PURPOSE:
@@ -67,7 +61,7 @@ def main() -> int:
         _ = interface.KdReadInput(False, False, "", "")
 
         # And one pass of network related handling.
-        (Connected, Status) = protocol.KdEstablishConnection(
+        (Connected, Status) = connection.KdEstablishConnection(
             Socket,
             DebuggeeProtocolAddress,
             DebuggeePort)
@@ -91,11 +85,19 @@ def main() -> int:
         (PromptState, InputLine, InputFinished) = \
             interface.KdReadInput(PromptState, AllowInput, InputLine, "kd> ")
         if InputFinished:
-            protocol.KdHandleInput(Socket, DebuggeeProtocolAddress, DebuggeePort, InputLine)
+            FinishExecution = command.KdHandleInput(
+                Socket,
+                DebuggeeProtocolAddress,
+                DebuggeePort,
+                InputLine)
+            if FinishExecution:
+                interface.KdpShutdownInterface()
+                Socket.close()
+                return 0
             InputLine = ""
 
         # And one pass of network related handling.
-        (FinishExecution, EncounteredBreak, Status) = protocol.KdHandleIncomingPacket(Socket)
+        (FinishExecution, EncounteredBreak, Status) = receiver.KdHandleIncomingPacket(Socket)
         if FinishExecution:
             if Status == 0:
                 interface.KdpShutdownInterface()
