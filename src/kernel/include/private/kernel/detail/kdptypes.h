@@ -293,6 +293,11 @@ typedef struct __attribute__((packed)) {
 
 typedef struct __attribute__((packed)) {
     uint8_t Type;
+    char Architecture[16];
+} KdpDebugConnectAckPacket;
+
+typedef struct __attribute__((packed)) {
+    uint8_t Type;
     uint64_t Address;
     uint8_t ItemSize;
     uint32_t ItemCount;

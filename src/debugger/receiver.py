@@ -20,13 +20,24 @@ from . import utils
 #     None.
 #--------------------------------------------------------------------------------------------------
 def KdpHandleReadMemoryAck(PacketType: int, Data: bytes) -> None:
+    IsDisassemble = protocol.KdpCurrentState == protocol.KDP_STATE_DISASSEMBLE_PHYSICAL or \
+                    protocol.KdpCurrentState == protocol.KDP_STATE_DISASSEMBLE_VIRTUAL
+
     if PacketType == protocol.KDP_DEBUG_PACKET_READ_PHYSICAL_ACK:
-        ExpectedState = protocol.KDP_STATE_READ_PHYSICAL
-        PacketCommand = "rp"
+        if IsDisassemble:
+            ExpectedState = protocol.KDP_STATE_DISASSEMBLE_PHYSICAL
+            PacketCommand = "dp"
+        else:
+            ExpectedState = protocol.KDP_STATE_READ_PHYSICAL
+            PacketCommand = "rp"
         MemoryType = "physical"
     else:
-        ExpectedState = protocol.KDP_STATE_READ_VIRTUAL
-        PacketCommand = "rv"
+        if IsDisassemble:
+            ExpectedState = protocol.KDP_STATE_DISASSEMBLE_VIRTUAL
+            PacketCommand = "dv"
+        else:
+            ExpectedState = protocol.KDP_STATE_READ_VIRTUAL
+            PacketCommand = "rv"
         MemoryType = "virtual"
 
     # Should we be indeed printing something to the command window in this case?
@@ -61,16 +72,20 @@ def KdpHandleReadMemoryAck(PacketType: int, Data: bytes) -> None:
         return
 
     # Parameter validation (just to ensure no one can break us by manually sending bad packets).
-    if ItemSize not in (1, 2, 4, 8) or \
+    if (IsDisassemble and ItemSize != 1) or \
+       (not IsDisassemble and ItemSize not in (1, 2, 4, 8)) or\
        ItemCount * ItemSize != Length or \
        len(Data) - 18 < Length:
-        interface.KdPrint(
-            interface.KD_DEST_COMMAND,
-            interface.KD_TYPE_ERROR,
-            f"received corrupted `{PacketCommand}` acknowledgement\n")
-        return
+            interface.KdPrint(
+                interface.KD_DEST_COMMAND,
+                interface.KD_TYPE_ERROR,
+                f"received corrupted `{PacketCommand}` acknowledgement\n")
+            return
 
-    utils.KdpPrintMemoryData(MemoryType, Data[18:], Address, ItemSize, Length)
+    if IsDisassemble:
+        utils.KdpPrintDisassemblyData(MemoryType, Data[18:], Address, Length)
+    else:
+        utils.KdpPrintMemoryData(MemoryType, Data[18:], Address, ItemSize, Length)
 
 #--------------------------------------------------------------------------------------------------
 # PURPOSE:

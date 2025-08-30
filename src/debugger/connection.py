@@ -35,8 +35,18 @@ def KdEstablishConnection(
             # And wait for an ACK.
             Data, _ = Socket.recvfrom(2048)
             PacketType: int = struct.unpack(protocol.KDP_DEBUG_PACKET_FORMAT, Data[:1])[0]
-            if PacketType == protocol.KDP_DEBUG_PACKET_CONNECT_ACK:
-                return (True, protocol.KD_STATUS_SUCCESS)
+            if PacketType != protocol.KDP_DEBUG_PACKET_CONNECT_ACK:
+                pass
+
+            # The kernel is not going to send another ACK, so, we're forced to just use what we
+            # have.
+            # If the kernel didn't give us an architecture to work with, assume amd64 for now.
+            if len(Data) != 17:
+                protocol.KdpCurrentArchitecture = "amd64"
+            else:
+                protocol.KdpCurrentArchitecture = Data[1:].decode("utf-8").rstrip("\x00")
+
+            return (True, protocol.KD_STATUS_SUCCESS)
         except socket.timeout:
             return (False, protocol.KD_STATUS_TIMEOUT)
         except KeyboardInterrupt:

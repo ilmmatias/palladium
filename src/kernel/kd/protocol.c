@@ -47,8 +47,9 @@ static void ParseEarlyPacket(
         return;
     }
 
-    KdpDebugPacket AckPacket;
+    KdpDebugConnectAckPacket AckPacket;
     AckPacket.Type = KDP_DEBUG_PACKET_CONNECT_ACK;
+    strncpy(AckPacket.Architecture, KE_ARCH, sizeof(AckPacket.Architecture));
 
     uint32_t Status = KdpSendUdpPacket(
         SourceHardwareAddress,
@@ -56,7 +57,7 @@ static void ParseEarlyPacket(
         KdpDebuggeePort,
         SourcePort,
         &AckPacket,
-        sizeof(KdpDebugPacket));
+        sizeof(KdpDebugConnectAckPacket));
     if (Status) {
         KdPrint(
             KD_TYPE_ERROR,
@@ -368,7 +369,12 @@ static void ParseLatePacket(
         return;
     }
 
-    if (Packet->Type == KDP_DEBUG_PACKET_READ_PHYSICAL_REQ) {
+    if (Packet->Type == KDP_DEBUG_PACKET_CONNECT_REQ) {
+        /* We just ignore these (with no trace/messages), as the debugger just might end up flooding
+         * us with a few messages in between connecting (sending the ack) and them actually handling
+         * the ack. */
+        return;
+    } else if (Packet->Type == KDP_DEBUG_PACKET_READ_PHYSICAL_REQ) {
         ParseReadPhysicalPacket((KdpDebugReadAddressPacket *)Packet, Length);
     } else if (Packet->Type == KDP_DEBUG_PACKET_READ_VIRTUAL_REQ) {
         ParseReadVirtualPacket((KdpDebugReadAddressPacket *)Packet, Length);

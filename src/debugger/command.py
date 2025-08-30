@@ -9,6 +9,68 @@ from . import protocol
 
 #--------------------------------------------------------------------------------------------------
 # PURPOSE:
+#     This function handles sending a `read memory` request to the kernel (while setting everything
+#     up to disassemble that memory).
+#
+# PARAMETERS:
+#     Socket - What socket we're using.
+#     DebuggeeProtocolAddress - IP(v4) address of the debuggee.
+#     DebuggeePort - Target UDP port of the debuggee.
+#     InputTokens - What we read from the user.
+#
+# RETURN VALUE:
+#     None.
+#--------------------------------------------------------------------------------------------------
+def KdpHandleDisassembleMemoryRequest(
+    Socket: socket.socket,
+    DebuggeeProtocolAddress: str,
+    DebuggeePort: int,
+    InputTokens: list[str]) -> None:
+    RequestName = InputTokens[0][:2]
+
+    try:
+        # d[/A] B
+        #     B -> Unsigned number; How many bytes to try reading (and disassembling).
+        #     C -> Address.
+        if len(InputTokens) != 2 or \
+           (len(InputTokens[0]) > 3 and not InputTokens[0].startswith(f"{RequestName}/")):
+            raise ValueError(f"expected format: {RequestName}[/count] <address>")
+
+        Length = 128
+        if len(InputTokens[0]) > 4:
+            Length = int(InputTokens[0][4:])
+
+        Address = int(InputTokens[1], 16)
+    except ValueError as ExceptionData:
+        interface.KdPrint(
+            interface.KD_DEST_COMMAND,
+            interface.KD_TYPE_ERROR,
+            f"{ExceptionData}\n")
+        return
+
+    if RequestName == "dp":
+        protocol.KdpCurrentState = protocol.KDP_STATE_DISASSEMBLE_PHYSICAL
+        Packet = struct.pack(
+            protocol.KDP_DEBUG_PACKET_READ_ADDRESS_FORMAT,
+            protocol.KDP_DEBUG_PACKET_READ_PHYSICAL_REQ,
+            Address,
+            1,
+            Length,
+            Length)
+    else:
+        protocol.KdpCurrentState = protocol.KDP_STATE_DISASSEMBLE_VIRTUAL
+        Packet = struct.pack(
+            protocol.KDP_DEBUG_PACKET_READ_ADDRESS_FORMAT,
+            protocol.KDP_DEBUG_PACKET_READ_VIRTUAL_REQ,
+            Address,
+            1,
+            Length,
+            Length)
+
+    Socket.sendto(Packet, (DebuggeeProtocolAddress, DebuggeePort))
+
+#--------------------------------------------------------------------------------------------------
+# PURPOSE:
 #     This function handles an `el` (export log) request.
 #
 # PARAMETERS:
@@ -59,6 +121,14 @@ mouse controls:
     scroll up/down             - scroll the focused log up/down
 
 commands:
+    dp[/count] <address>       - tries to diassemble some data at the specified physical address
+                                 by default, 128 bytes of data will be read
+                                 [count] is how many bytes should be read
+                                 <address> should be a hexadecimal value
+    dv[/count] <address>       - tries to disassemble some data at the specified virtual address
+                                 by default, 128 bytes of data will be read
+                                 [count] is how many bytes should be read
+                                 <address> should be a hexadecimal value
     el[/target] <path>         - save the specified log to a file
                                  by default, the focused log will be saved
                                  [target] can be either `k` (kernel) or `c` (command)
@@ -227,7 +297,13 @@ def KdHandleInput(
     InputTokens = InputLine.split()
 
     CommandName = InputTokens[0].split("/")[0]
-    if CommandName == "el":
+    if CommandName == "dp" or CommandName == "dv":
+        KdpHandleDisassembleMemoryRequest(
+            Socket,
+            DebuggeeProtocolAddress,
+            DebuggeePort,
+            InputTokens)
+    elif CommandName == "el":
         KdpHandleExportLogRequest(InputTokens)
     elif CommandName == "h" or CommandName == "help":
         KdpHandleHelpRequest()

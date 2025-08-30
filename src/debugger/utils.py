@@ -1,9 +1,52 @@
 # SPDX-FileCopyrightText: (C) 2025 ilmmatias
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import capstone
 import struct
 
 from . import interface
+from . import protocol
+
+#--------------------------------------------------------------------------------------------------
+# PURPOSE:
+#     This function handles the disassembling some received memory data from the kernel.
+#
+# PARAMETERS:
+#     Kind - Which memory type we're reading (physical vs virtual).
+#     Payload - What memory data we should disassemble.
+#     Address - What address we read.
+#     Length - Total size in bytes of the region we're dumping.
+#
+# RETURN VALUE:
+#     None.
+#--------------------------------------------------------------------------------------------------
+def KdpPrintDisassemblyData(Kind: str, Payload: bytes, Address: int, Length: int) -> None:
+    # Add any architectures here as needed!
+    ArchitectureMap = {
+        "amd64": (capstone.CS_ARCH_X86, capstone.CS_MODE_64),
+    }
+
+    Parameters = ArchitectureMap.get(protocol.KdpCurrentArchitecture)
+    if not Parameters:
+        interface.KdPrint(
+            interface.KD_DEST_COMMAND,
+            interface.KD_TYPE_ERROR,
+            f"current architecture `{protocol.KdpCurrentArchitecture}` " +
+            "is unsupported for the disassembler!\n")
+        return
+
+    interface.KdPrint(
+        interface.KD_DEST_COMMAND,
+        interface.KD_TYPE_INFO,
+        f"disassembling data contained in the {Kind} range " +
+        f"0x{Address:x} - 0x{(Address + Length):x}\n")
+
+    Disassembler = capstone.Cs(Parameters[0], Parameters[1])
+    for (CurrentAddress, _, Mnemonic, Operands) in Disassembler.disasm_lite(Payload, Address):
+        interface.KdPrint(
+            interface.KD_DEST_COMMAND,
+            interface.KD_TYPE_NONE,
+            f"{(CurrentAddress):016x}:\t{Mnemonic:<10}\t{Operands}\n")
 
 #--------------------------------------------------------------------------------------------------
 # PURPOSE:
