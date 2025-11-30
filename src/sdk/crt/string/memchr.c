@@ -15,7 +15,7 @@
  * RETURN VALUE:
  *     Pointer to where the byte was found, or NULL if it wasn't found.
  *-----------------------------------------------------------------------------------------------*/
-void *memchr(const void *s, int c, size_t n) {
+__attribute__((no_builtin)) void *memchr(const void *s, int c, size_t n) {
     const char *Buffer = s;
 
     while (*Buffer != c && n) {

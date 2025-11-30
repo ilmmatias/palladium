@@ -10,7 +10,6 @@ add_library(acpi "knostdlib" SHARED
 
 target_link_libraries(acpi kernel)
 target_include_directories(acpi PRIVATE include/private PUBLIC include/public)
-target_compile_options(acpi PRIVATE $<$<COMPILE_LANGUAGE:C>:-ffreestanding>)
 target_link_options(acpi PRIVATE -Wl,--subsystem=native,--entry=DriverEntry)
 set_target_properties(acpi PROPERTIES SUFFIX ".sys")
 set_target_properties(acpi PROPERTIES ENABLE_EXPORTS TRUE)

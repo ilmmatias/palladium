@@ -16,7 +16,8 @@
  * RETURN VALUE:
  *     Start of the destination buffer.
  *-----------------------------------------------------------------------------------------------*/
-void *memcpy(void *CRT_RESTRICT s1, const void *CRT_RESTRICT s2, size_t n) {
+__attribute__((no_builtin)) void *
+memcpy(void *CRT_RESTRICT s1, const void *CRT_RESTRICT s2, size_t n) {
     char *CRT_RESTRICT Destination = s1;
     const char *CRT_RESTRICT Source = s2;
 

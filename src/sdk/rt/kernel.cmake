@@ -18,5 +18,3 @@ add_library(krt "kcrt" STATIC ${SOURCES} ${KERNEL_SOURCES})
 target_include_directories(krt
     PUBLIC include
     PRIVATE ../../kernel/include/public)
-
-target_compile_options(krt PRIVATE $<$<COMPILE_LANGUAGE:C>:-ffreestanding>)

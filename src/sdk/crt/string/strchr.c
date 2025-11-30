@@ -14,7 +14,7 @@
  * RETURN VALUE:
  *     Pointer to where the character was found, or NULL if it wasn't found.
  *-----------------------------------------------------------------------------------------------*/
-char *strchr(const char *s, int c) {
+__attribute__((no_builtin)) char *strchr(const char *s, int c) {
     while (*s && *s != c) {
         s++;
     }

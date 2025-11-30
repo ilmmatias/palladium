@@ -74,15 +74,10 @@ set(USER_DLL_STARTUP_SOURCES
 
 add_library(ucrt "osapi" SHARED ${USER_SOURCES} ucrt.def)
 target_include_directories(ucrt PUBLIC include)
-target_compile_options(ucrt PRIVATE $<$<COMPILE_LANGUAGE:C>:-ffreestanding>)
 target_link_options(ucrt PRIVATE -Wl,--entry=CrtDllStartup)
 
 add_library(ucrt_exe_startup "nostdlib" OBJECT ${USER_EXE_STARTUP_SOURCES})
-target_compile_options(ucrt_exe_startup PRIVATE $<$<COMPILE_LANGUAGE:C>:-ffreestanding>)
-
 add_library(ucrt_dll_startup "nostdlib" OBJECT ${USER_DLL_STARTUP_SOURCES})
-target_compile_options(ucrt_dll_startup PRIVATE $<$<COMPILE_LANGUAGE:C>:-ffreestanding>)
 
 add_library(ucrt_compiler "nostdlib" OBJECT ${COMPILER_SOURCES})
 target_include_directories(ucrt_compiler PRIVATE include)
-target_compile_options(ucrt_compiler PRIVATE $<$<COMPILE_LANGUAGE:C>:-ffreestanding>)

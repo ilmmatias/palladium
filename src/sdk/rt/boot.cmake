@@ -3,4 +3,3 @@
 
 add_library(brt "kcrt" STATIC ${SOURCES})
 target_include_directories(brt PUBLIC include)
-target_compile_options(brt PRIVATE $<$<COMPILE_LANGUAGE:C>:-ffreestanding>)

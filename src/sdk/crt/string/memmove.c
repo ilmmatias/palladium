@@ -16,7 +16,7 @@
  * RETURN VALUE:
  *     Start of the destination buffer.
  *-----------------------------------------------------------------------------------------------*/
-void *memmove(void *s1, const void *s2, size_t n) {
+__attribute__((no_builtin)) void *memmove(void *s1, const void *s2, size_t n) {
     char *Destination = (char *)s1;
     const char *Source = (const char *)s2;
 

@@ -8,5 +8,4 @@ set(SOURCES
 
 add_library(osapi "nostdlib" SHARED ${SOURCES} osapi.def)
 target_include_directories(osapi PUBLIC include)
-target_compile_options(osapi PRIVATE $<$<COMPILE_LANGUAGE:C>:-ffreestanding>)
 target_link_options(osapi PRIVATE -Wl,--entry=OsApiDllStartup)

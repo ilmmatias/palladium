@@ -13,7 +13,7 @@
  * RETURN VALUE:
  *     Size in bytes of the given string (excluding the \0 at the end).
  *-----------------------------------------------------------------------------------------------*/
-size_t strlen(const char *s) {
+__attribute__((no_builtin)) size_t strlen(const char *s) {
     size_t Size = 0;
 
     while (*(s++)) {

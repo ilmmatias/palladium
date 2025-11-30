@@ -16,7 +16,7 @@
  *     0 for equality, *s1 - *s2 if an inequality is found (where `s1` and `s1` are both
  *     reinterpreted as char*, and are pointing to where the inequality happened).
  *-----------------------------------------------------------------------------------------------*/
-int memcmp(const void *s1, const void *s2, size_t n) {
+__attribute__((no_builtin)) int memcmp(const void *s1, const void *s2, size_t n) {
     const char *Left = s1;
     const char *Right = s2;
 

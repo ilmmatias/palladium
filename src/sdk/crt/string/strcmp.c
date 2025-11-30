@@ -15,7 +15,7 @@
  *     0 for equality, *s1 - *s2 if an inequality is found (where `s1` and `s2` would be pointers
  *     to where the inequality happened).
  *-----------------------------------------------------------------------------------------------*/
-int strcmp(const char *s1, const char *s2) {
+__attribute__((no_builtin)) int strcmp(const char *s1, const char *s2) {
     while (*s1 && *s2 && *s1 == *s2) {
         s1++;
         s2++;
