@@ -22,6 +22,7 @@ uint32_t VidpBackground = 0x000000;
 uint32_t VidpForeground = 0xAAAAAA;
 uint16_t VidpCursorX = 0;
 uint16_t VidpCursorY = 0;
+uint16_t VidpRingTop = 0;
 
 KeSpinLock VidpLock = {0};
 bool VidpUseLock = true;
@@ -73,10 +74,28 @@ void VidpReleaseSpinLock(KeIrql OldIrql) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void VidpFlush(void) {
-    memcpy(
-        VidpBackBuffer + VidpFlushY * VidpPitch,
-        VidpFrontBuffer + VidpFlushY * VidpPitch,
-        VidpFlushLines * VidpPitch);
+    uint16_t FrontY = (VidpRingTop + VidpFlushY) % VidpHeight;
+    uint16_t WrapLine = VidpHeight - FrontY;
+
+    if (VidpFlushLines <= WrapLine) {
+        /* If we don't have that many lines, we just need one memcpy to get everything. */
+        memcpy(
+            VidpBackBuffer + VidpFlushY * VidpPitch,
+            VidpFrontBuffer + FrontY * VidpPitch,
+            VidpFlushLines * VidpPitch);
+    } else {
+        /* Otherwise (when we go over the wrap around point), we need to use two memcpys (one for
+         * before the wrap, and one for after the wrap). */
+        memcpy(
+            VidpBackBuffer + VidpFlushY * VidpPitch,
+            VidpFrontBuffer + FrontY * VidpPitch,
+            WrapLine * VidpPitch);
+        memcpy(
+            VidpBackBuffer + (VidpFlushY + WrapLine) * VidpPitch,
+            VidpFrontBuffer,
+            (VidpFlushLines - WrapLine) * VidpPitch);
+    }
+
     VidpPendingFullFlush = false;
 }
 
@@ -91,15 +110,24 @@ void VidpFlush(void) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 static void ScrollUp(void) {
-    const uint32_t ScreenSize = VidpPitch * VidpHeight;
-    const uint32_t LineSize = VidpPitch * VidpFont.Height;
-    memmove(VidpFrontBuffer, VidpFrontBuffer + LineSize, ScreenSize - LineSize);
+    /* We don't actually need to move the screen up, we can treat the front buffer as circular, and
+     * so start writing to its top instead of bottom. */
+    VidpRingTop = (VidpRingTop + VidpFont.Height) % VidpHeight;
 
-    /* We can't just memset, thanks to the background not being fixed at 0x00000000 (black). */
+    /* Now comes the issue, we need to be VERY careful here. The buffer wraps around, but the wrap
+     * around might be at an odd place, so we need to do things line by line. */
+    const uint16_t BackY = VidpHeight - VidpFont.Height;
     for (int i = 0; i < VidpFont.Height; i++) {
-        for (int j = 0; j < VidpWidth; j++) {
-            *(uint32_t *)&VidpFrontBuffer[ScreenSize - LineSize + i * VidpPitch + j * 4] =
-                VidpBackground;
+        uint16_t FrontY = (VidpRingTop + BackY + i) % VidpHeight;
+        uint32_t *Buffer = (uint32_t *)&VidpFrontBuffer[FrontY * VidpPitch];
+
+        /* Then, we can either set pixel by pixel, or use memset (if we have a solid background). */
+        if (VidpBackground == (VidpBackground & 0xFF) * 0x01010101) {
+            memset(Buffer, VidpBackground & 0xFF, VidpWidth * 4);
+        } else {
+            for (int j = 0; j < VidpWidth; j++) {
+                Buffer[j] = VidpBackground;
+            }
         }
     }
 
@@ -146,44 +174,55 @@ static void DrawCharacter(char Character) {
     const uint8_t *Data = &VidpFont.GlyphData[Info->Offset];
     uint16_t GlyphLeft = Info->Left;
     uint16_t GlyphTop = VidpFont.Ascender - Info->Top;
-    char *Buffer =
-        &VidpFrontBuffer[(VidpCursorY + GlyphTop) * VidpPitch + (VidpCursorX + GlyphLeft) * 4];
+
+    /* Grab the left and top limits for the full character area (so we don't need to check for them
+     * in the for loops). */
+    uint16_t LeftLimit = VidpFont.GlyphInfo[0x20].Advance;
+    if (VidpCursorX + LeftLimit > VidpWidth) {
+        LeftLimit = VidpWidth - VidpCursorX;
+    }
+
+    uint16_t TopLimit = VidpFont.Height;
+    if (VidpCursorY + TopLimit > VidpHeight) {
+        TopLimit = VidpHeight - VidpCursorY;
+    }
 
     /* The code after us only cares about the foreground, so we're left to manually clear the
        background. */
-    for (uint16_t Top = 0; Top < VidpFont.Height; Top++) {
-        if (VidpCursorY + Top >= VidpHeight) {
-            break;
-        }
-
-        for (uint16_t Left = 0; Left < VidpFont.GlyphInfo[0x20].Advance; Left++) {
-            if (VidpCursorX + Left >= VidpWidth) {
-                break;
+    for (uint16_t Top = 0; Top < TopLimit; Top++) {
+        uint16_t FrontY = (VidpCursorY + VidpRingTop + Top) % VidpHeight;
+        uint32_t *Buffer = (uint32_t *)&VidpFrontBuffer[FrontY * VidpPitch + VidpCursorX * 4];
+        if (VidpBackground == (VidpBackground & 0xFF) * 0x01010101) {
+            memset(Buffer, VidpBackground & 0xFF, LeftLimit * 4);
+        } else {
+            for (int j = 0; j < TopLimit; j++) {
+                Buffer[j] = VidpBackground;
             }
-
-            *(uint32_t
-                  *)&VidpFrontBuffer[(VidpCursorY + Top) * VidpPitch + (VidpCursorX + Left) * 4] =
-                VidpBackground;
         }
+    }
+
+    /* Then grab the left/top limits for the actual glyph contents. */
+    LeftLimit = Info->Width;
+    if (VidpCursorX + LeftLimit > VidpWidth) {
+        LeftLimit = VidpWidth - VidpCursorX;
+    }
+
+    TopLimit = Info->Height;
+    if (VidpCursorY + TopLimit > VidpHeight) {
+        TopLimit = VidpHeight - VidpCursorY;
     }
 
     /* We use a schema where each byte inside the glyph represents one pixel, the value of said
        pixel is the brightness of the pixel (0 being background); We just use Blend() to combine
        the background and foreground values based on the brightness. */
-    for (uint16_t Top = 0; Top < Info->Height; Top++) {
-        if (VidpCursorY + GlyphTop + Top >= VidpHeight) {
-            break;
-        }
-
-        for (uint16_t Left = 0; Left < Info->Width; Left++) {
-            if (VidpCursorX + GlyphLeft + Left >= VidpWidth) {
-                break;
-            }
-
+    for (uint16_t Top = 0; Top < TopLimit; Top++) {
+        uint16_t FrontY = (VidpCursorY + VidpRingTop + GlyphTop + Top) % VidpHeight;
+        uint32_t *Buffer =
+            (uint32_t *)&VidpFrontBuffer[FrontY * VidpPitch + (VidpCursorX + GlyphLeft) * 4];
+        for (uint16_t Left = 0; Left < LeftLimit; Left++) {
             uint8_t Alpha = Data[Top * Info->Width + Left];
             if (Alpha) {
-                *(uint32_t *)&Buffer[Top * VidpPitch + Left * 4] =
-                    Blend(VidpBackground, VidpForeground, Alpha);
+                Buffer[Left] = Blend(VidpBackground, VidpForeground, Alpha);
             }
         }
     }
@@ -204,6 +243,7 @@ void VidResetDisplay(void) {
     KeIrql OldIrql = VidpAcquireSpinLock();
     VidpCursorX = 0;
     VidpCursorY = 0;
+    VidpRingTop = 0;
 
     for (int i = 0; i < VidpHeight; i++) {
         for (int j = 0; j < VidpWidth; j++) {
