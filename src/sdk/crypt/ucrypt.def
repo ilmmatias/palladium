@@ -1,5 +1,10 @@
 LIBRARY ucrypt.dll
 EXPORTS
+    CryptInitializeChaCha20Cipher
+    CryptClearChaCha20Cipher
+    CryptEncryptChaCha20Cipher
+    CryptExtractChaCha20Cipher
+
     CryptClearSha224Hash
     CryptFinishSha224Hash
     CryptGetSha224Hash

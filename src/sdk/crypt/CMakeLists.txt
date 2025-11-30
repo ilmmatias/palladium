@@ -7,7 +7,9 @@ set(SOURCES
     sha2/sha224.c
     sha2/sha256.c
     sha2/sha384.c
-    sha2/sha512.c)
+    sha2/sha512.c
+
+    chacha20.c)
 
 include(kernel.cmake)
 include(user.cmake)
