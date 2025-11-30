@@ -47,6 +47,38 @@ static void InitializeEntry(
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
+ *     This function sets up the stack address used for cross privilege ring interrupts.
+ *
+ * PARAMETERS:
+ *     Processor - Pointer to the processor-specific structure.
+ *     EntryIndex - Which of the stack pointers to change.
+ *     StackLimit - Maximum address of the stack.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+static void InitializeRsp(KeProcessor *Processor, uint8_t EntryIndex, void *StackLimit) {
+    Processor->TssEntry.Rsp[EntryIndex] = (uint64_t)StackLimit;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function sets up the IST for a TSS entry.
+ *
+ * PARAMETERS:
+ *     Processor - Pointer to the processor-specific structure.
+ *     EntryIndex - Which entry to initialize.
+ *     StackLimit - Maximum address of the stack.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+static void InitializeIst(KeProcessor *Processor, uint8_t EntryIndex, void *StackLimit) {
+    Processor->TssEntry.Ist[EntryIndex] = (uint64_t)StackLimit;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
  *     This function initializes the Global Descriptor Table. This, in combination with
  *     InitializeIdt, means we're safe to unmap the first 2MiB (and map the SMP entry point to it).
  *
@@ -67,10 +99,10 @@ void HalpInitializeGdt(KeProcessor *Processor) {
     uint64_t TssBase = (uint64_t)&Processor->TssEntry;
     uint16_t TssSize = sizeof(HalpTssEntry);
     InitializeEntry(Processor, DESCR_SEG_TSS, TssBase, TssSize, GDT_TYPE_TSS, DESCR_DPL_KERNEL);
-    Processor->TssEntry.Rsp0 = (uint64_t)&Processor->SystemStack;
-    Processor->TssEntry.Ist[DESCR_IST_NMI - 1] = (uint64_t)&Processor->NmiStack;
-    Processor->TssEntry.Ist[DESCR_IST_DOUBLE_FAULT - 1] = (uint64_t)&Processor->DoubleFaultStack;
-    Processor->TssEntry.Ist[DESCR_IST_MACHINE_CHECK - 1] = (uint64_t)&Processor->MachineCheckStack;
+    InitializeRsp(Processor, DESCR_DPL_KERNEL, Processor->SystemStack + KE_STACK_SIZE);
+    InitializeIst(Processor, DESCR_IST_NMI, Processor->NmiStack + KE_STACK_SIZE);
+    InitializeIst(Processor, DESCR_IST_DOUBLE_FAULT, Processor->DoubleFaultStack + KE_STACK_SIZE);
+    InitializeIst(Processor, DESCR_IST_MACHINE_CHECK, Processor->MachineCheckStack + KE_STACK_SIZE);
     Processor->TssEntry.IoMapBase = TssSize;
 
     HalpGdtDescriptor Descriptor;
@@ -93,5 +125,5 @@ void HalpInitializeGdt(KeProcessor *Processor) {
  *-----------------------------------------------------------------------------------------------*/
 void HalpUpdateTss(void) {
     KeProcessor *Processor = KeGetCurrentProcessor();
-    Processor->TssEntry.Rsp0 = (uint64_t)Processor->StackBase;
+    InitializeRsp(Processor, DESCR_DPL_KERNEL, Processor->StackLimit);
 }

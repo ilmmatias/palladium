@@ -134,6 +134,7 @@ uint32_t MiFreePoolPages(void *Base) {
 
     /* Otherwise, start by freeing the base/first block (and unmapping it). */
     PageEntry->PoolBase = 0;
+    PageEntry->PoolItem = 0;
     MmFreeSinglePage(PhysicalAddress);
 
     /* And follow up by validating and freeing up the remaining memory. */

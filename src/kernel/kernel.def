@@ -50,6 +50,7 @@ EXPORTS
     PsDelayThread
     PsInitializeAlert
     PsQueueAlert
+    PsTerminateThread
     PsYieldThread
 
     VidGetColor

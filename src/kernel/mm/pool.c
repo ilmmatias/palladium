@@ -226,18 +226,23 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
     }
 
     /* Split the pages into equal sized chunks; This can have some waste depending on the chosen
-     * bucket sizes, so make sure to tune the min/max/shift values! */
+     * bucket sizes, especially because we need to skip anything that would accidentally align
+     * the result base to a page (that is reserved for large allocations), so make sure to
+     * tune the min/max/shift values, possibly even the amount of bucket classes! */
     KeAcquireSpinLockAtCurrentIrql(&FreeBlockLock[Head]);
     for (uint64_t i = 1; i < (HeadPages << MM_PAGE_SHIFT) / FullSize; i++) {
         BlockHeader *Header = (BlockHeader *)(StartAddress + i * FullSize);
-        Header->Head = Head;
-        RtPushSList(&FreeBlockList[Head], &Header->ListHeader);
+        if (((uint64_t)(Header + 1) & (MM_PAGE_SIZE - 1))) {
+            Header->Head = Head;
+            RtPushSList(&FreeBlockList[Head], &Header->ListHeader);
+        }
     }
 
     KeReleaseSpinLockAtCurrentIrql(&FreeBlockLock[Head]);
 
     /* The first block was skipped as it should be ours. */
     BlockHeader *Header = (BlockHeader *)StartAddress;
+    Header->Head = Head;
     memcpy(Header->Tag, Tag, 4);
     MiAddPoolTracker(FullSize, Tag);
     KeLowerIrql(OldIrql);
@@ -302,7 +307,7 @@ void MmFreePool(void *Base, const char Tag[4]) {
 
     /* If we haven't overflow the local cache yet, just directly push to it (as it doesn't need any
      * locks). */
-    uint64_t FullSize = GetHeadSize(Header->Head) + 16;
+    uint64_t FullSize = GetHeadSize(Header->Head) + sizeof(BlockHeader);
     KeProcessor *Processor = KeGetCurrentProcessor();
     if (Processor->FreePoolBlockListSize[Header->Head] < MI_PROCESSOR_POOL_CACHE_MAX_SIZE) {
         RtPushSList(&Processor->FreePoolBlockListHead[Header->Head], &Header->ListHeader);
