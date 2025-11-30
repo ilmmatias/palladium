@@ -1,0 +1,25 @@
+LIBRARY ucrypt.dll
+EXPORTS
+    CryptClearSha224Hash
+    CryptFinishSha224Hash
+    CryptGetSha224Hash
+    CryptInitializeSha224Hash
+    CryptUpdateSha224Hash
+
+    CryptClearSha256Hash
+    CryptFinishSha256Hash
+    CryptGetSha256Hash
+    CryptInitializeSha256Hash
+    CryptUpdateSha256Hash
+
+    CryptClearSha384Hash
+    CryptFinishSha384Hash
+    CryptGetSha384Hash
+    CryptInitializeSha384Hash
+    CryptUpdateSha384Hash
+
+    CryptClearSha512Hash
+    CryptFinishSha512Hash
+    CryptGetSha512Hash
+    CryptInitializeSha512Hash
+    CryptUpdateSha512Hash
