@@ -18,3 +18,5 @@ AlwaysBreakBeforeMultilineStrings: false
 BinPackArguments: false
 BinPackParameters: false
 ColumnLimit: 100
+PointerAlignment: Right
+ReferenceAlignment: Right
