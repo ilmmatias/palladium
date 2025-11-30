@@ -66,6 +66,7 @@ set(SOURCES
     string/memchr.c
     string/memcmp.c
     string/memmove.c
+    string/memset_explicit.c
     string/strcat.c
     string/strchr.c
     string/strcmp.c

@@ -85,6 +85,7 @@ EXPORTS
     memcpy
     memmove
     memset
+    memset_explicit
     strcat
     strchr
     strcmp
