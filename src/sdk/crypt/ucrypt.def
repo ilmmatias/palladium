@@ -5,6 +5,23 @@ EXPORTS
     CryptEncryptChaCha20Cipher
     CryptExtractChaCha20Cipher
 
+    CryptGetHashHandle
+
+    CryptGetHashBufferSize
+    CryptGetHashDigestSize
+
+    CryptClearHash
+    CryptFinishHash
+    CryptGetHash
+    CryptInitializeHash
+    CryptUpdateHash
+
+    CryptClearHmac
+    CryptFinishHmac
+    CryptGetHmac
+    CryptInitializeHmac
+    CryptUpdateHmac
+
     CryptClearSha224Hash
     CryptFinishSha224Hash
     CryptGetSha224Hash
