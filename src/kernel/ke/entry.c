@@ -1,6 +1,7 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
+#include <crt_impl/rand.h>
 #include <kernel/halp.h>
 #include <kernel/kdp.h>
 #include <kernel/ki.h>
@@ -22,6 +23,7 @@ static void InitializeBootProcessor(KiLoaderBlock *LoaderBlock) {
     /* Hello, World! We're essentially still fresh out of the loader land, so, take over the boot
      * framebuffer, and get us to a basic state (where the kernel/HAL is managing the basic
      * resources like exception/interrupt handling). */
+    __srand64(LoaderBlock->Basic.RandomSeed);
     VidpInitialize(LoaderBlock);
     MiInitializeEarlyPageAllocator(LoaderBlock);
     HalpInitializePlatform(LoaderBlock);

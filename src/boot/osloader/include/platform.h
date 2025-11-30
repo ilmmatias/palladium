@@ -13,13 +13,14 @@
 #endif /* __has_include */
 
 #define OSLP_BOOT_MAGIC "OLDR"
-#define OSLP_BOOT_VERSION 0x0000'0000'00000005
+#define OSLP_BOOT_VERSION 0x0000'0000'00000006
 
 typedef struct __attribute__((packed)) {
     char Magic[4];
     uint64_t LoaderVersion;
     RtDList *MemoryDescriptorListHead;
     RtDList *BootDriverListHead;
+    uint64_t RandomSeed;
 } OslpBootBasicData;
 
 typedef struct __attribute__((packed)) {

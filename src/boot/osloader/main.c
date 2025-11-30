@@ -4,6 +4,7 @@
 #include <acpi.h>
 #include <config.h>
 #include <console.h>
+#include <crt_impl/rand.h>
 #include <ctype.h>
 #include <entropy.h>
 #include <file.h>
@@ -319,6 +320,7 @@ EFI_STATUS OslMain(EFI_HANDLE *ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
         BootBlock->Basic.LoaderVersion = OSLP_BOOT_VERSION;
         BootBlock->Basic.MemoryDescriptorListHead = MemoryDescriptorListHead;
         BootBlock->Basic.BootDriverListHead = ModuleListHead;
+        BootBlock->Basic.RandomSeed = __rand64();
         BootBlock->Acpi.RootPointer = AcpiRootPointer;
         BootBlock->Acpi.RootTable = AcpiRootTable;
         BootBlock->Acpi.RootTableSize = AcpiRootTableSize;

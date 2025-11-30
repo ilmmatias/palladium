@@ -17,6 +17,7 @@ typedef struct __attribute__((packed)) {
     uint64_t LoaderVersion;
     RtDList *MemoryDescriptorListHead;
     RtDList *BootDriverListHead;
+    uint64_t RandomSeed;
 } KiLoaderBasicData;
 
 typedef struct __attribute__((packed)) {
