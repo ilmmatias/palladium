@@ -15,6 +15,51 @@ static KeSpinLock BitmapLock = {0};
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
+ *     This function directly allocates some virtual space that isn't mapped to any physical page.
+ *
+ * PARAMETERS:
+ *     Pages - How many pages we need.
+ *
+ * RETURN VALUE:
+ *     New virtual address (nothing mapped yet), or NULL on failure.
+ *-----------------------------------------------------------------------------------------------*/
+void *MiAllocatePoolSpace(uint32_t Pages) {
+    if (!Pages) {
+        return NULL;
+    }
+
+    /* We just need the bitmap lock, and then it's as simple as doing a bitmap search. */
+    KeAcquireSpinLockAtCurrentIrql(&BitmapLock);
+    uint64_t Index = RtFindClearBitsAndSet(&MiPoolBitmap, MiPoolBitmapHint, Pages);
+    if (Index != (uint64_t)-1) {
+        MiPoolBitmapHint = Index + Pages;
+    }
+
+    KeReleaseSpinLockAtCurrentIrql(&BitmapLock);
+    return Index != (uint64_t)-1 ? (void *)(MI_POOL_START + (Index << MM_PAGE_SHIFT)) : NULL;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function returns back a virtual memory range we're not using anymore.
+ *
+ * PARAMETERS:
+ *     Base - First virtual address of the allocation.
+ *     Pages - How many pages we're returning.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void MiFreePoolSpace(void *Base, uint32_t Pages) {
+    uint64_t Index = ((uint64_t)Base - MI_POOL_START) >> MM_PAGE_SHIFT;
+    KeAcquireSpinLockAtCurrentIrql(&BitmapLock);
+    RtClearBits(&MiPoolBitmap, Index, Pages);
+    MiPoolBitmapHint = Index;
+    KeReleaseSpinLockAtCurrentIrql(&BitmapLock);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
  *     This function allocates a the specified amount of pages from the pool space. We expect to be
  *     called at DISPATCH IRQL.
  *
@@ -57,18 +102,12 @@ void *MiAllocatePoolPages(uint32_t Pages) {
         }
     }
 
-    /* Otherwise, we need to grab more virtual space (this needs the bitmap lock). */
-    KeAcquireSpinLockAtCurrentIrql(&BitmapLock);
-    uint64_t Index = RtFindClearBitsAndSet(&MiPoolBitmap, MiPoolBitmapHint, Pages);
-    if (Index == (uint64_t)-1) {
-        KeReleaseSpinLockAtCurrentIrql(&BitmapLock);
+    /* Otherwise, we need to grab more virtual space. */
+    void *VirtualAddress = MiAllocatePoolSpace(Pages);
+    if (!VirtualAddress) {
         return NULL;
-    } else {
-        MiPoolBitmapHint = Index + Pages;
-        KeReleaseSpinLockAtCurrentIrql(&BitmapLock);
     }
 
-    char *VirtualAddress = (char *)(MI_POOL_START + (Index << MM_PAGE_SHIFT));
     for (uint64_t Offset = 0; Offset < Pages << MM_PAGE_SHIFT; Offset += MM_PAGE_SIZE) {
         /* TODO: What exactly should be do when we fail to map/allocate the space, unmap+free
          * the pages, mark them as big pool free? */
@@ -149,16 +188,9 @@ uint32_t MiFreePoolPages(void *Base) {
         MmFreeSinglePage(PhysicalAddress);
     }
 
-    /* And wrap up by unmapping and returning the whole range (the later one needs to be done under
-     * the lock). */
+    /* And wrap up by unmapping and returning the whole range. */
     HalpUnmapPages(Base, Pages << MM_PAGE_SHIFT);
-
-    uint64_t Index = ((uint64_t)Base - MI_POOL_START) >> MM_PAGE_SHIFT;
-    KeAcquireSpinLockAtCurrentIrql(&BitmapLock);
-    RtClearBits(&MiPoolBitmap, Index, Pages);
-    MiPoolBitmapHint = Index;
-    KeReleaseSpinLockAtCurrentIrql(&BitmapLock);
-
+    MiFreePoolSpace(Base, Pages);
     __atomic_fetch_sub(&MiTotalPoolPages, Pages, __ATOMIC_RELAXED);
     return Pages;
 }

@@ -37,6 +37,8 @@ void MiReleaseBootRegions(void);
 uint64_t MiAllocateEarlyPages(uint32_t Pages);
 
 void MiInitializePool(void);
+void *MiAllocatePoolSpace(uint32_t Pages);
+void MiFreePoolSpace(void *Base, uint32_t Pages);
 void *MiAllocatePoolPages(uint32_t Pages);
 uint32_t MiFreePoolPages(void *Base);
 

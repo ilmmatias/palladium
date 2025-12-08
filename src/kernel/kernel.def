@@ -14,6 +14,7 @@ EXPORTS
     HalDeleteInterrupt
     HalDisableInterrupt
     HalEnableInterrupt
+    HalFindAcpiTable
     HalGetTimerFrequency
     HalGetTimerTicks
     HalInitializeInterruptData
@@ -35,6 +36,8 @@ EXPORTS
     MmAllocateSinglePage
     MmFreePool
     MmFreeSinglePage
+    MmMapSpace
+    MmUnmapSpace
 
     ObCreateDirectory
     ObCreateObject

@@ -33,6 +33,7 @@ add_library(kernel "kernel" SHARED
     ev/signal.c
     ev/timer.c
 
+    hal/acpi.c
     hal/timer.c
 
     kd/arp.c
@@ -53,6 +54,7 @@ add_library(kernel "kernel" SHARED
     ke/panic.c
     ke/work.c
 
+    mm/map.c
     mm/page.c
     mm/pool.c
     mm/poolpage.c

@@ -28,6 +28,8 @@ void HalDeleteInterrupt(HalInterrupt *Interrupt);
 bool HalEnableInterrupt(HalInterrupt *Interrupt);
 void HalDisableInterrupt(HalInterrupt *Interrupt);
 
+void *HalFindAcpiTable(const char *Signature, int Index);
+
 void HalReadPciConfigurationSpace(
     uint32_t Bus,
     uint32_t Slot,

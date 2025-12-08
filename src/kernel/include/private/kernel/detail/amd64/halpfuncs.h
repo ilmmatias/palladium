@@ -4,7 +4,7 @@
 #ifndef _KERNEL_DETAIL_AMD64_HALPFUNCS_H_
 #define _KERNEL_DETAIL_AMD64_HALPFUNCS_H_
 
-#include <kernel/detail/ketypes.h>
+#include <kernel/detail/kitypes.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -20,6 +20,9 @@ void HalpInitializeIdt(KeProcessor *Processor);
 void HalpInitializeGdt(KeProcessor *Processor);
 void HalpFlushGdt(void);
 void HalpUpdateTss(void);
+
+void HalpInitializeEarlyAcpi(KiLoaderBlock *LoaderBlock);
+void *HalpFindEarlyAcpiTable(const char *Signature);
 
 void HalpCollectApics(void);
 void HalpInitializeApic(void);

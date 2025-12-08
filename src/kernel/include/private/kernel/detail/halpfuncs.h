@@ -27,18 +27,13 @@ void HalpInitializePlatform(KiLoaderBlock *LoaderBlock);
 void HalpInitializeBootProcessor(void);
 void HalpInitializeApplicationProcessor(KeProcessor *Processor);
 
-/* I'm not fully sure, should this be here? Initializing/using the kernel debugging stuff is
- * probably going to need this, so probably? */
 void HalpInitializeEarlyMap(KiLoaderBlock *LoaderBlock);
 void *HalpMapDebuggerMemory(uint64_t PhysicalAddress, size_t Size, int Flags);
 void HalpUnmapDebuggerMemory(void *VirtualAddress, size_t Size);
 void *HalpMapEarlyMemory(uint64_t PhysicalAddress, size_t Size, int Flags);
 void HalpUnmapEarlyMemory(void *VirtualAddress, size_t Size);
 
-/* I'm pretty sure this can go to the amd64-specific halpfuncs.h, but I'll leave here for now (at
- * least until we re-add a way to query the ACPI tables for the rest of the kernel). */
-void HalpInitializeEarlyAcpi(KiLoaderBlock *LoaderBlock);
-void *HalpFindEarlyAcpiTable(const char *Signature);
+void HalpInitializeLateAcpi(KiLoaderBlock *LoaderBlock);
 
 uint64_t HalpGetPhysicalAddress(void *VirtualAddress);
 bool HalpMapContiguousPages(

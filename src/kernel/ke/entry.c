@@ -67,6 +67,7 @@ static void InitializeBootProcessor(KiLoaderBlock *LoaderBlock) {
     /* The loader data will become inaccessible once we release/unmap all the remaining OSLOADER
      * regions, so save the required remaining data. After this, the stack trace on KeFatalError
      * will start working properly (as it depends on the module data to unwind). */
+    HalpInitializeLateAcpi(LoaderBlock);
     KiSaveBootStartDrivers(LoaderBlock);
     MiReleaseBootRegions();
 
