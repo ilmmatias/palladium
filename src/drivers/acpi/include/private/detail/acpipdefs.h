@@ -1,0 +1,23 @@
+/* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
+ * SPDX-License-Identifier: GPL-3.0-or-later */
+
+#ifndef _ACPIP_DETAIL_ACPIPDEFS_H_
+#define _ACPIP_DETAIL_ACPIPDEFS_H_
+
+#define ACPI_ARG_NONE 0
+#define ACPI_ARG_BYTE 1
+#define ACPI_ARG_WORD 2
+#define ACPI_ARG_DWORD 3
+#define ACPI_ARG_QWORD 4
+#define ACPI_ARG_STRING 5
+#define ACPI_ARG_NAME 6
+#define ACPI_ARG_TERM_ARG 7
+#define ACPI_ARG_OBJ_REF 8
+#define ACPI_ARG_INTEGER 9
+#define ACPI_ARG_BUFFER 10
+#define ACPI_ARG_PACKAGE 11
+
+#define ACPI_REASON_OUT_OF_MEMORY 0
+#define ACPI_REASON_CORRUPTED_TABLES 1
+
+#endif /* _ACPIP_DETAIL_ACPIPDEFS_H_ */
