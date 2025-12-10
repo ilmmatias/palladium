@@ -21,19 +21,24 @@ int AcpipExecuteLockOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
     switch (Opcode) {
         /* DefMutex := MutexOp NameString SyncFlags */
         case 0x015B: {
-            AcpiValue Value;
-            Value.Type = ACPI_MUTEX;
-            Value.References = 1;
-            Value.Mutex = AcpipAllocateBlock(sizeof(AcpiMutex));
-            if (!Value.Mutex) {
+            AcpiValue MutexValue;
+            MutexValue.Type = ACPI_MUTEX;
+            MutexValue.References = 1;
+            MutexValue.Mutex = AcpipAllocateBlock(sizeof(AcpiMutex));
+            if (!MutexValue.Mutex) {
                 return 0;
             }
 
-            Value.Mutex->References = 1;
-            Value.Mutex->Flags = State->Opcode->FixedArguments[1].Integer;
-            atomic_flag_clear(&Value.Mutex->Value);
+            MutexValue.Mutex->References = 1;
+            MutexValue.Mutex->SyncLevel = State->Opcode->FixedArguments[1].Integer & 0x0F;
+            MutexValue.Mutex->Handle = AcpipCreateMutex();
+            if (!MutexValue.Mutex->Handle) {
+                AcpipFreeBlock(MutexValue.Mutex);
+                return 0;
+            }
 
-            if (!AcpipCreateObject(&State->Opcode->FixedArguments[0].Name, &Value)) {
+            if (!AcpipCreateObject(&State->Opcode->FixedArguments[0].Name, &MutexValue)) {
+                AcpipFreeBlock(MutexValue.Mutex);
                 return 0;
             }
 
@@ -47,10 +52,13 @@ int AcpipExecuteLockOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
                 return 0;
             }
 
-            /* STUB, we should handle the timeout + use some kind of thread blocking fn
-               after we implement threads in the kernel. */
-            while (atomic_flag_test_and_set(&MutexObject.Mutex->Value))
-                ;
+            uint16_t Timeout = State->Opcode->FixedArguments[1].Integer;
+            int Result = AcpipAcquireMutex(MutexObject.Mutex->Handle, Timeout);
+            if (Value) {
+                Value->Type = ACPI_INTEGER;
+                Value->References = 1;
+                Value->Integer = Result ? UINT64_MAX : 0;
+            }
 
             AcpiRemoveReference(&State->Opcode->FixedArguments[0].TermArg, 0);
             break;
@@ -63,9 +71,52 @@ int AcpipExecuteLockOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
                 return 0;
             }
 
-            /* STUB, send a "mutex release" signal to the kernel after we implement threading. */
-            atomic_flag_clear(&MutexObject.Mutex->Value);
+            AcpipReleaseMutex(MutexObject.Mutex->Handle);
 
+            AcpiRemoveReference(&State->Opcode->FixedArguments[0].TermArg, 0);
+            break;
+        }
+
+        /* DefWait := WaitOp EventObject Operand */
+        case 0x255B: {
+            AcpiValue EventObject;
+            if (!AcpipReadTarget(State, &State->Opcode->FixedArguments[0].TermArg, &EventObject)) {
+                return 0;
+            }
+
+            uint64_t Timeout = State->Opcode->FixedArguments[1].TermArg.Integer;
+            int Result = AcpipWaitEvent(EventObject.Event->Handle, Timeout);
+            if (Value) {
+                Value->Type = ACPI_INTEGER;
+                Value->References = 1;
+                Value->Integer = Result ? UINT64_MAX : 0;
+            }
+
+            AcpiRemoveReference(&State->Opcode->FixedArguments[0].TermArg, 0);
+            AcpiRemoveReference(&State->Opcode->FixedArguments[1].TermArg, 0);
+            break;
+        }
+
+        /* DefSignal := SignalOp EventObject */
+        case 0x245B: {
+            AcpiValue EventObject;
+            if (!AcpipReadTarget(State, &State->Opcode->FixedArguments[0].TermArg, &EventObject)) {
+                return 0;
+            }
+
+            AcpipSignalEvent(EventObject.Event->Handle);
+            AcpiRemoveReference(&State->Opcode->FixedArguments[0].TermArg, 0);
+            break;
+        }
+
+        /* DefReset := ResetOp EventObject */
+        case 0x265B: {
+            AcpiValue EventObject;
+            if (!AcpipReadTarget(State, &State->Opcode->FixedArguments[0].TermArg, &EventObject)) {
+                return 0;
+            }
+
+            AcpipResetEvent(EventObject.Event->Handle);
             AcpiRemoveReference(&State->Opcode->FixedArguments[0].TermArg, 0);
             break;
         }

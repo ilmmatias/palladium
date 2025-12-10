@@ -4,7 +4,6 @@
 #ifndef _ACPI_DETAIL_ACPITYPES_H_
 #define _ACPI_DETAIL_ACPITYPES_H_
 
-#include <stdatomic.h>
 #include <stdint.h>
 
 struct AcpiPackage;
@@ -34,9 +33,14 @@ typedef struct {
 
 typedef struct {
     int References;
-    uint8_t Flags;
-    volatile atomic_flag Value;
+    uint8_t SyncLevel;
+    void *Handle;
 } AcpiMutex;
+
+typedef struct {
+    int References;
+    void *Handle;
+} AcpiEvent;
 
 typedef struct {
     int References;
@@ -55,6 +59,7 @@ typedef struct AcpiValue {
         AcpiBuffer *Buffer;
         struct AcpiPackage *Package;
         AcpiMutex *Mutex;
+        AcpiEvent *Event;
         struct {
             AcpiOverrideMethod Override;
             const uint8_t *Start;

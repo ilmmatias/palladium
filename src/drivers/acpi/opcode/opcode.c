@@ -390,6 +390,23 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
                     break;
                 }
 
+                /* DefNotify := NotifyOp NotifyObject NotifyValue */
+                case 0x86: {
+                    AcpiValue *NotifyObject = &State->Opcode->FixedArguments[0].TermArg;
+                    uint64_t NotifyValue = State->Opcode->FixedArguments[1].TermArg.Integer;
+
+                    /* TODO: Actually implement this. */
+                    if (NotifyObject->Type == ACPI_REFERENCE && NotifyObject->Reference) {
+                        AcpipShowTraceMessage(
+                            "Notify(%.4s, 0x%llx)\n", NotifyObject->Reference->Name, NotifyValue);
+                    }
+
+                    AcpiRemoveReference(NotifyObject, 0);
+                    AcpiRemoveReference(&State->Opcode->FixedArguments[1].TermArg, 0);
+                    break;
+                }
+
+
                 /* DebugObj */
                 case 0x315B: {
                     Value.Type = ACPI_DEBUG;

@@ -58,8 +58,20 @@ int AcpipExecuteNamedObjOpcode(AcpipState *State, uint16_t Opcode) {
             AcpiValue Value;
             Value.Type = ACPI_EVENT;
             Value.References = 1;
+            Value.Event = AcpipAllocateBlock(sizeof(AcpiEvent));
+            if (!Value.Event) {
+                return 0;
+            }
+
+            Value.Event->References = 1;
+            Value.Event->Handle = AcpipCreateEvent();
+            if (!Value.Event->Handle) {
+                AcpipFreeBlock(Value.Event);
+                return 0;
+            }
 
             if (!AcpipCreateObject(&State->Opcode->FixedArguments[0].Name, &Value)) {
+                AcpipFreeBlock(Value.Event);
                 return 0;
             }
 

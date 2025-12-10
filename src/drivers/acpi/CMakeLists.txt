@@ -9,6 +9,7 @@ add_library(acpi "knostdlib" SHARED
     interp/aml.c
     interp/args.c
     interp/field.c
+    interp/lock.c
     interp/object.c
     interp/override.c
     interp/termarg.c
@@ -32,6 +33,7 @@ add_library(acpi "knostdlib" SHARED
     os/mmio.c
     os/pci.c
     os/port.c
+    os/sync.c
     os/table.c
 
     acpi.def

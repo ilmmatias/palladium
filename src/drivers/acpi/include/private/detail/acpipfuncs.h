@@ -33,6 +33,19 @@ void AcpipShowDebugMessage(const char *Format, ...);
 void AcpipShowTraceMessage(const char *Format, ...);
 [[noreturn]] void AcpipShowErrorMessage(int Reason, const char *Format, ...);
 
+void *AcpipCreateEvent(void);
+int AcpipWaitEvent(void *Event, uint64_t Timeout);
+void AcpipSignalEvent(void *Event);
+void AcpipResetEvent(void *Event);
+
+void *AcpipCreateMutex(void);
+int AcpipAcquireMutex(void *Mutex, uint64_t Timeout);
+void AcpipReleaseMutex(void *Mutex);
+
+void AcpipInitializeGlobalLock(void);
+int AcpipAcquireGlobalLock(void);
+int AcpipReleaseGlobalLock(void);
+
 AcpipScope *AcpipEnterScope(AcpipState *State, AcpiObject *Object, uint32_t Length);
 AcpipScope *AcpipEnterIf(AcpipState *State, uint32_t Length);
 AcpipScope *AcpipEnterWhile(

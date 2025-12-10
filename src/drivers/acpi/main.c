@@ -91,6 +91,9 @@ void DriverEntry(void) {
     AcpipPopulateOverride();
     AcpipReadTables();
 
+    /* Save up the global lock data (if any exists). */
+    AcpipInitializeGlobalLock();
+
     /* We need _SB_ for the initialization process. AcpipPopulatePredefined should have created it,
        so we're assuming memory corruption if it doesn't exist. */
     AcpiObject *SbScope = AcpiSearchObject(NULL, "_SB_");
