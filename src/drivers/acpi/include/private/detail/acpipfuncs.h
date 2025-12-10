@@ -33,6 +33,10 @@ void AcpipShowDebugMessage(const char *Format, ...);
 void AcpipShowTraceMessage(const char *Format, ...);
 [[noreturn]] void AcpipShowErrorMessage(int Reason, const char *Format, ...);
 
+uint64_t AcpipGetTimer(void);
+void AcpipDelayThread(uint64_t Milliseconds);
+void AcpipStallExecution(uint64_t Microseconds);
+
 void *AcpipCreateEvent(void);
 int AcpipWaitEvent(void *Event, uint64_t Timeout);
 void AcpipSignalEvent(void *Event);

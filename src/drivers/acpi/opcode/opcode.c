@@ -302,10 +302,15 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
                     break;
                 }
 
+                /* DefStall := StallOp UsecTime */
+                case 0x215B: {
+                    AcpipStallExecution(State->Opcode->FixedArguments[0].TermArg.Integer);
+                    break;
+                }
+
                 /* DefSleep := SleepOp MsecTime */
                 case 0x225B: {
-                    /* TODO: Just a stub at the moment, make it work after we implement support in
-                       the kernel. */
+                    AcpipDelayThread(State->Opcode->FixedArguments[0].TermArg.Integer);
                     break;
                 }
 

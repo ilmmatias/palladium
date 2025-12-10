@@ -179,6 +179,14 @@ int AcpipExecuteDataObjOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Val
             break;
         }
 
+        /* TimerOp */
+        case 0x335B: {
+            Value->Type = ACPI_INTEGER;
+            Value->References = 1;
+            Value->Integer = AcpipGetTimer();
+            break;
+        }
+
         default:
             return -1;
     }

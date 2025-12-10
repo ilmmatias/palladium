@@ -35,6 +35,7 @@ add_library(acpi "knostdlib" SHARED
     os/port.c
     os/sync.c
     os/table.c
+    os/timer.c
 
     acpi.def
     main.c
