@@ -50,6 +50,12 @@ void AcpipInitializeGlobalLock(void);
 int AcpipAcquireGlobalLock(void);
 int AcpipReleaseGlobalLock(void);
 
+uint64_t AcpipReadEcSpace(uint16_t CmdPort, uint16_t DataPort, uint64_t Offset);
+void AcpipWriteEcSpace(uint16_t CmdPort, uint16_t DataPort, uint64_t Offset, uint64_t Data);
+
+uint64_t AcpipReadCmosSpace(uint64_t Offset);
+void AcpipWriteCmosSpace(uint64_t Offset, uint64_t Data);
+
 AcpipScope *AcpipEnterScope(AcpipState *State, AcpiObject *Object, uint32_t Length);
 AcpipScope *AcpipEnterIf(AcpipState *State, uint32_t Length);
 AcpipScope *AcpipEnterWhile(

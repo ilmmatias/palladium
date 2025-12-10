@@ -76,6 +76,99 @@ static int SetupPciConfigRegion(AcpiObject *Object) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
+ *     This function sets up a region for reading/writing into the Embedded Controller space.
+ *     We're a noop if the region isn't EC, or if we have already cached the required values.
+ *
+ * PARAMETERS:
+ *     Object - AML object containing the region.
+ *
+ * RETURN VALUE:
+ *     1 on success, 0 otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+static int SetupEcRegion(AcpiObject *Object) {
+    if (Object->Value.Region.RegionSpace != ACPI_SPACE_EMBEDDED_CONTROL ||
+        Object->Value.Region.EcReady) {
+        return 1;
+    }
+
+    /* Find the EC device (parent of the region) by checking for _HID = PNP0C09. */
+    AcpiObject *EcDevice = Object->Parent;
+    while (EcDevice) {
+        AcpiValue Hid;
+        if (AcpiEvaluateObject(AcpiSearchObject(EcDevice, "_HID"), &Hid, ACPI_INTEGER)) {
+            if (Hid.Integer == 0x090CD041) {
+                break;
+            }
+        }
+
+        EcDevice = EcDevice->Parent;
+    }
+
+    /* Use the default values if we couldn't find the device. */
+    if (!EcDevice) {
+        Object->Value.Region.EcDataPort = 0x62;
+        Object->Value.Region.EcCmdPort = 0x66;
+        Object->Value.Region.EcReady = 1;
+        return 1;
+    }
+
+    /* If we did find it, we need to evaluate the _CRS binary resource. */
+    AcpiValue Crs;
+    if (!AcpiEvaluateObject(AcpiSearchObject(EcDevice, "_CRS"), &Crs, ACPI_BUFFER)) {
+        Object->Value.Region.EcDataPort = 0x62;
+        Object->Value.Region.EcCmdPort = 0x66;
+        Object->Value.Region.EcReady = 1;
+        return 1;
+    }
+
+    /* And parse it for the IO ports... */
+    uint8_t *Data = Crs.Buffer->Data;
+    uint64_t Size = Crs.Buffer->Size;
+    uint16_t Ports[2] = {0x62, 0x66};
+    int PortIndex = 0;
+
+    while (Size > 0 && PortIndex < 2) {
+        uint8_t Tag = *Data;
+
+        if (Tag == 0x79) {
+            /* End tag. */
+            break;
+        } else if ((Tag & 0x80) == 0) {
+            /* Small resource descriptor. */
+            int Length = Tag & 0x07;
+            int Type = (Tag >> 3) & 0x0F;
+
+            if (Type == 0x08 && Length >= 7) {
+                /* IO Port Descriptor (fixed). */
+                Ports[PortIndex++] = *(uint16_t *)(Data + 1);
+            } else if (Type == 0x04 && Length >= 7) {
+                /* IO Port Descriptor (variable). */
+                Ports[PortIndex++] = *(uint16_t *)(Data + 1);
+            }
+
+            Data += Length + 1;
+            Size -= Length + 1;
+        } else {
+            /* Large resource descriptor. */
+            if (Size < 3) {
+                break;
+            }
+
+            uint16_t Length = *(uint16_t *)(Data + 1);
+            Data += Length + 3;
+            Size -= Length + 3;
+        }
+    }
+
+    AcpiRemoveReference(&Crs, 0);
+    Object->Value.Region.EcDataPort = Ports[0];
+    Object->Value.Region.EcCmdPort = Ports[1];
+    Object->Value.Region.EcReady = 1;
+    return 1;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
  *     This function reads data from the given region, using the given offset and the offset of
  *     the region field itself.
  *
@@ -91,13 +184,41 @@ static int SetupPciConfigRegion(AcpiObject *Object) {
  *-----------------------------------------------------------------------------------------------*/
 static uint64_t ReadRegion(AcpiValue *Source, int Offset, int Size) {
     switch (Source->Region.RegionSpace) {
-        case ACPI_SPACE_SYSTEM_MEMORY:
+        case ACPI_SPACE_SYSTEM_MEMORY: {
             return AcpipReadMmioSpace(Source->Region.RegionOffset + Offset, Size);
-        case ACPI_SPACE_SYSTEM_IO:
+        }
+
+        case ACPI_SPACE_SYSTEM_IO: {
             return AcpipReadIoSpace(Source->Region.RegionOffset + Offset, Size);
-        case ACPI_SPACE_PCI_CONFIG:
+        }
+
+        case ACPI_SPACE_PCI_CONFIG: {
             return AcpipReadPciConfigSpace(Source, Source->Region.RegionOffset + Offset, Size);
-        default:
+        }
+
+        case ACPI_SPACE_EMBEDDED_CONTROL: {
+            uint64_t Value = 0;
+            for (int i = 0; i < Size; i++) {
+                Value |= AcpipReadEcSpace(
+                             Source->Region.EcCmdPort,
+                             Source->Region.EcDataPort,
+                             Source->Region.RegionOffset + Offset + i)
+                         << (i * 8);
+            }
+
+            return Value;
+        }
+
+        case ACPI_SPACE_SYSTEM_CMOS: {
+            uint64_t Value = 0;
+            for (int i = 0; i < Size; i++) {
+                Value |= AcpipReadCmosSpace(Source->Region.RegionOffset + Offset + i) << (i * 8);
+            }
+
+            return Value;
+        }
+
+        default: {
             AcpipShowErrorMessage(
                 ACPI_REASON_CORRUPTED_TABLES,
                 "ReadRegionField(%p, %u, %u), RegionSpace = %hhu\n",
@@ -105,6 +226,7 @@ static uint64_t ReadRegion(AcpiValue *Source, int Offset, int Size) {
                 Offset,
                 Size,
                 Source->Region.RegionSpace);
+        }
     }
 }
 
@@ -126,16 +248,43 @@ static uint64_t ReadRegion(AcpiValue *Source, int Offset, int Size) {
  *-----------------------------------------------------------------------------------------------*/
 static void WriteRegion(AcpiValue *Source, int Offset, int Size, uint64_t Data) {
     switch (Source->Region.RegionSpace) {
-        case ACPI_SPACE_SYSTEM_MEMORY:
+        case ACPI_SPACE_SYSTEM_MEMORY: {
             AcpipWriteMmioSpace(Source->Region.RegionOffset + Offset, Size, Data);
             break;
-        case ACPI_SPACE_SYSTEM_IO:
+        }
+
+        case ACPI_SPACE_SYSTEM_IO: {
             AcpipWriteIoSpace(Source->Region.RegionOffset + Offset, Size, Data);
             break;
-        case ACPI_SPACE_PCI_CONFIG:
+        }
+
+        case ACPI_SPACE_PCI_CONFIG: {
             AcpipWritePciConfigSpace(Source, Source->Region.RegionOffset + Offset, Size, Data);
             break;
-        default:
+        }
+
+        case ACPI_SPACE_EMBEDDED_CONTROL: {
+            for (int i = 0; i < Size; i++) {
+                AcpipWriteEcSpace(
+                    Source->Region.EcCmdPort,
+                    Source->Region.EcDataPort,
+                    Source->Region.RegionOffset + Offset + i,
+                    (Data >> (i * 8)) & UINT8_MAX);
+            }
+
+            break;
+        }
+
+        case ACPI_SPACE_SYSTEM_CMOS: {
+            for (int i = 0; i < Size; i++) {
+                AcpipWriteCmosSpace(
+                    Source->Region.RegionOffset + Offset + i, (Data >> (i * 8)) & UINT8_MAX);
+            }
+
+            break;
+        }
+
+        default: {
             AcpipShowErrorMessage(
                 ACPI_REASON_CORRUPTED_TABLES,
                 "WriteRegionField(%p, %u, %u, %lu), RegionSpace = %hhu\n",
@@ -144,6 +293,7 @@ static void WriteRegion(AcpiValue *Source, int Offset, int Size, uint64_t Data) 
                 Size,
                 Data,
                 Source->Region.RegionSpace);
+        }
     }
 }
 
@@ -161,11 +311,19 @@ static void WriteRegion(AcpiValue *Source, int Offset, int Size, uint64_t Data) 
  *-----------------------------------------------------------------------------------------------*/
 static uint64_t ReadField(AcpiValue *Source, int Offset, int AccessWidth) {
     switch (Source->FieldUnit.FieldType) {
-        case ACPI_FIELD:
+        case ACPI_FIELD: {
             return ReadRegion(&Source->FieldUnit.Region->Value, Offset, AccessWidth / 8);
+        }
 
-        case ACPI_BANK_FIELD:
-            AcpipShowErrorMessage(ACPI_REASON_CORRUPTED_TABLES, "ReadField() on BankField\n");
+        case ACPI_BANK_FIELD: {
+            /* BankField: Write BankValue to bank register, then R/W from/into the region. */
+            AcpiValue BankValueData;
+            BankValueData.Type = ACPI_INTEGER;
+            BankValueData.References = 1;
+            BankValueData.Integer = Source->FieldUnit.BankValue;
+            AcpipWriteField(&Source->FieldUnit.Data->Value, &BankValueData);
+            return ReadRegion(&Source->FieldUnit.Region->Value, Offset, AccessWidth / 8);
+        }
 
         case ACPI_INDEX_FIELD: {
             /* Index field means we need to write into the index location, followed by R/W'ing
@@ -228,12 +386,21 @@ WriteField(AcpiValue *Target, int Offset, int AccessWidth, uint64_t Data, uint64
     uint64_t MaskedValue = MaskedBase | Data;
 
     switch (Target->FieldUnit.FieldType) {
-        case ACPI_FIELD:
+        case ACPI_FIELD: {
             return WriteRegion(
                 &Target->FieldUnit.Region->Value, Offset, AccessWidth / 8, MaskedValue);
+        }
 
-        case ACPI_BANK_FIELD:
-            AcpipShowErrorMessage(ACPI_REASON_CORRUPTED_TABLES, "WriteField() on BankField\n");
+        case ACPI_BANK_FIELD: {
+            /* BankField: Write BankValue to bank register, then R/W to/from the region. */
+            AcpiValue BankValueData;
+            BankValueData.Type = ACPI_INTEGER;
+            BankValueData.References = 1;
+            BankValueData.Integer = Target->FieldUnit.BankValue;
+            AcpipWriteField(&Target->FieldUnit.Data->Value, &BankValueData);
+            return WriteRegion(
+                &Target->FieldUnit.Region->Value, Offset, AccessWidth / 8, MaskedValue);
+        }
 
         case ACPI_INDEX_FIELD: {
             /* Index field means we need to write into the index location, followed by R/W'ing
@@ -316,6 +483,12 @@ SafeBufferRead(const uint8_t *Buffer, uint64_t Offset, int BufferWidth, int Acce
  *     1 on success, 0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
 int AcpipReadField(AcpiValue *Source, AcpiValue *Target) {
+    /* TODO: I think this deserves a macro or at least some struct/union magic? */
+    int NeedLock = (Source->FieldUnit.AccessType >> 4) & 1;
+    if (NeedLock) {
+        AcpipAcquireGlobalLock();
+    }
+
     /* We need to check for access width > 1 byte; Any invalid value will also be assumed to be 1
        byte. */
     int AccessWidth = 8;
@@ -331,10 +504,15 @@ int AcpipReadField(AcpiValue *Source, AcpiValue *Target) {
             break;
     }
 
-    /* We need some extra work for PCI Config regions, but we'll be caching it afterwards. */
+    /* We need some extra work for PCI Config and EC regions, but we'll be caching it afterwards. */
     if (Source->FieldUnit.FieldType == ACPI_FIELD ||
         Source->FieldUnit.FieldType == ACPI_BANK_FIELD) {
-        if (!SetupPciConfigRegion(Source->FieldUnit.Region)) {
+        if (!SetupPciConfigRegion(Source->FieldUnit.Region) ||
+            !SetupEcRegion(Source->FieldUnit.Region)) {
+            if (NeedLock) {
+                AcpipReleaseGlobalLock();
+            }
+
             return 0;
         }
     }
@@ -403,6 +581,11 @@ int AcpipReadField(AcpiValue *Source, AcpiValue *Target) {
     }
 
     memcpy(Buffer, &Item, AccessWidth / 8);
+
+    if (NeedLock) {
+        AcpipReleaseGlobalLock();
+    }
+
     return 1;
 }
 
@@ -419,6 +602,11 @@ int AcpipReadField(AcpiValue *Source, AcpiValue *Target) {
  *     1 on success, 0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
 int AcpipWriteField(AcpiValue *Target, AcpiValue *Data) {
+    int NeedLock = (Target->FieldUnit.AccessType >> 4) & 1;
+    if (NeedLock) {
+        AcpipAcquireGlobalLock();
+    }
+
     /* We need to check for access width > 1 byte; Any invalid value will also be assumed to be 1
        byte. */
     uint32_t AccessWidth = 8;
@@ -434,10 +622,15 @@ int AcpipWriteField(AcpiValue *Target, AcpiValue *Data) {
             break;
     }
 
-    /* We need some extra work for PCI Config regions, but we'll be caching it afterwards. */
+    /* We need some extra work for PCI Config and EC regions, but we'll be caching it afterwards. */
     if (Target->FieldUnit.FieldType == ACPI_FIELD ||
         Target->FieldUnit.FieldType == ACPI_BANK_FIELD) {
-        if (!SetupPciConfigRegion(Target->FieldUnit.Region)) {
+        if (!SetupPciConfigRegion(Target->FieldUnit.Region) ||
+            !SetupEcRegion(Target->FieldUnit.Region)) {
+            if (NeedLock) {
+                AcpipReleaseGlobalLock();
+            }
+
             return 0;
         }
     }
@@ -525,5 +718,10 @@ int AcpipWriteField(AcpiValue *Target, AcpiValue *Data) {
     }
 
     WriteField(Target, FieldOffset, AccessWidth, Item, UINT64_MAX << RunOffLength);
+
+    if (NeedLock) {
+        AcpipReleaseGlobalLock();
+    }
+
     return 1;
 }

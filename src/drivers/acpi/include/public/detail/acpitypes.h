@@ -75,6 +75,9 @@ typedef struct AcpiValue {
             uint32_t PciFunction;
             uint32_t PciSegment;
             uint32_t PciBus;
+            int EcReady;
+            uint16_t EcDataPort;
+            uint16_t EcCmdPort;
         } Region;
         struct {
             int FieldType;
