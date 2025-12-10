@@ -12,13 +12,13 @@ extern "C" {
 
 AcpiObject *AcpiSearchObject(AcpiObject *Parent, const char *Name);
 char *AcpiGetObjectPath(AcpiObject *Object);
-int AcpiEvaluateObject(AcpiObject *Object, AcpiValue *Result, int ExpectedType);
-int AcpiExecuteMethod(AcpiObject *Object, int ArgCount, AcpiValue *Arguments, AcpiValue *Result);
+bool AcpiEvaluateObject(AcpiObject *Object, AcpiValue *Result, int ExpectedType);
+bool AcpiExecuteMethod(AcpiObject *Object, int ArgCount, AcpiValue *Arguments, AcpiValue *Result);
 
 void AcpiCreateReference(AcpiValue *Source, AcpiValue *Target);
-void AcpiRemoveReference(AcpiValue *Value, int CleanupPointer);
+void AcpiRemoveReference(AcpiValue *Value, bool CleanupPointer);
 
-int AcpiCopyValue(AcpiValue *Source, AcpiValue *Target);
+bool AcpiCopyValue(AcpiValue *Source, AcpiValue *Target);
 
 #ifdef __cplusplus
 }

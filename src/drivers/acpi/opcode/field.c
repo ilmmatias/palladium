@@ -16,7 +16,7 @@
  *     Length - Length of this package.
  *
  * RETURN VALUE:
- *     1 on success, 0 otherwise.
+ *     true/false depending on success.
  *-----------------------------------------------------------------------------------------------*/
 static int ReadFieldList(AcpipState *State, AcpiValue *Base, uint32_t Start, uint32_t Length) {
     uint32_t LengthSoFar = Start - State->Scope->RemainingLength;
@@ -148,7 +148,7 @@ int AcpipExecuteFieldOpcode(AcpipState *State, uint16_t Opcode) {
             AcpiName *Name = &State->Opcode->FixedArguments[2].Name;
 
             if (ByteIndex >= SourceBuff->Buffer->Size) {
-                AcpiRemoveReference(SourceBuff, 0);
+                AcpiRemoveReference(SourceBuff, false);
                 return 0;
             }
 
@@ -156,7 +156,7 @@ int AcpipExecuteFieldOpcode(AcpipState *State, uint16_t Opcode) {
                store SourceBuff. */
             AcpiValue *Buffer = AcpipAllocateBlock(sizeof(AcpiValue));
             if (!Buffer) {
-                AcpiRemoveReference(SourceBuff, 0);
+                AcpiRemoveReference(SourceBuff, false);
                 return 0;
             }
 
@@ -173,7 +173,7 @@ int AcpipExecuteFieldOpcode(AcpipState *State, uint16_t Opcode) {
                                                       : 8;
 
             if (!AcpipCreateObject(Name, &Value)) {
-                AcpiRemoveReference(SourceBuff, 0);
+                AcpiRemoveReference(SourceBuff, false);
                 AcpipFreeBlock(Buffer);
                 return 0;
             }

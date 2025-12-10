@@ -7,9 +7,9 @@
 #include <detail/acpitypes.h>
 
 typedef struct {
-    int Valid;
+    bool Valid;
     int Count;
-    int HasPkgLength;
+    bool HasPkgLength;
     int Types[6];
 } AcpipArgument;
 
@@ -27,7 +27,7 @@ typedef struct AcpipOpcode {
     uint32_t PredicateBacktrack;
     uint16_t Opcode;
     AcpipArgument *ArgInfo;
-    int ValidPkgLength;
+    bool ValidPkgLength;
     uint32_t PkgLength;
     int ValidArgs;
     AcpipArgumentValue FixedArguments[6];
@@ -48,8 +48,8 @@ typedef struct AcpipScope {
 } AcpipScope;
 
 typedef struct AcpipState {
-    int IsMethod;
-    int HasReturned;
+    bool IsMethod;
+    bool HasReturned;
     AcpiValue Arguments[7];
     AcpiValue Locals[8];
     AcpiValue ReturnValue;

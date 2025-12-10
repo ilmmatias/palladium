@@ -29,7 +29,7 @@ void *AcpipCreateMutex(void) {
  * RETURN VALUE:
  *     0 on success (mutex acquired), non-zero on timeout.
  *-----------------------------------------------------------------------------------------------*/
-int AcpipAcquireMutex(void *Mutex, uint64_t Timeout) {
+bool AcpipAcquireMutex(void *Mutex, uint64_t Timeout) {
     return EvAcquireMutex(Mutex, Timeout == 0xFFFF ? EV_TIMEOUT_UNLIMITED : Timeout * EV_MILLISECS);
 }
 
@@ -72,7 +72,7 @@ void *AcpipCreateEvent(void) {
  * RETURN VALUE:
  *     0 on success (event signaled), non-zero on timeout.
  *-----------------------------------------------------------------------------------------------*/
-int AcpipWaitEvent(void *Event, uint64_t Timeout) {
+bool AcpipWaitEvent(void *Event, uint64_t Timeout) {
     return EvWaitForObject(
         Event, Timeout == 0xFFFF ? EV_TIMEOUT_UNLIMITED : Timeout * EV_MILLISECS);
 }

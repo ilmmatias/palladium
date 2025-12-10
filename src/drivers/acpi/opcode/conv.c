@@ -27,14 +27,14 @@ int AcpipExecuteConvOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
             AcpiValue *Target = &State->Opcode->FixedArguments[1].TermArg;
 
             if (!AcpipCastToBuffer(Value)) {
-                AcpiRemoveReference(Target, 0);
+                AcpiRemoveReference(Target, false);
                 return 0;
             } else if (!AcpipStoreTarget(State, Target, Value)) {
-                AcpiRemoveReference(Target, 0);
+                AcpiRemoveReference(Target, false);
                 return 0;
             }
 
-            AcpiRemoveReference(Target, 0);
+            AcpiRemoveReference(Target, false);
             break;
         }
 
@@ -46,14 +46,14 @@ int AcpipExecuteConvOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
             AcpiValue *Target = &State->Opcode->FixedArguments[1].TermArg;
 
             if (!AcpipCastToString(Value, 0, Opcode == 0x97)) {
-                AcpiRemoveReference(Target, 0);
+                AcpiRemoveReference(Target, false);
                 return 0;
             } else if (!AcpipStoreTarget(State, Target, Value)) {
-                AcpiRemoveReference(Target, 0);
+                AcpiRemoveReference(Target, false);
                 return 0;
             }
 
-            AcpiRemoveReference(Target, 0);
+            AcpiRemoveReference(Target, false);
             break;
         }
 
@@ -65,14 +65,14 @@ int AcpipExecuteConvOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
             Value->References = 1;
             if (!AcpipCastToInteger(
                     &State->Opcode->FixedArguments[0].TermArg, &Value->Integer, 1)) {
-                AcpiRemoveReference(Target, 0);
+                AcpiRemoveReference(Target, false);
                 return 0;
             } else if (!AcpipStoreTarget(State, Target, Value)) {
-                AcpiRemoveReference(Target, 0);
+                AcpiRemoveReference(Target, false);
                 return 0;
             }
 
-            AcpiRemoveReference(Target, 0);
+            AcpiRemoveReference(Target, false);
             break;
         }
 
@@ -88,8 +88,8 @@ int AcpipExecuteConvOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
             for (int i = 0; i < 16; i++) {
                 uint8_t Nibble = (BCDValue >> (i * 4)) & 0x0F;
                 if (Nibble > 9) {
-                    AcpiRemoveReference(&State->Opcode->FixedArguments[0].TermArg, 0);
-                    AcpiRemoveReference(Target, 0);
+                    AcpiRemoveReference(&State->Opcode->FixedArguments[0].TermArg, false);
+                    AcpiRemoveReference(Target, false);
                     return 0;
                 }
 
@@ -102,13 +102,13 @@ int AcpipExecuteConvOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
             Value->Integer = Result;
 
             if (!AcpipStoreTarget(State, Target, Value)) {
-                AcpiRemoveReference(&State->Opcode->FixedArguments[0].TermArg, 0);
-                AcpiRemoveReference(Target, 0);
+                AcpiRemoveReference(&State->Opcode->FixedArguments[0].TermArg, false);
+                AcpiRemoveReference(Target, false);
                 return 0;
             }
 
-            AcpiRemoveReference(&State->Opcode->FixedArguments[0].TermArg, 0);
-            AcpiRemoveReference(Target, 0);
+            AcpiRemoveReference(&State->Opcode->FixedArguments[0].TermArg, false);
+            AcpiRemoveReference(Target, false);
             break;
         }
 
@@ -125,8 +125,8 @@ int AcpipExecuteConvOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
             }
 
             if (Temp > 0) {
-                AcpiRemoveReference(&State->Opcode->FixedArguments[0].TermArg, 0);
-                AcpiRemoveReference(Target, 0);
+                AcpiRemoveReference(&State->Opcode->FixedArguments[0].TermArg, false);
+                AcpiRemoveReference(Target, false);
                 return 0;
             }
 
@@ -135,13 +135,13 @@ int AcpipExecuteConvOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
             Value->Integer = Result;
 
             if (!AcpipStoreTarget(State, Target, Value)) {
-                AcpiRemoveReference(&State->Opcode->FixedArguments[0].TermArg, 0);
-                AcpiRemoveReference(Target, 0);
+                AcpiRemoveReference(&State->Opcode->FixedArguments[0].TermArg, false);
+                AcpiRemoveReference(Target, false);
                 return 0;
             }
 
-            AcpiRemoveReference(&State->Opcode->FixedArguments[0].TermArg, 0);
-            AcpiRemoveReference(Target, 0);
+            AcpiRemoveReference(&State->Opcode->FixedArguments[0].TermArg, false);
+            AcpiRemoveReference(Target, false);
             break;
         }
 

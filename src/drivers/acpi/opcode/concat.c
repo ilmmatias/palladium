@@ -33,7 +33,7 @@ int AcpipExecuteConcatOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Valu
                     uint64_t RightValue;
                     int Result = AcpipCastToInteger(Right, &RightValue, 1);
                     if (!Result) {
-                        AcpiRemoveReference(&State->Opcode->FixedArguments[2].TermArg, 0);
+                        AcpiRemoveReference(&State->Opcode->FixedArguments[2].TermArg, false);
                         return 0;
                     }
 
@@ -41,7 +41,7 @@ int AcpipExecuteConcatOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Valu
                     Value->References = 1;
                     Value->Buffer = AcpipAllocateBlock(sizeof(AcpiBuffer) + 16);
                     if (!Value->Buffer) {
-                        AcpiRemoveReference(&State->Opcode->FixedArguments[2].TermArg, 0);
+                        AcpiRemoveReference(&State->Opcode->FixedArguments[2].TermArg, false);
                         return 0;
                     }
 
@@ -56,8 +56,8 @@ int AcpipExecuteConcatOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Valu
                 /* Read it as two buffers, and append them into another buffer. */
                 case ACPI_BUFFER: {
                     if (!AcpipCastToBuffer(Right)) {
-                        AcpiRemoveReference(Left, 0);
-                        AcpiRemoveReference(&State->Opcode->FixedArguments[2].TermArg, 0);
+                        AcpiRemoveReference(Left, false);
+                        AcpiRemoveReference(&State->Opcode->FixedArguments[2].TermArg, false);
                         return 0;
                     }
 
@@ -66,9 +66,9 @@ int AcpipExecuteConcatOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Valu
                     Value->Buffer = AcpipAllocateBlock(
                         sizeof(AcpiBuffer) + Left->Buffer->Size + Right->Buffer->Size);
                     if (!Value->Buffer) {
-                        AcpiRemoveReference(Left, 0);
-                        AcpiRemoveReference(Right, 0);
-                        AcpiRemoveReference(&State->Opcode->FixedArguments[2].TermArg, 0);
+                        AcpiRemoveReference(Left, false);
+                        AcpiRemoveReference(Right, false);
+                        AcpiRemoveReference(&State->Opcode->FixedArguments[2].TermArg, false);
                         return 0;
                     }
 
@@ -86,9 +86,9 @@ int AcpipExecuteConcatOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Valu
                 /* Convert both sides into strings, and append them into a single string. */
                 default: {
                     if (!AcpipCastToString(Left, 1, 0) || !AcpipCastToString(Right, 1, 0)) {
-                        AcpiRemoveReference(Left, 0);
-                        AcpiRemoveReference(Right, 0);
-                        AcpiRemoveReference(&State->Opcode->FixedArguments[2].TermArg, 0);
+                        AcpiRemoveReference(Left, false);
+                        AcpiRemoveReference(Right, false);
+                        AcpiRemoveReference(&State->Opcode->FixedArguments[2].TermArg, false);
                         return 0;
                     }
 
@@ -98,7 +98,7 @@ int AcpipExecuteConcatOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Valu
                         sizeof(AcpiString) + strlen(Left->String->Data) +
                         strlen(Right->String->Data) + 1);
                     if (!Value->String) {
-                        AcpiRemoveReference(&State->Opcode->FixedArguments[2].TermArg, 0);
+                        AcpiRemoveReference(&State->Opcode->FixedArguments[2].TermArg, false);
                         return 0;
                     }
 
@@ -111,9 +111,9 @@ int AcpipExecuteConcatOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Valu
             }
 
             int Status = AcpipStoreTarget(State, &State->Opcode->FixedArguments[2].TermArg, Value);
-            AcpiRemoveReference(Left, 0);
-            AcpiRemoveReference(Right, 0);
-            AcpiRemoveReference(&State->Opcode->FixedArguments[2].TermArg, 0);
+            AcpiRemoveReference(Left, false);
+            AcpiRemoveReference(Right, false);
+            AcpiRemoveReference(&State->Opcode->FixedArguments[2].TermArg, false);
 
             if (!Status) {
                 return 0;
@@ -144,10 +144,10 @@ int AcpipExecuteConcatOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Valu
                     Value->References = 1;
                     Value->Buffer = AcpipAllocateBlock(sizeof(AcpiBuffer) + Length);
                     if (!Value->Buffer) {
-                        AcpiRemoveReference(Source, 0);
-                        AcpiRemoveReference(&State->Opcode->FixedArguments[1].TermArg, 0);
-                        AcpiRemoveReference(&State->Opcode->FixedArguments[2].TermArg, 0);
-                        AcpiRemoveReference(Target, 0);
+                        AcpiRemoveReference(Source, false);
+                        AcpiRemoveReference(&State->Opcode->FixedArguments[1].TermArg, false);
+                        AcpiRemoveReference(&State->Opcode->FixedArguments[2].TermArg, false);
+                        AcpiRemoveReference(Target, false);
                         return 0;
                     }
 
@@ -174,10 +174,10 @@ int AcpipExecuteConcatOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Valu
                     Value->References = 1;
                     Value->String = AcpipAllocateBlock(sizeof(AcpiString) + Length + 1);
                     if (!Value->String) {
-                        AcpiRemoveReference(Source, 0);
-                        AcpiRemoveReference(&State->Opcode->FixedArguments[1].TermArg, 0);
-                        AcpiRemoveReference(&State->Opcode->FixedArguments[2].TermArg, 0);
-                        AcpiRemoveReference(Target, 0);
+                        AcpiRemoveReference(Source, false);
+                        AcpiRemoveReference(&State->Opcode->FixedArguments[1].TermArg, false);
+                        AcpiRemoveReference(&State->Opcode->FixedArguments[2].TermArg, false);
+                        AcpiRemoveReference(Target, false);
                         return 0;
                     }
 
@@ -191,19 +191,19 @@ int AcpipExecuteConcatOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Valu
                 }
 
                 default: {
-                    AcpiRemoveReference(Source, 0);
-                    AcpiRemoveReference(&State->Opcode->FixedArguments[1].TermArg, 0);
-                    AcpiRemoveReference(&State->Opcode->FixedArguments[2].TermArg, 0);
-                    AcpiRemoveReference(Target, 0);
+                    AcpiRemoveReference(Source, false);
+                    AcpiRemoveReference(&State->Opcode->FixedArguments[1].TermArg, false);
+                    AcpiRemoveReference(&State->Opcode->FixedArguments[2].TermArg, false);
+                    AcpiRemoveReference(Target, false);
                     return 0;
                 }
             }
 
             int Status = AcpipStoreTarget(State, Target, Value);
-            AcpiRemoveReference(Source, 0);
-            AcpiRemoveReference(&State->Opcode->FixedArguments[1].TermArg, 0);
-            AcpiRemoveReference(&State->Opcode->FixedArguments[2].TermArg, 0);
-            AcpiRemoveReference(Target, 0);
+            AcpiRemoveReference(Source, false);
+            AcpiRemoveReference(&State->Opcode->FixedArguments[1].TermArg, false);
+            AcpiRemoveReference(&State->Opcode->FixedArguments[2].TermArg, false);
+            AcpiRemoveReference(Target, false);
 
             if (!Status) {
                 return 0;

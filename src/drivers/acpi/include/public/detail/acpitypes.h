@@ -10,7 +10,7 @@ struct AcpiPackage;
 struct AcpiValue;
 struct AcpiObject;
 
-typedef int (
+typedef bool (
     *AcpiOverrideMethod)(int ArgCount, struct AcpiValue *Arguments, struct AcpiValue *Result);
 
 typedef struct {
@@ -70,12 +70,12 @@ typedef struct AcpiValue {
             uint8_t RegionSpace;
             uint64_t RegionOffset;
             uint64_t RegionLen;
-            int PciReady;
+            bool PciReady;
             uint32_t PciDevice;
             uint32_t PciFunction;
             uint32_t PciSegment;
             uint32_t PciBus;
-            int EcReady;
+            bool EcReady;
             uint16_t EcDataPort;
             uint16_t EcCmdPort;
         } Region;

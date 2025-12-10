@@ -14,11 +14,11 @@
  *     Object - AML object containing the region.
  *
  * RETURN VALUE:
- *     1 on success, 0 otherwise.
+ *     true/false depending on success.
  *-----------------------------------------------------------------------------------------------*/
-static int SetupPciConfigRegion(AcpiObject *Object) {
+static bool SetupPciConfigRegion(AcpiObject *Object) {
     if (Object->Value.Region.RegionSpace != 2 || Object->Value.Region.PciReady) {
-        return 1;
+        return true;
     }
 
     /* _SEG and _BBN makes no sense to exist inside a sub device, they should be taken from
@@ -39,7 +39,7 @@ static int SetupPciConfigRegion(AcpiObject *Object) {
 
     /* It makes no sense for the root PCI bus to not exist. */
     if (!RootBus) {
-        return 0;
+        return false;
     }
 
     /* _ADR is the only required symbol, as it the device and function values (which we can't
@@ -54,7 +54,7 @@ static int SetupPciConfigRegion(AcpiObject *Object) {
     Name.BacktrackCount = 0;
     Name.SegmentCount = 1;
     if (!AcpiEvaluateObject(AcpipResolveObject(&Name), &Adr, ACPI_INTEGER)) {
-        return 0;
+        return false;
     }
 
     AcpiValue Seg;
@@ -70,8 +70,8 @@ static int SetupPciConfigRegion(AcpiObject *Object) {
     /* Everything seems to be valid, break down the _ADR value, and set this region as ready. */
     Object->Value.Region.PciDevice = (Adr.Integer >> 16) & UINT16_MAX;
     Object->Value.Region.PciFunction = Adr.Integer & UINT16_MAX;
-    Object->Value.Region.PciReady = 1;
-    return 1;
+    Object->Value.Region.PciReady = true;
+    return true;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -83,12 +83,12 @@ static int SetupPciConfigRegion(AcpiObject *Object) {
  *     Object - AML object containing the region.
  *
  * RETURN VALUE:
- *     1 on success, 0 otherwise.
+ *     true/false depending on success.
  *-----------------------------------------------------------------------------------------------*/
-static int SetupEcRegion(AcpiObject *Object) {
+static bool SetupEcRegion(AcpiObject *Object) {
     if (Object->Value.Region.RegionSpace != ACPI_SPACE_EMBEDDED_CONTROL ||
         Object->Value.Region.EcReady) {
-        return 1;
+        return true;
     }
 
     /* Find the EC device (parent of the region) by checking for _HID = PNP0C09. */
@@ -108,8 +108,8 @@ static int SetupEcRegion(AcpiObject *Object) {
     if (!EcDevice) {
         Object->Value.Region.EcDataPort = 0x62;
         Object->Value.Region.EcCmdPort = 0x66;
-        Object->Value.Region.EcReady = 1;
-        return 1;
+        Object->Value.Region.EcReady = true;
+        return true;
     }
 
     /* If we did find it, we need to evaluate the _CRS binary resource. */
@@ -117,8 +117,8 @@ static int SetupEcRegion(AcpiObject *Object) {
     if (!AcpiEvaluateObject(AcpiSearchObject(EcDevice, "_CRS"), &Crs, ACPI_BUFFER)) {
         Object->Value.Region.EcDataPort = 0x62;
         Object->Value.Region.EcCmdPort = 0x66;
-        Object->Value.Region.EcReady = 1;
-        return 1;
+        Object->Value.Region.EcReady = true;
+        return true;
     }
 
     /* And parse it for the IO ports... */
@@ -138,12 +138,12 @@ static int SetupEcRegion(AcpiObject *Object) {
             int Length = Tag & 0x07;
             int Type = (Tag >> 3) & 0x0F;
 
-            if (Type == 0x08 && Length >= 7) {
-                /* IO Port Descriptor (fixed). */
-                Ports[PortIndex++] = *(uint16_t *)(Data + 1);
-            } else if (Type == 0x04 && Length >= 7) {
-                /* IO Port Descriptor (variable). */
-                Ports[PortIndex++] = *(uint16_t *)(Data + 1);
+            if (PortIndex < 2) {
+                if (Type == 0x08 && Length >= 7) {
+                    Ports[PortIndex++] = *(uint16_t *)(Data + 2);
+                } else if (Type == 0x09 && Length >= 3) {
+                    Ports[PortIndex++] = *(uint16_t *)(Data + 1);
+                }
             }
 
             Data += Length + 1;
@@ -160,11 +160,11 @@ static int SetupEcRegion(AcpiObject *Object) {
         }
     }
 
-    AcpiRemoveReference(&Crs, 0);
+    AcpiRemoveReference(&Crs, false);
     Object->Value.Region.EcDataPort = Ports[0];
     Object->Value.Region.EcCmdPort = Ports[1];
-    Object->Value.Region.EcReady = 1;
-    return 1;
+    Object->Value.Region.EcReady = true;
+    return true;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -480,11 +480,11 @@ SafeBufferRead(const uint8_t *Buffer, uint64_t Offset, int BufferWidth, int Acce
  *     Target - Where to save the requested data.
  *
  * RETURN VALUE:
- *     1 on success, 0 otherwise.
+ *     true/false depending on success.
  *-----------------------------------------------------------------------------------------------*/
-int AcpipReadField(AcpiValue *Source, AcpiValue *Target) {
+bool AcpipReadField(AcpiValue *Source, AcpiValue *Target) {
     /* TODO: I think this deserves a macro or at least some struct/union magic? */
-    int NeedLock = (Source->FieldUnit.AccessType >> 4) & 1;
+    bool NeedLock = (Source->FieldUnit.AccessType >> 4) & 1;
     if (NeedLock) {
         AcpipAcquireGlobalLock();
     }
@@ -513,7 +513,7 @@ int AcpipReadField(AcpiValue *Source, AcpiValue *Target) {
                 AcpipReleaseGlobalLock();
             }
 
-            return 0;
+            return false;
         }
     }
 
@@ -526,7 +526,7 @@ int AcpipReadField(AcpiValue *Source, AcpiValue *Target) {
         Target->Type = ACPI_BUFFER;
         Target->Buffer = AcpipAllocateBlock(sizeof(AcpiBuffer) + BufferSize);
         if (!Target->Buffer) {
-            return 0;
+            return false;
         }
 
         Target->Buffer->References = 1;
@@ -586,7 +586,7 @@ int AcpipReadField(AcpiValue *Source, AcpiValue *Target) {
         AcpipReleaseGlobalLock();
     }
 
-    return 1;
+    return true;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -599,10 +599,10 @@ int AcpipReadField(AcpiValue *Source, AcpiValue *Target) {
  *     Data - What to write into the field.
  *
  * RETURN VALUE:
- *     1 on success, 0 otherwise.
+ *     true/false depending on success.
  *-----------------------------------------------------------------------------------------------*/
-int AcpipWriteField(AcpiValue *Target, AcpiValue *Data) {
-    int NeedLock = (Target->FieldUnit.AccessType >> 4) & 1;
+bool AcpipWriteField(AcpiValue *Target, AcpiValue *Data) {
+    bool NeedLock = (Target->FieldUnit.AccessType >> 4) & 1;
     if (NeedLock) {
         AcpipAcquireGlobalLock();
     }
@@ -631,7 +631,7 @@ int AcpipWriteField(AcpiValue *Target, AcpiValue *Data) {
                 AcpipReleaseGlobalLock();
             }
 
-            return 0;
+            return false;
         }
     }
 
@@ -723,5 +723,5 @@ int AcpipWriteField(AcpiValue *Target, AcpiValue *Data) {
         AcpipReleaseGlobalLock();
     }
 
-    return 1;
+    return true;
 }

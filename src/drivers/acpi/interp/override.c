@@ -17,9 +17,9 @@ extern AcpiObject *AcpipObjectTree;
  *     Result - Output; Where to store the result value, if there's any.
  *
  * RETURN VALUE:
- *     1 on success, 0 otherwise.
+ *     true/false depending on success.
  *-----------------------------------------------------------------------------------------------*/
-static int ExecuteOsi(int ArgCount, AcpiValue *Arguments, AcpiValue *Result) {
+static bool ExecuteOsi(int ArgCount, AcpiValue *Arguments, AcpiValue *Result) {
     if (ArgCount >= 1 && Arguments[0].Type == ACPI_STRING) {
         AcpipShowTraceMessage("request for \\_OSI, feature = %s\n", Arguments[0].String->Data);
     } else {
@@ -39,13 +39,13 @@ static int ExecuteOsi(int ArgCount, AcpiValue *Arguments, AcpiValue *Result) {
         Result->Type = ACPI_INTEGER;
         Result->References = 1;
         Result->Integer = UINT64_MAX;
-        return 1;
+        return true;
     }
 
     Result->Type = ACPI_INTEGER;
     Result->References = 1;
     Result->Integer = 0;
-    return 1;
+    return true;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -58,9 +58,9 @@ static int ExecuteOsi(int ArgCount, AcpiValue *Arguments, AcpiValue *Result) {
  *     Result - Output; Where to store the result value, if there's any.
  *
  * RETURN VALUE:
- *     1 on success, 0 otherwise.
+ *     true/false depending on success.
  *-----------------------------------------------------------------------------------------------*/
-static int ExecuteOs(int ArgCount, AcpiValue *Arguments, AcpiValue *Result) {
+static bool ExecuteOs(int ArgCount, AcpiValue *Arguments, AcpiValue *Result) {
     (void)ArgCount;
     (void)Arguments;
 
@@ -87,9 +87,9 @@ static int ExecuteOs(int ArgCount, AcpiValue *Arguments, AcpiValue *Result) {
  *     Result - Output; Where to store the result value, if there's any.
  *
  * RETURN VALUE:
- *     1 on success, 0 otherwise.
+ *     true/false depending on success.
  *-----------------------------------------------------------------------------------------------*/
-static int ExecuteRev(int ArgCount, AcpiValue *Arguments, AcpiValue *Result) {
+static bool ExecuteRev(int ArgCount, AcpiValue *Arguments, AcpiValue *Result) {
     (void)ArgCount;
     (void)Arguments;
 
@@ -99,7 +99,7 @@ static int ExecuteRev(int ArgCount, AcpiValue *Arguments, AcpiValue *Result) {
     Result->References = 1;
     Result->Integer = ACPI_REVISION;
 
-    return 1;
+    return true;
 }
 
 /*-------------------------------------------------------------------------------------------------

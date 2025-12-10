@@ -75,11 +75,11 @@ int AcpipExecuteMathOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
             }
 
             if (!AcpipStoreTarget(State, Target, Value)) {
-                AcpiRemoveReference(Target, 0);
+                AcpiRemoveReference(Target, false);
                 return 0;
             }
 
-            AcpiRemoveReference(Target, 0);
+            AcpiRemoveReference(Target, false);
             break;
         }
 
@@ -92,8 +92,8 @@ int AcpipExecuteMathOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
 
             /* Division by zero is an error per ACPI specification. */
             if (Divisor == 0) {
-                AcpiRemoveReference(RemainderTarget, 0);
-                AcpiRemoveReference(QuotientTarget, 0);
+                AcpiRemoveReference(RemainderTarget, false);
+                AcpiRemoveReference(QuotientTarget, false);
                 return 0;
             }
 
@@ -110,8 +110,8 @@ int AcpipExecuteMathOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
             /* Save up both the remainder and the quotient. */
             if (!AcpipStoreTarget(State, RemainderTarget, &Remainder) ||
                 !AcpipStoreTarget(State, QuotientTarget, &Quotient)) {
-                AcpiRemoveReference(RemainderTarget, 0);
-                AcpiRemoveReference(QuotientTarget, 0);
+                AcpiRemoveReference(RemainderTarget, false);
+                AcpiRemoveReference(QuotientTarget, false);
                 return 0;
             }
 
@@ -120,8 +120,8 @@ int AcpipExecuteMathOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
             Value->References = 1;
             Value->Integer = Quotient.Integer;
 
-            AcpiRemoveReference(RemainderTarget, 0);
-            AcpiRemoveReference(QuotientTarget, 0);
+            AcpiRemoveReference(RemainderTarget, false);
+            AcpiRemoveReference(QuotientTarget, false);
             break;
         }
 
@@ -134,10 +134,10 @@ int AcpipExecuteMathOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
             uint64_t TargetInteger;
             AcpiValue TargetValue;
             if (!AcpipReadTarget(State, Target, &TargetValue)) {
-                AcpiRemoveReference(Target, 0);
+                AcpiRemoveReference(Target, false);
                 return 0;
             } else if (!AcpipCastToInteger(&TargetValue, &TargetInteger, 1)) {
-                AcpiRemoveReference(Target, 0);
+                AcpiRemoveReference(Target, false);
                 return 0;
             }
 
@@ -153,11 +153,11 @@ int AcpipExecuteMathOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
             }
 
             if (!AcpipStoreTarget(State, Target, Value)) {
-                AcpiRemoveReference(Target, 0);
+                AcpiRemoveReference(Target, false);
                 return 0;
             }
 
-            AcpiRemoveReference(Target, 0);
+            AcpiRemoveReference(Target, false);
             break;
         }
 
@@ -184,11 +184,11 @@ int AcpipExecuteMathOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
             }
 
             if (!AcpipStoreTarget(State, Target, Value)) {
-                AcpiRemoveReference(Target, 0);
+                AcpiRemoveReference(Target, false);
                 return 0;
             }
 
-            AcpiRemoveReference(Target, 0);
+            AcpiRemoveReference(Target, false);
             break;
         }
 

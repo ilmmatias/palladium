@@ -60,7 +60,7 @@ int AcpipExecuteLockOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
                 Value->Integer = Result ? UINT64_MAX : 0;
             }
 
-            AcpiRemoveReference(&State->Opcode->FixedArguments[0].TermArg, 0);
+            AcpiRemoveReference(&State->Opcode->FixedArguments[0].TermArg, false);
             break;
         }
 
@@ -73,7 +73,7 @@ int AcpipExecuteLockOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
 
             AcpipReleaseMutex(MutexObject.Mutex->Handle);
 
-            AcpiRemoveReference(&State->Opcode->FixedArguments[0].TermArg, 0);
+            AcpiRemoveReference(&State->Opcode->FixedArguments[0].TermArg, false);
             break;
         }
 
@@ -92,8 +92,8 @@ int AcpipExecuteLockOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
                 Value->Integer = Result ? UINT64_MAX : 0;
             }
 
-            AcpiRemoveReference(&State->Opcode->FixedArguments[0].TermArg, 0);
-            AcpiRemoveReference(&State->Opcode->FixedArguments[1].TermArg, 0);
+            AcpiRemoveReference(&State->Opcode->FixedArguments[0].TermArg, false);
+            AcpiRemoveReference(&State->Opcode->FixedArguments[1].TermArg, false);
             break;
         }
 
@@ -105,7 +105,7 @@ int AcpipExecuteLockOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
             }
 
             AcpipSignalEvent(EventObject.Event->Handle);
-            AcpiRemoveReference(&State->Opcode->FixedArguments[0].TermArg, 0);
+            AcpiRemoveReference(&State->Opcode->FixedArguments[0].TermArg, false);
             break;
         }
 
@@ -117,7 +117,7 @@ int AcpipExecuteLockOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
             }
 
             AcpipResetEvent(EventObject.Event->Handle);
-            AcpiRemoveReference(&State->Opcode->FixedArguments[0].TermArg, 0);
+            AcpiRemoveReference(&State->Opcode->FixedArguments[0].TermArg, false);
             break;
         }
 

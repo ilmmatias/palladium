@@ -48,7 +48,7 @@ int AcpipExecuteRefOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value) 
 
                             AcpiObject *Object = AcpipResolveObject(&Name);
                             if (!Object) {
-                                AcpiRemoveReference(Reference, 0);
+                                AcpiRemoveReference(Reference, false);
                                 return 0;
                             }
 
@@ -77,11 +77,11 @@ int AcpipExecuteRefOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value) 
                     break;
 
                 default:
-                    AcpiRemoveReference(Reference, 0);
+                    AcpiRemoveReference(Reference, false);
                     return 0;
             }
 
-            AcpiRemoveReference(Reference, 0);
+            AcpiRemoveReference(Reference, false);
             break;
         }
 
@@ -96,7 +96,7 @@ int AcpipExecuteRefOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value) 
             if (Buffer->Type != ACPI_STRING && Buffer->Type != ACPI_BUFFER &&
                 Buffer->Type != ACPI_PACKAGE) {
                 AcpiRemoveReference(Buffer, 1);
-                AcpiRemoveReference(Target, 0);
+                AcpiRemoveReference(Target, false);
                 return 0;
             }
 
@@ -106,7 +106,7 @@ int AcpipExecuteRefOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value) 
                 case ACPI_STRING: {
                     if (Index > strlen(Buffer->String->Data)) {
                         AcpiRemoveReference(Buffer, 1);
-                        AcpiRemoveReference(Target, 0);
+                        AcpiRemoveReference(Target, false);
                         return 0;
                     }
 
@@ -116,7 +116,7 @@ int AcpipExecuteRefOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value) 
                 case ACPI_BUFFER: {
                     if (Index >= Buffer->Buffer->Size) {
                         AcpiRemoveReference(Buffer, 1);
-                        AcpiRemoveReference(Target, 0);
+                        AcpiRemoveReference(Target, false);
                         return 0;
                     }
 
@@ -126,7 +126,7 @@ int AcpipExecuteRefOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value) 
                 default: {
                     if (Index >= Buffer->Package->Size) {
                         AcpiRemoveReference(Buffer, 1);
-                        AcpiRemoveReference(Target, 0);
+                        AcpiRemoveReference(Target, false);
                         return 0;
                     }
 
@@ -141,11 +141,11 @@ int AcpipExecuteRefOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value) 
 
             if (!AcpipStoreTarget(State, Target, Value)) {
                 AcpiRemoveReference(Buffer, 1);
-                AcpiRemoveReference(Target, 0);
+                AcpiRemoveReference(Target, false);
                 return 0;
             }
 
-            AcpiRemoveReference(Target, 0);
+            AcpiRemoveReference(Target, false);
             break;
         }
 
@@ -159,11 +159,11 @@ int AcpipExecuteRefOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value) 
             Value->Integer = SuperName->Type == ACPI_EMPTY ? 0 : UINT64_MAX;
 
             if (SuperName->Type != ACPI_EMPTY && !AcpipStoreTarget(State, Target, SuperName)) {
-                AcpiRemoveReference(Target, 0);
+                AcpiRemoveReference(Target, false);
                 return 0;
             }
 
-            AcpiRemoveReference(Target, 0);
+            AcpiRemoveReference(Target, false);
             break;
         }
 

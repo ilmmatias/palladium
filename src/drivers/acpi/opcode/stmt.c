@@ -119,7 +119,7 @@ int AcpipExecuteStmtOpcode(AcpipState *State, uint16_t Opcode) {
         case 0xA4: {
             memcpy(
                 &State->ReturnValue, &State->Opcode->FixedArguments[0].TermArg, sizeof(AcpiValue));
-            State->HasReturned = 1;
+            State->HasReturned = true;
             break;
         }
 

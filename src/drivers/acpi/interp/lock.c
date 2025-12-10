@@ -27,11 +27,11 @@ void AcpipInitializeGlobalLock(void) {
  *     None.
  *
  * RETURN VALUE:
- *     1 on success, 0 on failure.
+ *     true/false depending on success.
  *-----------------------------------------------------------------------------------------------*/
-int AcpipAcquireGlobalLock(void) {
+bool AcpipAcquireGlobalLock(void) {
     if (!FacsTable) {
-        return 1;
+        return true;
     }
 
     /* TODO: Probably add a FACS struct to sdt.h? */
@@ -61,9 +61,9 @@ int AcpipAcquireGlobalLock(void) {
  * RETURN VALUE:
  *     1 if the firmware wants notification (pending was set), 0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int AcpipReleaseGlobalLock(void) {
+bool AcpipReleaseGlobalLock(void) {
     if (!FacsTable) {
-        return 0;
+        return false;
     }
 
     volatile uint32_t *Lock = (volatile uint32_t *)((uintptr_t)FacsTable + 16);

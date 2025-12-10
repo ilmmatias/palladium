@@ -22,7 +22,7 @@ AcpiObject *AcpipCreateObject(AcpiName *Name, AcpiValue *Value);
 AcpiObject *AcpipResolveObject(AcpiName *Name);
 
 void AcpiCreateReference(AcpiValue *Source, AcpiValue *Target);
-void AcpiRemoveReference(AcpiValue *Value, int CleanupPointer);
+void AcpiRemoveReference(AcpiValue *Value, bool CleanupPointer);
 
 void *AcpipAllocateBlock(size_t Size);
 void *AcpipAllocateZeroBlock(size_t Elements, size_t ElementSize);
@@ -38,17 +38,17 @@ void AcpipDelayThread(uint64_t Milliseconds);
 void AcpipStallExecution(uint64_t Microseconds);
 
 void *AcpipCreateEvent(void);
-int AcpipWaitEvent(void *Event, uint64_t Timeout);
+bool AcpipWaitEvent(void *Event, uint64_t Timeout);
 void AcpipSignalEvent(void *Event);
 void AcpipResetEvent(void *Event);
 
 void *AcpipCreateMutex(void);
-int AcpipAcquireMutex(void *Mutex, uint64_t Timeout);
+bool AcpipAcquireMutex(void *Mutex, uint64_t Timeout);
 void AcpipReleaseMutex(void *Mutex);
 
 void AcpipInitializeGlobalLock(void);
-int AcpipAcquireGlobalLock(void);
-int AcpipReleaseGlobalLock(void);
+bool AcpipAcquireGlobalLock(void);
+bool AcpipReleaseGlobalLock(void);
 
 uint64_t AcpipReadEcSpace(uint16_t CmdPort, uint16_t DataPort, uint64_t Offset);
 void AcpipWriteEcSpace(uint16_t CmdPort, uint16_t DataPort, uint64_t Offset, uint64_t Data);
@@ -64,15 +64,15 @@ AcpipScope *AcpipEnterWhile(
     uint32_t PredicateBacktrack,
     uint32_t Length);
 
-int AcpipReadByte(AcpipState *State, uint8_t *Byte);
-int AcpipReadWord(AcpipState *State, uint16_t *Word);
-int AcpipReadDWord(AcpipState *State, uint32_t *DWord);
-int AcpipReadQWord(AcpipState *State, uint64_t *QWord);
-int AcpipReadPkgLength(AcpipState *State, uint32_t *Length);
-int AcpipReadName(AcpipState *State, AcpiName *Name);
+bool AcpipReadByte(AcpipState *State, uint8_t *Byte);
+bool AcpipReadWord(AcpipState *State, uint16_t *Word);
+bool AcpipReadDWord(AcpipState *State, uint32_t *DWord);
+bool AcpipReadQWord(AcpipState *State, uint64_t *QWord);
+bool AcpipReadPkgLength(AcpipState *State, uint32_t *Length);
+bool AcpipReadName(AcpipState *State, AcpiName *Name);
 
-int AcpipReadField(AcpiValue *Source, AcpiValue *Target);
-int AcpipWriteField(AcpiValue *Target, AcpiValue *Value);
+bool AcpipReadField(AcpiValue *Source, AcpiValue *Target);
+bool AcpipWriteField(AcpiValue *Target, AcpiValue *Value);
 
 uint64_t AcpipReadMmioSpace(uint64_t Address, int Size);
 void AcpipWriteMmioSpace(uint64_t Address, int Size, uint64_t Data);
@@ -81,8 +81,8 @@ void AcpipWritePciConfigSpace(AcpiValue *Source, int Offset, int Size, uint64_t 
 uint64_t AcpipReadIoSpace(int Offset, int Size);
 void AcpipWriteIoSpace(int Offset, int Size, uint64_t Data);
 
-int AcpipPrepareExecuteOpcode(AcpipState *State);
-int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Value);
+bool AcpipPrepareExecuteOpcode(AcpipState *State);
+bool AcpipExecuteOpcode(AcpipState *State, AcpiValue *Value);
 int AcpipExecuteConcatOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value);
 int AcpipExecuteConvOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value);
 int AcpipExecuteDataObjOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value);
@@ -94,13 +94,13 @@ int AcpipExecuteNsModOpcode(AcpipState *State, uint16_t Opcode);
 int AcpipExecuteRefOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value);
 int AcpipExecuteStmtOpcode(AcpipState *State, uint16_t Opcode);
 
-int AcpipCastToInteger(AcpiValue *Value, uint64_t *Result, int Cleanup);
-int AcpipCastToString(AcpiValue *Value, int ImplicitCast, int Decimal);
-int AcpipCastToBuffer(AcpiValue *Value);
+bool AcpipCastToInteger(AcpiValue *Value, uint64_t *Result, bool Cleanup);
+bool AcpipCastToString(AcpiValue *Value, bool ImplicitCast, bool Decimal);
+bool AcpipCastToBuffer(AcpiValue *Value);
 
-int AcpipExecuteTermList(AcpipState *State);
-int AcpipReadTarget(AcpipState *State, AcpiValue *Target, AcpiValue *Value);
-int AcpipStoreTarget(AcpipState *State, AcpiValue *Target, AcpiValue *Value);
+bool AcpipExecuteTermList(AcpipState *State);
+bool AcpipReadTarget(AcpipState *State, AcpiValue *Target, AcpiValue *Value);
+bool AcpipStoreTarget(AcpipState *State, AcpiValue *Target, AcpiValue *Value);
 
 #ifdef __cplusplus
 }

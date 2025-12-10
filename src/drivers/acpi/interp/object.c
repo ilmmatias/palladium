@@ -50,11 +50,11 @@ AcpiObject *AcpiSearchObject(AcpiObject *Parent, const char *Name) {
  *     ExpectedType - What type we want; we'll automatically CastToX() if this isn't ACPI_EMPTY.
  *
  * RETURN VALUE:
- *     1 on success, 0 otherwise.
+ *     true/false depending on success.
  *-----------------------------------------------------------------------------------------------*/
-int AcpiEvaluateObject(AcpiObject *Object, AcpiValue *Result, int ExpectedType) {
+bool AcpiEvaluateObject(AcpiObject *Object, AcpiValue *Result, int ExpectedType) {
     if (!Object || !Result) {
-        return 0;
+        return false;
     }
 
     AcpiValue MethodResult;
@@ -63,9 +63,9 @@ int AcpiEvaluateObject(AcpiObject *Object, AcpiValue *Result, int ExpectedType) 
         /* It should be safe to assume that a mismatch in the argument size means something's gone
            wrong?*/
         if (Value->Method.Flags & 0x07) {
-            return 0;
+            return false;
         } else if (!AcpiExecuteMethod(Object, 0, NULL, &MethodResult)) {
-            return 0;
+            return false;
         }
 
         Value = &MethodResult;
@@ -73,19 +73,19 @@ int AcpiEvaluateObject(AcpiObject *Object, AcpiValue *Result, int ExpectedType) 
 
     AcpiCreateReference(Value, Result);
     if (Value != &Object->Value) {
-        AcpiRemoveReference(Value, 0);
+        AcpiRemoveReference(Value, false);
     }
 
     /* Equal types means we're done. */
     if (ExpectedType == ACPI_EMPTY || ExpectedType == Value->Type) {
-        return 1;
+        return true;
     }
 
     switch (ExpectedType) {
         case ACPI_INTEGER: {
             uint64_t Integer;
-            if (!AcpipCastToInteger(Result, &Integer, 1)) {
-                return 0;
+            if (!AcpipCastToInteger(Result, &Integer, true)) {
+                return false;
             }
 
             Result->Type = ACPI_INTEGER;
@@ -95,8 +95,8 @@ int AcpiEvaluateObject(AcpiObject *Object, AcpiValue *Result, int ExpectedType) 
         }
 
         case ACPI_STRING: {
-            if (!AcpipCastToString(Result, 1, 0)) {
-                return 0;
+            if (!AcpipCastToString(Result, true, false)) {
+                return false;
             }
 
             break;
@@ -104,7 +104,7 @@ int AcpiEvaluateObject(AcpiObject *Object, AcpiValue *Result, int ExpectedType) 
 
         case ACPI_BUFFER: {
             if (!AcpipCastToBuffer(Result)) {
-                return 0;
+                return false;
             }
 
             break;
@@ -112,13 +112,13 @@ int AcpiEvaluateObject(AcpiObject *Object, AcpiValue *Result, int ExpectedType) 
 
         default: {
             if (Value->Type != ExpectedType) {
-                AcpiRemoveReference(Result, 0);
-                return 0;
+                AcpiRemoveReference(Result, false);
+                return false;
             }
         }
     }
 
-    return 1;
+    return true;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -150,7 +150,7 @@ AcpiObject *AcpipCreateObject(AcpiName *Name, AcpiValue *Value) {
 
     /* Second pass, validate that all required path segments in the way exist. */
     while (Name->SegmentCount > 1) {
-        while (1) {
+        while (true) {
             if (!Base) {
                 return NULL;
             }
@@ -185,7 +185,7 @@ AcpiObject *AcpipCreateObject(AcpiName *Name, AcpiValue *Value) {
     /* Final pass, searching for either the location to insert this object (end of the list),
        or a duplicate. */
     if (Base) {
-        while (1) {
+        while (true) {
             if (!memcmp(Base->Name, Name->Start, 4)) {
                 if (Base->Value.Type != ACPI_DEVICE && Base->Value.Type != ACPI_REGION &&
                     Base->Value.Type != ACPI_POWER && Base->Value.Type != ACPI_PROCESSOR &&
@@ -212,7 +212,7 @@ AcpiObject *AcpipCreateObject(AcpiName *Name, AcpiValue *Value) {
 
     AcpiObject *Entry = AcpipAllocateBlock(sizeof(AcpiObject));
     if (!Entry) {
-        return 0;
+        return NULL;
     }
 
     memcpy(Entry->Name, Name->Start, 4);
@@ -256,7 +256,7 @@ AcpiObject *AcpipResolveObject(AcpiName *Name) {
     AcpiObject *Base = Parent->Value.Children->Objects;
 
     while (Name->SegmentCount > 1) {
-        while (1) {
+        while (true) {
             if (!Base) {
                 return NULL;
             }
@@ -289,7 +289,7 @@ AcpiObject *AcpipResolveObject(AcpiName *Name) {
 
     /* Final pass, we need to search in the current entry, returning the object if we find it.
        If we can't find it, we fallback to the parent scope, up until we reach the root. */
-    while (1) {
+    while (true) {
         if (!Base) {
             Parent = Parent->Parent;
             if (!Parent) {

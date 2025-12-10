@@ -39,17 +39,17 @@ static char *Types[] = {
  *     Cleanup - Set this to one if we should RemoveReference buffers/strings.
  *
  * RETURN VALUE:
- *     1 on success, 0 otherwise.
+ *     true/false depending on success.
  *-----------------------------------------------------------------------------------------------*/
-int AcpipCastToInteger(AcpiValue *Value, uint64_t *Result, int Cleanup) {
+bool AcpipCastToInteger(AcpiValue *Value, uint64_t *Result, bool Cleanup) {
     if (Value->Type == ACPI_INTEGER) {
         *Result = Value->Integer;
 
         if (Cleanup) {
-            AcpiRemoveReference(Value, 0);
+            AcpiRemoveReference(Value, false);
         }
 
-        return 1;
+        return true;
     }
 
     *Result = 0;
@@ -71,17 +71,17 @@ int AcpipCastToInteger(AcpiValue *Value, uint64_t *Result, int Cleanup) {
 
         default:
             if (Cleanup) {
-                AcpiRemoveReference(Value, 0);
+                AcpiRemoveReference(Value, false);
             }
 
-            return 0;
+            return false;
     }
 
     if (Cleanup) {
-        AcpiRemoveReference(Value, 0);
+        AcpiRemoveReference(Value, false);
     }
 
-    return 1;
+    return true;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -95,11 +95,11 @@ int AcpipCastToInteger(AcpiValue *Value, uint64_t *Result, int Cleanup) {
  *               otherwise.
  *
  * RETURN VALUE:
- *     1 on success, 0 otherwise.
+ *     true/false depending on success.
  *-----------------------------------------------------------------------------------------------*/
-int AcpipCastToString(AcpiValue *Value, int ImplicitCast, int Decimal) {
+bool AcpipCastToString(AcpiValue *Value, bool ImplicitCast, bool Decimal) {
     if (Value->Type == ACPI_STRING) {
-        return 1;
+        return true;
     }
 
     AcpiString *String;
@@ -112,22 +112,22 @@ int AcpipCastToString(AcpiValue *Value, int ImplicitCast, int Decimal) {
                 int Size = snprintf(NULL, 0, "%lld", Value->Integer);
                 String = AcpipAllocateBlock(sizeof(AcpiString) + Size + 1);
                 if (!String) {
-                    return 0;
+                    return false;
                 }
 
                 if (snprintf(String->Data, Size + 1, "%lld", Value->Integer) != Size) {
                     AcpipFreeBlock(String);
-                    return 0;
+                    return false;
                 }
             } else {
                 String = AcpipAllocateBlock(sizeof(AcpiString) + 17);
                 if (!String) {
-                    return 0;
+                    return false;
                 }
 
                 if (snprintf(String->Data, 17, "%016llX", Value->Integer) != 16) {
                     AcpipFreeBlock(String);
-                    return 0;
+                    return false;
                 }
             }
 
@@ -155,7 +155,7 @@ int AcpipCastToString(AcpiValue *Value, int ImplicitCast, int Decimal) {
 
                 String = AcpipAllocateBlock(sizeof(AcpiString) + Size + 1);
                 if (!String) {
-                    return 0;
+                    return false;
                 }
 
                 int Offset = 0;
@@ -175,7 +175,7 @@ int AcpipCastToString(AcpiValue *Value, int ImplicitCast, int Decimal) {
             } else {
                 String = AcpipAllocateBlock(sizeof(AcpiString) + Value->Buffer->Size * 5);
                 if (!String) {
-                    return 0;
+                    return false;
                 }
 
                 for (uint64_t i = 0; i < Value->Buffer->Size; i++) {
@@ -193,7 +193,7 @@ int AcpipCastToString(AcpiValue *Value, int ImplicitCast, int Decimal) {
                             PrintfFormat,
                             Value->Buffer->Data[i]) != PrintfSize - 1) {
                         AcpipFreeBlock(String);
-                        return 0;
+                        return false;
                     }
                 }
             }
@@ -206,7 +206,7 @@ int AcpipCastToString(AcpiValue *Value, int ImplicitCast, int Decimal) {
         default: {
             String = AcpipAllocateBlock(sizeof(AcpiString) + strlen(Types[Value->Type]) + 1);
             if (!String) {
-                return 0;
+                return false;
             }
 
             strcpy(String->Data, Types[Value->Type]);
@@ -214,12 +214,12 @@ int AcpipCastToString(AcpiValue *Value, int ImplicitCast, int Decimal) {
         }
     }
 
-    AcpiRemoveReference(Value, 0);
+    AcpiRemoveReference(Value, false);
     Value->Type = ACPI_STRING;
     Value->String = String;
     Value->String->References = 1;
 
-    return 1;
+    return true;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -230,11 +230,11 @@ int AcpipCastToString(AcpiValue *Value, int ImplicitCast, int Decimal) {
  *     Value - I/O; Result of ExecuteOpcode; Will become the converted buffer after the cast.
  *
  * RETURN VALUE:
- *     1 on success, 0 otherwise.
+ *     true/false depending on success.
  *-----------------------------------------------------------------------------------------------*/
-int AcpipCastToBuffer(AcpiValue *Value) {
+bool AcpipCastToBuffer(AcpiValue *Value) {
     if (Value->Type == ACPI_BUFFER) {
-        return 1;
+        return true;
     }
 
     uint64_t BufferSize = 0;
@@ -246,8 +246,8 @@ int AcpipCastToBuffer(AcpiValue *Value) {
             BufferSize = 16;
             Buffer = AcpipAllocateBlock(sizeof(AcpiBuffer) + 16);
             if (!Buffer) {
-                AcpiRemoveReference(Value, 0);
-                return 0;
+                AcpiRemoveReference(Value, false);
+                return false;
             }
 
             *((uint64_t *)Buffer->Data) = Value->Integer;
@@ -260,8 +260,8 @@ int AcpipCastToBuffer(AcpiValue *Value) {
             BufferSize = strlen(Value->String->Data);
             Buffer = AcpipAllocateBlock(sizeof(AcpiBuffer) + (BufferSize ? ++BufferSize : 0));
             if (!Buffer) {
-                AcpiRemoveReference(Value, 0);
-                return 0;
+                AcpiRemoveReference(Value, false);
+                return false;
             }
 
             if (BufferSize) {
@@ -272,16 +272,16 @@ int AcpipCastToBuffer(AcpiValue *Value) {
         }
 
         default:
-            AcpiRemoveReference(Value, 0);
-            return 0;
+            AcpiRemoveReference(Value, false);
+            return false;
     }
 
-    AcpiRemoveReference(Value, 0);
+    AcpiRemoveReference(Value, false);
     Value->Type = ACPI_BUFFER;
     Value->References = 1;
     Value->Buffer = Buffer;
     Value->Buffer->References = 1;
     Value->Buffer->Size = BufferSize;
 
-    return 1;
+    return true;
 }

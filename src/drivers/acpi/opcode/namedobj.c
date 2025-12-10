@@ -93,11 +93,14 @@ int AcpipExecuteNamedObjOpcode(AcpipState *State, uint16_t Opcode) {
             Value.Region.RegionSpace = State->Opcode->FixedArguments[1].Integer;
             Value.Region.RegionOffset = State->Opcode->FixedArguments[2].TermArg.Integer;
             Value.Region.RegionLen = State->Opcode->FixedArguments[3].TermArg.Integer;
-            Value.Region.PciReady = 0;
+            Value.Region.PciReady = false;
             Value.Region.PciDevice = 0;
             Value.Region.PciFunction = 0;
             Value.Region.PciSegment = 0;
             Value.Region.PciBus = 0;
+            Value.Region.EcReady = false;
+            Value.Region.EcDataPort = 0;
+            Value.Region.EcCmdPort = 0;
 
             if (!AcpipCreateObject(&State->Opcode->FixedArguments[0].Name, &Value)) {
                 return 0;

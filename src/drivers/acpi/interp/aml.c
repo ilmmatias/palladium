@@ -23,7 +23,7 @@ extern AcpiObject *AcpipObjectTree;
  * RETURN VALUE:
  *     Return value of the method, or NULL if something went wrong.
  *-----------------------------------------------------------------------------------------------*/
-int AcpiExecuteMethod(AcpiObject *Object, int ArgCount, AcpiValue *Arguments, AcpiValue *Result) {
+bool AcpiExecuteMethod(AcpiObject *Object, int ArgCount, AcpiValue *Arguments, AcpiValue *Result) {
     if (!Object || Object->Value.Type != ACPI_METHOD) {
         if (Object) {
             char *Path = AcpiGetObjectPath(Object);
@@ -37,7 +37,7 @@ int AcpiExecuteMethod(AcpiObject *Object, int ArgCount, AcpiValue *Arguments, Ac
             }
         }
 
-        return 0;
+        return false;
     } else if (ArgCount < 0) {
         ArgCount = 0;
     } else if (ArgCount > 7) {
@@ -58,7 +58,7 @@ int AcpiExecuteMethod(AcpiObject *Object, int ArgCount, AcpiValue *Arguments, Ac
     Scope.Parent = NULL;
 
     memset(&State, 0, sizeof(State));
-    State.IsMethod = 1;
+    State.IsMethod = true;
     State.Scope = &Scope;
     State.Opcode = NULL;
 
@@ -66,7 +66,7 @@ int AcpiExecuteMethod(AcpiObject *Object, int ArgCount, AcpiValue *Arguments, Ac
         memcpy(State.Arguments, Arguments, ArgCount * sizeof(AcpiValue));
     }
 
-    int Status = AcpipExecuteTermList(&State);
+    bool Status = AcpipExecuteTermList(&State);
 
     /* Objects defined inside methods have temporary scopes (they live as long as the method
        doesn't return), so we still need to cleanup (even on failure). */
@@ -75,7 +75,7 @@ int AcpiExecuteMethod(AcpiObject *Object, int ArgCount, AcpiValue *Arguments, Ac
 
     while (Base != NULL) {
         AcpiObject *Next = Base->Next;
-        AcpiRemoveReference(&Base->Value, 0);
+        AcpiRemoveReference(&Base->Value, false);
         AcpipFreeBlock(Base);
         Base = Next;
     }
@@ -96,11 +96,11 @@ int AcpiExecuteMethod(AcpiObject *Object, int ArgCount, AcpiValue *Arguments, Ac
  *     Target - Destination of the copy.
  *
  * RETURN VALUE:
- *     1 on success, 0 otherwise.
+ *     true/false depending on success.
  *-----------------------------------------------------------------------------------------------*/
-int AcpiCopyValue(AcpiValue *Source, AcpiValue *Target) {
+bool AcpiCopyValue(AcpiValue *Source, AcpiValue *Target) {
     if (!Source || !Target) {
-        return 0;
+        return false;
     }
 
     memcpy(Target, Source, sizeof(AcpiValue));
@@ -111,7 +111,7 @@ int AcpiCopyValue(AcpiValue *Source, AcpiValue *Target) {
             Target->String =
                 AcpipAllocateBlock(sizeof(AcpiString) + strlen(Source->String->Data) + 1);
             if (!Target->String) {
-                return 0;
+                return false;
             }
 
             Target->String->References = 1;
@@ -122,7 +122,7 @@ int AcpiCopyValue(AcpiValue *Source, AcpiValue *Target) {
         case ACPI_BUFFER:
             Target->Buffer = AcpipAllocateBlock(sizeof(AcpiBuffer) + Source->Buffer->Size);
             if (!Target->Buffer) {
-                return 0;
+                return false;
             }
 
             Target->Buffer->References = 1;
@@ -135,7 +135,7 @@ int AcpiCopyValue(AcpiValue *Source, AcpiValue *Target) {
             Target->Package = AcpipAllocateBlock(
                 sizeof(AcpiPackage) + Source->Package->Size * sizeof(AcpiPackageElement));
             if (!Target->Package) {
-                return 0;
+                return false;
             }
 
             Target->Package->References = 1;
@@ -148,8 +148,8 @@ int AcpiCopyValue(AcpiValue *Source, AcpiValue *Target) {
                             &Source->Package->Data[i].Value, &Target->Package->Data[i].Value)) {
                         /* Recursive cleanup on failure (if we processed any items). */
                         Target->Package->Size = i ? i - 1 : 0;
-                        AcpiRemoveReference(Target, 0);
-                        return 0;
+                        AcpiRemoveReference(Target, false);
+                        return false;
                     }
                 } else {
                     memcpy(
@@ -163,7 +163,7 @@ int AcpiCopyValue(AcpiValue *Source, AcpiValue *Target) {
 
         case ACPI_MUTEX:
             AcpipShowTraceMessage("attempt at CopyValue(Mutex)\n");
-            return 0;
+            return false;
 
         case ACPI_FIELD_UNIT:
             AcpiCreateReference(&Source->FieldUnit.Region->Value, NULL);
@@ -179,7 +179,7 @@ int AcpiCopyValue(AcpiValue *Source, AcpiValue *Target) {
             break;
     }
 
-    return 1;
+    return true;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -259,12 +259,12 @@ void AcpiCreateReference(AcpiValue *Source, AcpiValue *Target) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void AcpiRemoveReference(AcpiValue *Value, int CleanupPointer) {
+void AcpiRemoveReference(AcpiValue *Value, bool CleanupPointer) {
     if (!Value || !Value->References) {
         return;
     }
 
-    int NeedsCleanup = --Value->References <= 0;
+    bool NeedsCleanup = --Value->References <= 0;
 
     switch (Value->Type) {
         case ACPI_STRING:
@@ -285,7 +285,7 @@ void AcpiRemoveReference(AcpiValue *Value, int CleanupPointer) {
             if (NeedsCleanup && --Value->Package->References <= 0) {
                 for (uint64_t i = 0; i < Value->Package->Size; i++) {
                     if (Value->Package->Data[i].Type) {
-                        AcpiRemoveReference(&Value->Package->Data[i].Value, 0);
+                        AcpiRemoveReference(&Value->Package->Data[i].Value, false);
                     }
                 }
 
@@ -296,9 +296,9 @@ void AcpiRemoveReference(AcpiValue *Value, int CleanupPointer) {
 
         case ACPI_FIELD_UNIT: {
             if (NeedsCleanup) {
-                AcpiRemoveReference(&Value->FieldUnit.Region->Value, 0);
+                AcpiRemoveReference(&Value->FieldUnit.Region->Value, false);
                 if (Value->FieldUnit.Data) {
-                    AcpiRemoveReference(&Value->FieldUnit.Data->Value, 0);
+                    AcpiRemoveReference(&Value->FieldUnit.Data->Value, false);
                 }
             }
 
@@ -316,7 +316,7 @@ void AcpiRemoveReference(AcpiValue *Value, int CleanupPointer) {
         case ACPI_BUFFER_FIELD:
         case ACPI_INDEX:
             if (NeedsCleanup) {
-                AcpiRemoveReference(Value->BufferField.Source, 1);
+                AcpiRemoveReference(Value->BufferField.Source, true);
             }
 
             break;
@@ -409,7 +409,7 @@ void AcpipPopulateTree(const uint8_t *Code, uint32_t Length) {
     Scope.Parent = NULL;
 
     memset(&State, 0, sizeof(State));
-    State.IsMethod = 0;
+    State.IsMethod = false;
     State.Scope = &Scope;
     State.Opcode = NULL;
 
@@ -520,13 +520,13 @@ AcpipScope *AcpipEnterWhile(
  * RETURN VALUE:
  *     0 on end of code, 1 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int AcpipReadByte(AcpipState *State, uint8_t *Byte) {
+bool AcpipReadByte(AcpipState *State, uint8_t *Byte) {
     if (State->Scope->RemainingLength) {
         *Byte = *(State->Scope->Code++);
         State->Scope->RemainingLength--;
-        return 1;
+        return true;
     } else {
-        return 0;
+        return false;
     }
 }
 
@@ -542,14 +542,14 @@ int AcpipReadByte(AcpipState *State, uint8_t *Byte) {
  * RETURN VALUE:
  *     0 on end of code, 1 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int AcpipReadWord(AcpipState *State, uint16_t *Word) {
+bool AcpipReadWord(AcpipState *State, uint16_t *Word) {
     if (State->Scope->RemainingLength > 1) {
         *Word = *(uint16_t *)State->Scope->Code;
         State->Scope->Code += 2;
         State->Scope->RemainingLength -= 2;
-        return 1;
+        return true;
     } else {
-        return 0;
+        return false;
     }
 }
 
@@ -565,14 +565,14 @@ int AcpipReadWord(AcpipState *State, uint16_t *Word) {
  * RETURN VALUE:
  *     0 on end of code, 1 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int AcpipReadDWord(AcpipState *State, uint32_t *DWord) {
+bool AcpipReadDWord(AcpipState *State, uint32_t *DWord) {
     if (State->Scope->RemainingLength > 3) {
         *DWord = *(uint32_t *)State->Scope->Code;
         State->Scope->Code += 4;
         State->Scope->RemainingLength -= 4;
-        return 1;
+        return true;
     } else {
-        return 0;
+        return false;
     }
 }
 
@@ -588,14 +588,14 @@ int AcpipReadDWord(AcpipState *State, uint32_t *DWord) {
  * RETURN VALUE:
  *     0 on end of code, 1 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int AcpipReadQWord(AcpipState *State, uint64_t *QWord) {
+bool AcpipReadQWord(AcpipState *State, uint64_t *QWord) {
     if (State->Scope->RemainingLength > 7) {
         *QWord = *(uint64_t *)State->Scope->Code;
         State->Scope->Code += 8;
         State->Scope->RemainingLength -= 8;
-        return 1;
+        return true;
     } else {
-        return 0;
+        return false;
     }
 }
 
@@ -610,10 +610,10 @@ int AcpipReadQWord(AcpipState *State, uint64_t *QWord) {
  * RETURN VALUE:
  *     0 on end of code, 1 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int AcpipReadPkgLength(AcpipState *State, uint32_t *Length) {
+bool AcpipReadPkgLength(AcpipState *State, uint32_t *Length) {
     uint8_t Leading;
     if (!AcpipReadByte(State, &Leading)) {
-        return 0;
+        return false;
     }
 
     /* High 2-bits of the leading byte specifies how many bytes we should read to get the package
@@ -622,7 +622,7 @@ int AcpipReadPkgLength(AcpipState *State, uint32_t *Length) {
 
     if (!(Leading >> 6)) {
         *Length = Leading & 0x3F;
-        return 1;
+        return true;
     }
 
     *Length = Leading & 0x0F;
@@ -630,13 +630,13 @@ int AcpipReadPkgLength(AcpipState *State, uint32_t *Length) {
     for (int i = 0; i < Leading >> 6; i++) {
         uint8_t Part;
         if (!AcpipReadByte(State, &Part)) {
-            return 0;
+            return false;
         }
 
         *Length |= (uint32_t)Part << (i * 8 + 4);
     }
 
-    return 1;
+    return true;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -650,13 +650,13 @@ int AcpipReadPkgLength(AcpipState *State, uint32_t *Length) {
  * RETURN VALUE:
  *     0 on end of code, 1 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int AcpipReadName(AcpipState *State, AcpiName *Name) {
+bool AcpipReadName(AcpipState *State, AcpiName *Name) {
     uint8_t Current;
     if (!AcpipReadByte(State, &Current)) {
-        return 0;
+        return false;
     }
 
-    int IsRoot = Current == '\\';
+    bool IsRoot = Current == '\\';
     int BacktrackCount = 0;
 
     /* Consume any and every `parent scope` prefixes, even if we don't have as many parent scopes
@@ -664,13 +664,13 @@ int AcpipReadName(AcpipState *State, AcpiName *Name) {
     if (IsRoot) {
         while (Current == '\\') {
             if (!AcpipReadByte(State, &Current)) {
-                return 0;
+                return false;
             }
         }
     } else if (!IsRoot && Current == '^') {
         while (Current == '^') {
             if (!AcpipReadByte(State, &Current)) {
-                return 0;
+                return false;
             }
 
             BacktrackCount++;
@@ -684,7 +684,7 @@ int AcpipReadName(AcpipState *State, AcpiName *Name) {
         SegmentCount = 2;
     } else if (Current == 0x2F) {
         if (!AcpipReadByte(State, &SegmentCount)) {
-            return 0;
+            return false;
         }
     } else if (Current) {
         SegmentCount = 1;
@@ -693,7 +693,7 @@ int AcpipReadName(AcpipState *State, AcpiName *Name) {
     }
 
     if (State->Scope->RemainingLength < SegmentCount * 4) {
-        return 0;
+        return false;
     }
 
     Name->LinkedObject = IsRoot ? NULL : State->Scope->LinkedObject;
@@ -703,5 +703,5 @@ int AcpipReadName(AcpipState *State, AcpiName *Name) {
     State->Scope->Code += SegmentCount * 4;
     State->Scope->RemainingLength -= SegmentCount * 4;
 
-    return 1;
+    return true;
 }

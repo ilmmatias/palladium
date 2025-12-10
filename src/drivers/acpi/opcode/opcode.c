@@ -11,7 +11,7 @@ extern AcpipArgument AcpipGroup1Arguments[256];
 #define TRY_EXECUTE_OPCODE(Function, ...)                    \
     Status = Function(State, Opcode->Opcode, ##__VA_ARGS__); \
     if (!Status) {                                           \
-        return 0;                                            \
+        return false;                                        \
     } else if (Status > 0) {                                 \
         break;                                               \
     }
@@ -25,28 +25,28 @@ extern AcpipArgument AcpipGroup1Arguments[256];
  *     State - AML state containing the current scope.
  *
  * RETURN VALUE:
- *     1 on success, 0 otherwise.
+ *     true/false depending on success.
  *-----------------------------------------------------------------------------------------------*/
-int AcpipPrepareExecuteOpcode(AcpipState *State) {
+bool AcpipPrepareExecuteOpcode(AcpipState *State) {
     uint8_t Opcode;
     if (!AcpipReadByte(State, &Opcode)) {
-        return 0;
+        return false;
     }
 
     uint8_t ExtOpcode = 0;
     if (Opcode == 0x5B && !AcpipReadByte(State, &ExtOpcode)) {
-        return 0;
+        return false;
     }
 
     AcpipArgument *Arguments =
         Opcode == 0x5B ? &AcpipGroup1Arguments[ExtOpcode] : &AcpipGroup0Arguments[Opcode];
     if (!Arguments->Valid) {
-        return 0;
+        return false;
     }
 
     AcpipOpcode *Info = AcpipAllocateZeroBlock(1, sizeof(AcpipOpcode));
     if (!Info) {
-        return 0;
+        return false;
     }
 
     Info->StartCode = State->Scope->Code;
@@ -55,7 +55,7 @@ int AcpipPrepareExecuteOpcode(AcpipState *State) {
     Info->ArgInfo = Arguments;
     Info->Parent = State->Opcode;
     State->Opcode = Info;
-    return 1;
+    return true;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -68,18 +68,18 @@ int AcpipPrepareExecuteOpcode(AcpipState *State) {
  *     Result - Output; Where to store the resulting value; Only used for expression calls.
  *
  * RETURN VALUE:
- *     1 on success, 0 otherwise.
+ *     true/false depending on success.
  *-----------------------------------------------------------------------------------------------*/
-int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
-    while (1) {
+bool AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
+    while (true) {
         AcpipOpcode *Opcode = State->Opcode;
 
         if (Opcode->ArgInfo->HasPkgLength && !Opcode->ValidPkgLength) {
             if (!AcpipReadPkgLength(State, &Opcode->PkgLength)) {
-                return 0;
+                return false;
             }
 
-            Opcode->ValidPkgLength = 1;
+            Opcode->ValidPkgLength = true;
             Opcode->Predicate = State->Scope->Code;
             Opcode->PredicateBacktrack = State->Scope->RemainingLength;
         }
@@ -100,28 +100,28 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
 
                 case ACPI_ARG_BYTE:
                     if (!AcpipReadByte(State, (uint8_t *)&Arg->Integer)) {
-                        return 0;
+                        return false;
                     }
 
                     break;
 
                 case ACPI_ARG_WORD:
                     if (!AcpipReadWord(State, (uint16_t *)&Arg->Integer)) {
-                        return 0;
+                        return false;
                     }
 
                     break;
 
                 case ACPI_ARG_DWORD:
                     if (!AcpipReadDWord(State, (uint32_t *)&Arg->Integer)) {
-                        return 0;
+                        return false;
                     }
 
                     break;
 
                 case ACPI_ARG_QWORD:
                     if (!AcpipReadQWord(State, &Arg->Integer)) {
-                        return 0;
+                        return false;
                     }
 
                     break;
@@ -134,12 +134,12 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
                     }
 
                     if (++StringSize > State->Scope->RemainingLength) {
-                        return 0;
+                        return false;
                     }
 
                     Arg->String = AcpipAllocateBlock(sizeof(AcpiString) + StringSize);
                     if (!Arg->String) {
-                        return 0;
+                        return false;
                     }
 
                     Arg->String->References = 1;
@@ -152,14 +152,14 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
 
                 case ACPI_ARG_NAME:
                     if (!AcpipReadName(State, &Arg->Name)) {
-                        return 0;
+                        return false;
                     }
 
                     break;
 
                 default:
                     if (!AcpipPrepareExecuteOpcode(State)) {
-                        return 0;
+                        return false;
                     }
 
                     State->Opcode->ParentArgType = Opcode->ArgInfo->Types[Position];
@@ -235,11 +235,11 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
 
                     if (!AcpipStoreTarget(
                             State, Target, &State->Opcode->FixedArguments[0].TermArg)) {
-                        AcpiRemoveReference(Target, 0);
-                        return 0;
+                        AcpiRemoveReference(Target, false);
+                        return false;
                     }
 
-                    AcpiRemoveReference(Target, 0);
+                    AcpiRemoveReference(Target, false);
                     break;
                 }
 
@@ -248,14 +248,14 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
                     AcpiValue Target;
                     if (!AcpipReadTarget(
                             State, &State->Opcode->FixedArguments[0].TermArg, &Target)) {
-                        AcpiRemoveReference(&State->Opcode->FixedArguments[0].TermArg, 0);
-                        return 0;
+                        AcpiRemoveReference(&State->Opcode->FixedArguments[0].TermArg, false);
+                        return false;
                     }
 
                     Value.Type = ACPI_INTEGER;
                     Value.References = 1;
 
-                    AcpiRemoveReference(&State->Opcode->FixedArguments[0].TermArg, 0);
+                    AcpiRemoveReference(&State->Opcode->FixedArguments[0].TermArg, false);
                     if (Target.Type == ACPI_STRING) {
                         Value.Integer = strlen(Target.String->Data);
                     } else if (Target.Type == ACPI_BUFFER) {
@@ -263,7 +263,7 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
                     } else if (Target.Type == ACPI_PACKAGE) {
                         Value.Integer = Target.Package->Size;
                     } else {
-                        return 0;
+                        return false;
                     }
 
                     break;
@@ -275,7 +275,7 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
                     Value.Type = ACPI_INTEGER;
                     Value.References = 1;
                     Value.Integer = SuperName->Type;
-                    AcpiRemoveReference(SuperName, 0);
+                    AcpiRemoveReference(SuperName, false);
                     break;
                 }
 
@@ -286,19 +286,19 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
 
                     AcpiValue Copy;
                     if (!AcpiCopyValue(Source, &Copy)) {
-                        AcpiRemoveReference(Source, 0);
-                        AcpiRemoveReference(Target, 0);
-                        return 0;
+                        AcpiRemoveReference(Source, false);
+                        AcpiRemoveReference(Target, false);
+                        return false;
                     }
 
                     if (!AcpipStoreTarget(State, Target, &Copy)) {
-                        AcpiRemoveReference(Source, 0);
-                        AcpiRemoveReference(Target, 0);
-                        return 0;
+                        AcpiRemoveReference(Source, false);
+                        AcpiRemoveReference(Target, false);
+                        return false;
                     }
 
-                    AcpiRemoveReference(Source, 0);
-                    AcpiRemoveReference(Target, 0);
+                    AcpiRemoveReference(Source, false);
+                    AcpiRemoveReference(Target, false);
                     break;
                 }
 
@@ -337,11 +337,12 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
                             }
 
                             uint64_t PkgValue = Element->Value.Integer;
-                            int Match1 = 0, Match2 = 0;
+                            bool Match1 = false;
+                            bool Match2 = false;
 
                             switch (MatchOp1) {
                                 case 0: /* MTR - always true */
-                                    Match1 = 1;
+                                    Match1 = true;
                                     break;
                                 case 1: /* MEQ */
                                     Match1 = PkgValue == Operand1;
@@ -362,7 +363,7 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
 
                             switch (MatchOp2) {
                                 case 0: /* MTR */
-                                    Match2 = 1;
+                                    Match2 = true;
                                     break;
                                 case 1: /* MEQ */
                                     Match2 = PkgValue == Operand2;
@@ -388,10 +389,10 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
                         }
                     }
 
-                    AcpiRemoveReference(SearchPkg, 0);
-                    AcpiRemoveReference(&State->Opcode->FixedArguments[2].TermArg, 0);
-                    AcpiRemoveReference(&State->Opcode->FixedArguments[4].TermArg, 0);
-                    AcpiRemoveReference(&State->Opcode->FixedArguments[5].TermArg, 0);
+                    AcpiRemoveReference(SearchPkg, false);
+                    AcpiRemoveReference(&State->Opcode->FixedArguments[2].TermArg, false);
+                    AcpiRemoveReference(&State->Opcode->FixedArguments[4].TermArg, false);
+                    AcpiRemoveReference(&State->Opcode->FixedArguments[5].TermArg, false);
                     break;
                 }
 
@@ -406,8 +407,8 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
                             "Notify(%.4s, 0x%llx)\n", NotifyObject->Reference->Name, NotifyValue);
                     }
 
-                    AcpiRemoveReference(NotifyObject, 0);
-                    AcpiRemoveReference(&State->Opcode->FixedArguments[1].TermArg, 0);
+                    AcpiRemoveReference(NotifyObject, false);
+                    AcpiRemoveReference(&State->Opcode->FixedArguments[1].TermArg, false);
                     break;
                 }
 
@@ -448,7 +449,7 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
 
                     AcpiName Name;
                     if (!AcpipReadName(State, &Name)) {
-                        return 0;
+                        return false;
                     }
 
                     AcpiObject *Object = AcpipResolveObject(&Name);
@@ -457,7 +458,7 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
                             Value.Type = ACPI_EMPTY;
                             break;
                         } else {
-                            return 0;
+                            return false;
                         }
                     }
 
@@ -475,7 +476,7 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
                                etc). */
                             case ACPI_FIELD_UNIT:
                                 if (!AcpipReadField(&Object->Value, &Value)) {
-                                    return 0;
+                                    return false;
                                 }
 
                                 break;
@@ -498,23 +499,23 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
                     for (int i = 0; i < (Object->Value.Method.Flags & 0x07); i++) {
                         if (!AcpipPrepareExecuteOpcode(State) ||
                             !AcpipExecuteOpcode(State, &Arguments[i])) {
-                            return 0;
+                            return false;
                         }
                     }
 
                     if (!AcpiExecuteMethod(
                             Object, Object->Value.Method.Flags & 0x07, Arguments, &Value)) {
-                        return 0;
+                        return false;
                     }
 
                     for (int i = 0; i < (Object->Value.Method.Flags & 0x07); i++) {
-                        AcpiRemoveReference(&Arguments[i], 0);
+                        AcpiRemoveReference(&Arguments[i], false);
                     }
 
                     break;
                 }
             }
-        } while (0);
+        } while (false);
 
         /* If we're done, we should be free to write the result variable (as we're returning
            already). */
@@ -522,14 +523,14 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
             if (Result) {
                 memcpy(Result, &Value, sizeof(AcpiValue));
             } else {
-                AcpiRemoveReference(&Value, 0);
+                AcpiRemoveReference(&Value, false);
             }
 
             AcpipOpcode *Parent = Opcode->Parent;
             AcpipFreeBlock(Opcode);
             State->Opcode = Parent;
 
-            return 1;
+            return true;
         }
 
         /* Everything but the primitives (integer, buffer, and package) need no handling;
@@ -537,8 +538,8 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
         switch (Opcode->ParentArgType) {
             case ACPI_ARG_INTEGER:
                 Opcode->ParentArg->TermArg.Type = ACPI_INTEGER;
-                if (!AcpipCastToInteger(&Value, &Opcode->ParentArg->TermArg.Integer, 1)) {
-                    return 0;
+                if (!AcpipCastToInteger(&Value, &Opcode->ParentArg->TermArg.Integer, true)) {
+                    return false;
                 }
 
                 break;
@@ -546,7 +547,7 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
             case ACPI_ARG_BUFFER:
                 memcpy(&Opcode->ParentArg->TermArg, &Value, sizeof(AcpiValue));
                 if (!AcpipCastToBuffer(&Opcode->ParentArg->TermArg)) {
-                    return 0;
+                    return false;
                 }
 
                 break;

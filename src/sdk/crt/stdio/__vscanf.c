@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <ctype.h>
-#include <limits.h>
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -171,7 +170,7 @@ static bool _strtou(
                 (base == 16 && (ch == 'x' || ch == 'X'))) {
                 if (width_set && !--width) {
                     *value = 0;
-                    return 1;
+                    return true;
                 }
 
                 ch = read_ch(context);

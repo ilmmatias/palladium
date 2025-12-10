@@ -11,18 +11,18 @@
  *     State - AML state containing the current scope.
  *
  * RETURN VALUE:
- *     1 on success, 0 otherwise.
+ *     true/false depending on success.
  *-----------------------------------------------------------------------------------------------*/
-int AcpipExecuteTermList(AcpipState *State) {
-    int Status = 0;
+bool AcpipExecuteTermList(AcpipState *State) {
+    bool Status = false;
 
-    while (1) {
+    while (true) {
         if (!State->Scope->RemainingLength) {
             /* Backtrack into the previous scope, or end if we're already in the top-most
                scope. */
             AcpipScope *Parent = State->Scope->Parent;
             if (!Parent) {
-                Status = 1;
+                Status = true;
                 break;
             }
 
@@ -35,8 +35,8 @@ int AcpipExecuteTermList(AcpipState *State) {
                 AcpiValue PredicateValue;
                 if (!AcpipPrepareExecuteOpcode(State) ||
                     !AcpipExecuteOpcode(State, &PredicateValue) ||
-                    !AcpipCastToInteger(&PredicateValue, &Predicate, 1)) {
-                    return 0;
+                    !AcpipCastToInteger(&PredicateValue, &Predicate, true)) {
+                    return false;
                 }
 
                 if (Predicate) {
@@ -61,7 +61,7 @@ int AcpipExecuteTermList(AcpipState *State) {
         }
 
         if (State->HasReturned) {
-            Status = 1;
+            Status = true;
             break;
         }
     }

@@ -17,18 +17,18 @@
  *     CmdPort - The EC command/status port address.
  *
  * RETURN VALUE:
- *     1 on success, 0 on timeout.
+ *     true/false depending on success.
  *-----------------------------------------------------------------------------------------------*/
-static int WaitIbfEmpty(uint16_t CmdPort) {
+static bool WaitIbfEmpty(uint16_t CmdPort) {
     for (int i = 0; i < 10000; i++) {
         if (!(AcpipReadIoSpace(CmdPort, 1) & STATUS_IBF)) {
-            return 1;
+            return true;
         }
 
         AcpipStallExecution(10);
     }
 
-    return 0;
+    return false;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -39,18 +39,18 @@ static int WaitIbfEmpty(uint16_t CmdPort) {
  *     CmdPort - The EC command/status port address.
  *
  * RETURN VALUE:
- *     1 on success, 0 on timeout.
+ *     true/false depending on success.
  *-----------------------------------------------------------------------------------------------*/
-static int WaitObfFull(uint16_t CmdPort) {
+static bool WaitObfFull(uint16_t CmdPort) {
     for (int i = 0; i < 10000; i++) {
         if (AcpipReadIoSpace(CmdPort, 1) & STATUS_OBF) {
-            return 1;
+            return true;
         }
 
         AcpipStallExecution(10);
     }
 
-    return 0;
+    return false;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -100,6 +100,7 @@ void AcpipWriteEcSpace(uint16_t CmdPort, uint16_t DataPort, uint64_t Offset, uin
     if (!WaitIbfEmpty(CmdPort)) {
         return;
     }
+
     AcpipWriteIoSpace(CmdPort, 1, CMD_WRITE);
     if (!WaitIbfEmpty(CmdPort)) {
         return;

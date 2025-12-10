@@ -16,7 +16,7 @@
  * RETURN VALUE:
  *     1 if the read was successful, 0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int AcpipReadTarget(AcpipState *State, AcpiValue *Target, AcpiValue *Value) {
+bool AcpipReadTarget(AcpipState *State, AcpiValue *Target, AcpiValue *Value) {
     AcpiValue *Source;
 
     switch (Target->Type) {
@@ -28,9 +28,9 @@ int AcpipReadTarget(AcpipState *State, AcpiValue *Target, AcpiValue *Value) {
             break;
         case ACPI_REFERENCE:
             AcpiCreateReference(&Target->Reference->Value, Value);
-            return 1;
+            return true;
         default:
-            return 0;
+            return false;
     }
 
     return AcpiCopyValue(Source, Value);
@@ -48,7 +48,7 @@ int AcpipReadTarget(AcpipState *State, AcpiValue *Target, AcpiValue *Value) {
  * RETURN VALUE:
  *     1 if the store was successful, 0 otherwise.
  *-----------------------------------------------------------------------------------------------*/
-int AcpipStoreTarget(AcpipState *State, AcpiValue *Target, AcpiValue *Value) {
+bool AcpipStoreTarget(AcpipState *State, AcpiValue *Target, AcpiValue *Value) {
     switch (Target->Type) {
         case ACPI_INDEX: {
             AcpiValue *Buffer = Target->BufferField.Source;
@@ -57,7 +57,7 @@ int AcpipStoreTarget(AcpipState *State, AcpiValue *Target, AcpiValue *Value) {
             switch (Buffer->Type) {
                 case ACPI_PACKAGE: {
                     if (Buffer->Package->Data[Index].Type) {
-                        AcpiRemoveReference(&Buffer->Package->Data[Index].Value, 0);
+                        AcpiRemoveReference(&Buffer->Package->Data[Index].Value, false);
                     }
 
                     Buffer->Package->Data[Index].Type = 1;
@@ -77,17 +77,17 @@ int AcpipStoreTarget(AcpipState *State, AcpiValue *Target, AcpiValue *Value) {
             break;
         }
         case ACPI_LOCAL:
-            AcpiRemoveReference(&State->Locals[Target->Integer], 0);
+            AcpiRemoveReference(&State->Locals[Target->Integer], false);
             AcpiCopyValue(Value, &State->Locals[Target->Integer]);
             break;
         case ACPI_ARG:
-            AcpiRemoveReference(&State->Arguments[Target->Integer], 0);
+            AcpiRemoveReference(&State->Arguments[Target->Integer], false);
             AcpiCopyValue(Value, &State->Arguments[Target->Integer]);
             break;
         case ACPI_DEBUG:
-            if (AcpipCastToString(Value, 1, 0)) {
+            if (AcpipCastToString(Value, true, false)) {
                 AcpipShowDebugMessage("AML message: %s\n", Value->String->Data);
-                AcpiRemoveReference(Value, 0);
+                AcpiRemoveReference(Value, false);
             }
 
             break;
@@ -96,11 +96,11 @@ int AcpipStoreTarget(AcpipState *State, AcpiValue *Target, AcpiValue *Value) {
                 /* Integers, strings, and buffers are allowed to be implicitly cast into. */
                 case ACPI_INTEGER: {
                     uint64_t IntegerValue;
-                    if (!AcpipCastToInteger(Value, &IntegerValue, 1)) {
-                        return 0;
+                    if (!AcpipCastToInteger(Value, &IntegerValue, true)) {
+                        return false;
                     }
 
-                    AcpiRemoveReference(&Target->Reference->Value, 0);
+                    AcpiRemoveReference(&Target->Reference->Value, false);
                     Target->Reference->Value.Type = ACPI_INTEGER;
                     Target->Reference->Value.Integer = IntegerValue;
 
@@ -108,22 +108,22 @@ int AcpipStoreTarget(AcpipState *State, AcpiValue *Target, AcpiValue *Value) {
                 }
 
                 case ACPI_STRING: {
-                    AcpiRemoveReference(&Target->Reference->Value, 0);
+                    AcpiRemoveReference(&Target->Reference->Value, false);
                     memcpy(&Target->Reference->Value, Value, sizeof(AcpiValue));
 
-                    if (!AcpipCastToString(&Target->Reference->Value, 1, 0)) {
-                        return 0;
+                    if (!AcpipCastToString(&Target->Reference->Value, true, false)) {
+                        return false;
                     }
 
                     break;
                 }
 
                 case ACPI_BUFFER: {
-                    AcpiRemoveReference(&Target->Reference->Value, 0);
+                    AcpiRemoveReference(&Target->Reference->Value, false);
                     memcpy(&Target->Reference->Value, Value, sizeof(AcpiValue));
 
                     if (!AcpipCastToBuffer(&Target->Reference->Value)) {
-                        return 0;
+                        return false;
                     }
 
                     break;
@@ -132,10 +132,10 @@ int AcpipStoreTarget(AcpipState *State, AcpiValue *Target, AcpiValue *Value) {
                 /* Store to packages is only allowed if the source too is a package. */
                 case ACPI_PACKAGE: {
                     if (Value->Type != ACPI_PACKAGE) {
-                        return 0;
+                        return false;
                     }
 
-                    AcpiRemoveReference(&Target->Reference->Value, 0);
+                    AcpiRemoveReference(&Target->Reference->Value, false);
                     memcpy(&Target->Reference->Value, Value, sizeof(AcpiValue));
 
                     break;
@@ -146,14 +146,14 @@ int AcpipStoreTarget(AcpipState *State, AcpiValue *Target, AcpiValue *Value) {
                 case ACPI_FIELD_UNIT: {
                     if (Value->Type != ACPI_INTEGER && Value->Type != ACPI_STRING &&
                         Value->Type != ACPI_BUFFER) {
-                        return 0;
+                        return false;
                     }
 
-                    int Status = AcpipWriteField(&Target->Reference->Value, Value);
-                    AcpiRemoveReference(Value, 0);
+                    bool Status = AcpipWriteField(&Target->Reference->Value, Value);
+                    AcpiRemoveReference(Value, false);
 
                     if (!Status) {
-                        return 0;
+                        return false;
                     }
 
                     break;
@@ -164,8 +164,8 @@ int AcpipStoreTarget(AcpipState *State, AcpiValue *Target, AcpiValue *Value) {
                     AcpiValue *Source = Target->Reference->Value.BufferField.Source;
 
                     uint64_t Slot;
-                    if (!AcpipCastToInteger(Value, &Slot, 1)) {
-                        return 0;
+                    if (!AcpipCastToInteger(Value, &Slot, true)) {
+                        return false;
                     }
 
                     switch (Target->Reference->Value.BufferField.Size) {
@@ -202,5 +202,5 @@ int AcpipStoreTarget(AcpipState *State, AcpiValue *Target, AcpiValue *Value) {
             break;
     }
 
-    return 1;
+    return true;
 }
