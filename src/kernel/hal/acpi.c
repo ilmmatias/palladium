@@ -14,6 +14,8 @@ typedef struct {
 } CacheEntry;
 
 CacheEntry *Entries = NULL;
+CacheEntry *DsdtEntry = NULL;
+CacheEntry *FacsEntry = NULL;
 int EntryCount = 0;
 
 /*-------------------------------------------------------------------------------------------------
@@ -97,6 +99,7 @@ void HalpInitializeLateAcpi(KiLoaderBlock *LoaderBlock) {
     }
 
     uintptr_t DsdtAddress = 0;
+    uintptr_t FacsAddress = 0;
     uint32_t *RsdtTables = (uint32_t *)(RootTable + 1);
     uint64_t *XsdtTables = (uint64_t *)(RootTable + 1);
     for (uint32_t i = 0; i < (RootTable->Length - sizeof(HalpSdtHeader)) / (IsXsdt ? 8 : 4); i++) {
@@ -111,17 +114,25 @@ void HalpInitializeLateAcpi(KiLoaderBlock *LoaderBlock) {
                 0);
         }
 
-        /* Ignore the DSDT, we'll grab it out of the FADT in a bit. */
-        if (!memcmp(Header->Signature, "DSDT", 4)) {
+        /* Ignore the DSDT (and the FACS), we'll grab it out of the FADT in a bit. */
+        if (!memcmp(Header->Signature, "DSDT", 4) || !memcmp(Header->Signature, "FACS", 4)) {
             MmUnmapSpace(Header, MM_PAGE_SIZE);
             EntryCount--;
             continue;
         }
 
-        /* Talking about the FADT, grab the DSDT out of it if we find it. */
-        if (!memcmp(Header->Signature, "FACP", 4) && !DsdtAddress) {
+        /* Talking about the FADT, grab the two we taked about out of it (if we find it). */
+        if (!memcmp(Header->Signature, "FACP", 4)) {
             HalpFadtHeader *FadtHeader = (HalpFadtHeader *)Header;
-            DsdtAddress = FadtHeader->XDsdt ? FadtHeader->XDsdt : FadtHeader->Dsdt;
+
+            if (!DsdtAddress) {
+                DsdtAddress = FadtHeader->XDsdt ? FadtHeader->XDsdt : FadtHeader->Dsdt;
+            }
+
+            if (!FacsAddress) {
+                FacsAddress = FadtHeader->XFirmwareControl ? FadtHeader->XFirmwareControl
+                                                           : FadtHeader->FirmwareCtrl;
+            }
         }
 
         /* Just the first page is enough to grab the signature and size, and then we can store the
@@ -135,29 +146,45 @@ void HalpInitializeLateAcpi(KiLoaderBlock *LoaderBlock) {
         MmUnmapSpace(Header, MM_PAGE_SIZE);
     }
 
-    /* If we don't have any DSDT, we're done here (but really, most non-embedded machines should
-     * have one). */
-    if (!DsdtAddress) {
-        EntryCount--;
-        return;
+    /* If we have a DSDT, we can add it to the cache (and cache the entry position). */
+    if (DsdtAddress) {
+        HalpSdtHeader *Header = MmMapSpace(MM_SPACE_NORMAL, DsdtAddress, MM_PAGE_SIZE);
+        if (!Header) {
+            KeFatalError(
+                KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+                KE_PANIC_PARAMETER_ACPI_INITIALIZATION_FAILURE,
+                KE_PANIC_PARAMETER_BAD_DSDT_TABLE,
+                KE_PANIC_PARAMETER_OUT_OF_RESOURCES,
+                0);
+        }
+
+        DsdtEntry = &Entries[EntryCount++];
+        memcpy(DsdtEntry->Signature, Header->Signature, 4);
+        DsdtEntry->PhysicalAddress = DsdtAddress;
+        DsdtEntry->VirtualAddress = NULL;
+        DsdtEntry->Length = Header->Length;
+        MmUnmapSpace(Header, MM_PAGE_SIZE);
     }
 
-    HalpSdtHeader *Header = MmMapSpace(MM_SPACE_NORMAL, DsdtAddress, MM_PAGE_SIZE);
-    if (!Header) {
-        KeFatalError(
-            KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
-            KE_PANIC_PARAMETER_ACPI_INITIALIZATION_FAILURE,
-            KE_PANIC_PARAMETER_BAD_DSDT_TABLE,
-            KE_PANIC_PARAMETER_OUT_OF_RESOURCES,
-            0);
-    }
+    /* Do the same for the FACS as well. */
+    if (FacsAddress) {
+        HalpSdtHeader *Header = MmMapSpace(MM_SPACE_NORMAL, FacsAddress, MM_PAGE_SIZE);
+        if (!Header) {
+            KeFatalError(
+                KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+                KE_PANIC_PARAMETER_ACPI_INITIALIZATION_FAILURE,
+                KE_PANIC_PARAMETER_BAD_FACS_TABLE,
+                KE_PANIC_PARAMETER_OUT_OF_RESOURCES,
+                0);
+        }
 
-    memcpy(Entries[EntryCount].Signature, Header->Signature, 4);
-    Entries[EntryCount].PhysicalAddress = DsdtAddress;
-    Entries[EntryCount].VirtualAddress = NULL;
-    Entries[EntryCount].Length = Header->Length;
-    EntryCount++;
-    MmUnmapSpace(Header, MM_PAGE_SIZE);
+        FacsEntry = &Entries[EntryCount++];
+        memcpy(FacsEntry->Signature, Header->Signature, 4);
+        FacsEntry->PhysicalAddress = FacsAddress;
+        FacsEntry->VirtualAddress = NULL;
+        FacsEntry->Length = Header->Length;
+        MmUnmapSpace(Header, MM_PAGE_SIZE);
+    }
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -174,11 +201,11 @@ void HalpInitializeLateAcpi(KiLoaderBlock *LoaderBlock) {
 void *HalFindAcpiTable(const char *Signature, int Index) {
     CacheEntry *Entry = NULL;
 
-    /* Shortcut: If we have a DSDT (and we're searching for it), it should be available in the last
-     * spot of the cache. */
+    /* Shortcut: We already know if we have a DSDT (or a FACS), no need for a search. */
     if (!memcmp(Signature, "DSDT", 4)) {
-        Entry =
-            !memcmp(Entries[EntryCount - 1].Signature, "DSDT", 4) ? &Entries[EntryCount - 1] : NULL;
+        Entry = DsdtEntry;
+    } else if (!memcmp(Signature, "FACS", 4)) {
+        Entry = FacsEntry;
     } else {
         for (int i = 0; i < EntryCount; i++) {
             if (!memcmp(Entries[i].Signature, Signature, 4) && !Index--) {

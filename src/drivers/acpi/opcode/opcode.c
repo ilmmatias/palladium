@@ -411,6 +411,18 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
                     break;
                 }
 
+                /* DefFatal := FatalOp FatalType FatalCode FatalArg */
+                case 0x325B: {
+                    uint8_t FatalType = State->Opcode->FixedArguments[0].Integer;
+                    uint32_t FatalCode = State->Opcode->FixedArguments[1].Integer;
+                    uint64_t FatalArg = State->Opcode->FixedArguments[2].TermArg.Integer;
+                    AcpipShowErrorMessage(
+                        ACPI_REASON_FATAL,
+                        "Fatal opcode: Type=0x%02x, Code=0x%08x, Arg=0x%016llx\n",
+                        FatalType,
+                        FatalCode,
+                        FatalArg);
+                }
 
                 /* DebugObj */
                 case 0x315B: {
