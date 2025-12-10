@@ -309,6 +309,87 @@ int AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
                     break;
                 }
 
+                /* DefMatch := MatchOp SearchPackage MatchOpcode1 Operand1 MatchOpcode2 Operand2
+                 *             StartIndex */
+                case 0x89: {
+                    AcpiValue *SearchPkg = &State->Opcode->FixedArguments[0].TermArg;
+                    uint8_t MatchOp1 = State->Opcode->FixedArguments[1].Integer;
+                    uint64_t Operand1 = State->Opcode->FixedArguments[2].TermArg.Integer;
+                    uint8_t MatchOp2 = State->Opcode->FixedArguments[3].Integer;
+                    uint64_t Operand2 = State->Opcode->FixedArguments[4].TermArg.Integer;
+                    uint64_t StartIndex = State->Opcode->FixedArguments[5].TermArg.Integer;
+
+                    Value.Type = ACPI_INTEGER;
+                    Value.References = 1;
+                    Value.Integer = UINT64_MAX;
+
+                    if (SearchPkg->Type == ACPI_PACKAGE) {
+                        for (uint64_t i = StartIndex; i < SearchPkg->Package->Size; i++) {
+                            AcpiPackageElement *Element = &SearchPkg->Package->Data[i];
+                            if (Element->Type != ACPI_INTEGER ||
+                                Element->Value.Type != ACPI_INTEGER) {
+                                continue;
+                            }
+
+                            uint64_t PkgValue = Element->Value.Integer;
+                            int Match1 = 0, Match2 = 0;
+
+                            switch (MatchOp1) {
+                                case 0: /* MTR - always true */
+                                    Match1 = 1;
+                                    break;
+                                case 1: /* MEQ */
+                                    Match1 = PkgValue == Operand1;
+                                    break;
+                                case 2: /* MLE */
+                                    Match1 = PkgValue <= Operand1;
+                                    break;
+                                case 3: /* MLT */
+                                    Match1 = PkgValue < Operand1;
+                                    break;
+                                case 4: /* MGE */
+                                    Match1 = PkgValue >= Operand1;
+                                    break;
+                                case 5: /* MGT */
+                                    Match1 = PkgValue > Operand1;
+                                    break;
+                            }
+
+                            switch (MatchOp2) {
+                                case 0: /* MTR */
+                                    Match2 = 1;
+                                    break;
+                                case 1: /* MEQ */
+                                    Match2 = PkgValue == Operand2;
+                                    break;
+                                case 2: /* MLE */
+                                    Match2 = PkgValue <= Operand2;
+                                    break;
+                                case 3: /* MLT */
+                                    Match2 = PkgValue < Operand2;
+                                    break;
+                                case 4: /* MGE */
+                                    Match2 = PkgValue >= Operand2;
+                                    break;
+                                case 5: /* MGT */
+                                    Match2 = PkgValue > Operand2;
+                                    break;
+                            }
+
+                            if (Match1 && Match2) {
+                                Value.Integer = i;
+                                break;
+                            }
+                        }
+                    }
+
+                    AcpiRemoveReference(SearchPkg, 0);
+                    AcpiRemoveReference(&State->Opcode->FixedArguments[2].TermArg, 0);
+                    AcpiRemoveReference(&State->Opcode->FixedArguments[4].TermArg, 0);
+                    AcpiRemoveReference(&State->Opcode->FixedArguments[5].TermArg, 0);
+                    break;
+                }
+
                 /* DebugObj */
                 case 0x315B: {
                     Value.Type = ACPI_DEBUG;

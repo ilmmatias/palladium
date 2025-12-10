@@ -83,6 +83,48 @@ int AcpipExecuteMathOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
             break;
         }
 
+        /* DefDivide := DivideOp Dividend Divisor Remainder Quotient */
+        case 0x78: {
+            uint64_t Dividend = State->Opcode->FixedArguments[0].TermArg.Integer;
+            uint64_t Divisor = State->Opcode->FixedArguments[1].TermArg.Integer;
+            AcpiValue *RemainderTarget = &State->Opcode->FixedArguments[2].TermArg;
+            AcpiValue *QuotientTarget = &State->Opcode->FixedArguments[3].TermArg;
+
+            /* Division by zero is an error per ACPI specification. */
+            if (Divisor == 0) {
+                AcpiRemoveReference(RemainderTarget, 0);
+                AcpiRemoveReference(QuotientTarget, 0);
+                return 0;
+            }
+
+            AcpiValue Remainder;
+            Remainder.Type = ACPI_INTEGER;
+            Remainder.References = 1;
+            Remainder.Integer = Dividend % Divisor;
+
+            AcpiValue Quotient;
+            Quotient.Type = ACPI_INTEGER;
+            Quotient.References = 1;
+            Quotient.Integer = Dividend / Divisor;
+
+            /* Save up both the remainder and the quotient. */
+            if (!AcpipStoreTarget(State, RemainderTarget, &Remainder) ||
+                !AcpipStoreTarget(State, QuotientTarget, &Quotient)) {
+                AcpiRemoveReference(RemainderTarget, 0);
+                AcpiRemoveReference(QuotientTarget, 0);
+                return 0;
+            }
+
+            /* The result is always the quotient. */
+            Value->Type = ACPI_INTEGER;
+            Value->References = 1;
+            Value->Integer = Quotient.Integer;
+
+            AcpiRemoveReference(RemainderTarget, 0);
+            AcpiRemoveReference(QuotientTarget, 0);
+            break;
+        }
+
         /* Unary operations without a target (all follow the format: Op Target, where Target is
            both the input and the output). */
         case 0x75:
@@ -121,7 +163,9 @@ int AcpipExecuteMathOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
 
         /* Unary operations with a target (Op TermArg Target, the operate on TermArg, and save the
            result on Target). */
-        case 0x80: {
+        case 0x80:
+        case 0x81:
+        case 0x82: {
             uint64_t Operand = State->Opcode->FixedArguments[0].TermArg.Integer;
             AcpiValue *Target = &State->Opcode->FixedArguments[1].TermArg;
 
@@ -130,6 +174,12 @@ int AcpipExecuteMathOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
             switch (Opcode) {
                 case 0x80:
                     Value->Integer = ~Operand;
+                    break;
+                case 0x81:
+                    Value->Integer = Operand == 0 ? 0 : 64 - __builtin_clzll(Operand);
+                    break;
+                case 0x82:
+                    Value->Integer = Operand == 0 ? 0 : __builtin_clzll(Operand) + 1;
                     break;
             }
 

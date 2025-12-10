@@ -278,6 +278,9 @@ int AcpipCastToBuffer(AcpiValue *Value) {
 
     AcpiRemoveReference(Value, 0);
     Value->Type = ACPI_BUFFER;
+    Value->References = 1;
+    Value->Buffer = Buffer;
+    Value->Buffer->References = 1;
     Value->Buffer->Size = BufferSize;
 
     return 1;

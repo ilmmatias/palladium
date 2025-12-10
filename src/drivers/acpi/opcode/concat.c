@@ -122,6 +122,96 @@ int AcpipExecuteConcatOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Valu
             break;
         }
 
+        /* DefMid := MidOp Source Index Length Result */
+        case 0x9E: {
+            AcpiValue *Source = &State->Opcode->FixedArguments[0].TermArg;
+            uint64_t Index = State->Opcode->FixedArguments[1].TermArg.Integer;
+            uint64_t Length = State->Opcode->FixedArguments[2].TermArg.Integer;
+            AcpiValue *Target = &State->Opcode->FixedArguments[3].TermArg;
+
+            switch (Source->Type) {
+                /* Extract a portion of a buffer. */
+                case ACPI_BUFFER: {
+                    uint64_t SourceLen = Source->Buffer->Size;
+                    if (Index >= SourceLen) {
+                        Index = SourceLen;
+                        Length = 0;
+                    } else if (Index + Length > SourceLen) {
+                        Length = SourceLen - Index;
+                    }
+
+                    Value->Type = ACPI_BUFFER;
+                    Value->References = 1;
+                    Value->Buffer = AcpipAllocateBlock(sizeof(AcpiBuffer) + Length);
+                    if (!Value->Buffer) {
+                        AcpiRemoveReference(Source, 0);
+                        AcpiRemoveReference(&State->Opcode->FixedArguments[1].TermArg, 0);
+                        AcpiRemoveReference(&State->Opcode->FixedArguments[2].TermArg, 0);
+                        AcpiRemoveReference(Target, 0);
+                        return 0;
+                    }
+
+                    Value->Buffer->References = 1;
+                    Value->Buffer->Size = Length;
+                    if (Length > 0) {
+                        memcpy(Value->Buffer->Data, Source->Buffer->Data + Index, Length);
+                    }
+
+                    break;
+                }
+
+                /* Extract a portion of a string. */
+                case ACPI_STRING: {
+                    uint64_t SourceLen = strlen(Source->String->Data);
+                    if (Index >= SourceLen) {
+                        Index = SourceLen;
+                        Length = 0;
+                    } else if (Index + Length > SourceLen) {
+                        Length = SourceLen - Index;
+                    }
+
+                    Value->Type = ACPI_STRING;
+                    Value->References = 1;
+                    Value->String = AcpipAllocateBlock(sizeof(AcpiString) + Length + 1);
+                    if (!Value->String) {
+                        AcpiRemoveReference(Source, 0);
+                        AcpiRemoveReference(&State->Opcode->FixedArguments[1].TermArg, 0);
+                        AcpiRemoveReference(&State->Opcode->FixedArguments[2].TermArg, 0);
+                        AcpiRemoveReference(Target, 0);
+                        return 0;
+                    }
+
+                    if (Length > 0) {
+                        memcpy(Value->String->Data, Source->String->Data + Index, Length);
+                    }
+
+                    Value->String->Data[Length] = '\0';
+                    Value->String->References = 1;
+                    break;
+                }
+
+                default: {
+                    AcpiRemoveReference(Source, 0);
+                    AcpiRemoveReference(&State->Opcode->FixedArguments[1].TermArg, 0);
+                    AcpiRemoveReference(&State->Opcode->FixedArguments[2].TermArg, 0);
+                    AcpiRemoveReference(Target, 0);
+                    return 0;
+                }
+            }
+
+            int Status = AcpipStoreTarget(State, Target, Value);
+            AcpiRemoveReference(Source, 0);
+            AcpiRemoveReference(&State->Opcode->FixedArguments[1].TermArg, 0);
+            AcpiRemoveReference(&State->Opcode->FixedArguments[2].TermArg, 0);
+            AcpiRemoveReference(Target, 0);
+
+            if (!Status) {
+                return 0;
+            }
+
+            break;
+        }
+
         default:
             return -1;
     }

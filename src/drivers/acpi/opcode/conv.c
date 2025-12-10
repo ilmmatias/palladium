@@ -76,6 +76,75 @@ int AcpipExecuteConvOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
             break;
         }
 
+        /* DefFromBCD := FromBCDOp BCDValue Target */
+        case 0x285B: {
+            uint64_t BCDValue = State->Opcode->FixedArguments[0].TermArg.Integer;
+            AcpiValue *Target = &State->Opcode->FixedArguments[1].TermArg;
+
+            /* BCD packs each digit into a nibble, or extracting for forming numbers is as easy as
+             * shifting the nibbles around. */
+            uint64_t Result = 0;
+            uint64_t Multiplier = 1;
+            for (int i = 0; i < 16; i++) {
+                uint8_t Nibble = (BCDValue >> (i * 4)) & 0x0F;
+                if (Nibble > 9) {
+                    AcpiRemoveReference(&State->Opcode->FixedArguments[0].TermArg, 0);
+                    AcpiRemoveReference(Target, 0);
+                    return 0;
+                }
+
+                Result += Nibble * Multiplier;
+                Multiplier *= 10;
+            }
+
+            Value->Type = ACPI_INTEGER;
+            Value->References = 1;
+            Value->Integer = Result;
+
+            if (!AcpipStoreTarget(State, Target, Value)) {
+                AcpiRemoveReference(&State->Opcode->FixedArguments[0].TermArg, 0);
+                AcpiRemoveReference(Target, 0);
+                return 0;
+            }
+
+            AcpiRemoveReference(&State->Opcode->FixedArguments[0].TermArg, 0);
+            AcpiRemoveReference(Target, 0);
+            break;
+        }
+
+        /* DefToBCD := ToBCDOp Operand Target */
+        case 0x295B: {
+            uint64_t Operand = State->Opcode->FixedArguments[0].TermArg.Integer;
+            AcpiValue *Target = &State->Opcode->FixedArguments[1].TermArg;
+
+            uint64_t Result = 0;
+            uint64_t Temp = Operand;
+            for (int i = 0; i < 16 && Temp > 0; i++) {
+                Result |= (Temp % 10) << (i * 4);
+                Temp /= 10;
+            }
+
+            if (Temp > 0) {
+                AcpiRemoveReference(&State->Opcode->FixedArguments[0].TermArg, 0);
+                AcpiRemoveReference(Target, 0);
+                return 0;
+            }
+
+            Value->Type = ACPI_INTEGER;
+            Value->References = 1;
+            Value->Integer = Result;
+
+            if (!AcpipStoreTarget(State, Target, Value)) {
+                AcpiRemoveReference(&State->Opcode->FixedArguments[0].TermArg, 0);
+                AcpiRemoveReference(Target, 0);
+                return 0;
+            }
+
+            AcpiRemoveReference(&State->Opcode->FixedArguments[0].TermArg, 0);
+            AcpiRemoveReference(Target, 0);
+            break;
+        }
+
         default:
             return -1;
     }

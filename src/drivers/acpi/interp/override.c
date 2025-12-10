@@ -97,7 +97,7 @@ static int ExecuteRev(int ArgCount, AcpiValue *Arguments, AcpiValue *Result) {
 
     Result->Type = ACPI_INTEGER;
     Result->References = 1;
-    Result->Integer = 2;
+    Result->Integer = ACPI_REVISION;
 
     return 1;
 }
