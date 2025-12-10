@@ -1,4 +1,4 @@
-/* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
+/* SPDX-FileCopyrightText: (C) 2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <acpip.h>
@@ -19,20 +19,23 @@ uint64_t AcpipReadMmioSpace(uint64_t Address, int Size) {
     AcpipShowTraceMessage("read from MMIO space, address 0x%llX, size %u\n", Address, Size);
 
     void *VirtualAddress = MmMapSpace(MM_SPACE_NORMAL, Address, Size);
-    uint64_t Value = 0;
+    if (!VirtualAddress) {
+        return 0;
+    }
 
+    uint64_t Value = 0;
     switch (Size) {
         case 1:
-            Value = *(uint8_t *)VirtualAddress;
+            Value = *(volatile uint8_t *)VirtualAddress;
             break;
         case 2:
-            Value = *(uint16_t *)VirtualAddress;
+            Value = *(volatile uint16_t *)VirtualAddress;
             break;
         case 3:
-            Value = *(uint32_t *)VirtualAddress;
+            Value = *(volatile uint32_t *)VirtualAddress;
             break;
         default:
-            Value = *(uint64_t *)VirtualAddress;
+            Value = *(volatile uint64_t *)VirtualAddress;
             break;
     }
 
@@ -57,19 +60,22 @@ void AcpipWriteMmioSpace(uint64_t Address, int Size, uint64_t Data) {
         "write into MMIO space, address 0x%llX, size %u, data 0x%llX\n", Address, Size, Data);
 
     void *VirtualAddress = MmMapSpace(MM_SPACE_NORMAL, Address, Size);
+    if (!VirtualAddress) {
+        return;
+    }
 
     switch (Size) {
         case 1:
-            *(uint8_t *)VirtualAddress = Data;
+            *(volatile uint8_t *)VirtualAddress = Data;
             break;
         case 2:
-            *(uint16_t *)VirtualAddress = Data;
+            *(volatile uint16_t *)VirtualAddress = Data;
             break;
         case 3:
-            *(uint32_t *)VirtualAddress = Data;
+            *(volatile uint32_t *)VirtualAddress = Data;
             break;
         default:
-            *(uint64_t *)VirtualAddress = Data;
+            *(volatile uint64_t *)VirtualAddress = Data;
             break;
     }
 

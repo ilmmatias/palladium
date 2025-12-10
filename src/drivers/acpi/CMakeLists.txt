@@ -3,13 +3,6 @@
 
 project(os/drivers/acpi)
 
-if(ARCH STREQUAL "amd64")
-    set(SOURCES
-        ${ARCH}/mmio.c
-        ${ARCH}/pci.c
-        ${ARCH}/port.c)
-endif()
-
 add_library(acpi "knostdlib" SHARED
     ${SOURCES}
 
@@ -34,9 +27,15 @@ add_library(acpi "knostdlib" SHARED
     opcode/stmt.c
     opcode/target.c
 
+    os/debug.c
+    os/memory.c
+    os/mmio.c
+    os/pci.c
+    os/port.c
+    os/table.c
+
     acpi.def
     main.c
-    os.c
     table.c)
 
 target_link_libraries(acpi kernel)

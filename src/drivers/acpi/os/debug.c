@@ -1,69 +1,10 @@
-/* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
+/* SPDX-FileCopyrightText: (C) 2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <acpip.h>
-#include <kernel/hal.h>
 #include <kernel/kd.h>
 #include <kernel/ke.h>
-#include <kernel/mm.h>
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     This function searches for a specific table inside the RSDT/XSDT.
- *
- * PARAMETERS:
- *     Signature - Signature of the required entry.
- *
- * RETURN VALUE:
- *     Pointer to the header of the entry, or NULL on failure.
- *-----------------------------------------------------------------------------------------------*/
-SdtHeader *AcpipFindTable(char Signature[4], int Index) {
-    return HalFindAcpiTable(Signature, Index);
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     Wrapper around the OS' malloc (or malloc-like) routine.
- *
- * PARAMETERS:
- *     Size - Size in bytes of the block.
- *
- * RETURN VALUE:
- *     Start of the allocated block, or NULL on failure.
- *-----------------------------------------------------------------------------------------------*/
-void *AcpipAllocateBlock(size_t Size) {
-    return MmAllocatePool(Size, MM_POOL_TAG_ACPI);
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     Wrapper around the OS' calloc (or calloc-like) routine.
- *
- * PARAMETERS:
- *     Elements - How many elements we have.
- *     ElementSize - Size in bytes of each element.
- *
- * RETURN VALUE:
- *     Start of the allocated block, or NULL on failure.
- *-----------------------------------------------------------------------------------------------*/
-void *AcpipAllocateZeroBlock(size_t Elements, size_t ElementSize) {
-    return MmAllocatePool(Elements * ElementSize, MM_POOL_TAG_ACPI);
-}
-
-/*-------------------------------------------------------------------------------------------------
- * PURPOSE:
- *     Wrapper around the OS' free() routine. Should be able to transparently free anything
- *     allocated by AcpipAllocateBlock/ZeroBlock.
- *
- * PARAMETERS:
- *     Block - Start of the block we're trying to free.
- *
- * RETURN VALUE:
- *     None.
- *-----------------------------------------------------------------------------------------------*/
-void AcpipFreeBlock(void *Block) {
-    MmFreePool(Block, MM_POOL_TAG_ACPI);
-}
+#include <stdarg.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
