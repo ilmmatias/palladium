@@ -69,6 +69,30 @@ bool AcpipCastToInteger(AcpiValue *Value, uint64_t *Result, bool Cleanup) {
             *Result = strtoull(Value->String->Data, NULL, 16);
             break;
 
+        /* Field units need to be read first, which gives us either a buffer (which we can treat as
+         * any ACPI_BUFFER), or an integer (which we don't need to do anything special). */
+        case ACPI_FIELD_UNIT: {
+            AcpiValue Field;
+            if (!AcpipReadField(Value, &Field)) {
+                if (Cleanup) {
+                    AcpiRemoveReference(Value, false);
+                }
+
+                return false;
+            }
+
+            if (Field.Type == ACPI_INTEGER) {
+                *Result = Field.Integer;
+            } else {
+                for (uint64_t i = 0; i < (Field.Buffer->Size > 8 ? 8 : Field.Buffer->Size); i++) {
+                    *Result |= (uint64_t)Field.Buffer->Data[i] << (i * 8);
+                }
+            }
+
+            AcpiRemoveReference(&Field, false);
+            break;
+        }
+
         default:
             if (Cleanup) {
                 AcpiRemoveReference(Value, false);
@@ -268,6 +292,32 @@ bool AcpipCastToBuffer(AcpiValue *Value) {
                 strcpy((char *)Buffer->Data, Value->String->Data);
             }
 
+            break;
+        }
+
+        /* Field units can be integers or buffers (we need the same logic as ACPI_INTEGER for the
+         * earlier, and we pass-through for the later). */
+        case ACPI_FIELD_UNIT: {
+            AcpiValue Field;
+            if (!AcpipReadField(Value, &Field)) {
+                AcpiRemoveReference(Value, false);
+                return false;
+            }
+
+            if (Field.Type != ACPI_INTEGER) {
+                AcpiRemoveReference(Value, false);
+                memcpy(Value, &Field, sizeof(AcpiValue));
+                return true;
+            }
+
+            BufferSize = 16;
+            Buffer = AcpipAllocateBlock(sizeof(AcpiBuffer) + 16);
+            if (!Buffer) {
+                AcpiRemoveReference(Value, false);
+                return false;
+            }
+
+            *((uint64_t *)Buffer->Data) = Field.Integer;
             break;
         }
 
