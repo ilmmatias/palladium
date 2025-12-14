@@ -56,13 +56,8 @@ bool AcpipStoreTarget(AcpipState *State, AcpiValue *Target, AcpiValue *Value) {
 
             switch (Buffer->Type) {
                 case ACPI_PACKAGE: {
-                    if (Buffer->Package->Data[Index].Type) {
-                        AcpiRemoveReference(&Buffer->Package->Data[Index].Value, false);
-                    }
-
-                    Buffer->Package->Data[Index].Type = 1;
-                    AcpiCopyValue(Value, &Buffer->Package->Data[Index].Value);
-
+                    AcpiRemoveReference(&Buffer->Package->Data[Index], false);
+                    AcpiCopyValue(Value, &Buffer->Package->Data[Index]);
                     break;
                 }
 

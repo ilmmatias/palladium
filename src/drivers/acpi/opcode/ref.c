@@ -37,8 +37,8 @@ int AcpipExecuteRefOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value) 
                     uint64_t Index = Reference->BufferField.Index;
 
                     if (Source->Type == ACPI_PACKAGE) {
-                        if (Source->Package->Data[Index].Type) {
-                            AcpiCreateReference(&Source->Package->Data[Index].Value, Value);
+                        if (Source->Package->Data[Index].Type != ACPI_NAME) {
+                            AcpiCreateReference(&Source->Package->Data[Index], Value);
                         } else {
                             /* For NameStrings, we need to resolve them + create a reference to
                                their contents; by now, the object they point to should exist, so

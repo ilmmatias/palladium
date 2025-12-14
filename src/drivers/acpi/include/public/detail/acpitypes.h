@@ -60,6 +60,7 @@ typedef struct AcpiValue {
         struct AcpiPackage *Package;
         AcpiMutex *Mutex;
         AcpiEvent *Event;
+        AcpiName Name;
         struct {
             AcpiOverrideMethod Override;
             const uint8_t *Start;
@@ -107,18 +108,10 @@ typedef struct AcpiValue {
     };
 } AcpiValue;
 
-typedef struct {
-    int Type;
-    union {
-        AcpiName Name;
-        AcpiValue Value;
-    };
-} AcpiPackageElement;
-
 typedef struct AcpiPackage {
     int References;
     uint64_t Size;
-    AcpiPackageElement Data[];
+    AcpiValue Data[];
 } AcpiPackage;
 
 typedef struct AcpiObject {

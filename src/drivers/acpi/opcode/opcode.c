@@ -330,13 +330,28 @@ bool AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
 
                     if (SearchPkg->Type == ACPI_PACKAGE) {
                         for (uint64_t i = StartIndex; i < SearchPkg->Package->Size; i++) {
-                            AcpiPackageElement *Element = &SearchPkg->Package->Data[i];
-                            if (Element->Type != ACPI_INTEGER ||
-                                Element->Value.Type != ACPI_INTEGER) {
+                            AcpiValue *Element = &SearchPkg->Package->Data[i];
+
+                            /* Grab the actual value of the element (deref any names).  */
+                            if (Element->Type == ACPI_NAME) {
+                                AcpiName Name;
+                                memcpy(&Name, &Element->Name, sizeof(AcpiName));
+
+                                AcpiObject *Object = AcpipResolveObject(&Name);
+                                if (!Object) {
+                                    continue;
+                                }
+
+                                Element = &Object->Value;
+                            }
+
+                            /* And then validate if this is something we can actually match
+                             * against. */
+                            if (Element->Type != ACPI_INTEGER) {
                                 continue;
                             }
 
-                            uint64_t PkgValue = Element->Value.Integer;
+                            uint64_t PkgValue = Element->Integer;
                             bool Match1 = false;
                             bool Match2 = false;
 
@@ -551,12 +566,6 @@ bool AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
                 }
 
                 break;
-
-            case ACPI_ARG_PACKAGE:
-                AcpipShowErrorMessage(
-                    ACPI_REASON_CORRUPTED_TABLES,
-                    "we need to write the result into %p, the type is ACPI_ARG_PACKAGE\n",
-                    Opcode->ParentArg);
 
             default:
                 memcpy(&Opcode->ParentArg->TermArg, &Value, sizeof(AcpiValue));

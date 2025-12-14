@@ -132,8 +132,8 @@ bool AcpiCopyValue(AcpiValue *Source, AcpiValue *Target) {
             break;
 
         case ACPI_PACKAGE:
-            Target->Package = AcpipAllocateBlock(
-                sizeof(AcpiPackage) + Source->Package->Size * sizeof(AcpiPackageElement));
+            Target->Package =
+                AcpipAllocateBlock(sizeof(AcpiPackage) + Source->Package->Size * sizeof(AcpiValue));
             if (!Target->Package) {
                 return false;
             }
@@ -141,21 +141,27 @@ bool AcpiCopyValue(AcpiValue *Source, AcpiValue *Target) {
             Target->Package->References = 1;
             Target->Package->Size = Source->Package->Size;
 
+            /* Packages are a bit special; They are the only ones that can contain ACPI_NAME, except
+             * that by the time we're doing a copy of them, all names should already be resolvable
+             * (so try to do it). */
             for (uint64_t i = 0; i < Source->Package->Size; i++) {
-                if (Source->Package->Data[i].Type) {
-                    Target->Package->Data[i].Type = 1;
-                    if (!AcpiCopyValue(
-                            &Source->Package->Data[i].Value, &Target->Package->Data[i].Value)) {
+                if (Source->Package->Data[i].Type == ACPI_NAME) {
+                    AcpiName Name;
+                    memcpy(&Name, &Source->Package->Data[i].Name, sizeof(AcpiName));
+
+                    AcpiObject *Object = AcpipResolveObject(&Name);
+                    if (!Object) {
                         /* Recursive cleanup on failure (if we processed any items). */
-                        Target->Package->Size = i ? i - 1 : 0;
+                        Target->Package->Size = i;
                         AcpiRemoveReference(Target, false);
                         return false;
                     }
-                } else {
-                    memcpy(
-                        &Target->Package->Data[i],
-                        &Source->Package->Data[i],
-                        sizeof(AcpiPackageElement));
+
+                    AcpiCreateReference(&Object->Value, &Target->Package->Data[i]);
+                } else if (!AcpiCopyValue(&Source->Package->Data[i], &Target->Package->Data[i])) {
+                    Target->Package->Size = i;
+                    AcpiRemoveReference(Target, false);
+                    return false;
                 }
             }
 
@@ -284,9 +290,7 @@ void AcpiRemoveReference(AcpiValue *Value, bool CleanupPointer) {
         case ACPI_PACKAGE:
             if (NeedsCleanup && --Value->Package->References <= 0) {
                 for (uint64_t i = 0; i < Value->Package->Size; i++) {
-                    if (Value->Package->Data[i].Type) {
-                        AcpiRemoveReference(&Value->Package->Data[i].Value, false);
-                    }
+                    AcpiRemoveReference(&Value->Package->Data[i], false);
                 }
 
                 AcpipFreeBlock(Value->Package);

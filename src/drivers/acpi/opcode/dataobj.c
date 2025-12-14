@@ -109,7 +109,7 @@ int AcpipExecuteDataObjOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Val
 
             PkgLength -= LengthSoFar;
             Value->Package =
-                AcpipAllocateZeroBlock(1, sizeof(AcpiPackage) + Size * sizeof(AcpiPackageElement));
+                AcpipAllocateZeroBlock(1, sizeof(AcpiPackage) + Size * sizeof(AcpiValue));
             if (!Value->Package) {
                 return 0;
             }
@@ -121,7 +121,7 @@ int AcpipExecuteDataObjOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Val
             Value->Package->References = 1;
             Value->Package->Size = Size;
 
-            uint8_t i = 0;
+            uint64_t i = 0;
             while (PkgLength) {
                 if (i >= Value->Package->Size) {
                     AcpiRemoveReference(Value, false);
@@ -134,20 +134,18 @@ int AcpipExecuteDataObjOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Val
                 /* Each PackageElement should always be either a NameString, or a DataRefObject. */
                 if (Opcode == '\\' || Opcode == '^' || Opcode == 0x2E || Opcode == 0x2F ||
                     isupper(Opcode) || Opcode == '_') {
-                    Value->Package->Data[i].Type = 0;
+                    Value->Package->Data[i].Type = ACPI_NAME;
                     if (!AcpipReadName(State, &Value->Package->Data[i].Name)) {
                         Value->Package->Size = i;
                         AcpiRemoveReference(Value, false);
                         return 0;
                     }
-                } else {
-                    Value->Package->Data[i].Type = 1;
-                    if (!AcpipPrepareExecuteOpcode(State) ||
-                        !AcpipExecuteOpcode(State, &Value->Package->Data[i].Value)) {
+                } else if (
+                    !AcpipPrepareExecuteOpcode(State) ||
+                    !AcpipExecuteOpcode(State, &Value->Package->Data[i])) {
                         Value->Package->Size = i;
                         AcpiRemoveReference(Value, false);
                         return 0;
-                    }
                 }
 
                 i++;

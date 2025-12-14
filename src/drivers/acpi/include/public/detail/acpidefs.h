@@ -28,6 +28,7 @@
 #define ACPI_INDEX 20
 #define ACPI_LOCAL 21
 #define ACPI_ARG 22
+#define ACPI_NAME 23
 
 #define ACPI_FIELD 0
 #define ACPI_BANK_FIELD 1
