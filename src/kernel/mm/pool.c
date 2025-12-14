@@ -243,6 +243,7 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
     /* The first block was skipped as it should be ours. */
     BlockHeader *Header = (BlockHeader *)StartAddress;
     Header->Head = Head;
+    Header->ListHeader.Next = NULL;
     memcpy(Header->Tag, Tag, 4);
     MiAddPoolTracker(FullSize, Tag);
     KeLowerIrql(OldIrql);

@@ -67,7 +67,6 @@ int AcpipExecuteDataObjOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Val
             if (LengthSoFar > PkgLength ||
                 PkgLength - LengthSoFar > State->Scope->RemainingLength ||
                 PkgLength - LengthSoFar > BufferSize) {
-                AcpipFreeBlock(Value->Buffer);
                 return 0;
             }
 
@@ -143,9 +142,9 @@ int AcpipExecuteDataObjOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Val
                 } else if (
                     !AcpipPrepareExecuteOpcode(State) ||
                     !AcpipExecuteOpcode(State, &Value->Package->Data[i])) {
-                        Value->Package->Size = i;
-                        AcpiRemoveReference(Value, false);
-                        return 0;
+                    Value->Package->Size = i;
+                    AcpiRemoveReference(Value, false);
+                    return 0;
                 }
 
                 i++;

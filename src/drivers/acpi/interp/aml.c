@@ -64,6 +64,24 @@ bool AcpiExecuteMethod(AcpiObject *Object, int ArgCount, AcpiValue *Arguments, A
 
     if (ArgCount) {
         memcpy(State.Arguments, Arguments, ArgCount * sizeof(AcpiValue));
+
+        for (int i = 0; i < ArgCount; i++) {
+            AcpiValue *Arg = &State.Arguments[i];
+            switch (Arg->Type) {
+                case ACPI_STRING:
+                    Arg->String->References++;
+                    break;
+                case ACPI_BUFFER:
+                    Arg->Buffer->References++;
+                    break;
+                case ACPI_PACKAGE:
+                    Arg->Package->References++;
+                    break;
+                case ACPI_MUTEX:
+                    Arg->Mutex->References++;
+                    break;
+            }
+        }
     }
 
     bool Status = AcpipExecuteTermList(&State);
