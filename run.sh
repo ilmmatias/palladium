@@ -103,7 +103,7 @@ fi
 
 # Spin up a new virtual machine.
 QEMU_BINARY="qemu-system-x86_64"
-QEMU_BASIC_FLAGS="--enable-kvm -cpu host,+invtsc -smp $(nproc)"
+QEMU_BASIC_FLAGS="--enable-kvm -machine q35 -cpu host,+invtsc -smp $(nproc)"
 QEMU_OVMF_CODE_FLAGS="-drive if=pflash,format=raw,unit=0,file=code.bin,readonly=on"
 QEMU_OVMF_VARS_FLAGS="-drive if=pflash,format=raw,unit=1,file=vars.bin"
 QEMU_DISK_FLAGS="-cdrom $ISO_NAME"

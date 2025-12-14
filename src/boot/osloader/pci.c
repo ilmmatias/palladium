@@ -9,12 +9,16 @@
  *
  * PARAMETERS:
  *     ClassId - Which class code the device should have.
+ *     SubclassId - Which subclass code the device should have.
  *     Handles - Output; Where to store the handle list.
  *
  * RETURN VALUE:
  *     Size of the handle list.
  *-----------------------------------------------------------------------------------------------*/
-UINTN OslFindPciDevicesByClass(uint16_t ClassId, EFI_PCI_IO_PROTOCOL ***Devices) {
+UINTN OslFindPciDevicesByClass(
+    uint8_t ClassId,
+    uint8_t SubclassId,
+    EFI_PCI_IO_PROTOCOL ***Devices) {
     /* EFI firmwares nicely lay out all valid PCI devices as PCI_IO_PROTOCOL handles, so we don't
      * need to manually probe for all possible valid devices.  */
     UINTN HandleCount = 0;
@@ -42,7 +46,8 @@ UINTN OslFindPciDevicesByClass(uint16_t ClassId, EFI_PCI_IO_PROTOCOL ***Devices)
         PCI_TYPE00 Header;
         Status = PciIo->Pci.Read(
             PciIo, EfiPciIoWidthUint32, 0, sizeof(PCI_TYPE00) / sizeof(UINT32), &Header);
-        if (Status == EFI_SUCCESS && Header.Hdr.ClassCode[2] == ClassId) {
+        if (Status == EFI_SUCCESS && Header.Hdr.ClassCode[1] == SubclassId &&
+            Header.Hdr.ClassCode[2] == ClassId) {
             (*Devices)[DeviceCount++] = PciIo;
         }
     }

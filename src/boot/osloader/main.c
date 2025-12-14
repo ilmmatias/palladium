@@ -138,7 +138,8 @@ EFI_STATUS OslMain(EFI_HANDLE *ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
         void *KdnetDllInitializer = NULL;
         if (Config.DebugEnabled) {
             EFI_PCI_IO_PROTOCOL **Devices = NULL;
-            UINTN DeviceCount = OslFindPciDevicesByClass(PCI_CLASS_NETWORK, &Devices);
+            UINTN DeviceCount =
+                OslFindPciDevicesByClass(PCI_CLASS_NETWORK, PCI_CLASS_NETWORK_ETHERNET, &Devices);
             if (!DeviceCount) {
                 OslPrint("Failed to load the KDNET module.\r\n");
                 OslPrint("Couldn't find a valid PCI network card.\r\n");
