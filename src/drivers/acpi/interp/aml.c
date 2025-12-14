@@ -190,6 +190,72 @@ bool AcpiCopyValue(AcpiValue *Source, AcpiValue *Target) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
+ *     This function extracts a value, casting it to the specified type if necessary/possible.
+ *
+ * PARAMETERS:
+ *     Source - Which value we're casting.
+ *     Target - Where to store the result.
+ *     ExpectedType - The type we expect the value to be.
+ *
+ * RETURN VALUE:
+ *     true/false depending on success.
+ *-----------------------------------------------------------------------------------------------*/
+bool AcpiCastValue(AcpiValue *Source, AcpiValue *Target, int ExpectedType) {
+    /* We probably should optimize our cast functions to not depend on copy value (it's kinda
+     * wasteful to do it everytime first, when we're probably going to erase the contents of the
+     * target anyways to put the new data)... */
+    if (!AcpiCopyValue(Source, Target)) {
+        return false;
+    } else if (ExpectedType == ACPI_EMPTY || ExpectedType == Source->Type) {
+        return true;
+    }
+
+    switch (ExpectedType) {
+        case ACPI_INTEGER: {
+            uint64_t Integer;
+            if (!AcpipCastToInteger(Source, &Integer, false)) {
+                AcpiRemoveReference(Target, false);
+                return false;
+            }
+
+            AcpiRemoveReference(Target, false);
+            Target->Type = ACPI_INTEGER;
+            Target->References = 1;
+            Target->Integer = Integer;
+            break;
+        }
+
+        case ACPI_STRING: {
+            if (!AcpipCastToString(Target, true, false)) {
+                AcpiRemoveReference(Target, false);
+                return false;
+            }
+
+            break;
+        }
+
+        case ACPI_BUFFER: {
+            if (!AcpipCastToBuffer(Target)) {
+                AcpiRemoveReference(Target, false);
+                return false;
+            }
+
+            break;
+        }
+
+        default: {
+            if (Target->Type != ExpectedType) {
+                AcpiRemoveReference(Target, false);
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
  *     This function tells the object that either its containing pointer/object is being added
  *     inside another (and we need to increase the value reference counter), or that we're reusing
  *     its internal data (and just increasing the type-specific reference counter), according to

@@ -1,5 +1,6 @@
 LIBRARY acpi.sys
 EXPORTS
+    AcpiCastValue
     AcpiCopyValue
     AcpiCreateReference
     AcpiEvaluateObject

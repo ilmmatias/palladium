@@ -41,13 +41,13 @@ AcpiObject *AcpiSearchObject(AcpiObject *Parent, const char *Name) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This function evaluates the given object, either executing it as a method and returning its
- *     result, or copying its value.
+ *     This function evaluates the given object, executing it as a method to get its result if
+ *     necessary.
  *
  * PARAMETERS:
  *     Object - The object to be evaluated.
  *     Result - Output; Where to store the result.
- *     ExpectedType - What type we want; we'll automatically CastToX() if this isn't ACPI_EMPTY.
+ *     ExpectedType - What type we want, we'll automatically cast to it if possible.
  *
  * RETURN VALUE:
  *     true/false depending on success.
@@ -71,54 +71,14 @@ bool AcpiEvaluateObject(AcpiObject *Object, AcpiValue *Result, int ExpectedType)
         Value = &MethodResult;
     }
 
-    AcpiCreateReference(Value, Result);
+    /* Now relegate this to AcpiCastValue (casting to the target type is their job). */
+    bool Status = AcpiCastValue(Value, Result, ExpectedType);
+
     if (Value != &Object->Value) {
         AcpiRemoveReference(Value, false);
     }
 
-    /* Equal types means we're done. */
-    if (ExpectedType == ACPI_EMPTY || ExpectedType == Value->Type) {
-        return true;
-    }
-
-    switch (ExpectedType) {
-        case ACPI_INTEGER: {
-            uint64_t Integer;
-            if (!AcpipCastToInteger(Result, &Integer, true)) {
-                return false;
-            }
-
-            Result->Type = ACPI_INTEGER;
-            Result->References = 1;
-            Result->Integer = Integer;
-            break;
-        }
-
-        case ACPI_STRING: {
-            if (!AcpipCastToString(Result, true, false)) {
-                return false;
-            }
-
-            break;
-        }
-
-        case ACPI_BUFFER: {
-            if (!AcpipCastToBuffer(Result)) {
-                return false;
-            }
-
-            break;
-        }
-
-        default: {
-            if (Value->Type != ExpectedType) {
-                AcpiRemoveReference(Result, false);
-                return false;
-            }
-        }
-    }
-
-    return true;
+    return Status;
 }
 
 /*-------------------------------------------------------------------------------------------------

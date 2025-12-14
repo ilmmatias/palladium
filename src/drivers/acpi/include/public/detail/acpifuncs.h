@@ -19,6 +19,7 @@ void AcpiCreateReference(AcpiValue *Source, AcpiValue *Target);
 void AcpiRemoveReference(AcpiValue *Value, bool CleanupPointer);
 
 bool AcpiCopyValue(AcpiValue *Source, AcpiValue *Target);
+bool AcpiCastValue(AcpiValue *Source, AcpiValue *Target, int ExpectedType);
 
 #ifdef __cplusplus
 }
