@@ -32,9 +32,9 @@ RtSList MiPoolTagListHead[256] = {};
  *     Bucket index.
  *-----------------------------------------------------------------------------------------------*/
 static uint32_t GetHeadIndex(size_t Size) {
-    if (Size < MM_POOL_SMALL_MAX) {
+    if (Size <= MM_POOL_SMALL_MAX) {
         return (Size - 1) >> MM_POOL_SMALL_SHIFT;
-    } else if (Size < MM_POOL_MEDIUM_MAX) {
+    } else if (Size <= MM_POOL_MEDIUM_MAX) {
         return MM_POOL_SMALL_COUNT + ((Size - MM_POOL_MEDIUM_MIN - 1) >> MM_POOL_MEDIUM_SHIFT);
     } else {
         return MM_POOL_SMALL_COUNT + MM_POOL_MEDIUM_COUNT +

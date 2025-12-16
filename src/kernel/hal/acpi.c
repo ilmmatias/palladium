@@ -87,7 +87,7 @@ void HalpInitializeLateAcpi(KiLoaderBlock *LoaderBlock) {
 
     /* Just a linear array to store everything should be fine.  */
     Entries = MmAllocatePool(
-        sizeof(CacheEntry) * ((RootTable->Length - sizeof(HalpSdtHeader)) / (IsXsdt ? 8 : 4) + 1),
+        sizeof(CacheEntry) * ((RootTable->Length - sizeof(HalpSdtHeader)) / (IsXsdt ? 8 : 4) + 2),
         MM_POOL_TAG_ACPI);
     if (!Entries) {
         KeFatalError(
@@ -117,7 +117,6 @@ void HalpInitializeLateAcpi(KiLoaderBlock *LoaderBlock) {
         /* Ignore the DSDT (and the FACS), we'll grab it out of the FADT in a bit. */
         if (!memcmp(Header->Signature, "DSDT", 4) || !memcmp(Header->Signature, "FACS", 4)) {
             MmUnmapSpace(Header, MM_PAGE_SIZE);
-            EntryCount--;
             continue;
         }
 
