@@ -110,6 +110,37 @@ bool AcpipCastToInteger(AcpiValue *Value, uint64_t *Result, bool Cleanup) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
+ *     This function mounts the printf format string for the current buffer position.
+ *
+ * PARAMETERS:
+ *     Position - Which index we're currently printing.
+ *     Size - Size of the buffer in elements.
+ *     ImplicitCast - Set this to 0 if you only want explicit casts, or to 1 otherwise.
+ *     Decimal - Set this to 0 if you want decimal digits instead of hexadecimal, or to 1
+ *               otherwise.
+ *
+ * RETURN VALUE:
+ *     The printf format string.
+ *-----------------------------------------------------------------------------------------------*/
+static const char *
+GetBufferStringFormat(uint64_t Position, uint64_t Size, bool ImplicitCast, bool Decimal) {
+    if (Decimal) {
+        if (Position < Size - 1) {
+            return ImplicitCast ? "%ld " : "%ld,";
+        } else {
+            return "%ld";
+        }
+    } else {
+        if (Position < Size - 1) {
+            return ImplicitCast ? "0x%02hhX " : "0x%02hhX,";
+        } else {
+            return "0x%02hhX";
+        }
+    }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
  *     This function tries casting the result of a previous ExecuteOpcode into a string.
  *
  * PARAMETERS:
@@ -161,65 +192,25 @@ bool AcpipCastToString(AcpiValue *Value, bool ImplicitCast, bool Decimal) {
         /* Buffers should be converted into a list of either space or comma separated pairs of
            digits; We use space for implicit conversion, and comma for explicit. */
         case ACPI_BUFFER: {
-            /* Hexadecimal is the easier case, as we know we should always have 4 digits per
-               buffer item; For decimal, we're not sure of the size until we run snprintf, so
-               we need two loops using snprintf. */
-            if (Decimal) {
-                int Size = 0;
+            int Size = 0;
 
-                for (uint64_t i = 0; i < Value->Buffer->Size; i++) {
-                    const char *PrintfFormat = "%ld";
+            for (uint64_t i = 0; i < Value->Buffer->Size; i++) {
+                const char *PrintfFormat =
+                    GetBufferStringFormat(i, Value->Buffer->Size, ImplicitCast, Decimal);
+                Size += snprintf(NULL, 0, PrintfFormat, Value->Buffer->Data[i]);
+            }
 
-                    if (i < Value->Buffer->Size - 1) {
-                        PrintfFormat = ImplicitCast ? "%ld " : "%ld,";
-                    }
+            String = AcpipAllocateBlock(sizeof(AcpiString) + Size + 1);
+            if (!String) {
+                return false;
+            }
 
-                    Size += snprintf(NULL, 0, PrintfFormat, Value->Buffer->Data[i]);
-                }
-
-                String = AcpipAllocateBlock(sizeof(AcpiString) + Size + 1);
-                if (!String) {
-                    return false;
-                }
-
-                int Offset = 0;
-                for (uint64_t i = 0; i < Value->Buffer->Size; i++) {
-                    const char *PrintfFormat = "%ld";
-
-                    if (i < Value->Buffer->Size - 1) {
-                        PrintfFormat = ImplicitCast ? "%ld " : "%ld,";
-                    }
-
-                    Offset += snprintf(
-                        String->Data + Offset,
-                        Size - Offset + 1,
-                        PrintfFormat,
-                        Value->Buffer->Data[i]);
-                }
-            } else {
-                String = AcpipAllocateBlock(sizeof(AcpiString) + Value->Buffer->Size * 5);
-                if (!String) {
-                    return false;
-                }
-
-                for (uint64_t i = 0; i < Value->Buffer->Size; i++) {
-                    int PrintfSize = 5;
-                    const char *PrintfFormat = "0x%02hhX";
-
-                    if (i < Value->Buffer->Size - 1) {
-                        PrintfSize = 6;
-                        PrintfFormat = ImplicitCast ? "0x%02hhX " : "0x%02hhX,";
-                    }
-
-                    if (snprintf(
-                            String->Data + i * 5,
-                            PrintfSize,
-                            PrintfFormat,
-                            Value->Buffer->Data[i]) != PrintfSize - 1) {
-                        AcpipFreeBlock(String);
-                        return false;
-                    }
-                }
+            int Offset = 0;
+            for (uint64_t i = 0; i < Value->Buffer->Size; i++) {
+                const char *PrintfFormat =
+                    GetBufferStringFormat(i, Value->Buffer->Size, ImplicitCast, Decimal);
+                Offset += snprintf(
+                    String->Data + Offset, Size - Offset + 1, PrintfFormat, Value->Buffer->Data[i]);
             }
 
             break;
