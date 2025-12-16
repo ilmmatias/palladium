@@ -157,25 +157,47 @@ bool AcpipStoreTarget(AcpipState *State, AcpiValue *Target, AcpiValue *Value) {
                 case ACPI_BUFFER_FIELD: {
                     uint64_t Index = Target->Reference->Value.BufferField.Index;
                     AcpiValue *Source = Target->Reference->Value.BufferField.Source;
+                    int Size = Target->Reference->Value.BufferField.Size;
 
                     uint64_t Slot;
                     if (!AcpipCastToInteger(Value, &Slot, true)) {
                         return false;
                     }
 
-                    switch (Target->Reference->Value.BufferField.Size) {
-                        case 2:
-                            *((uint16_t *)(Source->Buffer->Data + Index)) = Slot;
-                            break;
-                        case 4:
-                            *((uint32_t *)(Source->Buffer->Data + Index)) = Slot;
-                            break;
-                        case 8:
-                            *((uint64_t *)(Source->Buffer->Data + Index)) = Slot;
-                            break;
-                        default:
-                            *(Source->Buffer->Data + Index) = Slot;
-                            break;
+                    if (Size == 0) {
+                        /* Size=0 indicates a 1-bit field where Index is a bit offset. */
+                        uint64_t ByteOffset = Index / 8;
+                        uint8_t BitOffset = Index % 8;
+
+                        if (ByteOffset >= Source->Buffer->Size) {
+                            return false;
+                        }
+
+                        if (Slot & 1) {
+                            Source->Buffer->Data[ByteOffset] |= (1 << BitOffset);
+                        } else {
+                            Source->Buffer->Data[ByteOffset] &= ~(1 << BitOffset);
+                        }
+                    } else {
+                        /* Otherwise this is a normal byte/word/dword/qword field. */
+                        if (Index + Size > Source->Buffer->Size) {
+                            return false;
+                        }
+
+                        switch (Size) {
+                            case 2:
+                                *((uint16_t *)(Source->Buffer->Data + Index)) = Slot;
+                                break;
+                            case 4:
+                                *((uint32_t *)(Source->Buffer->Data + Index)) = Slot;
+                                break;
+                            case 8:
+                                *((uint64_t *)(Source->Buffer->Data + Index)) = Slot;
+                                break;
+                            default:
+                                *(Source->Buffer->Data + Index) = Slot;
+                                break;
+                        }
                     }
 
                     break;

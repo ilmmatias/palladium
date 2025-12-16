@@ -146,8 +146,9 @@ int AcpipExecuteFieldOpcode(AcpipState *State, uint16_t Opcode) {
             AcpiValue *SourceBuff = &State->Opcode->FixedArguments[0].TermArg;
             uint64_t ByteIndex = State->Opcode->FixedArguments[1].TermArg.Integer;
             AcpiName *Name = &State->Opcode->FixedArguments[2].Name;
+            uint64_t FieldSize = Opcode == 0x8A ? 4 : Opcode == 0x8B ? 2 : Opcode == 0x8C ? 1 : 8;
 
-            if (ByteIndex >= SourceBuff->Buffer->Size) {
+            if (ByteIndex + FieldSize > SourceBuff->Buffer->Size) {
                 AcpiRemoveReference(SourceBuff, false);
                 return 0;
             }
@@ -167,10 +168,44 @@ int AcpipExecuteFieldOpcode(AcpipState *State, uint16_t Opcode) {
             Value.References = 1;
             Value.BufferField.Source = Buffer;
             Value.BufferField.Index = ByteIndex;
-            Value.BufferField.Size = Opcode == 0x8A   ? 4
-                                     : Opcode == 0x8B ? 2
-                                     : Opcode == 0x8C ? 1
-                                                      : 8;
+            Value.BufferField.Size = FieldSize;
+
+            if (!AcpipCreateObject(Name, &Value)) {
+                AcpiRemoveReference(SourceBuff, false);
+                AcpipFreeBlock(Buffer);
+                return 0;
+            }
+
+            break;
+        }
+
+        /* DefCreateBitField := CreateBitFieldOp SourceBuff BitIndex NameString */
+        case 0x8D: {
+            AcpiValue *SourceBuff = &State->Opcode->FixedArguments[0].TermArg;
+            uint64_t BitIndex = State->Opcode->FixedArguments[1].TermArg.Integer;
+            AcpiName *Name = &State->Opcode->FixedArguments[2].Name;
+
+            if (BitIndex >= SourceBuff->Buffer->Size * 8) {
+                AcpiRemoveReference(SourceBuff, false);
+                return 0;
+            }
+
+            AcpiValue *Buffer = AcpipAllocateBlock(sizeof(AcpiValue));
+            if (!Buffer) {
+                AcpiRemoveReference(SourceBuff, false);
+                return 0;
+            }
+
+            memcpy(Buffer, SourceBuff, sizeof(AcpiValue));
+
+            AcpiValue Value;
+            Value.Type = ACPI_BUFFER_FIELD;
+            Value.References = 1;
+            Value.BufferField.Source = Buffer;
+            Value.BufferField.Index = BitIndex;
+
+            /* Size 0 is the indicator we use for bit fields. */
+            Value.BufferField.Size = 0;
 
             if (!AcpipCreateObject(Name, &Value)) {
                 AcpiRemoveReference(SourceBuff, false);
