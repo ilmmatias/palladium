@@ -115,8 +115,8 @@ bool AcpipCastToInteger(AcpiValue *Value, uint64_t *Result, bool Cleanup) {
  * PARAMETERS:
  *     Position - Which index we're currently printing.
  *     Size - Size of the buffer in elements.
- *     ImplicitCast - Set this to 0 if you only want explicit casts, or to 1 otherwise.
- *     Decimal - Set this to 0 if you want decimal digits instead of hexadecimal, or to 1
+ *     ImplicitCast - Set this to false if you only want explicit casts, or to true otherwise.
+ *     Decimal - Set this to false if you want decimal digits instead of hexadecimal, or to true
  *               otherwise.
  *
  * RETURN VALUE:
@@ -145,8 +145,8 @@ GetBufferStringFormat(uint64_t Position, uint64_t Size, bool ImplicitCast, bool 
  *
  * PARAMETERS:
  *     Value - I/O; Result of ExecuteOpcode; Will become the converted string after the cast.
- *     ImplicitCast - Set this to 0 if you only want explicit casts, or to 1 otherwise.
- *     Decimal - Set this to 0 if you want decimal digits instead of hexadecimal, or to 1
+ *     ImplicitCast - Set this to false if you only want explicit casts, or to true otherwise.
+ *     Decimal - Set this to false if you want decimal digits instead of hexadecimal, or to true
  *               otherwise.
  *
  * RETURN VALUE:

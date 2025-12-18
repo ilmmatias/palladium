@@ -31,7 +31,7 @@ int AcpipExecuteConcatOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Valu
                 case ACPI_INTEGER: {
                     uint64_t LeftValue = Left->Integer;
                     uint64_t RightValue;
-                    int Result = AcpipCastToInteger(Right, &RightValue, 1);
+                    int Result = AcpipCastToInteger(Right, &RightValue, true);
                     if (!Result) {
                         AcpiRemoveReference(&State->Opcode->FixedArguments[2].TermArg, false);
                         return 0;
@@ -85,7 +85,7 @@ int AcpipExecuteConcatOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Valu
 
                 /* Convert both sides into strings, and append them into a single string. */
                 default: {
-                    if (!AcpipCastToString(Left, 1, 0) || !AcpipCastToString(Right, 1, 0)) {
+                    if (!AcpipCastToString(Left, true, false) || !AcpipCastToString(Right, true, false)) {
                         AcpiRemoveReference(Left, false);
                         AcpiRemoveReference(Right, false);
                         AcpiRemoveReference(&State->Opcode->FixedArguments[2].TermArg, false);

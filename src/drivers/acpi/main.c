@@ -57,6 +57,7 @@ static void InitializeChildren(AcpiObject *Root) {
                 }
 
                 AcpiValue Arguments[2];
+                Arguments[0].Type = ACPI_INTEGER;
                 Arguments[0].References = 1;
                 Arguments[0].Integer = Region->Value.Region.RegionSpace;
                 Arguments[1].Type = ACPI_INTEGER;

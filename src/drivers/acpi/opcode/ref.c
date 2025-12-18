@@ -95,7 +95,7 @@ int AcpipExecuteRefOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value) 
             AcpiCreateReference(&State->Opcode->FixedArguments[0].TermArg, Buffer);
             if (Buffer->Type != ACPI_STRING && Buffer->Type != ACPI_BUFFER &&
                 Buffer->Type != ACPI_PACKAGE) {
-                AcpiRemoveReference(Buffer, 1);
+                AcpiRemoveReference(Buffer, true);
                 AcpiRemoveReference(Target, false);
                 return 0;
             }
@@ -105,7 +105,7 @@ int AcpipExecuteRefOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value) 
             switch (Buffer->Type) {
                 case ACPI_STRING: {
                     if (Index > strlen(Buffer->String->Data)) {
-                        AcpiRemoveReference(Buffer, 1);
+                        AcpiRemoveReference(Buffer, true);
                         AcpiRemoveReference(Target, false);
                         return 0;
                     }
@@ -115,7 +115,7 @@ int AcpipExecuteRefOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value) 
 
                 case ACPI_BUFFER: {
                     if (Index >= Buffer->Buffer->Size) {
-                        AcpiRemoveReference(Buffer, 1);
+                        AcpiRemoveReference(Buffer, true);
                         AcpiRemoveReference(Target, false);
                         return 0;
                     }
@@ -125,7 +125,7 @@ int AcpipExecuteRefOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value) 
 
                 default: {
                     if (Index >= Buffer->Package->Size) {
-                        AcpiRemoveReference(Buffer, 1);
+                        AcpiRemoveReference(Buffer, true);
                         AcpiRemoveReference(Target, false);
                         return 0;
                     }
@@ -140,7 +140,7 @@ int AcpipExecuteRefOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value) 
             Value->BufferField.Index = Index;
 
             if (!AcpipStoreTarget(State, Target, Value)) {
-                AcpiRemoveReference(Buffer, 1);
+                AcpiRemoveReference(Buffer, true);
                 AcpiRemoveReference(Target, false);
                 return 0;
             }

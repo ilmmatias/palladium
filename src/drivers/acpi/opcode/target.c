@@ -14,7 +14,7 @@
  *     Value - Output; Where to store the value read.
  *
  * RETURN VALUE:
- *     1 if the read was successful, 0 otherwise.
+ *     true if the read was successful, false otherwise.
  *-----------------------------------------------------------------------------------------------*/
 bool AcpipReadTarget(AcpipState *State, AcpiValue *Target, AcpiValue *Value) {
     AcpiValue *Source;
@@ -46,7 +46,7 @@ bool AcpipReadTarget(AcpipState *State, AcpiValue *Target, AcpiValue *Value) {
  *     Value - Value to store.
  *
  * RETURN VALUE:
- *     1 if the store was successful, 0 otherwise.
+ *     true if the store was successful, false otherwise.
  *-----------------------------------------------------------------------------------------------*/
 bool AcpipStoreTarget(AcpipState *State, AcpiValue *Target, AcpiValue *Value) {
     switch (Target->Type) {

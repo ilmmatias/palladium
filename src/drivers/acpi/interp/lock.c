@@ -59,7 +59,7 @@ bool AcpipAcquireGlobalLock(void) {
  *     None.
  *
  * RETURN VALUE:
- *     1 if the firmware wants notification (pending was set), 0 otherwise.
+ *     true if the firmware wants notification (pending was set), false otherwise.
  *-----------------------------------------------------------------------------------------------*/
 bool AcpipReleaseGlobalLock(void) {
     if (!FacsTable) {

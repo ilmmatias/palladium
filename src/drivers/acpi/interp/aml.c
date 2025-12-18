@@ -343,8 +343,8 @@ void AcpiCreateReference(AcpiValue *Source, AcpiValue *Target) {
  *
  * PARAMETERS:
  *     Value - Pointer to the value to be freed.
- *     CleanupPointer - Set to 0 if this is a heap allocated pointer, or if you wish to reuse it
- *                      after freeing it.
+ *     CleanupPointer - Set to false if this is a heap allocated pointer, or if you wish to reuse
+ *                      it after freeing it.
  *
  * RETURN VALUE:
  *     None.
@@ -606,7 +606,7 @@ AcpipScope *AcpipEnterWhile(
  *     Byte - Output; What we've read, on success.
  *
  * RETURN VALUE:
- *     0 on end of code, 1 otherwise.
+ *     false on end of code, true otherwise.
  *-----------------------------------------------------------------------------------------------*/
 bool AcpipReadByte(AcpipState *State, uint8_t *Byte) {
     if (State->Scope->RemainingLength) {
@@ -628,7 +628,7 @@ bool AcpipReadByte(AcpipState *State, uint8_t *Byte) {
  *     Word - Output; What we've read, on success.
  *
  * RETURN VALUE:
- *     0 on end of code, 1 otherwise.
+ *     false on end of code, true otherwise.
  *-----------------------------------------------------------------------------------------------*/
 bool AcpipReadWord(AcpipState *State, uint16_t *Word) {
     if (State->Scope->RemainingLength > 1) {
@@ -651,7 +651,7 @@ bool AcpipReadWord(AcpipState *State, uint16_t *Word) {
  *     DWord - Output; What we've read, on success.
  *
  * RETURN VALUE:
- *     0 on end of code, 1 otherwise.
+ *     false on end of code, true otherwise.
  *-----------------------------------------------------------------------------------------------*/
 bool AcpipReadDWord(AcpipState *State, uint32_t *DWord) {
     if (State->Scope->RemainingLength > 3) {
@@ -674,7 +674,7 @@ bool AcpipReadDWord(AcpipState *State, uint32_t *DWord) {
  *     QWord - Output; What we've read, on success.
  *
  * RETURN VALUE:
- *     0 on end of code, 1 otherwise.
+ *     false on end of code, true otherwise.
  *-----------------------------------------------------------------------------------------------*/
 bool AcpipReadQWord(AcpipState *State, uint64_t *QWord) {
     if (State->Scope->RemainingLength > 7) {
@@ -696,7 +696,7 @@ bool AcpipReadQWord(AcpipState *State, uint64_t *QWord) {
  *     Length - Output; What we've read, on success.
  *
  * RETURN VALUE:
- *     0 on end of code, 1 otherwise.
+ *     false on end of code, true otherwise.
  *-----------------------------------------------------------------------------------------------*/
 bool AcpipReadPkgLength(AcpipState *State, uint32_t *Length) {
     uint8_t Leading;
@@ -736,7 +736,7 @@ bool AcpipReadPkgLength(AcpipState *State, uint32_t *Length) {
  *     Name - Output; Will contain the name string data in case of a success.
  *
  * RETURN VALUE:
- *     0 on end of code, 1 otherwise.
+ *     false on end of code, true otherwise.
  *-----------------------------------------------------------------------------------------------*/
 bool AcpipReadName(AcpipState *State, AcpiName *Name) {
     uint8_t Current;

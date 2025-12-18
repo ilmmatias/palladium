@@ -136,7 +136,7 @@ int AcpipExecuteMathOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
             if (!AcpipReadTarget(State, Target, &TargetValue)) {
                 AcpiRemoveReference(Target, false);
                 return 0;
-            } else if (!AcpipCastToInteger(&TargetValue, &TargetInteger, 1)) {
+            } else if (!AcpipCastToInteger(&TargetValue, &TargetInteger, true)) {
                 AcpiRemoveReference(Target, false);
                 return 0;
             }

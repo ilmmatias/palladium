@@ -135,8 +135,12 @@ static bool SetupEcRegion(AcpiObject *Object) {
             break;
         } else if ((Tag & 0x80) == 0) {
             /* Small resource descriptor. */
-            int Length = Tag & 0x07;
+            uint64_t Length = Tag & 0x07;
             int Type = (Tag >> 3) & 0x0F;
+
+            if (Size < Length + 1) {
+                break;
+            }
 
             if (PortIndex < 2) {
                 if (Type == 0x08 && Length >= 7) {
@@ -154,7 +158,11 @@ static bool SetupEcRegion(AcpiObject *Object) {
                 break;
             }
 
-            uint16_t Length = *(uint16_t *)(Data + 1);
+            uint64_t Length = *(uint16_t *)(Data + 1);
+            if (Size < Length + 3) {
+                break;
+            }
+
             Data += Length + 3;
             Size -= Length + 3;
         }
