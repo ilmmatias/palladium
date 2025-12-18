@@ -38,6 +38,69 @@ bool AcpipReadTarget(AcpipState *State, AcpiValue *Target, AcpiValue *Value) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
+ *     This functions stores an integer value into a buffer field.
+ *
+ * PARAMETERS:
+ *     Buffer - Where to store the value (address+size).
+ *     Index - Which index to store the value into.
+ *     Value - Value to store.
+ *
+ * RETURN VALUE:
+ *     true if the store was successful, false otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+static bool StoreBufferField(AcpiValue *Buffer, uint64_t Index, AcpiValue *Value) {
+    AcpiValue *Source = Buffer->BufferField.Source;
+    uint64_t Size = Buffer->BufferField.Size;
+    if (Index >= Size) {
+        return false;
+    }
+
+    uint64_t Slot;
+    if (!AcpipCastToInteger(Value, &Slot, true)) {
+        return false;
+    }
+
+    if (Size == 0) {
+        /* Size=0 indicates a 1-bit field where Index is a bit offset. */
+        uint64_t ByteOffset = Index / 8;
+        uint8_t BitOffset = Index % 8;
+
+        if (ByteOffset >= Source->Buffer->Size) {
+            return false;
+        }
+
+        if (Slot & 1) {
+            Source->Buffer->Data[ByteOffset] |= (1 << BitOffset);
+        } else {
+            Source->Buffer->Data[ByteOffset] &= ~(1 << BitOffset);
+        }
+    } else {
+        /* Otherwise this is a normal byte/word/dword/qword field. */
+        if (Index + Size > Source->Buffer->Size) {
+            return false;
+        }
+
+        switch (Size) {
+            case 2:
+                *((uint16_t *)(Source->Buffer->Data + Index)) = Slot;
+                break;
+            case 4:
+                *((uint32_t *)(Source->Buffer->Data + Index)) = Slot;
+                break;
+            case 8:
+                *((uint64_t *)(Source->Buffer->Data + Index)) = Slot;
+                break;
+            default:
+                *(Source->Buffer->Data + Index) = Slot;
+                break;
+        }
+    }
+
+    return true;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
  *     This functions stores a value into a target/name.
  *
  * PARAMETERS:
@@ -55,6 +118,14 @@ bool AcpipStoreTarget(AcpipState *State, AcpiValue *Target, AcpiValue *Value) {
             uint64_t Index = Target->BufferField.Index;
 
             switch (Buffer->Type) {
+                case ACPI_BUFFER: {
+                    if (!StoreBufferField(Buffer, Index, Value)) {
+                        return false;
+                    }
+
+                    break;
+                }
+
                 case ACPI_PACKAGE: {
                     AcpiRemoveReference(&Buffer->Package->Data[Index], false);
                     AcpiCopyValue(Value, &Buffer->Package->Data[Index]);
@@ -155,49 +226,11 @@ bool AcpipStoreTarget(AcpipState *State, AcpiValue *Target, AcpiValue *Value) {
                 }
 
                 case ACPI_BUFFER_FIELD: {
+                    AcpiValue *Buffer = Target->Reference->Value.BufferField.Source;
                     uint64_t Index = Target->Reference->Value.BufferField.Index;
-                    AcpiValue *Source = Target->Reference->Value.BufferField.Source;
-                    int Size = Target->Reference->Value.BufferField.Size;
 
-                    uint64_t Slot;
-                    if (!AcpipCastToInteger(Value, &Slot, true)) {
+                    if (!StoreBufferField(Buffer, Index, Value)) {
                         return false;
-                    }
-
-                    if (Size == 0) {
-                        /* Size=0 indicates a 1-bit field where Index is a bit offset. */
-                        uint64_t ByteOffset = Index / 8;
-                        uint8_t BitOffset = Index % 8;
-
-                        if (ByteOffset >= Source->Buffer->Size) {
-                            return false;
-                        }
-
-                        if (Slot & 1) {
-                            Source->Buffer->Data[ByteOffset] |= (1 << BitOffset);
-                        } else {
-                            Source->Buffer->Data[ByteOffset] &= ~(1 << BitOffset);
-                        }
-                    } else {
-                        /* Otherwise this is a normal byte/word/dword/qword field. */
-                        if (Index + Size > Source->Buffer->Size) {
-                            return false;
-                        }
-
-                        switch (Size) {
-                            case 2:
-                                *((uint16_t *)(Source->Buffer->Data + Index)) = Slot;
-                                break;
-                            case 4:
-                                *((uint32_t *)(Source->Buffer->Data + Index)) = Slot;
-                                break;
-                            case 8:
-                                *((uint64_t *)(Source->Buffer->Data + Index)) = Slot;
-                                break;
-                            default:
-                                *(Source->Buffer->Data + Index) = Slot;
-                                break;
-                        }
                     }
 
                     break;

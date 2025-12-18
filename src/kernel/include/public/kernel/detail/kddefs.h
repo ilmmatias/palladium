@@ -16,4 +16,12 @@
 #define KD_TYPE_DEBUG 3
 #define KD_TYPE_INFO 4
 
+#define KD_ENABLE_TRACE false
+
+#ifdef NDEBUG
+#define KD_ENABLE_DEBUG false
+#else
+#define KD_ENABLE_DEBUG true
+#endif /* NDEBUG */
+
 #endif /* _KERNEL_DETAIL_KDDEFS_H_ */

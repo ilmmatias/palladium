@@ -36,10 +36,12 @@ void AcpipShowInfoMessage(const char *Message, ...) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void AcpipShowDebugMessage(const char *Message, ...) {
-    va_list Arguments;
-    va_start(Arguments, Message);
-    KdPrintVariadic(KD_TYPE_DEBUG, Message, Arguments);
-    va_end(Arguments);
+    if (KD_ENABLE_DEBUG) {
+        va_list Arguments;
+        va_start(Arguments, Message);
+        KdPrintVariadic(KD_TYPE_DEBUG, Message, Arguments);
+        va_end(Arguments);
+    }
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -55,10 +57,12 @@ void AcpipShowDebugMessage(const char *Message, ...) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void AcpipShowTraceMessage(const char *Message, ...) {
-    va_list Arguments;
-    va_start(Arguments, Message);
-    KdPrintVariadic(KD_TYPE_TRACE, Message, Arguments);
-    va_end(Arguments);
+    if (KD_ENABLE_TRACE) {
+        va_list Arguments;
+        va_start(Arguments, Message);
+        KdPrintVariadic(KD_TYPE_TRACE, Message, Arguments);
+        va_end(Arguments);
+    }
 }
 
 /*-------------------------------------------------------------------------------------------------

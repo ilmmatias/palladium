@@ -82,6 +82,12 @@ void KdPrintVariadic(int Type, const char *Message, va_list Arguments) {
         return;
     }
 
+    /* Also don't bother if this type of message is disabled. */
+    if ((Type == KD_TYPE_TRACE && !KD_ENABLE_TRACE) ||
+        (Type == KD_TYPE_DEBUG && !KD_ENABLE_DEBUG)) {
+        return;
+    }
+
     /* Lock any other processors from messing with our buffer while we do it. */
     KeIrql OldIrql;
     if (UseLock) {
