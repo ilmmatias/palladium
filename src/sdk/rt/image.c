@@ -23,7 +23,7 @@ uint64_t RtLookupImageBase(uint64_t Address) {
         KeModule *Module = CONTAINING_RECORD(ListHeader, KeModule, ListHeader);
 
         if (Address >= (uint64_t)Module->ImageBase &&
-            Address <= (uint64_t)Module->ImageBase + Module->SizeOfImage) {
+            Address < (uint64_t)Module->ImageBase + Module->SizeOfImage) {
             return (uint64_t)Module->ImageBase;
         }
 

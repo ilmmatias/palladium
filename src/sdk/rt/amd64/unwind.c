@@ -390,7 +390,7 @@ RtExceptionRoutine RtVirtualUnwind(
 
         /* And update the function entry if we have more chained info. */
         if (UnwindInfo->Flags & RT_UNW_FLAG_CHAININFO) {
-            FunctionEntry = RtGetChainedFunctionEntry(ImageBase, UnwindInfo);
+            FunctionEntry = RtGetChainedFunctionEntry(UnwindInfo);
         } else {
             /* Or pop RIP (fully restoring the frame) if we haven't done that yet. */
             if (!HasMachineFrame) {

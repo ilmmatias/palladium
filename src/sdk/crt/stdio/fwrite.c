@@ -35,14 +35,23 @@ size_t fwrite_unlocked(
         return 0;
     }
 
+    if (nmemb > ((size_t)-1) / size) {
+        stream->flags |= __STDIO_FLAGS_ERROR;
+        return 0;
+    }
+
     const char *src = ptr;
     stream->flags |= __STDIO_FLAGS_WRITING;
 
-    size_t wrote;
+    size_t wrote = 0;
     size_t total_bytes = size * nmemb;
 
     if (!stream->buffer || stream->buffer_type == _IONBF) {
         int flags = __write_file(stream->handle, src, total_bytes, &wrote);
+        if (!flags && total_bytes && !wrote) {
+            flags = __STDIO_FLAGS_ERROR;
+        }
+
         if (flags) {
             stream->flags |= flags;
         }
@@ -57,6 +66,7 @@ size_t fwrite_unlocked(
        is (takes into consideration the buffer size); Write all that we can into the buffer,
        flushing if we reached the end of the buffer or if we have a newline on _IOLBF. */
     while (accum < total_bytes) {
+        new_line = false;
         size_t remaining = size * nmemb - accum;
         size_t copy_size = stream->buffer_size - stream->buffer_pos;
         if (remaining < copy_size) {
@@ -85,8 +95,8 @@ size_t fwrite_unlocked(
 
             stream->buffer_pos -= wrote;
 
-            if (flags) {
-                stream->flags |= flags;
+            if (flags || !wrote) {
+                stream->flags |= flags ? flags : __STDIO_FLAGS_ERROR;
                 break;
             }
         }

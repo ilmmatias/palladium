@@ -24,17 +24,18 @@ int fseek_unlocked(FILE *stream, long int offset, int whence) {
         return 1;
     }
 
-    fflush_unlocked(stream);
+    if (fflush_unlocked(stream) == EOF) {
+        return 1;
+    }
 
-    /* Assume that as long as seek_file doesn't fail, the result of fflush doesn't matter. */
     int flags = __seek_file(stream->handle, offset, whence);
     if (flags) {
         stream->flags |= flags;
+        return 1;
     } else {
         stream->flags &= ~__STDIO_FLAGS_EOF;
+        return 0;
     }
-
-    return 0;
 }
 
 /*-------------------------------------------------------------------------------------------------

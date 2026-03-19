@@ -20,7 +20,7 @@ int fclose(FILE *stream) {
         return EOF;
     }
 
-    fflush_unlocked(stream);
+    int res = fflush(stream);
     __close_file(stream->handle);
 
     if (stream->user_lock) {
@@ -33,5 +33,5 @@ int fclose(FILE *stream) {
 
     free(stream);
 
-    return 0;
+    return res;
 }

@@ -1,8 +1,6 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#include <stddef.h>
-
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function implements generic code to compare two C strings.
@@ -16,10 +14,13 @@
  *     to where the inequality happened).
  *-----------------------------------------------------------------------------------------------*/
 __attribute__((no_builtin)) int strcmp(const char *s1, const char *s2) {
-    while (*s1 && *s2 && *s1 == *s2) {
-        s1++;
-        s2++;
+    const unsigned char *Left = (const unsigned char *)s1;
+    const unsigned char *Right = (const unsigned char *)s2;
+
+    while (*Left && *Right && *Left == *Right) {
+        Left++;
+        Right++;
     }
 
-    return *s1 - *s2;
+    return *Left - *Right;
 }

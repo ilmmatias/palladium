@@ -16,9 +16,10 @@
  *     Pointer to where the byte was found, or NULL if it wasn't found.
  *-----------------------------------------------------------------------------------------------*/
 __attribute__((no_builtin)) void *memchr(const void *s, int c, size_t n) {
-    const char *Buffer = s;
+    const unsigned char *Buffer = s;
+    unsigned char Data = c;
 
-    while (*Buffer != c && n) {
+    while (n && *Buffer != Data) {
         Buffer++;
         n--;
     }

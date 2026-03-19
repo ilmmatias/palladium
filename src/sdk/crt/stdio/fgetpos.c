@@ -17,6 +17,10 @@
  *     0 on success, 1 otherwise.
  *-----------------------------------------------------------------------------------------------*/
 int fgetpos_unlocked(FILE *CRT_RESTRICT stream, fpos_t *CRT_RESTRICT pos) {
+    if (!stream || !pos) {
+        return 1;
+    }
+
     /* I'm not sure if this is the actual right way to implement this? */
     long offset = ftell_unlocked(stream);
     if (offset != -1) {

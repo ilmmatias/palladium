@@ -1,6 +1,7 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
+#include <crt_impl/file_flags.h>
 #include <crt_impl/os.h>
 #include <stdio.h>
 
@@ -16,8 +17,13 @@
  *     How many bytes are we into the file.
  *-----------------------------------------------------------------------------------------------*/
 long ftell_unlocked(FILE *stream) {
+    if (!stream) {
+        return -1;
+    }
+
     long offset;
     if (__tell_file(stream->handle, &offset)) {
+        stream->flags |= __STDIO_FLAGS_ERROR;
         return -1;
     } else {
         return offset + stream->buffer_pos - stream->buffer_read - stream->unget_size;

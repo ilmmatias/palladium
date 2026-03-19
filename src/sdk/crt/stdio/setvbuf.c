@@ -20,15 +20,21 @@
  *     0 on success, 1 otherwise.
  *-----------------------------------------------------------------------------------------------*/
 int setvbuf_unlocked(FILE *CRT_RESTRICT stream, char *CRT_RESTRICT buf, int mode, size_t size) {
-    if (!stream) {
+    if (!stream || (mode != _IONBF && mode != _IOLBF && mode != _IOFBF)) {
         return 1;
     }
 
     /* We'll be overwriting those fields in the next block, so we need to save it. */
     bool user_buffer = stream->user_buffer;
-    fflush_unlocked(stream);
+    if (fflush_unlocked(stream) == EOF) {
+        return 1;
+    }
 
     if (mode == _IOLBF || mode == _IOFBF) {
+        if (!size) {
+            return 1;
+        }
+
         if (!buf) {
             buf = malloc(size);
 
@@ -46,7 +52,11 @@ int setvbuf_unlocked(FILE *CRT_RESTRICT stream, char *CRT_RESTRICT buf, int mode
         stream->buffer_read = 0;
         stream->buffer_pos = 0;
     } else {
+        stream->user_buffer = false;
         stream->buffer_type = _IONBF;
+        stream->buffer_size = 0;
+        stream->buffer_read = 0;
+        stream->buffer_pos = 0;
     }
 
     if (stream->buffer && !user_buffer) {

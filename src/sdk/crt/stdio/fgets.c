@@ -53,7 +53,7 @@ char *fgets_unlocked(char *CRT_RESTRICT s, int count, FILE *CRT_RESTRICT stream)
     }
 
     *dest = 0;
-    return fail ? NULL : s;
+    return fail && dest == s ? NULL : s;
 }
 
 /*-------------------------------------------------------------------------------------------------

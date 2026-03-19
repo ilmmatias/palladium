@@ -23,7 +23,9 @@ void setbuf_unlocked(FILE *CRT_RESTRICT stream, char *CRT_RESTRICT buf) {
         return;
     }
 
-    fflush_unlocked(stream);
+    if (fflush_unlocked(stream) == EOF) {
+        return;
+    }
 
     if (stream->buffer && !stream->user_buffer) {
         free(stream->buffer);
@@ -36,7 +38,11 @@ void setbuf_unlocked(FILE *CRT_RESTRICT stream, char *CRT_RESTRICT buf) {
         stream->buffer_read = 0;
         stream->buffer_pos = 0;
     } else {
+        stream->user_buffer = false;
         stream->buffer_type = _IONBF;
+        stream->buffer_size = 0;
+        stream->buffer_read = 0;
+        stream->buffer_pos = 0;
     }
 
     stream->buffer = buf;

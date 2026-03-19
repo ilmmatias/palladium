@@ -30,9 +30,7 @@ char *strncat(char *CRT_RESTRICT s1, const char *CRT_RESTRICT s2, size_t n) {
         n--;
     }
 
-    if (n) {
-        *Destination = 0;
-    }
+    *Destination = 0;
 
     return s1;
 }

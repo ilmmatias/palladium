@@ -17,6 +17,9 @@
  *-----------------------------------------------------------------------------------------------*/
 char *gets_unlocked(char *str) {
     FILE *stream = stdin;
+    if (!stream || !str) {
+        return NULL;
+    }
 
     if ((stream->flags & __STDIO_FLAGS_ERROR) || (stream->flags & __STDIO_FLAGS_EOF)) {
         if (!(stream->flags & __STDIO_FLAGS_EOF)) {
@@ -37,14 +40,15 @@ char *gets_unlocked(char *str) {
             break;
         }
 
-        *(dest++) = ch;
         if (ch == '\n') {
             break;
         }
+
+        *(dest++) = ch;
     }
 
     *dest = 0;
-    return fail ? NULL : str;
+    return fail && dest == str ? NULL : str;
 }
 
 /*-------------------------------------------------------------------------------------------------

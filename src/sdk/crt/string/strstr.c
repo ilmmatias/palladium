@@ -24,13 +24,16 @@ char *strstr(const char *s1, const char *s2) {
         const char *Search = s2;
         const char *Start = s1;
 
-        while (*s1 && *Search && *(s1++) == *Search) {
+        while (*s1 && *Search && *s1 == *Search) {
+            s1++;
             Search++;
         }
 
         if (!*Search) {
             return (char *)Start;
         }
+
+        s1 = Start + 1;
     }
 
     return NULL;

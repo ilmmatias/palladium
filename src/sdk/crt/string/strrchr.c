@@ -16,14 +16,15 @@
  *-----------------------------------------------------------------------------------------------*/
 char *strrchr(const char *s, int c) {
     const char *Last = NULL;
+    unsigned char Data = c;
 
-    while (*s) {
-        if (*s == c) {
+    do {
+        if ((unsigned char)*s == Data) {
             Last = s;
         }
 
         s++;
-    }
+    } while (*(s - 1));
 
     return (char *)Last;
 }

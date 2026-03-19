@@ -19,14 +19,15 @@
  *     Pointer to the byte after the marker, or NULL if the marker wasn't found.
  *-----------------------------------------------------------------------------------------------*/
 void *memccpy(void *CRT_RESTRICT s1, const void *CRT_RESTRICT s2, int c, size_t n) {
-    char *Destination = s1;
-    const char *Source = s2;
+    unsigned char *Destination = s1;
+    const unsigned char *Source = s2;
+    unsigned char Marker = c;
 
     while (n) {
-        int Data = *(Source++);
+        unsigned char Data = *(Source++);
         *(Destination++) = Data;
 
-        if (Data == c) {
+        if (Data == Marker) {
             break;
         }
 

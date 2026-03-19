@@ -71,6 +71,7 @@ bool RtDispatchException(RtExceptionRecord *ExceptionRecord, RtContext *ContextR
             DispatcherContext.ImageBase = ImageBase;
             DispatcherContext.FunctionEntry = FunctionEntry;
             DispatcherContext.EstablisherFrame = EstablisherFrame;
+            DispatcherContext.TargetIp = 0;
             DispatcherContext.ScopeIndex = 0;
 
             do {

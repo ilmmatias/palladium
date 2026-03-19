@@ -35,6 +35,11 @@ fread_unlocked(void *CRT_RESTRICT ptr, size_t size, size_t nmemb, FILE *CRT_REST
         return 0;
     }
 
+    if (nmemb > ((size_t)-1) / size) {
+        stream->flags |= __STDIO_FLAGS_ERROR;
+        return 0;
+    }
+
     /* Not flushing stdout before reading user input can cause some funky/unexpected behaviour
        (like the prompt not appearing, because it doesn't end with a new line). */
     if (stream == stdin) {
@@ -58,8 +63,12 @@ fread_unlocked(void *CRT_RESTRICT ptr, size_t size, size_t nmemb, FILE *CRT_REST
     }
 
     if (!stream->buffer || stream->buffer_type == _IONBF) {
-        size_t read;
+        size_t read = 0;
         int flags = __read_file(stream->handle, dest, total_bytes, &read);
+        if (!flags && !read) {
+            flags = __STDIO_FLAGS_EOF;
+        }
+
         if (flags) {
             stream->flags |= flags;
         }
@@ -77,6 +86,10 @@ fread_unlocked(void *CRT_RESTRICT ptr, size_t size, size_t nmemb, FILE *CRT_REST
                 stream->handle, stream->buffer, stream->buffer_size, &stream->buffer_read);
 
             stream->buffer_pos = 0;
+
+            if (!flags && !stream->buffer_read) {
+                flags = __STDIO_FLAGS_EOF;
+            }
 
             /* EOF is only valid/set if the user actually tried reading beyond the file
                boundaries. */

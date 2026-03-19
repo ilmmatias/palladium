@@ -17,8 +17,8 @@
  *     reinterpreted as char*, and are pointing to where the inequality happened).
  *-----------------------------------------------------------------------------------------------*/
 __attribute__((no_builtin)) int memcmp(const void *s1, const void *s2, size_t n) {
-    const char *Left = s1;
-    const char *Right = s2;
+    const unsigned char *Left = s1;
+    const unsigned char *Right = s2;
 
     while (n--) {
         if (*Left != *Right) {

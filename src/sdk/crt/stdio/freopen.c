@@ -36,6 +36,7 @@ FILE *freopen(
     }
 
     if (!filename || !mode) {
+        funlockfile(stream);
         if (stream->user_lock) {
             __delete_lock(stream->lock_handle);
         }
@@ -45,8 +46,19 @@ FILE *freopen(
     }
 
     int flags = __parse_open_mode(mode);
+    if (!flags) {
+        funlockfile(stream);
+        if (stream->user_lock) {
+            __delete_lock(stream->lock_handle);
+        }
+
+        free(stream);
+        return NULL;
+    }
+
     void *handle = __open_file(filename, flags);
     if (!handle) {
+        funlockfile(stream);
         if (stream->user_lock) {
             __delete_lock(stream->lock_handle);
         }
@@ -57,6 +69,7 @@ FILE *freopen(
 
     stream->buffer = malloc(BUFSIZ);
     if (!stream->buffer) {
+        funlockfile(stream);
         if (stream->user_lock) {
             __delete_lock(stream->lock_handle);
         }
@@ -67,6 +80,7 @@ FILE *freopen(
     }
 
     stream->handle = handle;
+    stream->user_buffer = false;
     stream->buffer_type = _IOFBF;
     stream->buffer_size = BUFSIZ;
     stream->buffer_read = 0;

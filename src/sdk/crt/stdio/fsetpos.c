@@ -16,6 +16,10 @@
  *     0 on success, 1 otherwise.
  *-----------------------------------------------------------------------------------------------*/
 int fsetpos_unlocked(FILE *stream, const fpos_t *pos) {
+    if (!stream || !pos) {
+        return 1;
+    }
+
     /* I'm not sure if this is the actual right way to implement this? */
     return fseek_unlocked(stream, *pos, SEEK_SET);
 }

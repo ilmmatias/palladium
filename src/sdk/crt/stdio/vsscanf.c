@@ -3,7 +3,6 @@
 
 #include <crt_impl/fmt.h>
 #include <stdio.h>
-#include <string.h>
 
 typedef struct {
     const char *buffer;
@@ -21,7 +20,7 @@ typedef struct {
  *-----------------------------------------------------------------------------------------------*/
 static int read_ch(void *context) {
     context_t *str_context = context;
-    return *(str_context->buffer) ? *(str_context->buffer++) : EOF;
+    return *(str_context->buffer) ? (unsigned char)*(str_context->buffer++) : EOF;
 }
 
 /*-------------------------------------------------------------------------------------------------

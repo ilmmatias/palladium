@@ -14,7 +14,7 @@
  *     Data stored in the fread buffer, or EOF on failure.
  *-----------------------------------------------------------------------------------------------*/
 int fgetc_unlocked(FILE *stream) {
-    int ch = 0;
+    unsigned char ch = 0;
     return fread_unlocked(&ch, 1, 1, stream) ? ch : EOF;
 }
 

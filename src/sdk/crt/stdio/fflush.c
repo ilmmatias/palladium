@@ -4,6 +4,7 @@
 #include <crt_impl/file_flags.h>
 #include <crt_impl/os.h>
 #include <stdio.h>
+#include <string.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -27,6 +28,15 @@ int fflush_unlocked(FILE *stream) {
     /* We follow the POSIX standard here; Instead of UB/not doing anything, we reset the input
        buffer position, and drop the unget buffer. */
     if (stream->flags & __STDIO_FLAGS_READING) {
+        long offset = -(long)(stream->buffer_read - stream->buffer_pos + stream->unget_size);
+        if (offset) {
+            int flags = __seek_file(stream->handle, offset, SEEK_CUR);
+            if (flags) {
+                stream->flags |= flags;
+                return EOF;
+            }
+        }
+
         stream->buffer_pos = 0;
         stream->buffer_read = 0;
         stream->unget_size = 0;
@@ -37,12 +47,22 @@ int fflush_unlocked(FILE *stream) {
         return 0;
     }
 
-    size_t wrote;
-    int flags = __write_file(stream->handle, stream->buffer, stream->buffer_pos, &wrote);
-    stream->buffer_pos = 0;
-    stream->flags = (stream->flags | flags) & ~__STDIO_FLAGS_WRITING;
+    while (stream->buffer_pos) {
+        size_t wrote = 0;
+        int flags = __write_file(stream->handle, stream->buffer, stream->buffer_pos, &wrote);
+        if (wrote < stream->buffer_pos) {
+            memmove(stream->buffer, stream->buffer + wrote, stream->buffer_pos - wrote);
+        }
 
-    return flags ? EOF : 0;
+        stream->buffer_pos -= wrote;
+        if (flags || !wrote) {
+            stream->flags |= flags ? flags : __STDIO_FLAGS_ERROR;
+            return EOF;
+        }
+    }
+
+    stream->flags &= ~__STDIO_FLAGS_WRITING;
+    return 0;
 }
 
 /*-------------------------------------------------------------------------------------------------

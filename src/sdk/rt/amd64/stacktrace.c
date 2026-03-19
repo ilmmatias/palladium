@@ -4,9 +4,6 @@
 #include <kernel/ke.h>
 #include <rt/except.h>
 
-//
-#include <kernel/vid.h>
-
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function unwinds the caller's stack, capturing all frames along the way.
@@ -20,6 +17,14 @@
  *     How many frames we actually captured.
  *-----------------------------------------------------------------------------------------------*/
 int RtCaptureStackTrace(void **Frames, int FramesToCapture, int FramesToSkip) {
+    if (!Frames || FramesToCapture <= 0) {
+        return 0;
+    }
+
+    if (FramesToSkip < 0) {
+        FramesToSkip = 0;
+    }
+
     RtContext Context;
     RtSaveContext(&Context);
 

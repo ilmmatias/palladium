@@ -15,7 +15,8 @@
  *     Data written onto the file, or EOF on failure.
  *-----------------------------------------------------------------------------------------------*/
 int fputc_unlocked(int ch, FILE *stream) {
-    return fwrite_unlocked(&ch, 1, 1, stream) ? ch : EOF;
+    unsigned char data = ch;
+    return fwrite_unlocked(&data, 1, 1, stream) ? data : EOF;
 }
 
 /*-------------------------------------------------------------------------------------------------

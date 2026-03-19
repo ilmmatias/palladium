@@ -29,6 +29,8 @@ int __parse_open_mode(const char *mode) {
         case 'a':
             flags |= __STDIO_FLAGS_WRITE | __STDIO_FLAGS_APPEND;
             break;
+        default:
+            return 0;
     }
 
     /* Next up, keep on parsing while the string isn't done (the next flags can come up in any
@@ -47,10 +49,10 @@ int __parse_open_mode(const char *mode) {
             case 'x':
                 flags |= __STDIO_FLAGS_EXCL;
                 break;
+            default:
+                return 0;
         }
     }
 
-    /* No valid flags, we're assuming read-only; Is this correct, or should we just leave the flags
-     * empty. */
-    return flags ? flags : __STDIO_FLAGS_READ;
+    return flags;
 }

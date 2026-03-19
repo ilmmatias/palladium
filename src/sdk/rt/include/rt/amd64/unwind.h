@@ -28,8 +28,7 @@
     ((void *)&RtGetUnwindCodeEntry((info), ((info)->CountOfCodes + 1) & ~1))
 #define RtGetExceptionHandler(base, info) \
     ((void *)((base) + *(uint32_t *)RtGetLanguageSpecificData(info)))
-#define RtGetChainedFunctionEntry(base, info) \
-    ((RtRuntimeFunction *)((base) + *(uint32_t *)RtGetLanguageSpecificData(info)))
+#define RtGetChainedFunctionEntry(info) ((RtRuntimeFunction *)RtGetLanguageSpecificData(info))
 #define RtGetExceptionDataPtr(info) ((void *)((uint32_t *)RtGetLanguageSpecificData(info) + 1))
 
 typedef union {

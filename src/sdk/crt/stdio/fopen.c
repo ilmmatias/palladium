@@ -25,6 +25,10 @@ FILE *fopen(const char *CRT_RESTRICT filename, const char *CRT_RESTRICT mode) {
     }
 
     int flags = __parse_open_mode(mode);
+    if (!flags) {
+        return NULL;
+    }
+
     void *handle = __open_file(filename, flags);
     if (!handle) {
         return NULL;
@@ -43,6 +47,8 @@ FILE *fopen(const char *CRT_RESTRICT filename, const char *CRT_RESTRICT mode) {
         return NULL;
     }
 
+    memset(stream, 0, sizeof(FILE));
+
     /* By default we make all files fully buffered. */
     stream->buffer = malloc(BUFSIZ);
     if (!stream->buffer) {
@@ -55,6 +61,7 @@ FILE *fopen(const char *CRT_RESTRICT filename, const char *CRT_RESTRICT mode) {
     stream->handle = handle;
     stream->lock_handle = lock_handle;
     stream->user_lock = true;
+    stream->user_buffer = false;
     stream->buffer_type = _IOFBF;
     stream->buffer_size = BUFSIZ;
     stream->buffer_read = 0;
