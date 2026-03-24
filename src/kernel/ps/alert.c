@@ -49,6 +49,7 @@ bool PsQueueAlert(PsThread* Thread, PsAlert* Alert) {
         return false;
     } else if (!__atomic_compare_exchange_n(
                    &Alert->Queued, &ExpectedValue, true, 0, __ATOMIC_RELEASE, __ATOMIC_ACQUIRE)) {
+        KeReleaseSpinLockAndLowerIrql(&Thread->AlertLock, OldIrql);
         return false;
     }
 
@@ -83,7 +84,7 @@ void PspProcessAlertQueue(void) {
         RtSList* ListHeader = RtPopSList(&Thread->AlertList);
         KeReleaseSpinLockAndLowerIrql(&Thread->AlertLock, OldIrql);
         if (!ListHeader) {
-            continue;
+            break;
         }
 
         PsAlert* Alert = CONTAINING_RECORD(ListHeader, PsAlert, ListHeader);

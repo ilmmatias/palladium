@@ -65,7 +65,7 @@ ObDirectory ObRootDirectory;
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void ObInitializeRootDirectory(void) {
+void ObpInitializeRootDirectory(void) {
     for (size_t i = 0; i < 32; i++) {
         RtInitializeDList(&ObRootDirectory.HashHeads[i]);
     }
@@ -125,21 +125,25 @@ bool ObInsertIntoDirectory(ObDirectory *Directory, const char *Name, void *Objec
         return false;
     }
 
+    /* Initialize the entry fields. */
+    Entry->Object = Object;
+    Entry->Parent = Directory;
+    memcpy(Entry->Name, Name, NameSize);
+    Entry->Name[NameSize] = 0;
+    RtInitializeDList(&Entry->HashHeader);
+
+    /* And block anyone from accidentally competing with us. */
+    ObReferenceObject(Object);
+
     /* Hopefully this will succeed, otherwise, free up everything and bail out. */
     ObpDirectoryEntry *ExpectedParent = NULL;
     if (!__atomic_compare_exchange_n(
             &ObjectHeader->Parent, &ExpectedParent, Entry, 0, __ATOMIC_RELEASE, __ATOMIC_ACQUIRE)) {
+        ObDereferenceObject(Object);
         MmFreePool(Entry->Name, MM_POOL_TAG_OBJECT);
         MmFreePool(Entry, MM_POOL_TAG_OBJECT);
         return false;
     }
-
-    /* Now we're past the last place we could have gotten an allocation failure, so, block
-     * the object from dying after we return. */
-    Entry->Object = Object;
-    Entry->Parent = Directory;
-    memcpy(Entry->Name, Name, NameSize);
-    ObReferenceObject(Object);
 
     /* And append to the directory. With this, we should be done. */
     uint32_t Hash = RtGetHash(Name, NameSize);
