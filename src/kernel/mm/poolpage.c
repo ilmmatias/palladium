@@ -108,15 +108,15 @@ void *MiAllocatePoolPages(uint32_t Pages) {
         return NULL;
     }
 
+    uint32_t AllocatedPages = 0;
     for (uint64_t Offset = 0; Offset < Pages << MM_PAGE_SHIFT; Offset += MM_PAGE_SIZE) {
-        /* TODO: What exactly should be do when we fail to map/allocate the space, unmap+free
-         * the pages, mark them as big pool free? */
         uint64_t PhysicalAddress = MmAllocateSinglePage();
         if (!PhysicalAddress) {
-            return NULL;
+            break;
         } else if (!HalpMapContiguousPages(
                        VirtualAddress + Offset, PhysicalAddress, MM_PAGE_SIZE, MI_MAP_WRITE)) {
-            return NULL;
+            MmFreeSinglePage(PhysicalAddress);
+            break;
         }
 
         /* Mark the pages of the pool as such. */
@@ -127,6 +127,27 @@ void *MiAllocatePoolPages(uint32_t Pages) {
             Entry->PoolBase = 1;
             Entry->Pages = Pages;
         }
+
+        AllocatedPages++;
+    }
+
+    /* And clean it up if we failed to map (or allocate) something. */
+    if (AllocatedPages != Pages) {
+        for (uint32_t Page = 0; Page < AllocatedPages; Page++) {
+            uint64_t PhysicalAddress =
+                HalpGetPhysicalAddress((char *)VirtualAddress + (Page << MM_PAGE_SHIFT));
+            MiPageEntry *Entry = &MI_PAGE_ENTRY(PhysicalAddress);
+            Entry->PoolBase = 0;
+            Entry->PoolItem = 0;
+            MmFreeSinglePage(PhysicalAddress);
+        }
+
+        if (AllocatedPages) {
+            HalpUnmapPages(VirtualAddress, (uint64_t)AllocatedPages << MM_PAGE_SHIFT);
+        }
+
+        MiFreePoolSpace(VirtualAddress, Pages);
+        return NULL;
     }
 
     __atomic_fetch_add(&MiTotalPoolPages, Pages, __ATOMIC_RELAXED);
