@@ -95,6 +95,8 @@ bool OslFindFile(const char *Path) {
  *     Either a buffer allocated using gBS->AllocatePool containing all the file data, or NULL.
  *-----------------------------------------------------------------------------------------------*/
 void *OslReadFile(const char *Path, uint64_t *Size) {
+    *Size = 0;
+
     size_t PathSize = strlen(Path);
     CHAR16 Path16[strlen(Path) + 1];
     Path16[PathSize] = 0;
@@ -134,6 +136,10 @@ void *OslReadFile(const char *Path, uint64_t *Size) {
     }
 
     if (Status != EFI_SUCCESS) {
+        if (FileInfo) {
+            gBS->FreePool(FileInfo);
+        }
+
         Handle->Close(Handle);
         return NULL;
     }
@@ -144,14 +150,15 @@ void *OslReadFile(const char *Path, uint64_t *Size) {
     *Size = FileInfo->FileSize;
     gBS->FreePool(FileInfo);
 
-    Status = gBS->AllocatePool(EfiLoaderData, *Size, &Buffer);
+    Status = gBS->AllocatePool(EfiLoaderData, *Size ? *Size : 1, &Buffer);
     if (Status != EFI_SUCCESS) {
         Handle->Close(Handle);
         return NULL;
     }
 
-    Status = Handle->Read(Handle, Size, Buffer);
-    if (Status != EFI_SUCCESS) {
+    UINTN ReadSize = *Size;
+    Status = Handle->Read(Handle, &ReadSize, Buffer);
+    if (Status != EFI_SUCCESS || ReadSize != *Size) {
         gBS->FreePool(Buffer);
         Handle->Close(Handle);
         return NULL;

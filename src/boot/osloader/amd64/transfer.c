@@ -39,16 +39,29 @@
         CONTAINING_RECORD(BootBlock->Basic.BootDriverListHead->Next, OslpModuleEntry, ListHeader)
             ->EntryPoint;
 
-    /* At some point or another, this should return EFI_SUCCESS, or so we hope. */
     EFI_STATUS Status;
     do {
         UINTN MapKey = 0;
-        UINTN MemoryMapSize = 0;
-        UINTN DescriptorSize = 0;
-        UINT32 DescriptorVersion = 0;
-        gBS->GetMemoryMap(&MemoryMapSize, NULL, &MapKey, &DescriptorSize, &DescriptorVersion);
+        Status =
+            gBS->GetMemoryMap(&MemoryMapSize, MemoryMap, &MapKey, &DescriptorSize, &DescriptorVersion);
+        if (Status == EFI_BUFFER_TOO_SMALL) {
+            OslPrint("The EFI memory map grew after the loader built its descriptor list.\r\n");
+            OslPrint("The boot process cannot continue safely.\r\n");
+            break;
+        } else if (Status != EFI_SUCCESS) {
+            OslPrint("Failed to refresh the EFI memory map before ExitBootServices().\r\n");
+            OslPrint("The boot process cannot continue.\r\n");
+            break;
+        }
+
         Status = gBS->ExitBootServices(gIH, MapKey);
-    } while (Status != EFI_SUCCESS);
+    } while (Status == EFI_INVALID_PARAMETER);
+
+    if (Status != EFI_SUCCESS) {
+        while (true) {
+            __asm__ volatile("hlt");
+        }
+    }
 
     /* GDT and IDT address won't be sane after we load the new page table; We need to disable
      * interrupts. */

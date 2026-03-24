@@ -65,10 +65,13 @@ bool OslpCreateMemoryDescriptors(
     /* Let's try to read up the memory map; This may take a few retries to get right (as
      * GetMemoryMap can allocate memory when you call it). */
     UINTN MapKey = 0;
+    UINTN ActualMemoryMapSize = 0;
+    UINTN MemoryMapCapacity = *MemoryMapSize;
 
     while (true) {
+        ActualMemoryMapSize = MemoryMapCapacity;
         Status = gBS->GetMemoryMap(
-            MemoryMapSize, *MemoryMap, &MapKey, DescriptorSize, DescriptorVersion);
+            &ActualMemoryMapSize, *MemoryMap, &MapKey, DescriptorSize, DescriptorVersion);
         if (Status != EFI_BUFFER_TOO_SMALL) {
             break;
         }
@@ -77,7 +80,9 @@ bool OslpCreateMemoryDescriptors(
             gBS->FreePool(*MemoryMap);
         }
 
-        Status = gBS->AllocatePool(EfiLoaderData, *MemoryMapSize, (VOID **)MemoryMap);
+        /* Leave some room for the allocations we still need to perform before ExitBootServices. */
+        MemoryMapCapacity = ActualMemoryMapSize + (2 * EFI_PAGE_SIZE);
+        Status = gBS->AllocatePool(EfiLoaderData, MemoryMapCapacity, (VOID **)MemoryMap);
         if (Status != EFI_SUCCESS) {
             break;
         }
@@ -92,7 +97,7 @@ bool OslpCreateMemoryDescriptors(
 
     /* We cannot ignore the DescriptorSize, as sizeof(EFI_MEMORY_DESCRIPTOR) might not be the same
      * as DescriptorSize (and we need to advance by DescriptorSize each iteration)! */
-    for (UINTN Offset = 0; Offset < *MemoryMapSize; Offset += *DescriptorSize) {
+    for (UINTN Offset = 0; Offset < ActualMemoryMapSize; Offset += *DescriptorSize) {
         EFI_MEMORY_DESCRIPTOR *Descriptor =
             (EFI_MEMORY_DESCRIPTOR *)((uint64_t)*MemoryMap + Offset);
         uint64_t BasePage = Descriptor->PhysicalStart >> EFI_PAGE_SHIFT;
@@ -165,6 +170,9 @@ bool OslpCreateMemoryDescriptors(
         return false;
     }
 
+    /* The transfer path reuses this buffer for one last GetMemoryMap call before
+     * ExitBootServices. */
+    *MemoryMapSize = MemoryMapCapacity;
     return true;
 }
 
@@ -334,12 +342,17 @@ bool OslpUpdateMemoryDescriptors(
     if (ListHeader != MemoryDescriptorListHead) {
         /* Merge backwards. */
         while (true) {
+            if (ListHeader->Prev == MemoryDescriptorListHead) {
+                break;
+            }
+
             OtherEntry = CONTAINING_RECORD(ListHeader->Prev, OslpMemoryDescriptor, ListHeader);
             if (OtherEntry->Type == Entry->Type &&
                 OtherEntry->BasePage + OtherEntry->PageCount == Entry->BasePage) {
                 Entry->BasePage = OtherEntry->BasePage;
                 Entry->PageCount += OtherEntry->PageCount;
-                RtUnlinkDList(ListHeader->Prev);
+                RtUnlinkDList(&OtherEntry->ListHeader);
+                RtAppendDList(MemoryDescriptorStack, &OtherEntry->ListHeader);
             } else {
                 break;
             }
@@ -347,11 +360,16 @@ bool OslpUpdateMemoryDescriptors(
 
         /* Merge forwards. */
         while (true) {
+            if (ListHeader->Next == MemoryDescriptorListHead) {
+                break;
+            }
+
             OtherEntry = CONTAINING_RECORD(ListHeader->Next, OslpMemoryDescriptor, ListHeader);
             if (Entry->Type == OtherEntry->Type &&
                 Entry->BasePage + Entry->PageCount == OtherEntry->BasePage) {
                 Entry->PageCount += OtherEntry->PageCount;
-                RtUnlinkDList(ListHeader->Next);
+                RtUnlinkDList(&OtherEntry->ListHeader);
+                RtAppendDList(MemoryDescriptorStack, &OtherEntry->ListHeader);
             } else {
                 break;
             }

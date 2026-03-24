@@ -288,7 +288,7 @@ EFI_STATUS OslMain(EFI_HANDLE *ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
         if (!OslpCreateMemoryDescriptors(
                 &LoadedPrograms,
                 FrontBufferPhys,
-                FramebufferHeight * FramebufferPitch * 4,
+                FramebufferHeight * FramebufferPitch,
                 &MemoryDescriptorListHead,
                 &MemoryDescriptorStack,
                 &MemoryMapSize,
@@ -348,7 +348,7 @@ EFI_STATUS OslMain(EFI_HANDLE *ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
             MemoryDescriptorListHead,
             &MemoryDescriptorStack,
             &LoadedPrograms,
-            FramebufferHeight * FramebufferPitch * 4,
+            FramebufferHeight * FramebufferPitch,
             BackBufferPhys,
             BackBufferVirt,
             FrontBufferPhys,

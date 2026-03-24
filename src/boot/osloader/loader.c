@@ -11,6 +11,22 @@
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
+ *     Checks if a specific region is within a certain bounds of another.
+ *
+ * PARAMETERS:
+ *     Offset - Start of the the region.
+ *     Size - Size of the region.
+ *     Limit - Max boundary to check against.
+ *
+ * RETURN VALUE:
+ *     true/false depending on if the region was within the boundary limit.
+ *-----------------------------------------------------------------------------------------------*/
+static bool OslpCheckRange(uint64_t Offset, uint64_t Size, uint64_t Limit) {
+    return Offset <= Limit && Size <= Limit - Offset;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
  *     This function loads up the given PE image into memory, and adds it to the loaded programs
  *     list.
  *
@@ -38,7 +54,23 @@ OslpLoadedProgram *OslLoadExecutable(const char *ImageName, const char *ImagePat
 
     /* The PE data is prefixed with a MZ header and a MS-DOS stub; The offset into the PE data is
        guaranteed to be after the main MZ header. */
+    if (BufferSize < 0x40) {
+        OslPrint("Failed to load a kernel/driver file.\r\n");
+        OslPrint("The file at %s is truncated.\r\n", ImagePath);
+        OslPrint("The boot process cannot continue.\r\n");
+        gBS->FreePool(Buffer);
+        return NULL;
+    }
+
     uint32_t Offset = *(uint32_t *)(Buffer + 0x3C);
+    if (!OslpCheckRange(Offset, sizeof(PeHeader), BufferSize)) {
+        OslPrint("Failed to load a kernel/driver file.\r\n");
+        OslPrint("The file at %s doesn't contain a valid PE header.\r\n", ImagePath);
+        OslPrint("The boot process cannot continue.\r\n");
+        gBS->FreePool(Buffer);
+        return NULL;
+    }
+
     PeHeader *Header = (PeHeader *)(Buffer + Offset);
 
     /* Following the information at https://learn.microsoft.com/en-us/windows/win32/debug/pe-format
@@ -49,15 +81,55 @@ OslpLoadedProgram *OslLoadExecutable(const char *ImageName, const char *ImagePat
         OslPrint("Failed to load a kernel/driver file.\r\n");
         OslPrint("The file at %s doesn't seem to be a valid for this architecture.\r\n", ImagePath);
         OslPrint("The boot process cannot continue.\r\n");
+        gBS->FreePool(Buffer);
+        return NULL;
+    }
+
+    if (Header->SizeOfOptionalHeader < sizeof(PeHeader) - 24 ||
+        !Header->SizeOfImage || Header->SizeOfHeaders > Header->SizeOfImage ||
+        !OslpCheckRange(0, Header->SizeOfHeaders, BufferSize) ||
+        !OslpCheckRange(
+            Offset,
+            24 + Header->SizeOfOptionalHeader +
+                (uint64_t)Header->NumberOfSections * sizeof(PeSectionHeader),
+            BufferSize) ||
+        Header->AddressOfEntryPoint >= Header->SizeOfImage) {
+        OslPrint("Failed to load a kernel/driver file.\r\n");
+        OslPrint("The file at %s has malformed PE header data.\r\n", ImagePath);
+        OslPrint("The boot process cannot continue.\r\n");
+        gBS->FreePool(Buffer);
         return NULL;
     }
 
     /* Calculate the size (and were to put) the symbol table; Loading up all sections to the proper
        places will probably trash it (and the strings table) as we currently stand. */
-    char *SourceSymbols = Buffer + Header->PointerToSymbolTable;
     uint32_t TargetSymbols = Header->SizeOfImage;
-    uint32_t Strings = *(uint32_t *)(SourceSymbols + Header->NumberOfSymbols * 18);
-    uint32_t SymbolTableSize = Strings + Header->NumberOfSymbols * 18;
+    char *SourceSymbols = NULL;
+    uint32_t SymbolTableSize = 0;
+    if (Header->PointerToSymbolTable && Header->NumberOfSymbols) {
+        uint64_t SymbolBytes = (uint64_t)Header->NumberOfSymbols * 18;
+        if (!OslpCheckRange(Header->PointerToSymbolTable, SymbolBytes + sizeof(uint32_t), BufferSize)) {
+            OslPrint("Failed to load a kernel/driver file.\r\n");
+            OslPrint("The file at %s has a malformed COFF symbol table.\r\n", ImagePath);
+            OslPrint("The boot process cannot continue.\r\n");
+            gBS->FreePool(Buffer);
+            return NULL;
+        }
+
+        SourceSymbols = Buffer + Header->PointerToSymbolTable;
+        uint32_t Strings = *(uint32_t *)(SourceSymbols + SymbolBytes);
+        if (Strings < sizeof(uint32_t) ||
+            !OslpCheckRange(Header->PointerToSymbolTable, SymbolBytes + Strings, BufferSize)) {
+            OslPrint("Failed to load a kernel/driver file.\r\n");
+            OslPrint("The file at %s has a malformed COFF string table.\r\n", ImagePath);
+            OslPrint("The boot process cannot continue.\r\n");
+            gBS->FreePool(Buffer);
+            return NULL;
+        }
+
+        SymbolTableSize = Strings + SymbolBytes;
+    }
+
     uint32_t ImagePages =
         (Header->SizeOfImage + SymbolTableSize + EFI_PAGE_SIZE - 1) >> EFI_PAGE_SHIFT;
 
@@ -108,12 +180,15 @@ OslpLoadedProgram *OslLoadExecutable(const char *ImageName, const char *ImagePat
        should have given us the code/data size + all headers, so we're assuming that and loading
        it all up to the base address. */
     memcpy(ThisProgram->PhysicalAddress, Buffer, Header->SizeOfHeaders);
-    memcpy((char *)ThisProgram->PhysicalAddress + TargetSymbols, SourceSymbols, SymbolTableSize);
+    if (SymbolTableSize) {
+        memcpy(
+            (char *)ThisProgram->PhysicalAddress + TargetSymbols, SourceSymbols, SymbolTableSize);
+    }
 
     uint64_t ExpectedBase = Header->ImageBase;
     Header = (PeHeader *)((char *)ThisProgram->PhysicalAddress + Offset);
     Header->ImageBase = (uint64_t)ThisProgram->VirtualAddress;
-    Header->PointerToSymbolTable = TargetSymbols;
+    Header->PointerToSymbolTable = SymbolTableSize ? TargetSymbols : 0;
 
     ThisProgram->BaseDiff = (uint64_t)ThisProgram->VirtualAddress - ExpectedBase;
     ThisProgram->EntryPoint =
@@ -123,18 +198,38 @@ OslpLoadedProgram *OslLoadExecutable(const char *ImageName, const char *ImagePat
                                                     Header->SizeOfOptionalHeader + 24);
 
     for (uint16_t i = 0; i < Header->NumberOfSections; i++) {
-        /* W^X, the kernel should have been compiled in a way that this is valid. */
-        int Flags = Sections[i].Characteristics & 0x20000000   ? PAGE_FLAGS_EXEC
-                    : Sections[i].Characteristics & 0x80000000 ? PAGE_FLAGS_WRITE
-                                                               : 0;
-
         uint32_t Size = Sections[i].VirtualSize;
         if (Sections[i].SizeOfRawData > Size) {
             Size = Sections[i].SizeOfRawData;
         }
 
-        for (uint32_t Page = 0; Page < (Size + EFI_PAGE_SIZE - 1) >> EFI_PAGE_SHIFT; Page++) {
-            ThisProgram->PageFlags[(Sections[i].VirtualAddress >> EFI_PAGE_SHIFT) + Page] = Flags;
+        if (!OslpCheckRange(Sections[i].VirtualAddress, Size, Header->SizeOfImage) ||
+            (Sections[i].SizeOfRawData &&
+             !OslpCheckRange(Sections[i].PointerToRawData, Sections[i].SizeOfRawData, BufferSize))) {
+            OslPrint("Failed to load a kernel/driver file.\r\n");
+            OslPrint("The file at %s has section data outside the image bounds.\r\n", ImagePath);
+            OslPrint("The boot process cannot continue.\r\n");
+            gBS->FreePool(Buffer);
+            return NULL;
+        }
+
+        /* W^X, the kernel should have been compiled in a way that this is valid. */
+        int Flags = Sections[i].Characteristics & 0x20000000   ? PAGE_FLAGS_EXEC
+                    : Sections[i].Characteristics & 0x80000000 ? PAGE_FLAGS_WRITE
+                                                               : 0;
+
+        uint64_t FirstPage = Sections[i].VirtualAddress >> EFI_PAGE_SHIFT;
+        uint64_t SectionPages = (Size + EFI_PAGE_SIZE - 1) >> EFI_PAGE_SHIFT;
+        if (FirstPage + SectionPages > ImagePages) {
+            OslPrint("Failed to load a kernel/driver file.\r\n");
+            OslPrint("The file at %s has section data outside the image bounds.\r\n", ImagePath);
+            OslPrint("The boot process cannot continue.\r\n");
+            gBS->FreePool(Buffer);
+            return NULL;
+        }
+
+        for (uint32_t Page = 0; Page < SectionPages; Page++) {
+            ThisProgram->PageFlags[FirstPage + Page] = Flags;
         }
 
         if (Sections[i].SizeOfRawData) {
@@ -155,6 +250,33 @@ OslpLoadedProgram *OslLoadExecutable(const char *ImageName, const char *ImagePat
 
     /* Grab up this image's export table, we need it for the next boot step (after we load all
      * images). */
+    if ((Header->DataDirectories.ExportTable.Size &&
+         !OslpCheckRange(
+             Header->DataDirectories.ExportTable.VirtualAddress,
+             Header->DataDirectories.ExportTable.Size,
+             Header->SizeOfImage)) ||
+        (Header->DataDirectories.ImportTable.Size &&
+         !OslpCheckRange(
+             Header->DataDirectories.ImportTable.VirtualAddress,
+             Header->DataDirectories.ImportTable.Size,
+             Header->SizeOfImage)) ||
+        (Header->DataDirectories.BaseRelocationTable.Size &&
+         !OslpCheckRange(
+             Header->DataDirectories.BaseRelocationTable.VirtualAddress,
+             Header->DataDirectories.BaseRelocationTable.Size,
+             Header->SizeOfImage)) ||
+        (Header->DataDirectories.LoadConfigTable.Size &&
+         !OslpCheckRange(
+             Header->DataDirectories.LoadConfigTable.VirtualAddress,
+             Header->DataDirectories.LoadConfigTable.Size,
+             Header->SizeOfImage))) {
+        OslPrint("Failed to load a kernel/driver file.\r\n");
+        OslPrint("The file at %s has invalid data directory bounds.\r\n", ImagePath);
+        OslPrint("The boot process cannot continue.\r\n");
+        gBS->FreePool(Buffer);
+        return NULL;
+    }
+
     if (Header->DataDirectories.ExportTable.Size) {
         PeExportHeader *ExportHeader =
             (PeExportHeader *)((char *)ThisProgram->PhysicalAddress +
@@ -200,6 +322,15 @@ OslpLoadedProgram *OslLoadExecutable(const char *ImageName, const char *ImagePat
         PeLoadConfigHeader *LoadConfigHeader =
             (PeLoadConfigHeader *)((char *)ThisProgram->PhysicalAddress +
                                    Header->DataDirectories.LoadConfigTable.VirtualAddress);
+        if (LoadConfigHeader->SecurityCookie < ExpectedBase ||
+            LoadConfigHeader->SecurityCookie - ExpectedBase >= Header->SizeOfImage) {
+            OslPrint("Failed to load a kernel/driver file.\r\n");
+            OslPrint("The file at %s has an invalid load-config cookie pointer.\r\n", ImagePath);
+            OslPrint("The boot process cannot continue.\r\n");
+            gBS->FreePool(Buffer);
+            return NULL;
+        }
+
         uintptr_t *CookiePtr = (uintptr_t *)((char *)ThisProgram->PhysicalAddress +
                                              LoadConfigHeader->SecurityCookie - ExpectedBase);
         uintptr_t DefaultSecurityCookie = *CookiePtr;

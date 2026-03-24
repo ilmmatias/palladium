@@ -47,8 +47,12 @@ EFI_STATUS OslpInitializeVirtualAllocator(void) {
  *-----------------------------------------------------------------------------------------------*/
 void *OslAllocateVirtualAddress(uint64_t Pages) {
     Pages = (Pages + VIRTUAL_RANDOM_PAGES - 1) / VIRTUAL_RANDOM_PAGES;
+    if (!Pages || Pages > SpaceSize) {
+        return NULL;
+    }
+
     uint64_t StartingIndex =
-        RtFindClearBitsAndSet(&BitmapHeader, __rand64() % (SpaceSize - Pages), Pages);
+        RtFindClearBitsAndSet(&BitmapHeader, __rand64() % (SpaceSize - Pages + 1), Pages);
     if (StartingIndex != (uint64_t)-1) {
         return (void *)(VIRTUAL_BASE + (StartingIndex << VIRTUAL_RANDOM_SHIFT));
     } else {

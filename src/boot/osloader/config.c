@@ -110,10 +110,11 @@ static inline size_t ReadValue(char *Line, char **Value) {
  *-----------------------------------------------------------------------------------------------*/
 static bool ExpandBootDriverCapacity(OslConfig *Config) {
     char **BootDrivers = Config->BootDrivers;
-    Config->BootDriverCapacity *= 2;
+    size_t NewCapacity = Config->BootDriverCapacity * 2;
     EFI_STATUS Status = gBS->AllocatePool(
-        EfiLoaderData, Config->BootDriverCapacity * sizeof(char *), (VOID **)&Config->BootDrivers);
+        EfiLoaderData, NewCapacity * sizeof(char *), (VOID **)&Config->BootDrivers);
     if (Status != EFI_SUCCESS) {
+        Config->BootDrivers = BootDrivers;
         OslPrint("Failed to load the configuration file.\r\n");
         OslPrint("The system ran out of memory.\r\n");
         OslPrint("The boot process cannot continue.\r\n");
@@ -121,6 +122,8 @@ static bool ExpandBootDriverCapacity(OslConfig *Config) {
     }
 
     memcpy(Config->BootDrivers, BootDrivers, Config->BootDriverCount * sizeof(char *));
+    gBS->FreePool(BootDrivers);
+    Config->BootDriverCapacity = NewCapacity;
     return true;
 }
 
@@ -199,6 +202,10 @@ bool OslLoadConfigFile(const char *Path, OslConfig *Config) {
 
     /* At most this will do nothing (if we already read in a NULL terminator), but let's make sure
      * our loops won't enter invalid heap memory. */
+    if (!FileSize) {
+        return true;
+    }
+
     FileContents[FileSize - 1] = 0;
 
     /* Now, we just need a small loop to read each of the parts; Errors on the syntax of the file

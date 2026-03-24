@@ -51,6 +51,7 @@ bool OslpInitializeAcpi(
         OslPrint("Failed to obtain the ACPI root table pointer.\r\n");
         OslPrint("There might be something wrong with your UEFI firmware.\r\n");
         OslPrint("The boot process cannot continue.\r\n");
+        return false;
     }
 
     *AcpiRootTableSize = ((SdtHeader *)*AcpiRootTable)->Length;

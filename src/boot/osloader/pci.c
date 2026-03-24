@@ -32,6 +32,7 @@ UINTN OslFindPciDevicesByClass(
     Status = gBS->AllocatePool(
         EfiLoaderData, sizeof(EFI_PCI_IO_PROTOCOL *) * HandleCount, (VOID **)Devices);
     if (Status != EFI_SUCCESS) {
+        gBS->FreePool(Handles);
         return 0;
     }
 
@@ -52,5 +53,6 @@ UINTN OslFindPciDevicesByClass(
         }
     }
 
+    gBS->FreePool(Handles);
     return DeviceCount;
 }
