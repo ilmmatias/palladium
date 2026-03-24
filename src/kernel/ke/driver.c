@@ -163,21 +163,36 @@ void KiDumpSymbol(void *Address) {
 
     /* Should we keep this here I wonder; We should have enough stack space for it, but still, maybe
      * consider doing something else? */
-    char NameBuffer[256];
-    if (!memcmp(Closest->Name, "\0\0\0\0", 4)) {
-        strncpy(NameBuffer, Strings + *((uint32_t *)Closest + 1), sizeof(NameBuffer));
-    } else {
-        strncpy(NameBuffer, Closest->Name, 8);
-        NameBuffer[8] = 0;
-    }
+    if (Closest) {
+        char NameBuffer[256];
+        if (!memcmp(Closest->Name, "\0\0\0\0", 4)) {
+            strncpy(NameBuffer, Strings + *((uint32_t *)Closest + 1), sizeof(NameBuffer));
+            NameBuffer[sizeof(NameBuffer) - 1] = 0;
+        } else {
+            strncpy(NameBuffer, Closest->Name, 8);
+            NameBuffer[8] = 0;
+        }
 
-    VidPrint(
-        "0x%016llx - %s!%s+%#llx\n", Offset, Image->ImageName, NameBuffer, Offset - ClosestAddress);
-    KdPrint(
-        KD_TYPE_NONE,
-        KDP_ANSI_FG_RED "0x%016llx - %s!%s+%#llx" KDP_ANSI_RESET "\n",
-        Offset,
-        Image->ImageName,
-        NameBuffer,
-        Offset - ClosestAddress);
+        VidPrint(
+            "0x%016llx - %s!%s+%#llx\n",
+            Offset,
+            Image->ImageName,
+            NameBuffer,
+            Offset - ClosestAddress);
+        KdPrint(
+            KD_TYPE_NONE,
+            KDP_ANSI_FG_RED "0x%016llx - %s!%s+%#llx" KDP_ANSI_RESET "\n",
+            Offset,
+            Image->ImageName,
+            NameBuffer,
+            Offset - ClosestAddress);
+    } else {
+        VidPrint("0x%016llx - %s+%#llx\n", Offset, Image->ImageName, Offset - ClosestAddress);
+        KdPrint(
+            KD_TYPE_NONE,
+            KDP_ANSI_FG_RED "0x%016llx - %s+%#llx" KDP_ANSI_RESET "\n",
+            Offset,
+            Image->ImageName,
+            Offset - ClosestAddress);
+    }
 }
