@@ -24,9 +24,10 @@ AcpiObject *AcpiSearchObject(AcpiObject *Parent, const char *Name) {
         Parent = AcpipObjectTree;
     }
 
-    if (Parent->Value.Type != ACPI_DEVICE && Parent->Value.Type != ACPI_REGION &&
-        Parent->Value.Type != ACPI_POWER && Parent->Value.Type != ACPI_PROCESSOR &&
-        Parent->Value.Type != ACPI_THERMAL && Parent->Value.Type != ACPI_SCOPE) {
+    if (Parent->Value.Type != ACPI_DEVICE && Parent->Value.Type != ACPI_METHOD &&
+        Parent->Value.Type != ACPI_REGION && Parent->Value.Type != ACPI_POWER &&
+        Parent->Value.Type != ACPI_PROCESSOR && Parent->Value.Type != ACPI_THERMAL &&
+        Parent->Value.Type != ACPI_SCOPE) {
         return NULL;
     }
 

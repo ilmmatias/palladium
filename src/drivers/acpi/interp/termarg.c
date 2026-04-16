@@ -58,7 +58,7 @@ bool AcpipCastToInteger(AcpiValue *Value, uint64_t *Result, bool Cleanup) {
            validate the size of the buffer. */
         case ACPI_BUFFER:
             for (uint64_t i = 0; i < (Value->Buffer->Size > 8 ? 8 : Value->Buffer->Size); i++) {
-                *Result |= Value->Buffer->Data[i] << (i * 8);
+                *Result |= (uint64_t)Value->Buffer->Data[i] << (i * 8);
             }
 
             break;
@@ -258,8 +258,8 @@ bool AcpipCastToBuffer(AcpiValue *Value) {
     switch (Value->Type) {
         /* Integers get their underlying in-memory representation copied as an 8-byte buffer. */
         case ACPI_INTEGER: {
-            BufferSize = 16;
-            Buffer = AcpipAllocateBlock(sizeof(AcpiBuffer) + 16);
+            BufferSize = 8;
+            Buffer = AcpipAllocateBlock(sizeof(AcpiBuffer) + BufferSize);
             if (!Buffer) {
                 AcpiRemoveReference(Value, false);
                 return false;
@@ -301,8 +301,8 @@ bool AcpipCastToBuffer(AcpiValue *Value) {
                 return true;
             }
 
-            BufferSize = 16;
-            Buffer = AcpipAllocateBlock(sizeof(AcpiBuffer) + 16);
+            BufferSize = 8;
+            Buffer = AcpipAllocateBlock(sizeof(AcpiBuffer) + BufferSize);
             if (!Buffer) {
                 AcpiRemoveReference(Value, false);
                 return false;

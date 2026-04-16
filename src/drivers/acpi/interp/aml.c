@@ -42,7 +42,9 @@ bool AcpiExecuteMethod(AcpiObject *Object, int ArgCount, AcpiValue *Arguments, A
         ArgCount = 0;
     } else if (ArgCount > 7) {
         ArgCount = 7;
-    } else if (Object->Value.Method.Override) {
+    }
+
+    if (Object->Value.Method.Override) {
         return Object->Value.Method.Override(ArgCount, Arguments, Result);
     }
 
@@ -79,6 +81,9 @@ bool AcpiExecuteMethod(AcpiObject *Object, int ArgCount, AcpiValue *Arguments, A
                     break;
                 case ACPI_MUTEX:
                     Arg->Mutex->References++;
+                    break;
+                case ACPI_EVENT:
+                    Arg->Event->References++;
                     break;
             }
         }
@@ -188,6 +193,10 @@ bool AcpiCopyValue(AcpiValue *Source, AcpiValue *Target) {
         case ACPI_MUTEX:
             AcpipShowTraceMessage("attempt at CopyValue(Mutex)\n");
             return false;
+
+        case ACPI_EVENT:
+            Target->Event->References++;
+            break;
 
         case ACPI_FIELD_UNIT:
             AcpiCreateReference(&Source->FieldUnit.Region->Value, NULL);
@@ -320,6 +329,9 @@ void AcpiCreateReference(AcpiValue *Source, AcpiValue *Target) {
         case ACPI_MUTEX:
             Target->Mutex->References++;
             break;
+        case ACPI_EVENT:
+            Target->Event->References++;
+            break;
         case ACPI_BUFFER_FIELD:
         case ACPI_INDEX:
             AcpiCreateReference(Target->BufferField.Source, NULL);
@@ -396,6 +408,14 @@ void AcpiRemoveReference(AcpiValue *Value, bool CleanupPointer) {
         case ACPI_MUTEX: {
             if (NeedsCleanup && --Value->Mutex->References <= 0) {
                 AcpipFreeBlock(Value->Mutex);
+            }
+
+            break;
+        }
+
+        case ACPI_EVENT: {
+            if (NeedsCleanup && --Value->Event->References <= 0) {
+                AcpipFreeBlock(Value->Event);
             }
 
             break;
@@ -632,7 +652,7 @@ bool AcpipReadByte(AcpipState *State, uint8_t *Byte) {
  *-----------------------------------------------------------------------------------------------*/
 bool AcpipReadWord(AcpipState *State, uint16_t *Word) {
     if (State->Scope->RemainingLength > 1) {
-        *Word = *(uint16_t *)State->Scope->Code;
+        memcpy(Word, State->Scope->Code, 2);
         State->Scope->Code += 2;
         State->Scope->RemainingLength -= 2;
         return true;
@@ -655,7 +675,7 @@ bool AcpipReadWord(AcpipState *State, uint16_t *Word) {
  *-----------------------------------------------------------------------------------------------*/
 bool AcpipReadDWord(AcpipState *State, uint32_t *DWord) {
     if (State->Scope->RemainingLength > 3) {
-        *DWord = *(uint32_t *)State->Scope->Code;
+        memcpy(DWord, State->Scope->Code, 4);
         State->Scope->Code += 4;
         State->Scope->RemainingLength -= 4;
         return true;
@@ -678,7 +698,7 @@ bool AcpipReadDWord(AcpipState *State, uint32_t *DWord) {
  *-----------------------------------------------------------------------------------------------*/
 bool AcpipReadQWord(AcpipState *State, uint64_t *QWord) {
     if (State->Scope->RemainingLength > 7) {
-        *QWord = *(uint64_t *)State->Scope->Code;
+        memcpy(QWord, State->Scope->Code, 8);
         State->Scope->Code += 8;
         State->Scope->RemainingLength -= 8;
         return true;

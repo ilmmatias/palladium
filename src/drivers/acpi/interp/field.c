@@ -450,33 +450,12 @@ SafeBufferRead(const uint8_t *Buffer, uint64_t Offset, int BufferWidth, int Acce
 
     /* This should be guaranteed to be a multiple of 8 (and limited between 0-64). */
     uint64_t Value = 0;
-    switch (RemainingBits > AccessWidth ? AccessWidth : RemainingBits) {
-        /* Somewhat fixed values (they have no complex logic). */
-        case 8:
-            return *Buffer;
-        case 64:
-            return *(uint64_t *)Buffer;
-
-        /* 16-24, read up any bits after the 16th, and join them together. */
-        case 24:
-            Value |= (uint32_t)(*(Buffer + 2)) << 16;
-        case 16:
-            return *(uint16_t *)Buffer | Value;
-
-        /* 32-56, read up any bits after the 32nd, and join them together. */
-        case 56:
-            Value |= (uint64_t)(*(Buffer + 6)) << 48;
-        case 48:
-            Value |= (uint64_t)(*(Buffer + 5)) << 40;
-        case 40:
-            Value |= (uint64_t)(*(Buffer + 4)) << 32;
-        case 32:
-            return *(uint32_t *)Buffer | Value;
-
-        /* Assume anything else (including 0), is just zero. */
-        default:
-            return 0;
+    int ByteCount = (RemainingBits > AccessWidth ? AccessWidth : RemainingBits) / 8;
+    if (ByteCount > 0) {
+        memcpy(&Value, Buffer, ByteCount);
     }
+
+    return Value;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -709,9 +688,8 @@ bool AcpipWriteField(AcpiValue *Target, AcpiValue *Data) {
         Item = Value >> UnalignedOffset;
     }
 
-    /* Fixup the offsets, as they point to the item after the aligned end. */
+    /* Fixup the buffer offset, as it points to the item after the aligned end. */
     BufferOffset -= AccessWidth / 8;
-    FieldOffset -= Target->FieldUnit.Offset / 8;
 
     /* This should take care of the remaining buffer size being bigger than the AccessWidth. */
     int RunOffLength = BufferWidth - BufferOffset * 8;

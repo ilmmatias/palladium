@@ -45,6 +45,7 @@ static int ReadFieldList(AcpipState *State, AcpiValue *Base, uint32_t Start, uin
                     return 0;
                 }
 
+                Offset += Length;
                 break;
             }
 

@@ -38,23 +38,19 @@ bool AcpipReadTarget(AcpipState *State, AcpiValue *Target, AcpiValue *Value) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
- *     This functions stores an integer value into a buffer field.
+ *     This function stores an integer value into a buffer.
  *
  * PARAMETERS:
- *     Buffer - Where to store the value (address+size).
- *     Index - Which index to store the value into.
+ *     Buffer - Where to store the value (both address and size data).
+ *     Index - Which index inside the buffer to store the value.
  *     Value - Value to store.
  *
  * RETURN VALUE:
  *     true if the store was successful, false otherwise.
  *-----------------------------------------------------------------------------------------------*/
-static bool StoreBufferField(AcpiValue *Buffer, uint64_t Index, AcpiValue *Value) {
+static bool StoreBuffer(AcpiValue *Buffer, uint64_t Index, AcpiValue *Value) {
     AcpiValue *Source = Buffer->BufferField.Source;
     uint64_t Size = Buffer->BufferField.Size;
-    if (Index >= Size) {
-        return false;
-    }
-
     uint64_t Slot;
     if (!AcpipCastToInteger(Value, &Slot, true)) {
         return false;
@@ -80,20 +76,7 @@ static bool StoreBufferField(AcpiValue *Buffer, uint64_t Index, AcpiValue *Value
             return false;
         }
 
-        switch (Size) {
-            case 2:
-                *((uint16_t *)(Source->Buffer->Data + Index)) = Slot;
-                break;
-            case 4:
-                *((uint32_t *)(Source->Buffer->Data + Index)) = Slot;
-                break;
-            case 8:
-                *((uint64_t *)(Source->Buffer->Data + Index)) = Slot;
-                break;
-            default:
-                *(Source->Buffer->Data + Index) = Slot;
-                break;
-        }
+        memcpy(Source->Buffer->Data + Index, &Slot, Size);
     }
 
     return true;
@@ -119,7 +102,7 @@ bool AcpipStoreTarget(AcpipState *State, AcpiValue *Target, AcpiValue *Value) {
 
             switch (Buffer->Type) {
                 case ACPI_BUFFER: {
-                    if (!StoreBufferField(Buffer, Index, Value)) {
+                    if (!StoreBuffer(Buffer, Index, Value)) {
                         return false;
                     }
 
@@ -142,22 +125,29 @@ bool AcpipStoreTarget(AcpipState *State, AcpiValue *Target, AcpiValue *Value) {
 
             break;
         }
-        case ACPI_LOCAL:
+
+        case ACPI_LOCAL: {
             AcpiRemoveReference(&State->Locals[Target->Integer], false);
             AcpiCopyValue(Value, &State->Locals[Target->Integer]);
             break;
-        case ACPI_ARG:
+        }
+
+        case ACPI_ARG: {
             AcpiRemoveReference(&State->Arguments[Target->Integer], false);
             AcpiCopyValue(Value, &State->Arguments[Target->Integer]);
             break;
-        case ACPI_DEBUG:
+        }
+
+        case ACPI_DEBUG: {
             if (AcpipCastToString(Value, true, false)) {
                 AcpipShowDebugMessage("AML message: %s\n", Value->String->Data);
                 AcpiRemoveReference(Value, false);
             }
 
             break;
-        case ACPI_REFERENCE:
+        }
+
+        case ACPI_REFERENCE: {
             switch (Target->Reference->Value.Type) {
                 /* Integers, strings, and buffers are allowed to be implicitly cast into. */
                 case ACPI_INTEGER: {
@@ -226,30 +216,33 @@ bool AcpipStoreTarget(AcpipState *State, AcpiValue *Target, AcpiValue *Value) {
                 }
 
                 case ACPI_BUFFER_FIELD: {
-                    AcpiValue *Buffer = Target->Reference->Value.BufferField.Source;
+                    AcpiValue *Buffer = &Target->Reference->Value;
                     uint64_t Index = Target->Reference->Value.BufferField.Index;
-
-                    if (!StoreBufferField(Buffer, Index, Value)) {
+                    if (!StoreBuffer(Buffer, Index, Value)) {
                         return false;
                     }
 
                     break;
                 }
 
-                default:
+                default: {
                     AcpipShowErrorMessage(
                         ACPI_REASON_CORRUPTED_TABLES,
                         "writing to a named field of type %d\n",
                         Target->Reference->Value.Type);
+                }
             }
 
             break;
-        default:
+        }
+
+        default: {
             if (Target->Type != ACPI_INTEGER) {
                 AcpipShowDebugMessage("attempt to store into target of type %d\n", Target->Type);
             }
 
             break;
+        }
     }
 
     return true;
