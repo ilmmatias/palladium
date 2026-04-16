@@ -6,6 +6,7 @@
 #include <kernel/psp.h>
 
 extern KeAffinity KiIdleProcessors;
+extern uint64_t PspGlobalThreadCount;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -123,6 +124,8 @@ bool EvWaitForObject(void *Object, uint64_t Timeout) {
     if (ListHeader == &Processor->ThreadQueue) {
         KeSetAffinityBit(&KiIdleProcessors, Processor->Number);
     } else {
+        __atomic_sub_fetch(&Processor->ThreadCount, 1, __ATOMIC_RELEASE);
+        __atomic_sub_fetch(&PspGlobalThreadCount, 1, __ATOMIC_RELEASE);
         TargetThread = CONTAINING_RECORD(ListHeader, PsThread, ListHeader);
     }
 

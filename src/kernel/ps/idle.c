@@ -8,6 +8,7 @@
 #include <kernel/psp.h>
 
 extern KeAffinity KiIdleProcessors;
+extern uint64_t PspGlobalThreadCount;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -59,6 +60,7 @@ static PsThread *TrySteal(KeProcessor *Processor) {
          * and return early if we already have something. */
         RtDList *TargetThread = RtTruncateDList(&TargetProcessor->ThreadQueue);
         __atomic_sub_fetch(&TargetProcessor->ThreadCount, 1, __ATOMIC_RELEASE);
+        __atomic_sub_fetch(&PspGlobalThreadCount, 1, __ATOMIC_RELEASE);
         KeReleaseSpinLockAndLowerIrql(&TargetProcessor->Lock, OldIrql);
         if (TargetThread != &TargetProcessor->ThreadQueue) {
             return CONTAINING_RECORD(TargetThread, PsThread, ListHeader);
@@ -118,6 +120,7 @@ static PsThread *TrySteal(KeProcessor *Processor) {
                 continue;
             } else {
                 __atomic_sub_fetch(&Processor->ThreadCount, 1, __ATOMIC_RELEASE);
+                __atomic_sub_fetch(&PspGlobalThreadCount, 1, __ATOMIC_RELEASE);
                 TargetThread = CONTAINING_RECORD(ListHeader, PsThread, ListHeader);
             }
         }
