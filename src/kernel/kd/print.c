@@ -1,6 +1,7 @@
 /* SPDX-FileCopyrightText: (C) 2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
+#include <kernel/halp.h>
 #include <kernel/kd.h>
 #include <kernel/kdp.h>
 #include <kernel/ke.h>
@@ -9,6 +10,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 extern const VidpFontData VidpFont;
 
@@ -81,8 +83,8 @@ void KdpReleaseOwnership(void) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void KdPrintVariadic(int Type, const char *Message, va_list Arguments) {
-    /* Don't bother if neither echoing is enabled nor the debugger is connected. */
-    if (!KdpDebugEchoEnabled && !KdpDebugConnected) {
+    /* Don't bother if none of the display, diagnostic, or debugger sinks are available. */
+    if (!KdpDebugEchoEnabled && !KdpDebugConnected && !HalpDiagnosticDeviceEnabled()) {
         return;
     }
 
@@ -148,12 +150,21 @@ void KdPrintVariadic(int Type, const char *Message, va_list Arguments) {
 
     int Offset = sizeof(KdpDebugPacket);
     if (ColorPrefix && Prefix) {
-        Offset += snprintf(
+        int PrefixSize = snprintf(
             Buffer + Offset, sizeof(Buffer) - Offset, "%s%s" KDP_ANSI_RESET, ColorPrefix, Prefix);
+        if (PrefixSize > 0) {
+            size_t Available = sizeof(Buffer) - Offset;
+            Offset += (size_t)PrefixSize < Available ? PrefixSize : Available - 1;
+        }
     }
 
     /* And the main message on gray-white foreground + black background. */
-    int Size = vsnprintf(Buffer + Offset, sizeof(Buffer) - Offset, Message, Arguments);
+    int FormattedSize = vsnprintf(Buffer + Offset, sizeof(Buffer) - Offset, Message, Arguments);
+    int Size = 0;
+    if (FormattedSize > 0) {
+        size_t Available = sizeof(Buffer) - Offset;
+        Size = (size_t)FormattedSize < Available ? FormattedSize : Available - 1;
+    }
 
     if (KdpDebugEchoEnabled) {
         /* The start of the buffer contains the header + color prefix for the debugger, but our
@@ -171,6 +182,14 @@ void KdPrintVariadic(int Type, const char *Message, va_list Arguments) {
 
         VidpFlush();
         VidpReleaseSpinLock(KE_IRQL_DISPATCH);
+    }
+
+    if (HalpDiagnosticDeviceEnabled()) {
+        if (Prefix) {
+            HalpWriteDiagnosticDevice(Prefix, strlen(Prefix));
+        }
+
+        HalpWriteDiagnosticDevice(Buffer + Offset, Size);
     }
 
     /* We still do need to handle sending the message to the debugger; We already appended the

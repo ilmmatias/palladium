@@ -325,6 +325,7 @@ EFI_STATUS OslMain(EFI_HANDLE *ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
 
         memcpy(BootBlock->Basic.Magic, OSLP_BOOT_MAGIC, 4);
         BootBlock->Basic.LoaderVersion = OSLP_BOOT_VERSION;
+        BootBlock->Basic.BlockSize = sizeof(OslpBootBlock);
         BootBlock->Basic.MemoryDescriptorListHead = MemoryDescriptorListHead;
         BootBlock->Basic.BootDriverListHead = ModuleListHead;
         BootBlock->Basic.RandomSeed = __rand64();
@@ -346,6 +347,9 @@ EFI_STATUS OslMain(EFI_HANDLE *ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
         BootBlock->Debug.DeviceNumber = DeviceNumber;
         BootBlock->Debug.FunctionNumber = FunctionNumber;
         BootBlock->Debug.Initializer = KdnetDllInitializer;
+        BootBlock->Diagnostic.Type = Config.DiagnosticType;
+        BootBlock->Diagnostic.BaudRate = Config.DiagnosticBaudRate;
+        BootBlock->Diagnostic.Address = Config.DiagnosticAddress;
         OslpInitializeArchBootData(BootBlock);
 
         /* All that's left before trying to transfer execution should be building the page map, so

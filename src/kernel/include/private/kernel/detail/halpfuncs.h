@@ -25,6 +25,9 @@ extern uint32_t HalpOnlineProcessorCount;
 extern KeProcessor **HalpProcessorList;
 
 void HalpInitializeBootStack(KiLoaderBlock *LoaderBlock);
+void HalpInitializeDiagnosticDevice(KiLoaderBlock *LoaderBlock);
+bool HalpDiagnosticDeviceEnabled(void);
+void HalpWriteDiagnosticDevice(const char *Buffer, size_t Size);
 void HalpInitializePlatform(KiLoaderBlock *LoaderBlock);
 void HalpInitializeBootProcessor(void);
 void HalpInitializeApplicationProcessor(KeProcessor *Processor);

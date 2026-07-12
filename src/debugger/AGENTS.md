@@ -7,20 +7,20 @@ from the repository root as:
 python3 -m src.debugger <ipv4-or-localhost> <port>
 ```
 
-- `protocol.py` constants and little-endian `struct` formats mirror
+- `codec.py` constants and little-endian `struct` formats mirror
   `src/kernel/include/private/kernel/detail/kdpdefs.h`, `kdptypes.h`, and `kernel/kd/protocol.c`.
   Update both sides atomically for a wire change; do not add client-only packet types that imply
   target support.
 - Validate datagram length and field relationships before unpacking or indexing. Keep the current
   outstanding-request state coherent on timeout, malformed reply, unexpected ACK, and user exit.
-- `connection.py` owns handshake, `receiver.py` dispatches packets, `command.py` parses/sends
-  commands, `utils.py` renders memory/disassembly, and `interface.py` owns curses. Do not fold wire
-  behavior into TUI presentation.
+- `transport.py` owns peer-validated UDP I/O, `session.py` owns handshake and request state,
+  `commands.py` parses typed commands, and `events.py` is the frontend boundary. `interface.py` owns
+  curses while `headless.py` renders text/JSONL. Do not fold wire behavior into presentation.
 - Always restore the curses terminal and close the socket on error/interrupt paths. Export-log paths
   are user-selected host writes; do not hard-code machine paths or write during passive inspection.
-- The source imports `curses` and `capstone`; the README currently mentions only curses, so do not
-  claim dependency installation is fully documented. Disassembly currently maps only `amd64`.
+- The TUI imports `curses`, and disassembly lazily imports `capstone`; headless paths that do not
+  disassemble must remain usable without either module. Disassembly currently maps only `amd64`.
 
-No automated client tests are present. At minimum check changed modules for Python syntax without
-creating committed `__pycache__`; for behavior changes, connect to a debugger-enabled QEMU boot and
-exercise the changed command, timeout/error handling, resize/exit behavior, and malformed datagrams.
+Host tests under `tests` use a synchronized localhost fake target. They cover the Python client but
+not the kernel's raw Ethernet/KD extension path. Also connect to a debugger-enabled QEMU boot when
+kernel wire behavior changes, and never commit generated `__pycache__` data.

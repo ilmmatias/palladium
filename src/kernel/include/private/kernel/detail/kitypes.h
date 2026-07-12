@@ -7,6 +7,7 @@
 #define _KERNEL_DETAIL_KITYPES_H_
 
 #include <kernel/detail/ketypes.h>
+#include <stddef.h>
 
 /* clang-format off */
 #if __has_include(ARCH_MAKE_INCLUDE_PATH(kernel/detail, kitypes.h))
@@ -17,6 +18,7 @@
 typedef struct __attribute__((packed)) {
     char Magic[4];
     uint64_t LoaderVersion;
+    uint32_t BlockSize;
     RtDList *MemoryDescriptorListHead;
     RtDList *BootDriverListHead;
     uint64_t RandomSeed;
@@ -50,11 +52,28 @@ typedef struct __attribute__((packed)) {
 } KiLoaderDebugData;
 
 typedef struct __attribute__((packed)) {
+    uint32_t Type;
+    uint32_t BaudRate;
+    uint64_t Address;
+} KiLoaderDiagnosticData;
+
+typedef struct __attribute__((packed)) {
     KiLoaderBasicData Basic;
     KiLoaderAcpiData Acpi;
     KiLoaderGraphicsData Graphics;
     KiLoaderDebugData Debug;
+    KiLoaderDiagnosticData Diagnostic;
     KiLoaderArchData Arch;
 } KiLoaderBlock;
+
+static_assert(sizeof(KiLoaderBasicData) == 40);
+static_assert(sizeof(KiLoaderDiagnosticData) == 16);
+static_assert(offsetof(KiLoaderBlock, Basic) == 0);
+static_assert(offsetof(KiLoaderBlock, Acpi) == 40);
+static_assert(offsetof(KiLoaderBlock, Graphics) == 64);
+static_assert(offsetof(KiLoaderBlock, Debug) == 92);
+static_assert(offsetof(KiLoaderBlock, Diagnostic) == 124);
+static_assert(offsetof(KiLoaderBlock, Arch) == 140);
+static_assert(sizeof(KiLoaderBlock) == 148);
 
 #endif /* _KERNEL_DETAIL_KITYPES_H_ */

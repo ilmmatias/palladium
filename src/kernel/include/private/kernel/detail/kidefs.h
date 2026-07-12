@@ -14,4 +14,10 @@
 #endif /* __has__include */
 /* clang-format on */
 
+#define KI_LOADER_MAGIC "OLDR"
+#define KI_LOADER_VERSION 0x0000'0000'00000007
+
+#define KI_LOADER_DIAGNOSTIC_NONE 0
+#define KI_LOADER_DIAGNOSTIC_PC16550_PIO 1
+
 #endif /* _KERNEL_DETAIL_KIDEFS_H_ */

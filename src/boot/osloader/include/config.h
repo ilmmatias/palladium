@@ -13,6 +13,9 @@ typedef struct {
     bool DebugEchoEnabled;
     uint8_t DebugAddress[4];
     uint16_t DebugPort;
+    uint32_t DiagnosticType;
+    uint32_t DiagnosticBaudRate;
+    uint64_t DiagnosticAddress;
     size_t BootDriverCapacity;
     size_t BootDriverCount;
     char **BootDrivers;

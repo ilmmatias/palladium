@@ -18,6 +18,7 @@ if(ARCH STREQUAL "amd64")
         hal/${ARCH}/map.c
         hal/${ARCH}/pci.c
         hal/${ARCH}/platform.c
+        hal/${ARCH}/serial.c
         hal/${ARCH}/smp.c
         hal/${ARCH}/smp.S
         hal/${ARCH}/timer.c

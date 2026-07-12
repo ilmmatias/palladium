@@ -7,6 +7,7 @@
 #include <efi/spec.h>
 #include <efi/types.h>
 #include <file.h>
+#include <platform.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -179,6 +180,9 @@ bool OslLoadConfigFile(const char *Path, OslConfig *Config) {
     Config->DebugAddress[2] = 2;
     Config->DebugAddress[3] = 15;
     Config->DebugPort = 50005;
+    Config->DiagnosticType = OSLP_DIAGNOSTIC_NONE;
+    Config->DiagnosticBaudRate = 115200;
+    Config->DiagnosticAddress = 0x3F8;
     Config->BootDriverCount = 0;
     Config->BootDrivers = NULL;
 
@@ -297,6 +301,37 @@ bool OslLoadConfigFile(const char *Path, OslConfig *Config) {
         } else if (!strcmp(Name, "DEBUGPORT")) {
             if (sscanf(Value, "%hu", &Config->DebugPort) != 1) {
                 OslPrint("Invalid debug port at line %zu in the file %s.\r\n", LineNumber, Path);
+            }
+        } else if (!strcmp(Name, "DIAGNOSTICDEVICE")) {
+            if (!strcmp(Value, "PC16550")) {
+                Config->DiagnosticType = OSLP_DIAGNOSTIC_PC16550_PIO;
+            } else if (!strcmp(Value, "NONE")) {
+                Config->DiagnosticType = OSLP_DIAGNOSTIC_NONE;
+            } else {
+                Config->DiagnosticType = OSLP_DIAGNOSTIC_NONE;
+                OslPrint(
+                    "Invalid diagnostic device at line %zu in the file %s.\r\n", LineNumber, Path);
+            }
+        } else if (!strcmp(Name, "DIAGNOSTICADDRESS")) {
+            char *End = NULL;
+            unsigned long long Address = strtoull(Value, &End, 0);
+            if (!*Value || *End || Address > UINT16_MAX - 7) {
+                OslPrint(
+                    "Invalid diagnostic address at line %zu in the file %s.\r\n", LineNumber, Path);
+            } else {
+                Config->DiagnosticAddress = Address;
+            }
+        } else if (!strcmp(Name, "DIAGNOSTICBAUDRATE")) {
+            char *End = NULL;
+            unsigned long BaudRate = strtoul(Value, &End, 0);
+            if (!*Value || *End || !BaudRate || BaudRate > UINT32_MAX || 115200 % BaudRate ||
+                115200 / BaudRate > UINT16_MAX) {
+                OslPrint(
+                    "Invalid diagnostic baud rate at line %zu in the file %s.\r\n",
+                    LineNumber,
+                    Path);
+            } else {
+                Config->DiagnosticBaudRate = BaudRate;
             }
         } else if (!strcmp(Name, "BOOTDRIVER")) {
             if (Config->BootDriverCount >= Config->BootDriverCapacity &&

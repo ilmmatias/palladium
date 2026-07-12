@@ -11,6 +11,21 @@ env:
   BUILD_TYPE: Release
 
 jobs:
+  debugger-host-tests:
+    runs-on: ubuntu-24.04
+
+    steps:
+    - name: Checkout palladium
+      uses: actions/checkout@v4
+      with:
+        path: palladium
+
+    - name: Run debugger host tests
+      working-directory: palladium
+      run: |
+        python3 -m unittest discover -s src/debugger/tests
+        python3 -m unittest discover -s tools/tests
+
   build:
     runs-on: ubuntu-24.04
 
@@ -18,7 +33,7 @@ jobs:
     - name: Install basic packages
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential cmake lld ninja-build mkisofs mtools
+        sudo apt-get install -y build-essential cmake lld ninja-build mkisofs mtools ovmf qemu-system-x86
 
     - name: Install LLVM
       run: |
@@ -27,14 +42,14 @@ jobs:
         sudo apt-get install -y clang-21 lld-21 llvm-21 libclang-21-dev
 
     - name: Checkout llvm-project
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         repository: llvm/llvm-project
         ref: llvmorg-21.1.0
         path: llvm-project
 
     - name: Checkout palladium
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         path: palladium
 
@@ -59,32 +74,28 @@ jobs:
     - name: Build Target
       run: cmake --build build.target --config ${{env.BUILD_TYPE}}
 
-    - name: Build EFI image
+    - name: Build image and run required TCG smoke boot
       run: |
-        dd if=/dev/zero of=build.target/fat.img bs=1k count=184320
-        mformat -F -i build.target/fat.img
-        mmd -i build.target/fat.img ::/EFI
-        mmd -i build.target/fat.img ::/EFI/BOOT
-        mmd -i build.target/fat.img ::/EFI/PALLADIUM
-        mcopy -i build.target/fat.img build.target/boot/osloader/osloader.exe ::/EFI/BOOT/BOOTX64.EFI
-        mcopy -i build.target/fat.img build.target/kernel/kernel.exe ::/EFI/PALLADIUM/KERNEL.EXE
-        mcopy -i build.target/fat.img build.target/drivers/acpi/acpi.sys ::/EFI/PALLADIUM/ACPI.SYS
-        echo "Kernel=KERNEL.EXE" > build.target/boot.cfg
-        echo "BootDriver=ACPI.SYS" >> build.target/boot.cfg
-        mcopy -i build.target/fat.img build.target/boot.cfg ::/EFI/PALLADIUM/BOOT.CFG
-
-    - name: Build ISO image
-      run: |
-        mkdir -p _root
-        cp build.target/fat.img _root/fat.img
-        mkisofs -R -f -eltorito-boot fat.img -no-emul-boot -o build.target/iso9660.iso _root
+        palladium/tools/smoke.sh \
+          --build-dir build.target \
+          --output-dir build.target/evidence \
+          --ovmf-code /usr/share/OVMF/OVMF_CODE.fd \
+          --ovmf-vars /usr/share/OVMF/OVMF_VARS.fd \
+          --timeout 60
 
     - uses: actions/upload-artifact@v4
       with:
         name: fat.img
-        path: build.target/fat.img
+        path: build.target/evidence/image/fat.img
 
     - uses: actions/upload-artifact@v4
       with:
         name: iso9660.iso
-        path: build.target/iso9660.iso
+        path: build.target/evidence/image/iso9660.iso
+
+    - name: Upload QEMU smoke logs
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: qemu-smoke-logs
+        path: build.target/evidence/qemu

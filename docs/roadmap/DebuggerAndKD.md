@@ -352,6 +352,14 @@ acquire/send pairs, MTU/capabilities, byte-stream framing adapter, polling/inter
 IRQL/allocation rules, loss/reset indication. `UseSerialFraming` and USB-related fields in the
 extension ABI are evidence of possible modes, not proof of semantics. [CODE]/[QUESTION]
 
+M0's amd64 PC16550 diagnostic output is a bounded one-way HAL sink, not a KD transport. When K2/K3
+begin, evaluate a Palladium-owned bidirectional PC16550 KD adapter alongside native USB and
+extension-backed transports; it would avoid a proprietary module for serial debugging. Decide then
+whether the one-way diagnostic mechanism remains a HAL facility, shares only an amd64 UART device
+primitive with KD, or is superseded. Do not make KD protocol/session code call the M0 diagnostic
+write API, and do not move transport ownership into the HAL merely because UART PIO is an amd64 HAL
+mechanism. [ARCHITECTURAL RECOMMENDATION]
+
 **Phases.** (1) document current ownership pairs. (2) wrap extension buffers with no behavior
 change. (3) move Ethernet/IP/UDP behind a packet adapter. (4) isolate protocol from network tuple.
 (5) add an in-memory/fault-injection transport. (6) only then add a second real transport.

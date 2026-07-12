@@ -5,6 +5,7 @@
 #define _PLATFORM_H_
 
 #include <memory.h>
+#include <stddef.h>
 
 #if __has_include(ARCH_MAKE_INCLUDE_PATH_WITHOUT_PREFIX(platform.h))
 #include ARCH_MAKE_INCLUDE_PATH_WITHOUT_PREFIX(platform.h)
@@ -13,11 +14,15 @@
 #endif /* __has_include */
 
 #define OSLP_BOOT_MAGIC "OLDR"
-#define OSLP_BOOT_VERSION 0x0000'0000'00000006
+#define OSLP_BOOT_VERSION 0x0000'0000'00000007
+
+#define OSLP_DIAGNOSTIC_NONE 0
+#define OSLP_DIAGNOSTIC_PC16550_PIO 1
 
 typedef struct __attribute__((packed)) {
     char Magic[4];
     uint64_t LoaderVersion;
+    uint32_t BlockSize;
     RtDList *MemoryDescriptorListHead;
     RtDList *BootDriverListHead;
     uint64_t RandomSeed;
@@ -51,12 +56,29 @@ typedef struct __attribute__((packed)) {
 } OslpBootDebugData;
 
 typedef struct __attribute__((packed)) {
+    uint32_t Type;
+    uint32_t BaudRate;
+    uint64_t Address;
+} OslpBootDiagnosticData;
+
+typedef struct __attribute__((packed)) {
     OslpBootBasicData Basic;
     OslpBootAcpiData Acpi;
     OslpBootGraphicsData Graphics;
     OslpBootDebugData Debug;
+    OslpBootDiagnosticData Diagnostic;
     OslpBootArchData Arch;
 } OslpBootBlock;
+
+static_assert(sizeof(OslpBootBasicData) == 40);
+static_assert(sizeof(OslpBootDiagnosticData) == 16);
+static_assert(offsetof(OslpBootBlock, Basic) == 0);
+static_assert(offsetof(OslpBootBlock, Acpi) == 40);
+static_assert(offsetof(OslpBootBlock, Graphics) == 64);
+static_assert(offsetof(OslpBootBlock, Debug) == 92);
+static_assert(offsetof(OslpBootBlock, Diagnostic) == 124);
+static_assert(offsetof(OslpBootBlock, Arch) == 140);
+static_assert(sizeof(OslpBootBlock) == 148);
 
 bool OslpCreateMemoryDescriptors(
     RtDList *LoadedPrograms,
