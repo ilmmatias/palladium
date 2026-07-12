@@ -28,12 +28,17 @@ jobs:
 
   build:
     runs-on: ubuntu-24.04
+    env:
+      OVMF_CODE_PATH: /usr/share/OVMF/OVMF_CODE_4M.fd
+      OVMF_VARS_PATH: /usr/share/OVMF/OVMF_VARS_4M.fd
 
     steps:
     - name: Install basic packages
       run: |
         sudo apt-get update
         sudo apt-get install -y build-essential cmake lld ninja-build mkisofs mtools ovmf qemu-system-x86
+        test -f "$OVMF_CODE_PATH"
+        test -f "$OVMF_VARS_PATH"
 
     - name: Install LLVM
       run: |
@@ -79,8 +84,8 @@ jobs:
         palladium/tools/smoke.sh \
           --build-dir build.target \
           --output-dir build.target/evidence \
-          --ovmf-code /usr/share/OVMF/OVMF_CODE.fd \
-          --ovmf-vars /usr/share/OVMF/OVMF_VARS.fd \
+          --ovmf-code "$OVMF_CODE_PATH" \
+          --ovmf-vars "$OVMF_VARS_PATH" \
           --timeout 60
 
     - uses: actions/upload-artifact@v4
