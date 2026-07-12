@@ -19,6 +19,7 @@ extern "C" {
 #endif /* __cplusplus */
 
 void KeInitializeWork(KeWork *Work, void (*Routine)(void *), void *Context);
+/* Work is caller-owned and must remain alive through callback completion. */
 bool KeQueueWork(KeWork *Work, bool HighPriority);
 
 void KeInitializeAffinity(KeAffinity *Mask);

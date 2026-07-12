@@ -31,21 +31,40 @@ static bool TryAcquire(EvMutex *Mutex, bool IncreaseContention) {
     /* Owner is increasing the recursion; Let's just hope the caller remembers to ReleaseMutex() as
      * many times as they acquired it...  */
     if (Mutex->Owner == Thread) {
+        if (Mutex->Recursion == UINT64_MAX) {
+            KeFatalError(
+                KE_PANIC_MUTEX_RECURSION_LIMIT,
+                (uint64_t)Mutex,
+                (uint64_t)Thread,
+                Mutex->Recursion,
+                0);
+        }
+
         Mutex->Recursion++;
         return true;
     }
 
     /* Trying to acquire the lock with no contention, we're done if the lock has no owner in this
      * case. */
-    if (!Mutex->Contention && !Mutex->Owner) {
+    if (Mutex->Header.Signaled && !Mutex->Owner) {
         Mutex->Header.Signaled = false;
         Mutex->Recursion = 1;
         Mutex->Owner = Thread;
+        RtAppendDList(&Thread->OwnedMutexList, &Mutex->OwnerListHeader);
         return true;
     }
 
     /* Otherwise, update the contention according to the caller's intent. */
     if (IncreaseContention) {
+        if (Mutex->Contention == UINT64_MAX) {
+            KeFatalError(
+                KE_PANIC_MUTEX_RECURSION_LIMIT,
+                (uint64_t)Mutex,
+                (uint64_t)Thread,
+                Mutex->Contention,
+                1);
+        }
+
         Mutex->Contention++;
     }
 
@@ -69,6 +88,7 @@ EvMutex *EvCreateMutex(void) {
         Mutex->Header.Type = EV_TYPE_MUTEX;
         Mutex->Header.Signaled = true;
         RtInitializeDList(&Mutex->Header.WaitList);
+        RtInitializeDList(&Mutex->OwnerListHeader);
     }
 
     return Mutex;
@@ -120,14 +140,28 @@ bool EvAcquireMutex(EvMutex *Mutex, uint64_t Timeout) {
      * (so when it returns, it's either timeout or we're safe to setup the lock). */
     if (!EvWaitForObject(Mutex, Timeout)) {
         OldIrql = KeAcquireSpinLockAndRaiseIrql(&Mutex->Header.Lock, KE_IRQL_DISPATCH);
+        if (!Mutex->Contention) {
+            KeFatalError(KE_PANIC_BAD_THREAD_STATE, 0, 1, (uint64_t)Mutex, 0);
+        }
+
         Mutex->Contention--;
         KeReleaseSpinLockAndLowerIrql(&Mutex->Header.Lock, OldIrql);
         return false;
     }
 
     OldIrql = KeAcquireSpinLockAndRaiseIrql(&Mutex->Header.Lock, KE_IRQL_DISPATCH);
+    if (!Mutex->Contention || Mutex->Owner || Mutex->Header.Signaled) {
+        KeFatalError(
+            KE_PANIC_BAD_THREAD_STATE,
+            Mutex->Contention,
+            (uint64_t)Mutex->Owner,
+            Mutex->Header.Signaled,
+            (uint64_t)Mutex);
+    }
+
     Mutex->Recursion = 1;
     Mutex->Owner = PsGetCurrentThread();
+    RtAppendDList(&((PsThread *)Mutex->Owner)->OwnedMutexList, &Mutex->OwnerListHeader);
     Mutex->Contention--;
     KeReleaseSpinLockAndLowerIrql(&Mutex->Header.Lock, OldIrql);
 
@@ -163,8 +197,9 @@ void EvReleaseMutex(EvMutex *Mutex) {
         /* Take a bit of caution here; If we just set ourselves as signaled and wake up the next
          * thread, that thread and someone else that just called WaitForObject might see it as
          * signaled/acquirable, and that would cause a lot of trouble. */
+        RtUnlinkDList(&Mutex->OwnerListHeader);
         Mutex->Owner = NULL;
-        if (Mutex->Contention) {
+        if (Mutex->Header.WaitList.Next != &Mutex->Header.WaitList) {
             EvpWakeSingleThread(&Mutex->Header);
         } else {
             Mutex->Header.Signaled = true;

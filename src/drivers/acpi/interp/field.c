@@ -346,10 +346,16 @@ static uint64_t ReadField(AcpiValue *Source, int Offset, int AccessWidth) {
             Index.Integer = Offset;
             AcpipWriteField(&Source->FieldUnit.Region->Value, &Index);
 
-            AcpiValue Target;
-            AcpipReadField(&Source->FieldUnit.Data->Value, &Target);
+            AcpiValue Target = {0};
+            if (!AcpipReadField(&Source->FieldUnit.Data->Value, &Target) ||
+                Target.Type != ACPI_INTEGER) {
+                AcpiRemoveReference(&Target, false);
+                return 0;
+            }
 
-            return Target.Integer;
+            uint64_t Result = Target.Integer;
+            AcpiRemoveReference(&Target, false);
+            return Result;
         }
     }
 
@@ -517,6 +523,10 @@ bool AcpipReadField(AcpiValue *Source, AcpiValue *Target) {
         Target->Type = ACPI_BUFFER;
         Target->Buffer = AcpipAllocateBlock(sizeof(AcpiBuffer) + BufferSize);
         if (!Target->Buffer) {
+            if (NeedLock) {
+                AcpipReleaseGlobalLock();
+            }
+
             return false;
         }
 
@@ -685,7 +695,8 @@ bool AcpipWriteField(AcpiValue *Target, AcpiValue *Data) {
             RunOffLength = 0;
         }
 
-        WriteField(Target, FieldOffset, AccessWidth, Item, UINT64_MAX << RunOffLength);
+        uint64_t Mask = RunOffLength >= 64 ? 0 : UINT64_MAX << RunOffLength;
+        WriteField(Target, FieldOffset, AccessWidth, Item, Mask);
         Buffer += AccessWidth / 8;
         FieldOffset += AccessWidth / 8;
         BufferOffset += AccessWidth / 8;
@@ -707,7 +718,8 @@ bool AcpipWriteField(AcpiValue *Target, AcpiValue *Data) {
         RunOffLength = 0;
     }
 
-    WriteField(Target, FieldOffset, AccessWidth, Item, UINT64_MAX << RunOffLength);
+    uint64_t Mask = RunOffLength >= 64 ? 0 : UINT64_MAX << RunOffLength;
+    WriteField(Target, FieldOffset, AccessWidth, Item, Mask);
 
     if (NeedLock) {
         AcpipReleaseGlobalLock();

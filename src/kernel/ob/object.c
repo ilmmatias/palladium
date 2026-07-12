@@ -1,10 +1,12 @@
 /* SPDX-FileCopyrightText: (C) 2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
+#include <kernel/ke.h>
 #include <kernel/mm.h>
 #include <kernel/ob.h>
 #include <kernel/obp.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <string.h>
 
 /*-------------------------------------------------------------------------------------------------
@@ -44,7 +46,22 @@ void *ObCreateObject(ObType *Type, char Tag[4]) {
  *-----------------------------------------------------------------------------------------------*/
 void ObReferenceObject(void *Body) {
     ObpObject *Object = (ObpObject *)Body - 1;
-    __atomic_add_fetch(&Object->References, 1, __ATOMIC_RELEASE);
+    uint32_t References = __atomic_load_n(&Object->References, __ATOMIC_ACQUIRE);
+    while (true) {
+        if (!References || References == UINT32_MAX) {
+            KeFatalError(KE_PANIC_BAD_OBJECT_REFERENCE_COUNT, (uint64_t)Body, References, 1, 0);
+        }
+
+        if (__atomic_compare_exchange_n(
+                &Object->References,
+                &References,
+                References + 1,
+                true,
+                __ATOMIC_ACQ_REL,
+                __ATOMIC_ACQUIRE)) {
+            return;
+        }
+    }
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -60,12 +77,30 @@ void ObReferenceObject(void *Body) {
  *-----------------------------------------------------------------------------------------------*/
 void ObDereferenceObject(void *Body) {
     ObpObject *Object = (ObpObject *)Body - 1;
-    if (!__atomic_sub_fetch(&Object->References, 1, __ATOMIC_ACQUIRE)) {
-        /* Should we allow the delete pointer to be NULL? */
-        if (Object->Type->Delete) {
-            Object->Type->Delete(Body);
+    uint32_t References = __atomic_load_n(&Object->References, __ATOMIC_ACQUIRE);
+    while (true) {
+        if (!References) {
+            KeFatalError(KE_PANIC_BAD_OBJECT_REFERENCE_COUNT, (uint64_t)Body, References, 0, 0);
         }
 
-        MmFreePool(Object, Object->Tag);
+        uint32_t NewReferences = References - 1;
+        if (!__atomic_compare_exchange_n(
+                &Object->References,
+                &References,
+                NewReferences,
+                true,
+                __ATOMIC_ACQ_REL,
+                __ATOMIC_ACQUIRE)) {
+            continue;
+        }
+
+        if (!NewReferences) {
+            if (Object->Type->Delete) {
+                Object->Type->Delete(Body);
+            }
+
+            MmFreePool(Object, Object->Tag);
+        }
+        return;
     }
 }

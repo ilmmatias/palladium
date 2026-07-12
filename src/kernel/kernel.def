@@ -53,6 +53,7 @@ EXPORTS
     PsDelayThread
     PsInitializeAlert
     PsQueueAlert
+    PsResumeThread
     PsTerminateThread
     PsYieldThread
 

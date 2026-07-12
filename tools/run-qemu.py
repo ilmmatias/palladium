@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: (C) 2026 ilmmatias
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Run Palladium under QEMU in reproducible smoke or interactive modes."""
+"""Run Palladium under QEMU in reproducible smoke, self-test, or interactive modes."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any
 
 ANSI_ESCAPE = re.compile(r"\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\x1b\\))")
-MARKERS = (
+SMOKE_MARKERS = (
     ("loader-kernel", r"loading up\s+[\\/]+EFI[\\/]+PALLADIUM[\\/]+KERNEL\.EXE"),
     ("loader-acpi", r"loading up\s+[\\/]+EFI[\\/]+PALLADIUM[\\/]+ACPI\.SYS"),
     ("kernel-banner", r"palladium kernel for amd64, git commit .* (?:release|debug) build"),
@@ -28,31 +28,40 @@ MARKERS = (
     ("processor-online", r"1 processor online"),
     ("acpi-enabled", r"enabled ACPI"),
 )
+SELF_TEST_MARKERS = (
+    ("self-test-start", r"M1TEST START suite=[^\s]+ seed=[0-9a-f]+ cpus=[0-9]+"),
+    ("self-test-pass", r"M1TEST PASS suite=[^\s]+ cases=[0-9]+"),
+    ("self-test-complete", r"M1TEST COMPLETE cases=[0-9]+"),
+)
+MARKERS = SMOKE_MARKERS
 FAILURES = (
     ("loader-failure", r"The boot process cannot continue\."),
     ("kernel-fatal", r"\*\*\* STOP:"),
+    ("self-test-failure", r"M1TEST FAIL suite=[^\s]+ case=[^\s]+ code=[^\s]+"),
 )
 
 
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="mode", required=True)
-    for name in ("smoke", "interactive"):
+    for name in ("smoke", "selftest", "interactive"):
         command = subparsers.add_parser(name)
         command.add_argument("--image", required=True, type=Path, help="ISO or FAT image")
         command.add_argument("--ovmf-code", required=True, type=Path)
         command.add_argument("--ovmf-vars", required=True, type=Path)
         command.add_argument("--output-dir", required=True, type=Path)
-        command.add_argument("--timeout", type=float, default=60.0)
+        command.add_argument("--timeout", type=float, default=120.0 if name == "selftest" else 60.0)
         command.add_argument("--repeat", type=int, default=1)
         command.add_argument("--qemu", default="qemu-system-x86_64")
+        if name == "selftest":
+            command.add_argument("--smp", type=int, choices=(1, 2, 4), default=1)
         command.add_argument("qemu_args", nargs=argparse.REMAINDER,
                              help="extra QEMU arguments after --")
     arguments = parser.parse_args()
     if arguments.qemu_args[:1] == ["--"]:
         arguments.qemu_args = arguments.qemu_args[1:]
-    if arguments.mode == "smoke" and arguments.qemu_args:
-        parser.error("the fixed smoke profile does not accept extra QEMU arguments")
+    if arguments.mode in ("smoke", "selftest") and arguments.qemu_args:
+        parser.error(f"the fixed {arguments.mode} profile does not accept extra QEMU arguments")
     return arguments
 
 
@@ -61,14 +70,15 @@ def normalize_output(value: str) -> str:
 
 
 class MarkerTracker:
-    def __init__(self) -> None:
+    def __init__(self, markers: tuple[tuple[str, str], ...] = MARKERS) -> None:
+        self.markers = markers
         self.index = 0
         self.offset = 0
         self.matches: list[dict[str, Any]] = []
 
     def scan(self, text: str, elapsed: float) -> None:
-        while self.index < len(MARKERS):
-            name, pattern = MARKERS[self.index]
+        while self.index < len(self.markers):
+            name, pattern = self.markers[self.index]
             match = re.search(pattern, text[self.offset :], re.IGNORECASE)
             if not match:
                 break
@@ -80,7 +90,33 @@ class MarkerTracker:
 
     @property
     def complete(self) -> bool:
-        return self.index == len(MARKERS)
+        return self.index == len(self.markers)
+
+
+def markers_for(args: argparse.Namespace) -> tuple[tuple[str, str], ...]:
+    markers = list(SMOKE_MARKERS)
+    if args.mode == "selftest":
+        processor_count = args.smp
+        markers[4] = (
+            "processor-online",
+            rf"{processor_count} processor{'s' if processor_count != 1 else ''} online",
+        )
+        markers.extend(SELF_TEST_MARKERS)
+    return tuple(markers)
+
+
+def parse_self_test_records(text: str) -> list[dict[str, Any]]:
+    records = []
+    pattern = re.compile(r"M1TEST (START|PASS|FAIL|COMPLETE)(?:\s+([^\r\n]*))?")
+    for match in pattern.finditer(text):
+        record: dict[str, Any] = {"action": match.group(1).lower()}
+        for name, value in re.findall(r"([a-z]+)=([^\s]+)", match.group(2) or ""):
+            if name in ("cases", "case", "code", "cpus"):
+                record[name] = int(value, 10)
+            else:
+                record[name] = value
+        records.append(record)
+    return records
 
 
 def find_failure(text: str) -> dict[str, str] | None:
@@ -154,7 +190,8 @@ def stop_qemu(process: subprocess.Popen[bytes], qmp: socket.socket | None) -> st
 
 def build_command(args: argparse.Namespace, vars_copy: Path, serial_path: Path, qmp_path: Path) -> list[str]:
     command = [args.qemu]
-    if args.mode == "smoke":
+    if args.mode in ("smoke", "selftest"):
+        processor_count = 1 if args.mode == "smoke" else args.smp
         command += [
             "-accel",
             "tcg",
@@ -165,7 +202,7 @@ def build_command(args: argparse.Namespace, vars_copy: Path, serial_path: Path, 
             "-m",
             "256M",
             "-smp",
-            "1",
+            str(processor_count),
             "-display",
             "none",
             "-nic",
@@ -230,7 +267,8 @@ def run_once(args: argparse.Namespace, run_number: int, version: str) -> dict[st
     qmp_log_path.touch()
     command = build_command(args, vars_copy, serial_path, qmp_socket_path)
     started = time.monotonic()
-    tracker = MarkerTracker()
+    markers = markers_for(args)
+    tracker = MarkerTracker(markers)
     failure = None
     status = "launch-error"
     stop_method = "not-started"
@@ -272,12 +310,15 @@ def run_once(args: argparse.Namespace, run_number: int, version: str) -> dict[st
 
     result = {
         "status": status,
-        "passed": status == "passed" if args.mode == "smoke" else bool(process and process.returncode == 0),
+        "passed": status == "passed"
+        if args.mode in ("smoke", "selftest")
+        else bool(process and process.returncode == 0),
         "return_code": process.returncode if process is not None else None,
         "stop_method": stop_method,
         "duration_seconds": round(time.monotonic() - started, 3),
         "matched_markers": tracker.matches,
-        "expected_markers": [{"name": name, "pattern": pattern} for name, pattern in MARKERS],
+        "expected_markers": [{"name": name, "pattern": pattern} for name, pattern in markers],
+        "self_tests": parse_self_test_records(normalize_output(serial_path.read_text(errors="replace"))),
         "failure": failure,
         "command": command,
         "qemu_version": version,

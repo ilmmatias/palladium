@@ -11,6 +11,8 @@ include(sdk/cmake/project.cmake)
 project(os)
 enable_language(ASM C RC)
 
+option(PALLADIUM_ENABLE_SELF_TESTS "Compile the private kernel self-test plane" OFF)
+
 add_subdirectory(boot)
 add_subdirectory(drivers)
 add_subdirectory(kernel)

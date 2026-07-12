@@ -54,6 +54,40 @@ loading up \\EFI\\PALLADIUM\\ACPI.SYS
         self.assertEqual(loader["name"], "loader-failure")
         self.assertEqual(kernel["name"], "kernel-fatal")
 
+    def test_accepts_ordered_self_test_markers_and_records(self):
+        arguments = SimpleNamespace(mode="selftest", smp=4)
+        output = """
+loading up \\EFI\\PALLADIUM\\KERNEL.EXE
+loading up \\EFI\\PALLADIUM\\ACPI.SYS
+palladium kernel for amd64, git commit 123abcd debug build
+managing 256 MiB of memory
+4 processors online
+enabled ACPI
+M1TEST START suite=portable-rt seed=c001d00d cpus=4
+M1TEST PASS suite=portable-rt cases=3
+M1TEST COMPLETE cases=3
+"""
+        tracker = RUN_QEMU.MarkerTracker(RUN_QEMU.markers_for(arguments))
+        tracker.scan(output, 1.0)
+        self.assertTrue(tracker.complete)
+        self.assertEqual(
+            RUN_QEMU.parse_self_test_records(output),
+            [
+                {
+                    "action": "start",
+                    "suite": "portable-rt",
+                    "seed": "c001d00d",
+                    "cpus": 4,
+                },
+                {"action": "pass", "suite": "portable-rt", "cases": 3},
+                {"action": "complete", "cases": 3},
+            ],
+        )
+
+    def test_detects_self_test_failure(self):
+        failure = RUN_QEMU.find_failure("M1TEST FAIL suite=mm case=3 code=9\n")
+        self.assertEqual(failure["name"], "self-test-failure")
+
 
 class FakeProcess:
     def __init__(self, return_code=None):
@@ -115,6 +149,19 @@ class RunnerTests(unittest.TestCase):
         self.assertIn("pc-q35-8.2", first)
         self.assertEqual(first[first.index("-nic") + 1], "none")
         self.assertNotEqual(first, second)
+
+    def test_selftest_profile_uses_requested_processor_count(self):
+        args = self.arguments("unused")
+        args.mode = "selftest"
+        args.smp = 4
+        command = RUN_QEMU.build_command(
+            args,
+            self.root / "run-001" / "vars.fd",
+            self.root / "run-001" / "serial.log",
+            self.root / "run-001" / "qmp.sock",
+        )
+        self.assertEqual(command[command.index("-smp") + 1], "4")
+        self.assertEqual(command[command.index("-nic") + 1], "none")
 
     def test_early_exit_fails_and_preserves_fresh_variable_copy(self):
         args = self.arguments("early")

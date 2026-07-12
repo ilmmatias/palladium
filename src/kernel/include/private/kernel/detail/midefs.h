@@ -37,4 +37,9 @@
 
 #define MI_PROCESSOR_POOL_CACHE_MAX_SIZE 256
 
+/* Failed early page-table transactions can return individual pages before the PFN database
+ * exists. This bounded stack covers 4096 newly allocated page-table levels (at least 8GiB of
+ * previously unmapped 4KiB virtual mappings) without requiring another allocator. */
+#define MI_EARLY_ROLLBACK_PAGE_COUNT 4096
+
 #endif /* _KERNEL_DETAIL_MIDEFS_H_ */

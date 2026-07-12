@@ -6,6 +6,7 @@
 
 #include <efi/spec.h>
 #include <rt/list.h>
+#include <stddef.h>
 
 #if defined(ARCH_amd64)
 #define VIRTUAL_BASE 0xFFFF900000000000
@@ -36,6 +37,12 @@ typedef struct {
     uint64_t BasePage;
     uint64_t PageCount;
 } OslpMemoryDescriptor;
+
+static_assert(sizeof(OslpMemoryDescriptor) == 40);
+static_assert(offsetof(OslpMemoryDescriptor, ListHeader) == 0);
+static_assert(offsetof(OslpMemoryDescriptor, Type) == 16);
+static_assert(offsetof(OslpMemoryDescriptor, BasePage) == 24);
+static_assert(offsetof(OslpMemoryDescriptor, PageCount) == 32);
 
 void *OslAllocatePages(size_t Size, uint64_t Alignment);
 

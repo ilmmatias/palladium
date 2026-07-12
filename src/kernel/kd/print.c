@@ -95,8 +95,9 @@ void KdPrintVariadic(int Type, const char *Message, va_list Arguments) {
     }
 
     /* Lock any other processors from messing with our buffer while we do it. */
-    KeIrql OldIrql;
-    if (UseLock) {
+    bool Locked = UseLock;
+    KeIrql OldIrql = 0;
+    if (Locked) {
         OldIrql = KeAcquireSpinLockAndRaiseIrql(&Lock, KE_IRQL_DISPATCH);
     }
 
@@ -207,7 +208,7 @@ void KdPrintVariadic(int Type, const char *Message, va_list Arguments) {
             Offset + Size);
     }
 
-    if (UseLock) {
+    if (Locked) {
         KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
     }
 }

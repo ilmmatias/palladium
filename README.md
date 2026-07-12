@@ -27,8 +27,12 @@ For clang-tidy, configure with `-DCMAKE_EXPORT_COMPILE_COMMANDS=ON`, then run:
 run-clang-tidy -p build.amd64.rel -source-filter='.*\.(c)$'
 ```
 
-Do not apply clang-tidy `-fix` across unrelated source. The current warning baseline is recorded in
-[the core-correctness roadmap](docs/roadmap/CoreCorrectnessAndVerification.md).
+Do not apply clang-tidy `-fix` across unrelated source. The LLVM-versioned warning classification
+is recorded in [the M1 baseline](docs/roadmap/M1ClangTidyBaseline.md). The selected analyzer gate is:
+
+```sh
+tools/run-clang-tidy-high-signal.sh build.amd64.rel
+```
 
 ### Images and reproducible QEMU smoke boot
 
@@ -98,6 +102,43 @@ tools/run-qemu.py interactive \
   --output-dir build.amd64.rel/qemu-interactive \
   -- -device e1000
 ```
+
+### M1 host and kernel self-tests
+
+Portable CRT/RT tests compile the production C sources directly with Palladium headers taking
+precedence, builtins disabled, and ASan/UBSan enabled:
+
+```sh
+cmake -S tests/host -B build.host -G Ninja
+cmake --build build.host
+ctest --test-dir build.host --output-on-failure
+```
+
+Private kernel self-tests are available only in a dedicated RelWithDebInfo image. The option is off
+by default, so ordinary kernels do not contain the test entry points or fault/test state:
+
+```sh
+cmake -S src -B build.amd64.selftest -G Ninja \
+  -DCMAKE_BUILD_TYPE=RelWithDebInfo -DARCH=amd64 \
+  -DPALLADIUM_ENABLE_SELF_TESTS=ON
+cmake --build build.amd64.selftest
+tools/build-image.sh \
+  --build-dir build.amd64.selftest \
+  --output-dir build.amd64.selftest/images \
+  --diagnostic-serial
+tools/run-qemu.py selftest \
+  --image build.amd64.selftest/images/iso9660.iso \
+  --ovmf-code /path/to/OVMF_CODE.fd \
+  --ovmf-vars /path/to/OVMF_VARS.fd \
+  --output-dir build.amd64.selftest/qemu-selftest \
+  --smp 1
+```
+
+The self-test profile accepts only `--smp 1`, `2`, or `4`, uses TCG and a 120-second timeout, and
+requires the structured `M1TEST` records to complete without a failure or kernel stop. The 2- and
+4-CPU profiles are qualification lanes rather than substitutes for hardware concurrency testing.
+The contracts and current rollout status are recorded in
+[the M1 executive baseline](docs/M1ExecutiveBaseline.md).
 
 ### Kernel debugger client
 

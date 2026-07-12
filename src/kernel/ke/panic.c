@@ -41,6 +41,9 @@ static const char *Messages[] = {
     "PROCESSOR_LIMIT_EXCEEDED",
     "BAD_THREAD_STATE",
     "MUTEX_NOT_OWNED",
+    "MUTEX_RECURSION_LIMIT",
+    "BAD_OBJECT_REFERENCE_COUNT",
+    "THREAD_OWNS_MUTEX",
 };
 
 static KeSpinLock Lock = {0};

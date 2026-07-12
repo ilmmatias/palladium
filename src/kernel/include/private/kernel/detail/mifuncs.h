@@ -21,7 +21,8 @@ extern "C" {
 #endif /* __cplusplus */
 
 extern MiPageEntry *MiPageList;
-extern uint64_t MiTotalSystemPages;
+extern uint64_t MiTotalManagedPages;
+extern uint64_t MiTotalUnmanagedPages;
 extern uint64_t MiTotalReservedPages;
 extern uint64_t MiTotalCachedPages;
 extern uint64_t MiTotalUsedPages;
@@ -37,6 +38,10 @@ void MiInitializeEarlyPageAllocator(KiLoaderBlock *LoaderBlock);
 void MiInitializePageAllocator(void);
 void MiReleaseBootRegions(void);
 uint64_t MiAllocateEarlyPages(uint32_t Pages);
+void MiReleaseEarlyPage(uint64_t PhysicalAddress);
+#ifdef PALLADIUM_ENABLE_SELF_TESTS
+bool MiVerifyPageAccounting(void);
+#endif /* PALLADIUM_ENABLE_SELF_TESTS */
 
 void MiInitializePool(void);
 void *MiAllocatePoolSpace(uint32_t Pages);

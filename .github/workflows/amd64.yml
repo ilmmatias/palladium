@@ -11,6 +11,29 @@ env:
   BUILD_TYPE: Release
 
 jobs:
+  executive-host-tests:
+    runs-on: ubuntu-24.04
+
+    steps:
+    - name: Checkout palladium
+      uses: actions/checkout@v4
+      with:
+        path: palladium
+
+    - name: Install host test dependencies
+      run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build
+
+    - name: Configure and run ASan/UBSan host tests
+      run: |
+        cmake \
+          -S palladium/tests/host \
+          -B build.host \
+          -G Ninja \
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+          -DCMAKE_C_COMPILER=clang
+        cmake --build build.host
+        ctest --test-dir build.host --output-on-failure
+
   debugger-host-tests:
     runs-on: ubuntu-24.04
 
@@ -44,7 +67,7 @@ jobs:
       run: |
         wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
         sudo add-apt-repository -y "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-21 main"
-        sudo apt-get install -y clang-21 lld-21 llvm-21 libclang-21-dev
+        sudo apt-get install -y clang-21 clang-tools-21 lld-21 llvm-21 libclang-21-dev
 
     - name: Checkout llvm-project
       uses: actions/checkout@v4
@@ -74,10 +97,14 @@ jobs:
           -G Ninja \
           -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
           -DARCH=amd64 \
+          -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
           -DLLVM_SUFFIX=-21
 
     - name: Build Target
       run: cmake --build build.target --config ${{env.BUILD_TYPE}}
+
+    - name: Run high-signal clang-tidy gate
+      run: LLVM_SUFFIX=-21 palladium/tools/run-clang-tidy-high-signal.sh build.target
 
     - name: Build image and run required TCG smoke boot
       run: |
@@ -104,3 +131,40 @@ jobs:
       with:
         name: qemu-smoke-logs
         path: build.target/evidence/qemu
+
+    - name: Configure M1 self-test kernel
+      run: |
+        cmake \
+          -S palladium/src \
+          -B build.selftest \
+          -G Ninja \
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+          -DARCH=amd64 \
+          -DPALLADIUM_ENABLE_SELF_TESTS=ON \
+          -DLLVM_SUFFIX=-21
+
+    - name: Build M1 self-test kernel
+      run: cmake --build build.selftest
+
+    - name: Run staged 1-CPU M1 self-test boot
+      id: m1-selftest
+      continue-on-error: true
+      run: |
+        palladium/tools/build-image.sh \
+          --build-dir build.selftest \
+          --output-dir build.selftest/evidence/image \
+          --diagnostic-serial
+        palladium/tools/run-qemu.py selftest \
+          --image build.selftest/evidence/image/iso9660.iso \
+          --ovmf-code "$OVMF_CODE_PATH" \
+          --ovmf-vars "$OVMF_VARS_PATH" \
+          --output-dir build.selftest/evidence/qemu \
+          --smp 1 \
+          --timeout 120
+
+    - name: Upload staged M1 self-test logs
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: qemu-m1-selftest-logs
+        path: build.selftest/evidence

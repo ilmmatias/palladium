@@ -68,7 +68,9 @@ static void InitializeBootProcessor(KiLoaderBlock *LoaderBlock) {
     MiInitializePool();
     MiInitializePageAllocator();
     KdPrint(
-        KD_TYPE_INFO, "managing %llu MiB of memory\n", MiTotalSystemPages * MM_PAGE_SIZE / 1048576);
+        KD_TYPE_INFO,
+        "managing %llu MiB of memory\n",
+        MiTotalManagedPages * MM_PAGE_SIZE / 1048576);
 
     /* The loader data will become inaccessible once we release/unmap all the remaining OSLOADER
      * regions, so save the required remaining data. After this, the stack trace on KeFatalError
@@ -169,6 +171,10 @@ static void InitializeApplicationProcessor(KeProcessor *Processor) {
     /* Get all of the required boot modules up; This should let us load the remaining drivers from
      * the disk. */
     KiRunBootStartDrivers();
+
+#ifdef PALLADIUM_ENABLE_SELF_TESTS
+    KiRunSelfTests();
+#endif /* PALLADIUM_ENABLE_SELF_TESTS */
 
     while (true) {
         StopProcessor();
