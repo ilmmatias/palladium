@@ -346,6 +346,7 @@ int __vscanf(
         intmax_t signed_value;
         char *str_start;
         char *str;
+        int converted;
 
         ch = *(format++);
 
@@ -370,9 +371,10 @@ int __vscanf(
                 }
 
                 width = width_set ? width : 1;
+                converted = 0;
                 while (width-- > 0) {
                     int ch = read_ch(context);
-                    if (ch == EOF && str - str_start) {
+                    if (ch == EOF && converted) {
                         break;
                     }
 
@@ -384,6 +386,7 @@ int __vscanf(
                         *(str++) = ch;
                     }
 
+                    converted++;
                     read++;
                 }
 
@@ -408,13 +411,14 @@ int __vscanf(
                 }
 
                 unread_ch(context, ch);
+                converted = 0;
                 while (true) {
                     if (width_set && width-- <= 0) {
                         break;
                     }
 
                     ch = read_ch(context);
-                    if (ch == EOF && str - str_start) {
+                    if (ch == EOF && converted) {
                         break;
                     }
 
@@ -431,6 +435,7 @@ int __vscanf(
                         *(str++) = ch;
                     }
 
+                    converted++;
                     read++;
                 }
 

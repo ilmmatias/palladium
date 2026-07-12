@@ -44,7 +44,7 @@ static int GetSubtreeSize(RtAvlNode *Node) {
  *     0 means the node is balanced.
  *-----------------------------------------------------------------------------------------------*/
 static int GetBalance(RtAvlNode *Node) {
-    return GetHeight(Node->Left) - GetHeight(Node->Right);
+    return Node ? GetHeight(Node->Left) - GetHeight(Node->Right) : 0;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -209,14 +209,14 @@ static void RebalanceTree(RtAvlTree *Tree, RtAvlNode *StartNode) {
         int Balance = GetBalance(CurrentNode);
         RtAvlNode *ParentNode = CurrentNode->Parent;
         RtAvlNode *NewRoot = NULL;
-        if (Balance > 1 && GetBalance(CurrentNode->Left) >= 0) {
+        if (Balance > 1 && CurrentNode->Left && GetBalance(CurrentNode->Left) >= 0) {
             NewRoot = RotateRight(CurrentNode);
-        } else if (Balance < -1 && GetBalance(CurrentNode->Right) <= 0) {
+        } else if (Balance < -1 && CurrentNode->Right && GetBalance(CurrentNode->Right) <= 0) {
             NewRoot = RotateLeft(CurrentNode);
-        } else if (Balance > 1 && GetBalance(CurrentNode->Left) < 0) {
+        } else if (Balance > 1 && CurrentNode->Left && GetBalance(CurrentNode->Left) < 0) {
             CurrentNode->Left = RotateLeft(CurrentNode->Left);
             NewRoot = RotateRight(CurrentNode);
-        } else if (Balance < -1 && GetBalance(CurrentNode->Right) > 0) {
+        } else if (Balance < -1 && CurrentNode->Right && GetBalance(CurrentNode->Right) > 0) {
             CurrentNode->Right = RotateRight(CurrentNode->Right);
             NewRoot = RotateLeft(CurrentNode);
         }
@@ -349,51 +349,42 @@ RtAvlNode *RtRemoveAvlTree(RtAvlTree *Tree, RtAvlNode *NodeToRemove) {
         return NULL;
     }
 
-    RtAvlNode *NodeToReplace;
+    RtAvlNode *RebalanceNode;
     if (!NodeToRemove->Left || !NodeToRemove->Right) {
-        NodeToReplace = NodeToRemove;
+        RtAvlNode *ChildNode = NodeToRemove->Left ? NodeToRemove->Left : NodeToRemove->Right;
+        RebalanceNode = NodeToRemove->Parent;
+
+        if (ChildNode) {
+            ChildNode->Parent = RebalanceNode;
+        }
+
+        if (!RebalanceNode) {
+            Tree->Root = ChildNode;
+        } else if (RebalanceNode->Left == NodeToRemove) {
+            RebalanceNode->Left = ChildNode;
+        } else {
+            RebalanceNode->Right = ChildNode;
+        }
     } else {
-        NodeToReplace = GetInOrderSuccessor(NodeToRemove);
-    }
+        RtAvlNode *NodeToReplace = GetInOrderSuccessor(NodeToRemove);
+        RtAvlNode *ReplacementParent = NodeToReplace->Parent;
 
-    RtAvlNode *ChildNode;
-    if (NodeToReplace->Left) {
-        ChildNode = NodeToReplace->Left;
-    } else {
-        ChildNode = NodeToReplace->Right;
-    }
+        if (ReplacementParent != NodeToRemove) {
+            ReplacementParent->Left = NodeToReplace->Right;
+            if (NodeToReplace->Right) {
+                NodeToReplace->Right->Parent = ReplacementParent;
+            }
 
-    /* Splice out NodeToReplace by linking its child to its parent. */
-    RtAvlNode *RebalanceNode = NodeToReplace->Parent;
-    if (ChildNode) {
-        ChildNode->Parent = RebalanceNode;
-    }
+            NodeToReplace->Right = NodeToRemove->Right;
+            NodeToReplace->Right->Parent = NodeToReplace;
+            RebalanceNode = ReplacementParent;
+        } else {
+            RebalanceNode = NodeToReplace;
+        }
 
-    if (!RebalanceNode) {
-        Tree->Root = ChildNode;
-    } else if (NodeToReplace == RebalanceNode->Left) {
-        RebalanceNode->Left = ChildNode;
-    } else {
-        RebalanceNode->Right = ChildNode;
-    }
-
-    if (NodeToReplace != NodeToRemove) {
-        /* As we don't have any idea about the struct we're contained within, we cannot simple
-         * execute a memcpy, and instead, we need to manually swap the pointers around to reach the
-         * desired effect. */
-        NodeToReplace->Height = NodeToRemove->Height;
-        NodeToReplace->SubtreeSize = NodeToRemove->SubtreeSize;
         NodeToReplace->Parent = NodeToRemove->Parent;
         NodeToReplace->Left = NodeToRemove->Left;
-        NodeToReplace->Right = NodeToRemove->Right;
-
-        if (NodeToRemove->Left) {
-            NodeToRemove->Left->Parent = NodeToReplace;
-        }
-
-        if (NodeToRemove->Right) {
-            NodeToRemove->Right->Parent = NodeToReplace;
-        }
+        NodeToReplace->Left->Parent = NodeToReplace;
 
         if (!NodeToRemove->Parent) {
             Tree->Root = NodeToReplace;

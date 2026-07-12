@@ -9,7 +9,7 @@
 
 #ifndef CONTAINING_RECORD
 #define CONTAINING_RECORD(address, type, field) \
-    ((type *)((char *)(address) - (uintptr_t)(&((type *)0)->field)))
+    ((type *)((char *)(address) - offsetof(type, field)))
 #endif /* CONTAINING_RECORD */
 
 #endif /* _OS_CONTAINING_RECORD_H_ */
