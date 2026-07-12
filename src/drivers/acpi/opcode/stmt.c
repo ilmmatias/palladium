@@ -2,6 +2,8 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <acpip.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <string.h>
 
 /*-------------------------------------------------------------------------------------------------

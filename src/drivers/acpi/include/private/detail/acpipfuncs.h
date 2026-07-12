@@ -1,6 +1,8 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
+/* IWYU pragma: private, include <acpip.h> */
+
 #ifndef _ACPIP_DETAIL_ACPIPFUNCS_H_
 #define _ACPIP_DETAIL_ACPIPFUNCS_H_
 

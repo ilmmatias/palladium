@@ -4,6 +4,8 @@
 #include <kernel/halp.h>
 #include <kernel/ke.h>
 #include <os/intrin.h>
+#include <stddef.h>
+#include <stdint.h>
 
 static KeSpinLock Lock = {0};
 static void (*TargetRoutine)(void *) = NULL;

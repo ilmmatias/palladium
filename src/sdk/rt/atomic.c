@@ -3,6 +3,8 @@
 
 #include <rt/atomic.h>
 #include <rt/except.h>
+#include <rt/list.h>
+#include <stddef.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:

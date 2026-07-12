@@ -2,8 +2,11 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <kernel/halp.h>
-#include <kernel/mm.h>
+#include <kernel/ke.h>
 #include <kernel/ps.h>
+#include <os/containing_record.h>
+#include <rt/list.h>
+#include <stdint.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -21,7 +24,7 @@
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void PsInitializeAlert(PsAlert* Alert, uint64_t Flags, void (*Routine)(void*), void* Context) {
+void PsInitializeAlert(PsAlert *Alert, uint64_t Flags, void (*Routine)(void *), void *Context) {
     Alert->Routine = Routine;
     Alert->Context = Context;
     Alert->Queued = false;

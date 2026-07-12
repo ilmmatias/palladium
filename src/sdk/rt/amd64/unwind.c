@@ -3,7 +3,10 @@
 
 #include <kernel/ke.h>
 #include <os/pe.h>
+#include <rt/context.h>
 #include <rt/except.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <string.h>
 
 static const int UnwindOpSlots[] = {

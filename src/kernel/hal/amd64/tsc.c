@@ -3,6 +3,7 @@
 
 #include <cpuid.h>
 #include <kernel/ev.h>
+#include <kernel/hal.h>
 #include <kernel/halp.h>
 #include <kernel/kd.h>
 #include <os/intrin.h>

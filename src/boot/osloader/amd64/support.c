@@ -4,7 +4,9 @@
 #include <console.h>
 #include <cpuid.h>
 #include <crt_impl/rand.h>
+#include <efi/spec.h>
 #include <platform.h>
+#include <stdint.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:

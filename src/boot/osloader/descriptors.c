@@ -2,8 +2,15 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <console.h>
+#include <efi/spec.h>
+#include <efi/types.h>
 #include <loader.h>
+#include <memory.h>
+#include <os/containing_record.h>
 #include <platform.h>
+#include <rt/list.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <string.h>
 
 /*-------------------------------------------------------------------------------------------------

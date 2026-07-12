@@ -3,6 +3,9 @@
 
 #include <kernel/halp.h>
 #include <kernel/mi.h>
+#include <kernel/mm.h>
+#include <stddef.h>
+#include <stdint.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:

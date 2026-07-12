@@ -3,8 +3,12 @@
 
 #include <console.h>
 #include <crt_impl/rand.h>
+#include <efi/spec.h>
+#include <efi/types.h>
 #include <memory.h>
 #include <rt/bitmap.h>
+#include <stddef.h>
+#include <stdint.h>
 
 static void *BitmapBuffer = NULL;
 static RtBitmap BitmapHeader = {};

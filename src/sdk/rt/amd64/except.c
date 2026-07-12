@@ -2,7 +2,10 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <kernel/ke.h>
+#include <rt/context.h>
 #include <rt/except.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <string.h>
 
 /*-------------------------------------------------------------------------------------------------

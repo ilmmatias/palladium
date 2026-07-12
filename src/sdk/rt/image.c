@@ -2,7 +2,9 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <kernel/ke.h>
-#include <os/pe.h>
+#include <os/containing_record.h>
+#include <rt/list.h>
+#include <stdint.h>
 
 extern RtDList KiModuleListHead;
 

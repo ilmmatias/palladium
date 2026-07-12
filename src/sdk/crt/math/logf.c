@@ -3,7 +3,9 @@
 
 #include <crt_impl/ieee754.h>
 #include <crt_impl/math.h>
+#include <errno.h>
 #include <math.h>
+#include <stdint.h>
 
 /* Generated using sollya:
  *     for i from 0 to 127 do simplify(D(1 / (1 + i*2^-7))); */

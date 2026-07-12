@@ -1,7 +1,10 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
+#include <crt_impl/common.h>
 #include <crt_impl/fmt.h>
+#include <stdarg.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 

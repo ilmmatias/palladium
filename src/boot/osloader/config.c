@@ -4,7 +4,11 @@
 #include <config.h>
 #include <console.h>
 #include <ctype.h>
+#include <efi/spec.h>
+#include <efi/types.h>
 #include <file.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

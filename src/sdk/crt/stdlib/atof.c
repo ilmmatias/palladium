@@ -4,6 +4,7 @@
 #include <crt_impl/fmt.h>
 #include <ctype.h>
 #include <math.h>
+#include <stdlib.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:

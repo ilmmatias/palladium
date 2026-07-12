@@ -3,6 +3,7 @@
 
 #include <crypt/chacha20.h>
 #include <crypt/compiler.h>
+#include <stdint.h>
 #include <string.h>
 
 /* ChaCha is a bit nicer to modern architectures, as it's LE instead of BE. */

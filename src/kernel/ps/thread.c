@@ -1,12 +1,20 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
+#include <kernel/ev.h>
 #include <kernel/evp.h>
 #include <kernel/halp.h>
 #include <kernel/ke.h>
 #include <kernel/mm.h>
+#include <kernel/ob.h>
 #include <kernel/obp.h>
+#include <kernel/ps.h>
 #include <kernel/psp.h>
+#include <os/containing_record.h>
+#include <rt/avltree.h>
+#include <rt/list.h>
+#include <stddef.h>
+#include <stdint.h>
 
 extern KeAffinity KiIdleProcessors;
 

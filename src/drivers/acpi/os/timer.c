@@ -5,6 +5,7 @@
 #include <kernel/ev.h>
 #include <kernel/hal.h>
 #include <kernel/ps.h>
+#include <stdint.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:

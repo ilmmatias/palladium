@@ -2,7 +2,9 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <crypt/compiler.h>
+#include <crypt/hash.h>
 #include <crypt/hmac.h>
+#include <stdint.h>
 #include <string.h>
 
 /*-------------------------------------------------------------------------------------------------

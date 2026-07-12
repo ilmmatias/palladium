@@ -1,0 +1,53 @@
+---
+Checks:
+  - '-*'
+
+  # Compiler diagnostics and path-sensitive static analysis.
+  - 'clang-diagnostic-*'
+  - 'clang-analyzer-*'
+
+  # High-value correctness checks.
+  - 'bugprone-*'
+  - 'cert-*'
+  - 'concurrency-*'
+  - 'misc-*'
+  - 'portability-*'
+
+  # High-value readability checks.
+  - 'readability-avoid-const-params-in-decls'
+  - 'readability-braces-around-statements'
+  - 'readability-const-return-type'
+  - 'readability-container-contains'
+  - 'readability-delete-null-pointer'
+  - 'readability-else-after-return'
+  - 'readability-inconsistent-declaration-parameter-name'
+  - 'readability-misleading-indentation'
+  - 'readability-redundant-control-flow'
+  - 'readability-redundant-declaration'
+  - 'readability-redundant-function-ptr-dereference'
+  - 'readability-redundant-preprocessor'
+  - 'readability-simplify-boolean-expr'
+  - 'readability-static-accessed-through-instance'
+  - 'readability-uppercase-literal-suffix'
+
+  # Include What You Use (IWYU).
+  - 'misc-include-cleaner'
+
+  # Too noisy or poorly suited to low-level/freestanding code.
+  - '-bugprone-easily-swappable-parameters'
+  - '-bugprone-reserved-identifier'
+  - '-cert-dcl37-c'
+  - '-cert-dcl51-cpp'
+  - '-clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling'
+  - '-misc-use-anonymous-namespace'
+  - '-misc-use-internal-linkage'
+  - '-portability-restrict-system-includes'
+
+WarningsAsErrors: ''
+
+SystemHeaders: true
+HeaderFilterRegex: ''
+ExcludeHeaderFilterRegex: ''
+
+FormatStyle: file
+...

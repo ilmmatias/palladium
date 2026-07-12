@@ -3,6 +3,8 @@
 
 #include <kernel/halp.h>
 #include <kernel/ke.h>
+#include <os/containing_record.h>
+#include <rt/list.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -18,7 +20,7 @@
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void KeInitializeWork(KeWork* Work, void (*Routine)(void*), void* Context) {
+void KeInitializeWork(KeWork *Work, void (*Routine)(void *), void *Context) {
     Work->Routine = Routine;
     Work->Context = Context;
     Work->Queued = false;
@@ -37,7 +39,7 @@ void KeInitializeWork(KeWork* Work, void (*Routine)(void*), void* Context) {
  *     true if we queued successfully, or false if another processor/thread already queued this
  *     object.
  *-----------------------------------------------------------------------------------------------*/
-bool KeQueueWork(KeWork* Work, bool HighPriority) {
+bool KeQueueWork(KeWork *Work, bool HighPriority) {
     bool ExpectedValue = false;
     if (!__atomic_compare_exchange_n(
             &Work->Queued, &ExpectedValue, true, 0, __ATOMIC_RELEASE, __ATOMIC_ACQUIRE)) {

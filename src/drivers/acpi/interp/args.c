@@ -21,6 +21,7 @@
        Group 0, single byte + arguments.
        Group 1, two bytes (0x5B and opcode) + arguments. */
 
+// NOLINTBEGIN(misc-include-cleaner): I is a local ACPI table abbreviation, not complex.h.
 AcpipArgument AcpipGroup0Arguments[256] = {
     {1, 0, 0, {_, _, _, _, _, _}},  // ZeroOp
     {1, 0, 0, {_, _, _, _, _, _}},  // OneOp
@@ -279,6 +280,7 @@ AcpipArgument AcpipGroup0Arguments[256] = {
     {0, 0, 0, {_, _, _, _, _, _}},  //
     {1, 0, 0, {_, _, _, _, _, _}},  // OnesOp
 };
+// NOLINTEND(misc-include-cleaner)
 
 AcpipArgument AcpipGroup1Arguments[256] = {
     {0, 0, 0, {_, _, _, _, _, _}},  //

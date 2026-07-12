@@ -1,7 +1,10 @@
 /* SPDX-FileCopyrightText: (C) 2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
+#include <efi/spec.h>
+#include <efi/types.h>
 #include <pci.h>
+#include <stdint.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:

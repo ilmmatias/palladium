@@ -1,6 +1,8 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
+/* IWYU pragma: private, include <acpip.h> */
+
 #ifndef _SDT_H_
 #define _SDT_H_
 

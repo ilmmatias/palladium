@@ -3,7 +3,12 @@
 
 #include <kernel/ev.h>
 #include <kernel/ke.h>
+#include <kernel/ps.h>
 #include <kernel/psp.h>
+#include <os/containing_record.h>
+#include <rt/avltree.h>
+#include <rt/list.h>
+#include <stdint.h>
 
 extern KeAffinity KiIdleProcessors;
 extern uint64_t PspGlobalThreadCount;

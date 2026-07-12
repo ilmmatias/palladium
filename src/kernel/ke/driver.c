@@ -1,12 +1,17 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
+#include <kernel/kd.h>
 #include <kernel/kdp.h>
+#include <kernel/ke.h>
 #include <kernel/ki.h>
-#include <kernel/mi.h>
+#include <kernel/mm.h>
 #include <kernel/vid.h>
+#include <os/containing_record.h>
 #include <os/pe.h>
-#include <stdio.h>
+#include <rt/list.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <string.h>
 
 RtDList KiModuleListHead = {};

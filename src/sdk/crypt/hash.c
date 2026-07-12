@@ -2,6 +2,9 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <crypt/hash.h>
+#include <crypt/sha2.h>
+#include <stddef.h>
+#include <stdint.h>
 
 static const CryptHashHandle Handles[CRYPT_HASH_COUNT] = {
     {.BufferSize = 64,

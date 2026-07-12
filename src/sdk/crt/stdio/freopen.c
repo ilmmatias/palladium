@@ -1,11 +1,12 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
+#include <crt_impl/common.h>
 #include <crt_impl/file_flags.h>
 #include <crt_impl/os.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:

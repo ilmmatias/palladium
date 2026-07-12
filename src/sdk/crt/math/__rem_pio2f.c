@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <crt_impl/ieee754.h>
+#include <stdint.h>
 
 /* Constants for the fast path. */
 #define ROUND_FACTOR 0x1.8p52

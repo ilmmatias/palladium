@@ -3,7 +3,11 @@
 
 #include <kernel/halp.h>
 #include <kernel/ke.h>
+#include <kernel/ki.h>
+#include <kernel/mi.h>
 #include <kernel/mm.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <string.h>
 
 static int Version = 0;

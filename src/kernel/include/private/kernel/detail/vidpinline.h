@@ -1,6 +1,8 @@
 /* SPDX-FileCopyrightText: (C) 2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
+/* IWYU pragma: private, include <kernel/vidp.h> */
+
 #ifndef _KERNEL_DETAIL_VIDPINLINE_H_
 #define _KERNEL_DETAIL_VIDPINLINE_H_
 

@@ -3,8 +3,13 @@
 
 #include <kernel/ke.h>
 #include <kernel/mm.h>
+#include <kernel/ob.h>
 #include <kernel/obp.h>
+#include <os/containing_record.h>
 #include <rt/hash.h>
+#include <rt/list.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <string.h>
 
 /*-------------------------------------------------------------------------------------------------

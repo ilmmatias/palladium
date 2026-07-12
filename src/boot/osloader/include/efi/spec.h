@@ -18,14 +18,14 @@ SPDX-License-Identifier: BSD-2-Clause-Patent
 #ifndef _EFI_SPEC_H_
 #define _EFI_SPEC_H_
 
-#include <efi/types.h>
+#include <efi/types.h>  /* IWYU pragma: export */
 
 /* All these headers depend on just efi/types.h, so they need to be included afterwards. */
-#include <efi/device_path.h>
-#include <efi/pci.h>
-#include <efi/simple_text_in.h>
-#include <efi/simple_text_in_ex.h>
-#include <efi/simple_text_out.h>
+#include <efi/device_path.h>  /* IWYU pragma: export */
+#include <efi/pci.h>  /* IWYU pragma: export */
+#include <efi/simple_text_in.h>  /* IWYU pragma: export */
+#include <efi/simple_text_in_ex.h>  /* IWYU pragma: export */
+#include <efi/simple_text_out.h>  /* IWYU pragma: export */
 
 ///
 /// Enumeration of EFI memory allocation types.
@@ -222,7 +222,7 @@ typedef enum {
 
 /* pci_io.h annoyingly enough depends on ALLOCATE_TYPE and MEMORY_TYPE, so, here it sits,
  * kinda out of place. */
-#include <efi/pci_io.h>
+#include <efi/pci_io.h>  /* IWYU pragma: export */
 
 ///
 /// Definition of an EFI memory descriptor.
@@ -2398,12 +2398,12 @@ extern EFI_SYSTEM_TABLE        *gST;
 extern EFI_BOOT_SERVICES       *gBS;
 extern EFI_RUNTIME_SERVICES    *gRT;
 
-#include <efi/acpi.h>
-#include <efi/edid_active.h>
-#include <efi/file_info.h>
-#include <efi/graphics_output.h>
-#include <efi/loaded_image.h>
-#include <efi/rng.h>
-#include <efi/simple_file_system.h>
+#include <efi/acpi.h>  /* IWYU pragma: export */
+#include <efi/edid_active.h>  /* IWYU pragma: export */
+#include <efi/file_info.h>  /* IWYU pragma: export */
+#include <efi/graphics_output.h>  /* IWYU pragma: export */
+#include <efi/loaded_image.h>  /* IWYU pragma: export */
+#include <efi/rng.h>  /* IWYU pragma: export */
+#include <efi/simple_file_system.h>  /* IWYU pragma: export */
 
 #endif /* _EFI_SPEC_H_ */

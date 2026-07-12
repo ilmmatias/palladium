@@ -2,6 +2,9 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <crt_impl/os.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 
 typedef struct allocator_entry_t {

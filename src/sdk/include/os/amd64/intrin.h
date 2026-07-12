@@ -1,6 +1,8 @@
 /* SPDX-FileCopyrightText: (C) 2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
+/* IWYU pragma: private, include <os/intrin.h> */
+
 #ifndef _OS_AMD64_INTRIN_H_
 #define _OS_AMD64_INTRIN_H_
 

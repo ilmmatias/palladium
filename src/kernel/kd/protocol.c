@@ -2,9 +2,12 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <kernel/halp.h>
+#include <kernel/kd.h>
 #include <kernel/kdp.h>
+#include <kernel/mm.h>
 #include <os/intrin.h>
 #include <rt/except.h>
+#include <stdint.h>
 #include <string.h>
 
 extern void *KdpDebugAdapter;

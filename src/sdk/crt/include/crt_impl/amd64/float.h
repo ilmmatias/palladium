@@ -1,6 +1,8 @@
 /* SPDX-FileCopyrightText: (C) 2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
+/* IWYU pragma: private, include <float.h> */
+
 #ifndef CRT_IMPL_AMD64_FLOAT_H
 #define CRT_IMPL_AMD64_FLOAT_H
 

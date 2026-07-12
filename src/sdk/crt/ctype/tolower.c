@@ -1,6 +1,8 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
+#include <ctype.h>
+
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function converts uppercase characters into lowercase, leaving anything else

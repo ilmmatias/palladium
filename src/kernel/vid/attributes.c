@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <kernel/ke.h>
+#include <stdint.h>
 
 extern uint16_t VidpWidth;
 extern uint16_t VidpHeight;

@@ -3,6 +3,8 @@
 
 #include <console.h>
 #include <efi/spec.h>
+#include <efi/types.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 

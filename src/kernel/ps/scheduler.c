@@ -5,7 +5,13 @@
 #include <kernel/halp.h>
 #include <kernel/ke.h>
 #include <kernel/ob.h>
+#include <kernel/ps.h>
 #include <kernel/psp.h>
+#include <os/containing_record.h>
+#include <rt/avltree.h>
+#include <rt/list.h>
+#include <stddef.h>
+#include <stdint.h>
 
 [[noreturn]] extern void PspIdleThread(void *);
 extern uint64_t PspGlobalThreadCount;

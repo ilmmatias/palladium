@@ -3,6 +3,9 @@
 
 #include <crt_impl/fmt.h>
 #include <efi/spec.h>
+#include <efi/types.h>
+#include <stdarg.h>
+#include <stddef.h>
 #include <string.h>
 
 /*-------------------------------------------------------------------------------------------------

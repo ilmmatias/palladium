@@ -3,7 +3,10 @@
 
 #include <crt_impl/ieee754.h>
 #include <crt_impl/math.h>
+#include <errno.h>
+#include <math.h>
 #include <stddef.h>
+#include <stdint.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:

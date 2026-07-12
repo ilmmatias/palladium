@@ -3,6 +3,7 @@
 
 #include <kernel/halp.h>
 #include <kernel/ke.h>
+#include <stdint.h>
 #include <string.h>
 
 /*-------------------------------------------------------------------------------------------------

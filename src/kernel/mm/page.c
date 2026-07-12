@@ -3,7 +3,13 @@
 
 #include <kernel/halp.h>
 #include <kernel/ke.h>
+#include <kernel/ki.h>
 #include <kernel/mi.h>
+#include <kernel/mm.h>
+#include <os/containing_record.h>
+#include <rt/list.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <string.h>
 
 static RtDList *LoaderDescriptors = NULL;

@@ -1,11 +1,17 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
+#include <kernel/hal.h>
 #include <kernel/halp.h>
-#include <os/intrin.h>
 #include <kernel/ke.h>
 #include <kernel/mm.h>
+#include <os/containing_record.h>
+#include <os/intrin.h>
+#include <rt/context.h>
 #include <rt/except.h>
+#include <rt/list.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <string.h>
 
 extern struct __attribute__((packed)) {

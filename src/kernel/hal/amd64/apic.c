@@ -1,11 +1,17 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
+#include <kernel/hal.h>
 #include <kernel/halp.h>
 #include <kernel/kd.h>
 #include <kernel/ke.h>
+#include <kernel/mi.h>
 #include <kernel/mm.h>
+#include <os/containing_record.h>
 #include <os/intrin.h>
+#include <rt/list.h>
+#include <stddef.h>
+#include <stdint.h>
 
 RtSList HalpLapicListHead = {};
 

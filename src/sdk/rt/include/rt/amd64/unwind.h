@@ -1,6 +1,8 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
+/* IWYU pragma: private, include <rt/except.h> */
+
 #ifndef _RT_AMD64_UNWIND_H_
 #define _RT_AMD64_UNWIND_H_
 

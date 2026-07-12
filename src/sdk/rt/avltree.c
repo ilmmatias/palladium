@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <rt/avltree.h>
+#include <stddef.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -13,7 +14,7 @@
  * RETURN VALUE:
  *     Either the height of the node, or -1 if the node doesn't exist.
  *-----------------------------------------------------------------------------------------------*/
-static int GetHeight(RtAvlNode* Node) {
+static int GetHeight(RtAvlNode *Node) {
     return Node ? Node->Height : -1;
 }
 
@@ -27,7 +28,7 @@ static int GetHeight(RtAvlNode* Node) {
  * RETURN VALUE:
  *     Either the size of the node (and its childs), or 0 if the node doesn't exist.
  *-----------------------------------------------------------------------------------------------*/
-static int GetSubtreeSize(RtAvlNode* Node) {
+static int GetSubtreeSize(RtAvlNode *Node) {
     return Node ? Node->SubtreeSize : 0;
 }
 

@@ -1,10 +1,12 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
+#include <kernel/ev.h>
 #include <kernel/evp.h>
 #include <kernel/halp.h>
 #include <kernel/kd.h>
-#include <os/intrin.h>
+#include <stddef.h>
+#include <stdint.h>
 
 bool HalpTscActive = false;
 bool HalpTimerInitialized = false;

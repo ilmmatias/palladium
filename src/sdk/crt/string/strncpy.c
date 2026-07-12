@@ -3,6 +3,7 @@
 
 #include <crt_impl/common.h>
 #include <stddef.h>
+#include <string.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:

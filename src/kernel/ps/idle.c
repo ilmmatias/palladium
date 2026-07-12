@@ -4,8 +4,14 @@
 #include <crt_impl/rand.h>
 #include <kernel/halp.h>
 #include <kernel/kd.h>
-#include <kernel/mi.h>
+#include <kernel/ke.h>
+#include <kernel/ps.h>
 #include <kernel/psp.h>
+#include <os/containing_record.h>
+#include <os/intrin.h>
+#include <rt/list.h>
+#include <stddef.h>
+#include <stdint.h>
 
 extern KeAffinity KiIdleProcessors;
 extern uint64_t PspGlobalThreadCount;

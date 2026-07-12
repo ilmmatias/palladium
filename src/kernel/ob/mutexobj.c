@@ -3,6 +3,7 @@
 
 #include <kernel/ev.h>
 #include <kernel/ob.h>
+#include <stddef.h>
 
 ObType ObpMutexType = {
     .Name = "Mutex",

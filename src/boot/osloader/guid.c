@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <efi/spec.h>
+#include <efi/types.h>
 
 /* efi/acpi.h */
 EFI_GUID gEfiAcpiTableGuid = EFI_ACPI_TABLE_GUID;

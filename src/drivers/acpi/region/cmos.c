@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <acpip.h>
+#include <stdint.h>
 
 /* TODO: Should this data be in a header? */
 #define ADDRESS_PORT 0x70

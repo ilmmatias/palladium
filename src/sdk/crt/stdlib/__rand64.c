@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <stdint.h>
-#include <stdlib.h>
 
 uint64_t __rand_state = 1;
 

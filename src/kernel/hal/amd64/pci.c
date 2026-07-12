@@ -3,6 +3,8 @@
 
 #include <kernel/hal.h>
 #include <os/intrin.h>
+#include <stddef.h>
+#include <stdint.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:

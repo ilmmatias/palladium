@@ -1,6 +1,8 @@
 /* SPDX-FileCopyrightText: (C) 2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
+/* IWYU pragma: private, include <kernel/ob.h> */
+
 #ifndef _KERNEL_DETAIL_OBINLINE_H_
 #define _KERNEL_DETAIL_OBINLINE_H_
 

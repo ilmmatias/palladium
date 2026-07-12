@@ -1,6 +1,8 @@
 /* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
+#include <string.h>
+
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function implements generic code to compare two C strings.

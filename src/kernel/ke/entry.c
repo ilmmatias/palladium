@@ -3,11 +3,15 @@
 
 #include <crt_impl/rand.h>
 #include <kernel/halp.h>
+#include <kernel/kd.h>
 #include <kernel/kdp.h>
+#include <kernel/ke.h>
 #include <kernel/ki.h>
 #include <kernel/mi.h>
+#include <kernel/mm.h>
 #include <kernel/psp.h>
 #include <kernel/vidp.h>
+#include <os/intrin.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:

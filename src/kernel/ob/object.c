@@ -1,9 +1,10 @@
 /* SPDX-FileCopyrightText: (C) 2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
-#include <kernel/ke.h>
 #include <kernel/mm.h>
+#include <kernel/ob.h>
 #include <kernel/obp.h>
+#include <stddef.h>
 #include <string.h>
 
 /*-------------------------------------------------------------------------------------------------

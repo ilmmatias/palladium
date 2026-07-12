@@ -5,7 +5,10 @@
 #include <kernel/halp.h>
 #include <kernel/kd.h>
 #include <kernel/ke.h>
+#include <kernel/mi.h>
 #include <kernel/mm.h>
+#include <stddef.h>
+#include <stdint.h>
 
 extern bool HalpTimerInitialized;
 extern bool HalpTscActive;

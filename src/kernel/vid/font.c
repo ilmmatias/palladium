@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <kernel/vidp.h>
+#include <stdint.h>
 
 /* This font data was extracted from the Hack font (https://github.com/source-foundry/Hack). */
 

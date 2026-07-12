@@ -4,6 +4,9 @@
 #include <console.h>
 #include <crt_impl/rand.h>
 #include <efi/spec.h>
+#include <efi/types.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <support.h>
 
 /*-------------------------------------------------------------------------------------------------

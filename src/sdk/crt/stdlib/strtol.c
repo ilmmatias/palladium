@@ -4,6 +4,7 @@
 #include <crt_impl/common.h>
 #include <ctype.h>
 #include <limits.h>
+#include <stdlib.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:

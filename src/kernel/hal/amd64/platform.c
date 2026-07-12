@@ -5,7 +5,9 @@
 #include <kernel/halp.h>
 #include <kernel/kd.h>
 #include <kernel/ke.h>
+#include <kernel/ki.h>
 #include <os/intrin.h>
+#include <stdint.h>
 #include <string.h>
 
 /* Macro to help with checking the feature bits from CPUID (just to make the code a bit more

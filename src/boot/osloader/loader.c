@@ -3,10 +3,16 @@
 
 #include <console.h>
 #include <crt_impl/rand.h>
+#include <efi/spec.h>
+#include <efi/types.h>
 #include <file.h>
 #include <loader.h>
 #include <memory.h>
+#include <os/containing_record.h>
 #include <os/pe.h>
+#include <rt/list.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <string.h>
 
 /*-------------------------------------------------------------------------------------------------

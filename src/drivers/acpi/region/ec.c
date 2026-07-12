@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <acpip.h>
+#include <stdint.h>
 
 #define CMD_READ 0x80
 #define CMD_WRITE 0x81

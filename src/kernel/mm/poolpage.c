@@ -4,7 +4,11 @@
 #include <kernel/halp.h>
 #include <kernel/ke.h>
 #include <kernel/mi.h>
+#include <kernel/mm.h>
 #include <rt/bitmap.h>
+#include <rt/list.h>
+#include <stddef.h>
+#include <stdint.h>
 
 extern RtBitmap MiPoolBitmap;
 extern uint64_t MiPoolBitmapHint;

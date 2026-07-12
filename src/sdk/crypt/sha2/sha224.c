@@ -1,8 +1,9 @@
 /* SPDX-FileCopyrightText: (C) 2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
- #include <crypt/compiler.h>
-#include <crypt/sha2.h>
+#include <crypt/compiler.h>
+#include <crypt/sha2.h>  /* IWYU pragma: keep */
+#include <stdint.h>
 
 #if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
 #define BSWAP(A) (A)
