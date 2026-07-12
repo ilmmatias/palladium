@@ -8,6 +8,6 @@
 
 bool OslpInitializeArchEntropy(void);
 bool OslpCheckArchSupport(void);
-void OslpInitializeArchBootData(OslpBootBlock* BootBlock);
+void OslpInitializeArchBootData(OslpBootBlock *BootBlock);
 
 #endif /* _SUPPORT_H_ */

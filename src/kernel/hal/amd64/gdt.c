@@ -6,8 +6,6 @@
 #include <kernel/ke.h>
 #include <stdint.h>
 
-extern void HalpFlushGdt(void);
-
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function initializes an entry inside the GDT.

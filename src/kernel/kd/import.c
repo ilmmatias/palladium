@@ -471,9 +471,9 @@ static void Printf(char *Format, ...) {
     /* KdPrint calls the debugger, so make sure to handle recursion properly! */
     if (BlockRecursion) {
         return;
-    } else {
-        BlockRecursion = true;
     }
+
+    BlockRecursion = true;
 
     va_list Arguments;
     va_start(Arguments, Format);

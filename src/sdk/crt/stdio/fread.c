@@ -26,8 +26,9 @@ size_t
 fread_unlocked(void *CRT_RESTRICT ptr, size_t size, size_t nmemb, FILE *CRT_RESTRICT stream) {
     if (!stream || !size || !nmemb) {
         return 0;
-    } else if (
-        !ptr || !(stream->flags & __STDIO_FLAGS_READ) || (stream->flags & __STDIO_FLAGS_WRITING) ||
+    }
+
+    if (!ptr || !(stream->flags & __STDIO_FLAGS_READ) || (stream->flags & __STDIO_FLAGS_WRITING) ||
         (stream->flags & __STDIO_FLAGS_ERROR) || (stream->flags & __STDIO_FLAGS_EOF)) {
         if (!(stream->flags & __STDIO_FLAGS_EOF)) {
             stream->flags |= __STDIO_FLAGS_ERROR;

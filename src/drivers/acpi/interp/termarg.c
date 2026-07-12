@@ -130,16 +130,16 @@ GetBufferStringFormat(uint64_t Position, uint64_t Size, bool ImplicitCast, bool 
     if (Decimal) {
         if (Position < Size - 1) {
             return ImplicitCast ? "%ld " : "%ld,";
-        } else {
-            return "%ld";
         }
-    } else {
-        if (Position < Size - 1) {
-            return ImplicitCast ? "0x%02hhX " : "0x%02hhX,";
-        } else {
-            return "0x%02hhX";
-        }
+
+        return "%ld";
     }
+
+    if (Position < Size - 1) {
+        return ImplicitCast ? "0x%02hhX " : "0x%02hhX,";
+    }
+
+    return "0x%02hhX";
 }
 
 /*-------------------------------------------------------------------------------------------------

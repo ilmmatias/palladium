@@ -15,19 +15,19 @@
 
 /* Quarter round, macro because passing pointers arguments is kinda annoying (and C doesn't have
  * references). */
-#define QR(A, B, C, D) \
-    A += B;            \
-    D ^= A;            \
-    D = ROTL32(D, 16); \
-    C += D;            \
-    B ^= C;            \
-    B = ROTL32(B, 12); \
-    A += B;            \
-    D ^= A;            \
-    D = ROTL32(D, 8);  \
-    C += D;            \
-    B ^= C;            \
-    B = ROTL32(B, 7);
+#define QR(A, B, C, D)     \
+    (A) += (B);            \
+    (D) ^= (A);            \
+    (D) = ROTL32((D), 16); \
+    (C) += (D);            \
+    (B) ^= (C);            \
+    (B) = ROTL32((B), 12); \
+    (A) += (B);            \
+    (D) ^= (A);            \
+    (D) = ROTL32((D), 8);  \
+    (C) += (D);            \
+    (B) ^= (C);            \
+    (B) = ROTL32((B), 7);
 
 static const uint32_t InitialState[4] = {
     0x61707865,

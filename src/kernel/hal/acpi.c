@@ -78,7 +78,7 @@ void HalpInitializeLateAcpi(KiLoaderBlock *LoaderBlock) {
      * correct, but consider relaxing this if we end up finding out some firmwares either don't fill
      * the field, or have it set to an incorrect value. */
     int IsXsdt = LoaderBlock->Acpi.Version == 2;
-    if (memcmp(RootTable->Signature, IsXsdt ? "XSDT" : "RSDT", 4) ||
+    if (memcmp(RootTable->Signature, IsXsdt ? "XSDT" : "RSDT", 4) != 0 ||
         !Checksum((char *)RootTable, RootTable->Length)) {
         KeFatalError(
             KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
@@ -220,7 +220,9 @@ void *HalFindAcpiTable(const char *Signature, int Index) {
     /* No work left if we already grabbed this table before. */
     if (!Entry) {
         return NULL;
-    } else if (Entry->VirtualAddress) {
+    }
+
+    if (Entry->VirtualAddress) {
         return Entry->VirtualAddress;
     }
 

@@ -114,13 +114,15 @@ static bool _strtoi(
 
     if (overflow) {
         return true;
-    } else if (accum) {
+    }
+
+    if (accum) {
         *value *= sign;
         return true;
-    } else {
-        *value = 0;
-        return false;
     }
+
+    *value = 0;
+    return false;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -372,7 +374,9 @@ int __vscanf(
                     int ch = read_ch(context);
                     if (ch == EOF && str - str_start) {
                         break;
-                    } else if (ch == EOF) {
+                    }
+
+                    if (ch == EOF) {
                         return filled ? filled : EOF;
                     }
 
@@ -412,9 +416,13 @@ int __vscanf(
                     ch = read_ch(context);
                     if (ch == EOF && str - str_start) {
                         break;
-                    } else if (ch == EOF) {
+                    }
+
+                    if (ch == EOF) {
                         return filled ? filled : EOF;
-                    } else if (isspace(ch)) {
+                    }
+
+                    if (isspace(ch)) {
                         unread_ch(context, ch);
                         break;
                     }
@@ -539,8 +547,8 @@ int __vscanf(
             case 'p':
                 if (!_strtou(
                         16,
-                        width,
                         width_set,
+                        width,
                         &unsigned_value,
                         &read,
                         context,

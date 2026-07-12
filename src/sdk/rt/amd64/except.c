@@ -64,8 +64,8 @@ bool RtDispatchException(RtExceptionRecord *ExceptionRecord, RtContext *ContextR
         /* TODO: Raise a bad stack exception. */
         if ((EstablisherFrame & 7) || EstablisherFrame < StackBase ||
             EstablisherFrame >= StackLimit) {
-            while (true)
-                ;
+            while (true) {
+            }
         }
 
         if (LanguageHandler) {
@@ -121,8 +121,8 @@ bool RtDispatchException(RtExceptionRecord *ExceptionRecord, RtContext *ContextR
 
                     default: {
                         /* TODO: Raise a bad disposition exception. */
-                        while (true)
-                            ;
+                        while (true) {
+                        }
                     }
                 }
             } while (ExceptionRecord->ExceptionFlags & RT_EXC_FLAG_COLLIDED_UNWIND);
@@ -130,8 +130,8 @@ bool RtDispatchException(RtExceptionRecord *ExceptionRecord, RtContext *ContextR
             /* TODO: Raise a bad stack exception. */
             if ((EstablisherFrame & 7) || EstablisherFrame < StackBase ||
                 EstablisherFrame >= StackLimit) {
-                while (true)
-                    ;
+                while (true) {
+                }
             }
         }
 
@@ -230,7 +230,9 @@ int __C_specific_handler(
 
             if (FilterResult == RT_EXC_CONTINUE_EXECUTION) {
                 return RT_EXC_CONTINUE_EXECUTION;
-            } else if (FilterResult == RT_EXC_EXECUTE_HANDLER) {
+            }
+
+            if (FilterResult == RT_EXC_EXECUTE_HANDLER) {
                 RtUnwind(
                     (void *)EstablisherFrame,
                     (void *)(DispatcherContext->ImageBase +

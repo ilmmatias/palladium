@@ -47,7 +47,7 @@ bool KeQueueWork(KeWork *Work, bool HighPriority) {
     }
 
     KeIrql OldIrql = KeRaiseIrql(KE_IRQL_MAX);
-    KeProcessor* Processor = KeGetCurrentProcessor();
+    KeProcessor *Processor = KeGetCurrentProcessor();
 
     if (HighPriority) {
         RtPushDList(&Processor->WorkQueue, &Work->ListHeader);
@@ -82,10 +82,10 @@ void KiProcessWorkQueue(void) {
         KeFatalError(KE_PANIC_IRQL_NOT_EQUAL, KE_IRQL_DISPATCH, Irql, 0, 0);
     }
 
-    KeProcessor* Processor = KeGetCurrentProcessor();
+    KeProcessor *Processor = KeGetCurrentProcessor();
     while (Processor->WorkQueue.Next != &Processor->WorkQueue) {
         KeIrql OldIrql = KeRaiseIrql(KE_IRQL_MAX);
-        KeWork* Work = CONTAINING_RECORD(RtPopDList(&Processor->WorkQueue), KeWork, ListHeader);
+        KeWork *Work = CONTAINING_RECORD(RtPopDList(&Processor->WorkQueue), KeWork, ListHeader);
         KeLowerIrql(OldIrql);
         __atomic_store_n(&Work->Queued, false, __ATOMIC_RELEASE);
         Work->Routine(Work->Context);

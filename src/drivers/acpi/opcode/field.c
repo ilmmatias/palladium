@@ -227,7 +227,9 @@ int AcpipExecuteFieldOpcode(AcpipState *State, uint16_t Opcode) {
             AcpiObject *Object = AcpipResolveObject(Name);
             if (!Object) {
                 return 0;
-            } else if (Object->Value.Type != ACPI_REGION) {
+            }
+
+            if (Object->Value.Type != ACPI_REGION) {
                 return 0;
             }
 
@@ -253,14 +255,18 @@ int AcpipExecuteFieldOpcode(AcpipState *State, uint16_t Opcode) {
             AcpiObject *IndexObject = AcpipResolveObject(IndexName);
             if (!IndexObject) {
                 return 0;
-            } else if (IndexObject->Value.Type != ACPI_FIELD_UNIT) {
+            }
+
+            if (IndexObject->Value.Type != ACPI_FIELD_UNIT) {
                 return 0;
             }
 
             AcpiObject *DataObject = AcpipResolveObject(DataName);
             if (!DataObject) {
                 return 0;
-            } else if (DataObject->Value.Type != ACPI_FIELD_UNIT) {
+            }
+
+            if (DataObject->Value.Type != ACPI_FIELD_UNIT) {
                 return 0;
             }
 
@@ -288,14 +294,18 @@ int AcpipExecuteFieldOpcode(AcpipState *State, uint16_t Opcode) {
             AcpiObject *RegionObject = AcpipResolveObject(RegionName);
             if (!RegionObject) {
                 return 0;
-            } else if (RegionObject->Value.Type != ACPI_REGION) {
+            }
+
+            if (RegionObject->Value.Type != ACPI_REGION) {
                 return 0;
             }
 
             AcpiObject *BankObject = AcpipResolveObject(BankName);
             if (!BankObject) {
                 return 0;
-            } else if (BankObject->Value.Type != ACPI_FIELD_UNIT) {
+            }
+
+            if (BankObject->Value.Type != ACPI_FIELD_UNIT) {
                 return 0;
             }
 

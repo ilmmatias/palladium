@@ -71,8 +71,8 @@ void HalpInitializeTsc(void) {
             uint64_t StartTsc = __rdtsc();
             uint64_t StartRef = HalGetTimerTicks();
 
-            while (HalGetTimerTicks() < StartRef + Ticks)
-                ;
+            while (HalGetTimerTicks() < StartRef + Ticks) {
+            }
 
             uint64_t EndTsc = __rdtsc();
             uint64_t EndRef = HalGetTimerTicks();

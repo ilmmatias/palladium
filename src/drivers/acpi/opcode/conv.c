@@ -31,7 +31,9 @@ int AcpipExecuteConvOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
             if (!AcpipCastToBuffer(Value)) {
                 AcpiRemoveReference(Target, false);
                 return 0;
-            } else if (!AcpipStoreTarget(State, Target, Value)) {
+            }
+
+            if (!AcpipStoreTarget(State, Target, Value)) {
                 AcpiRemoveReference(Target, false);
                 return 0;
             }
@@ -50,7 +52,9 @@ int AcpipExecuteConvOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
             if (!AcpipCastToString(Value, false, Opcode == 0x97)) {
                 AcpiRemoveReference(Target, false);
                 return 0;
-            } else if (!AcpipStoreTarget(State, Target, Value)) {
+            }
+
+            if (!AcpipStoreTarget(State, Target, Value)) {
                 AcpiRemoveReference(Target, false);
                 return 0;
             }
@@ -69,7 +73,9 @@ int AcpipExecuteConvOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
                     &State->Opcode->FixedArguments[0].TermArg, &Value->Integer, true)) {
                 AcpiRemoveReference(Target, false);
                 return 0;
-            } else if (!AcpipStoreTarget(State, Target, Value)) {
+            }
+
+            if (!AcpipStoreTarget(State, Target, Value)) {
                 AcpiRemoveReference(Target, false);
                 return 0;
             }

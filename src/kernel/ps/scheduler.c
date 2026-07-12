@@ -61,7 +61,9 @@ RtAvlCompareResult PspCompareWaitThreads(RtAvlNode *FirstStruct, RtAvlNode *Seco
 
     if (FirstThread->WaitTicks > SecondThread->WaitTicks) {
         return RT_AVL_COMPARE_RESULT_LEFT;
-    } else if (FirstThread->WaitTicks < SecondThread->WaitTicks) {
+    }
+
+    if (FirstThread->WaitTicks < SecondThread->WaitTicks) {
         return RT_AVL_COMPARE_RESULT_RIGHT;
     }
 
@@ -70,7 +72,9 @@ RtAvlCompareResult PspCompareWaitThreads(RtAvlNode *FirstStruct, RtAvlNode *Seco
      * different). */
     if ((uintptr_t)FirstThread > (uintptr_t)SecondThread) {
         return RT_AVL_COMPARE_RESULT_LEFT;
-    } else if ((uintptr_t)FirstThread < (uintptr_t)SecondThread) {
+    }
+
+    if ((uintptr_t)FirstThread < (uintptr_t)SecondThread) {
         return RT_AVL_COMPARE_RESULT_RIGHT;
     }
 
@@ -258,11 +262,11 @@ void PspProcessQueue(void) {
         KeSetAffinityBit(&KiIdleProcessors, Processor->Number);
         KeReleaseSpinLockAndLowerIrql(&Processor->Lock, OldIrql);
         return;
-    } else {
-        __atomic_sub_fetch(&Processor->ThreadCount, 1, __ATOMIC_RELEASE);
-        __atomic_sub_fetch(&PspGlobalThreadCount, 1, __ATOMIC_RELEASE);
-        KeClearAffinityBit(&KiIdleProcessors, Processor->Number);
     }
+
+    __atomic_sub_fetch(&Processor->ThreadCount, 1, __ATOMIC_RELEASE);
+    __atomic_sub_fetch(&PspGlobalThreadCount, 1, __ATOMIC_RELEASE);
+    KeClearAffinityBit(&KiIdleProcessors, Processor->Number);
 
     PsThread *TargetThread = CONTAINING_RECORD(ListHeader, PsThread, ListHeader);
     PspSwitchThreads(Processor, CurrentThread, TargetThread, PS_STATE_QUEUED, OldIrql);

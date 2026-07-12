@@ -310,12 +310,12 @@ uint64_t MmAllocateSinglePage() {
     if (!ListHeader) {
         KeLowerIrql(OldIrql);
         return 0;
-    } else {
-        Processor->FreePageListSize--;
-        KeLowerIrql(OldIrql);
-        __atomic_sub_fetch(&MiTotalCachedPages, 1, __ATOMIC_RELAXED);
-        __atomic_add_fetch(&MiTotalUsedPages, 1, __ATOMIC_RELAXED);
     }
+
+    Processor->FreePageListSize--;
+    KeLowerIrql(OldIrql);
+    __atomic_sub_fetch(&MiTotalCachedPages, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&MiTotalUsedPages, 1, __ATOMIC_RELAXED);
 
     /* Make sure the flags make sense (if not, we probably have a corrupted PFN free list). */
     MiPageEntry *Entry = CONTAINING_RECORD(ListHeader, MiPageEntry, ListHeader);

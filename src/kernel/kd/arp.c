@@ -84,7 +84,7 @@ void KdpParseArpFrame(KdpArpHeader *ArpFrame, uint32_t Length) {
     /* We don't maintain any ARP tables ourselves, so we only care about ARP requests asking for our
      * IP. */
     if (KdpSwapNetworkOrder16(ArpFrame->Operation) != 1 ||
-        memcmp(ArpFrame->DestinationProtocolAddress, KdpDebuggeeProtocolAddress, 4)) {
+        memcmp(ArpFrame->DestinationProtocolAddress, KdpDebuggeeProtocolAddress, 4) != 0) {
         return;
     }
 

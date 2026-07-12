@@ -24,7 +24,7 @@ void KeInitializeAffinity(KeAffinity *Mask) {
 
     /* And set all remaining bits by hand (as to not overshoot). */
     for (uint64_t Bit = (Mask->Size >> 3) << 3; Bit < Mask->Size; Bit++) {
-        Mask->Bits[Bit >> 6] |= 1ull << (Bit & 0x3F);
+        Mask->Bits[Bit >> 6] |= 1ULL << (Bit & 0x3F);
     }
 }
 
@@ -44,7 +44,7 @@ bool KeGetAffinityBit(KeAffinity *Mask, uint32_t Number) {
         return false;
     }
 
-    uint64_t BitMask = 1ull << (Number & 0x3F);
+    uint64_t BitMask = 1ULL << (Number & 0x3F);
     return (__atomic_load_n(&Mask->Bits[Number >> 6], __ATOMIC_RELAXED) & BitMask) == BitMask;
 }
 
@@ -61,7 +61,7 @@ bool KeGetAffinityBit(KeAffinity *Mask, uint32_t Number) {
  *-----------------------------------------------------------------------------------------------*/
 void KeSetAffinityBit(KeAffinity *Mask, uint32_t Number) {
     if (Number < Mask->Size) {
-        __atomic_fetch_or(&Mask->Bits[Number >> 6], 1ull << (Number & 0x3F), __ATOMIC_RELAXED);
+        __atomic_fetch_or(&Mask->Bits[Number >> 6], 1ULL << (Number & 0x3F), __ATOMIC_RELAXED);
     }
 }
 
@@ -78,7 +78,7 @@ void KeSetAffinityBit(KeAffinity *Mask, uint32_t Number) {
  *-----------------------------------------------------------------------------------------------*/
 void KeClearAffinityBit(KeAffinity *Mask, uint32_t Number) {
     if (Number < Mask->Size) {
-        __atomic_fetch_and(&Mask->Bits[Number >> 6], ~(1ull << (Number & 0x3F)), __ATOMIC_RELAXED);
+        __atomic_fetch_and(&Mask->Bits[Number >> 6], ~(1ULL << (Number & 0x3F)), __ATOMIC_RELAXED);
     }
 }
 
@@ -150,7 +150,7 @@ uint64_t KeCountAffinitySetBits(KeAffinity *Mask) {
     uint64_t Word = __atomic_load_n(&Mask->Bits[WordCount - 1], __ATOMIC_RELAXED);
     uint32_t Remainder = Mask->Size & 63;
     if (Remainder) {
-        Result += __builtin_popcountll(Word & ((1ull << Remainder) - 1));
+        Result += __builtin_popcountll(Word & ((1ULL << Remainder) - 1));
     } else {
         Result += __builtin_popcountll(Word);
     }
@@ -182,7 +182,7 @@ uint64_t KeCountAffinityClearBits(KeAffinity *Mask) {
     uint64_t Word = __atomic_load_n(&Mask->Bits[WordCount - 1], __ATOMIC_RELAXED);
     uint32_t Remainder = Mask->Size & 63;
     if (Remainder) {
-        Result += __builtin_popcountll(~Word & ((1ull << Remainder) - 1));
+        Result += __builtin_popcountll(~Word & ((1ULL << Remainder) - 1));
     } else {
         Result += __builtin_popcountll(~Word);
     }

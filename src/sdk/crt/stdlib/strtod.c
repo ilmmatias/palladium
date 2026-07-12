@@ -30,7 +30,9 @@ double __strtod_hex(const char *str, double sign) {
         if (digit == '.') {
             dot = true;
             continue;
-        } else if (dot) {
+        }
+
+        if (dot) {
             /* Each digit is a nibble (4-bits). */
             p -= 4;
         }
@@ -97,7 +99,9 @@ double __strtod_dec(const char *str, double sign) {
         if (digit == '.') {
             dot = true;
             continue;
-        } else if (dot) {
+        }
+
+        if (dot) {
             e -= 1;
         }
 

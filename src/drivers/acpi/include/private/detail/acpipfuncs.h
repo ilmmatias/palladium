@@ -30,10 +30,10 @@ void *AcpipAllocateBlock(size_t Size);
 void *AcpipAllocateZeroBlock(size_t Elements, size_t ElementSize);
 void AcpipFreeBlock(void *Block);
 
-void AcpipShowInfoMessage(const char *Format, ...);
-void AcpipShowDebugMessage(const char *Format, ...);
-void AcpipShowTraceMessage(const char *Format, ...);
-[[noreturn]] void AcpipShowErrorMessage(int Reason, const char *Format, ...);
+void AcpipShowInfoMessage(const char *Message, ...);
+void AcpipShowDebugMessage(const char *Message, ...);
+void AcpipShowTraceMessage(const char *Message, ...);
+[[noreturn]] void AcpipShowErrorMessage(int Reason, const char *Message, ...);
 
 uint64_t AcpipGetTimer(void);
 void AcpipDelayThread(uint64_t Milliseconds);
@@ -74,7 +74,7 @@ bool AcpipReadPkgLength(AcpipState *State, uint32_t *Length);
 bool AcpipReadName(AcpipState *State, AcpiName *Name);
 
 bool AcpipReadField(AcpiValue *Source, AcpiValue *Target);
-bool AcpipWriteField(AcpiValue *Target, AcpiValue *Value);
+bool AcpipWriteField(AcpiValue *Target, AcpiValue *Data);
 
 uint64_t AcpipReadMmioSpace(uint64_t Address, int Size);
 void AcpipWriteMmioSpace(uint64_t Address, int Size, uint64_t Data);
@@ -84,7 +84,7 @@ uint64_t AcpipReadIoSpace(int Offset, int Size);
 void AcpipWriteIoSpace(int Offset, int Size, uint64_t Data);
 
 bool AcpipPrepareExecuteOpcode(AcpipState *State);
-bool AcpipExecuteOpcode(AcpipState *State, AcpiValue *Value);
+bool AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result);
 int AcpipExecuteConcatOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value);
 int AcpipExecuteConvOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value);
 int AcpipExecuteDataObjOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value);

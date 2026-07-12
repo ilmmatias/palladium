@@ -90,13 +90,13 @@ int vfprintf(FILE *CRT_RESTRICT stream, const char *CRT_RESTRICT format, va_list
 int vfscanf(FILE *CRT_RESTRICT stream, const char *CRT_RESTRICT format, va_list arg);
 int vprintf(const char *CRT_RESTRICT format, va_list arg);
 int vscanf(const char *CRT_RESTRICT format, va_list arg);
-int vsnprintf(char *CRT_RESTRICT s, size_t n, const char *CRT_RESTRICT format, va_list arg);
+int vsnprintf(char *CRT_RESTRICT s, size_t bufsz, const char *CRT_RESTRICT format, va_list arg);
 int vsprintf(char *CRT_RESTRICT s, const char *CRT_RESTRICT format, va_list arg);
 int vsscanf(const char *CRT_RESTRICT s, const char *CRT_RESTRICT format, va_list arg);
 
 /* Character input/output functions (unlocked variants). */
 int fgetc_unlocked(FILE *stream);
-char *fgets_unlocked(char *CRT_RESTRICT s, int n, FILE *CRT_RESTRICT stream);
+char *fgets_unlocked(char *CRT_RESTRICT s, int count, FILE *CRT_RESTRICT stream);
 int fputc_unlocked(int c, FILE *stream);
 int fputs_unlocked(const char *CRT_RESTRICT s, FILE *CRT_RESTRICT stream);
 int getchar_unlocked(void);
@@ -106,7 +106,7 @@ int ungetc_unlocked(int c, FILE *stream);
 
 /* Character input/output functions. */
 int fgetc(FILE *stream);
-char *fgets(char *CRT_RESTRICT s, int n, FILE *CRT_RESTRICT stream);
+char *fgets(char *CRT_RESTRICT s, int count, FILE *CRT_RESTRICT stream);
 int fputc(int c, FILE *stream);
 int fputs(const char *CRT_RESTRICT s, FILE *CRT_RESTRICT stream);
 int getchar(void);

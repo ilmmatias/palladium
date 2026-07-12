@@ -291,19 +291,21 @@ float logf(float x) {
     uint32_t xi_abs = xi & ~0x80000000;
     if (!xi || xi >= 0x7f800000) {
         if (xi_abs == 0) {
-            __raise_errnof(-1.0f / 0.0f, ERANGE);
+            __raise_errnof(-1.0F / 0.0F, ERANGE);
             return -INFINITY;
-        } else if (xi_abs <= 0x7f800000 && xi & 0x80000000) {
-            __raise_errnof(0.0f / 0.0f, EDOM);
-            return -NAN;
-        } else {
-            return x + x;
         }
+
+        if (xi_abs <= 0x7f800000 && xi & 0x80000000) {
+            __raise_errnof(0.0F / 0.0F, EDOM);
+            return -NAN;
+        }
+
+        return x + x;
     }
 
     /* Normalize any subnormal inputs. */
     if (xi < 0x800000) {
-        xi = __from_float(x * 0x1.0p23f) - 0xb800000;
+        xi = __from_float(x * 0x1.0p23F) - 0xb800000;
     }
 
     /* Separate the exponent and mantissa values. */

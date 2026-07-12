@@ -32,10 +32,10 @@ int fseek_unlocked(FILE *stream, long int offset, int whence) {
     if (flags) {
         stream->flags |= flags;
         return 1;
-    } else {
-        stream->flags &= ~__STDIO_FLAGS_EOF;
-        return 0;
     }
+
+    stream->flags &= ~__STDIO_FLAGS_EOF;
+    return 0;
 }
 
 /*-------------------------------------------------------------------------------------------------

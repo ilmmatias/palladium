@@ -27,9 +27,9 @@ int fgetpos_unlocked(FILE *CRT_RESTRICT stream, fpos_t *CRT_RESTRICT pos) {
     if (offset != -1) {
         *pos = offset;
         return 0;
-    } else {
-        return 1;
     }
+
+    return 1;
 }
 
 /*-------------------------------------------------------------------------------------------------

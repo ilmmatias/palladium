@@ -43,9 +43,9 @@ bool VidpUseLock = true;
 KeIrql VidpAcquireSpinLock(void) {
     if (VidpUseLock) {
         return KeAcquireSpinLockAndRaiseIrql(&VidpLock, KE_IRQL_DISPATCH);
-    } else {
-        return 0;
     }
+
+    return 0;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -83,20 +83,20 @@ void VidpFlush(void) {
     if (VidpFlushLines <= WrapLine) {
         /* If we don't have that many lines, we just need one memcpy to get everything. */
         memcpy(
-            VidpBackBuffer + VidpFlushY * VidpPitch,
-            VidpFrontBuffer + FrontY * VidpPitch,
-            VidpFlushLines * VidpPitch);
+            VidpBackBuffer + (ptrdiff_t)(VidpFlushY * VidpPitch),
+            VidpFrontBuffer + (ptrdiff_t)(FrontY * VidpPitch),
+            (size_t)(VidpFlushLines * VidpPitch));
     } else {
         /* Otherwise (when we go over the wrap around point), we need to use two memcpys (one for
          * before the wrap, and one for after the wrap). */
         memcpy(
-            VidpBackBuffer + VidpFlushY * VidpPitch,
-            VidpFrontBuffer + FrontY * VidpPitch,
-            WrapLine * VidpPitch);
+            VidpBackBuffer + (ptrdiff_t)(VidpFlushY * VidpPitch),
+            VidpFrontBuffer + (ptrdiff_t)(FrontY * VidpPitch),
+            (size_t)(WrapLine * VidpPitch));
         memcpy(
-            VidpBackBuffer + (VidpFlushY + WrapLine) * VidpPitch,
+            VidpBackBuffer + (ptrdiff_t)((VidpFlushY + WrapLine) * VidpPitch),
             VidpFrontBuffer,
-            (VidpFlushLines - WrapLine) * VidpPitch);
+            (size_t)((VidpFlushLines - WrapLine) * VidpPitch));
     }
 
     VidpPendingFullFlush = false;
@@ -122,11 +122,11 @@ static void ScrollUp(void) {
     const uint16_t BackY = VidpHeight - VidpFont.Height;
     for (int i = 0; i < VidpFont.Height; i++) {
         uint16_t FrontY = (VidpRingTop + BackY + i) % VidpHeight;
-        uint32_t *Buffer = (uint32_t *)&VidpFrontBuffer[FrontY * VidpPitch];
+        uint32_t *Buffer = (uint32_t *)&VidpFrontBuffer[(ptrdiff_t)(FrontY * VidpPitch)];
 
         /* Then, we can either set pixel by pixel, or use memset (if we have a solid background). */
         if (VidpBackground == (VidpBackground & 0xFF) * 0x01010101) {
-            memset(Buffer, VidpBackground & 0xFF, VidpWidth * 4);
+            memset(Buffer, VidpBackground & 0xFF, (size_t)(VidpWidth * 4));
         } else {
             for (int j = 0; j < VidpWidth; j++) {
                 Buffer[j] = VidpBackground;
@@ -196,7 +196,7 @@ static void DrawCharacter(char Character) {
         uint16_t FrontY = (VidpCursorY + VidpRingTop + Top) % VidpHeight;
         uint32_t *Buffer = (uint32_t *)&VidpFrontBuffer[FrontY * VidpPitch + VidpCursorX * 4];
         if (VidpBackground == (VidpBackground & 0xFF) * 0x01010101) {
-            memset(Buffer, VidpBackground & 0xFF, LeftLimit * 4);
+            memset(Buffer, VidpBackground & 0xFF, (size_t)(LeftLimit * 4));
         } else {
             for (int j = 0; j < TopLimit; j++) {
                 Buffer[j] = VidpBackground;

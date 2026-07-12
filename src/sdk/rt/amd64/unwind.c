@@ -47,9 +47,9 @@ static const int UnwindOpSlots[] = {
 static int GetUnwindOpSlots(RtUnwindCode *Code) {
     if (Code->UnwindOp == RT_UWOP_ALLOC_LARGE && Code->OpInfo) {
         return 3;
-    } else {
-        return UnwindOpSlots[Code->UnwindOp];
     }
+
+    return UnwindOpSlots[Code->UnwindOp];
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -85,26 +85,28 @@ static bool ProcessUnwindOps(
                     ContextRecord->Rsp += *(uint32_t *)(&UnwindInfo->UnwindCode[OpIndex + 1]);
                     OpIndex += 3;
                 } else {
-                    ContextRecord->Rsp += UnwindInfo->UnwindCode[OpIndex + 1].FrameOffset * 8;
+                    ContextRecord->Rsp +=
+                        (uint64_t)(UnwindInfo->UnwindCode[OpIndex + 1].FrameOffset * 8);
                     OpIndex += 2;
                 }
 
                 break;
 
             case RT_UWOP_ALLOC_SMALL:
-                ContextRecord->Rsp += (Code->OpInfo + 1) * 8;
+                ContextRecord->Rsp += (uint64_t)((Code->OpInfo + 1) * 8);
                 OpIndex += 1;
                 break;
 
             case RT_UWOP_SET_FPREG:
-                ContextRecord->Rsp =
-                    ContextRecord->Gpr[UnwindInfo->FrameRegister] - UnwindInfo->FrameOffset * 16;
+                ContextRecord->Rsp = ContextRecord->Gpr[UnwindInfo->FrameRegister] -
+                                     (uint64_t)(UnwindInfo->FrameOffset * 16);
                 OpIndex += 1;
                 break;
 
             case RT_UWOP_SAVE_NONVOL:
                 ContextRecord->Gpr[Code->OpInfo] =
-                    *(uint64_t *)(FrameBase + UnwindInfo->UnwindCode[OpIndex + 1].FrameOffset * 8);
+                    *(uint64_t *)(FrameBase +
+                                  (uint64_t)(UnwindInfo->UnwindCode[OpIndex + 1].FrameOffset * 8));
                 OpIndex += 2;
                 break;
 
@@ -124,7 +126,8 @@ static bool ProcessUnwindOps(
 
             case RT_UWOP_SAVE_XMM128:
                 ContextRecord->Xmm[Code->OpInfo] =
-                    *(__m128 *)(FrameBase + UnwindInfo->UnwindCode[OpIndex + 1].FrameOffset * 16);
+                    *(__m128 *)(FrameBase +
+                                (uint64_t)(UnwindInfo->UnwindCode[OpIndex + 1].FrameOffset * 16));
                 OpIndex += 2;
                 break;
 
@@ -251,8 +254,8 @@ RtExceptionRoutine RtVirtualUnwind(
         }
 
         if (HasSetFpreg) {
-            FrameBase =
-                ContextRecord->Gpr[UnwindInfo->FrameRegister] - UnwindInfo->FrameOffset * 16;
+            FrameBase = ContextRecord->Gpr[UnwindInfo->FrameRegister] -
+                        (uint64_t)(UnwindInfo->FrameOffset * 16);
         } else {
             FrameBase = ContextRecord->Rsp;
         }
@@ -410,9 +413,9 @@ RtExceptionRoutine RtVirtualUnwind(
         (UnwindInfo->Flags & (HandlerType & (RT_UNW_FLAG_EHANDLER | RT_UNW_FLAG_UHANDLER)))) {
         *HandlerData = RtGetExceptionDataPtr(UnwindInfo);
         return RtGetExceptionHandler(ImageBase, UnwindInfo);
-    } else {
-        return NULL;
     }
+
+    return NULL;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -465,8 +468,8 @@ RtUnwind(void *TargetFrame, void *TargetIp, RtExceptionRecord *ExceptionRecord, 
         if (!ImageBase) {
             /* We've unwound past the limit of the stack, this is bad (but at least we
                didn't access anything invalid). */
-            while (true)
-                ;
+            while (true) {
+            }
         }
 
         RtRuntimeFunction *FunctionEntry = RtLookupFunctionEntry(ImageBase, ControlPc);
@@ -495,8 +498,8 @@ RtUnwind(void *TargetFrame, void *TargetIp, RtExceptionRecord *ExceptionRecord, 
         if ((EstablisherFrame & 7) || EstablisherFrame < StackBase ||
             EstablisherFrame >= StackLimit ||
             (TargetFrame && (uint64_t)TargetFrame < EstablisherFrame)) {
-            while (true)
-                ;
+            while (true) {
+            }
         }
 
         if (LanguageHandler) {
@@ -553,8 +556,8 @@ RtUnwind(void *TargetFrame, void *TargetIp, RtExceptionRecord *ExceptionRecord, 
 
                     default: {
                         /* TODO: Raise a bad disposition exception. */
-                        while (true)
-                            ;
+                        while (true) {
+                        }
                     }
                 }
             } while (ExceptionRecord->ExceptionFlags & RT_EXC_FLAG_COLLIDED_UNWIND);
@@ -563,8 +566,8 @@ RtUnwind(void *TargetFrame, void *TargetIp, RtExceptionRecord *ExceptionRecord, 
             if ((EstablisherFrame & 7) || EstablisherFrame < StackBase ||
                 EstablisherFrame >= StackLimit ||
                 (TargetFrame && (uint64_t)TargetFrame < EstablisherFrame)) {
-                while (true)
-                    ;
+                while (true) {
+                }
             }
         }
 
@@ -579,8 +582,8 @@ RtUnwind(void *TargetFrame, void *TargetIp, RtExceptionRecord *ExceptionRecord, 
 
     if (EstablisherFrame != (uint64_t)TargetFrame) {
         /* TODO: Raise an exception here. */
-        while (true)
-            ;
+        while (true) {
+        }
     }
 
     ActiveContext.Rax = (uint64_t)ReturnValue;

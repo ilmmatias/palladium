@@ -63,7 +63,7 @@ void HalpInitializeEarlyAcpi(KiLoaderBlock *LoaderBlock) {
     /* If the signature is wrong, probably something is VERY wrong; Checksum should always be
      * correct, but consider relaxing this if we end up finding out some firmwares either don't fill
      * the field, or have it set to an incorrect value. */
-    if (memcmp(RootTable->Signature, Version == 2 ? "XSDT" : "RSDT", 4) ||
+    if (memcmp(RootTable->Signature, Version == 2 ? "XSDT" : "RSDT", 4) != 0 ||
         !Checksum((char *)RootTable, RootTable->Length)) {
         KeFatalError(
             KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
@@ -105,7 +105,7 @@ void *HalpFindEarlyAcpiTable(const char *Signature) {
         }
 
         /* Just the first page is enough to check the signature. */
-        if (memcmp(Header->Signature, Signature, 4)) {
+        if (memcmp(Header->Signature, Signature, 4) != 0) {
             HalpUnmapEarlyMemory(Header, MM_PAGE_SIZE);
             continue;
         }

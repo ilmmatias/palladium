@@ -41,7 +41,9 @@ bool AcpiExecuteMethod(AcpiObject *Object, int ArgCount, AcpiValue *Arguments, A
         }
 
         return false;
-    } else if (ArgCount < 0) {
+    }
+
+    if (ArgCount < 0) {
         ArgCount = 0;
     } else if (ArgCount > 7) {
         ArgCount = 7;
@@ -236,7 +238,9 @@ bool AcpiCastValue(AcpiValue *Source, AcpiValue *Target, int ExpectedType) {
      * target anyways to put the new data)... */
     if (!AcpiCopyValue(Source, Target)) {
         return false;
-    } else if (ExpectedType == ACPI_EMPTY || ExpectedType == Source->Type) {
+    }
+
+    if (ExpectedType == ACPI_EMPTY || ExpectedType == Source->Type) {
         return true;
     }
 
@@ -636,9 +640,9 @@ bool AcpipReadByte(AcpipState *State, uint8_t *Byte) {
         *Byte = *(State->Scope->Code++);
         State->Scope->RemainingLength--;
         return true;
-    } else {
-        return false;
     }
+
+    return false;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -659,9 +663,9 @@ bool AcpipReadWord(AcpipState *State, uint16_t *Word) {
         State->Scope->Code += 2;
         State->Scope->RemainingLength -= 2;
         return true;
-    } else {
-        return false;
     }
+
+    return false;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -682,9 +686,9 @@ bool AcpipReadDWord(AcpipState *State, uint32_t *DWord) {
         State->Scope->Code += 4;
         State->Scope->RemainingLength -= 4;
         return true;
-    } else {
-        return false;
     }
+
+    return false;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -705,9 +709,9 @@ bool AcpipReadQWord(AcpipState *State, uint64_t *QWord) {
         State->Scope->Code += 8;
         State->Scope->RemainingLength -= 8;
         return true;
-    } else {
-        return false;
     }
+
+    return false;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -811,7 +815,7 @@ bool AcpipReadName(AcpipState *State, AcpiName *Name) {
     Name->Start = State->Scope->Code;
     Name->BacktrackCount = BacktrackCount;
     Name->SegmentCount = SegmentCount;
-    State->Scope->Code += SegmentCount * 4;
+    State->Scope->Code += (ptrdiff_t)(SegmentCount * 4);
     State->Scope->RemainingLength -= SegmentCount * 4;
 
     return true;

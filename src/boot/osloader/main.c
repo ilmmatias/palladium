@@ -120,18 +120,18 @@ EFI_STATUS OslMain(EFI_HANDLE *ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
             OslPrint("The system ran out of memory while loading %s.\r\n", Config.Kernel);
             OslPrint("The boot process cannot continue.\r\n");
             break;
-        } else {
-            snprintf(ModulePath, ModuleNameLength + 16, "\\EFI\\PALLADIUM\\%s", Config.Kernel);
         }
+
+        snprintf(ModulePath, ModuleNameLength + 16, "\\EFI\\PALLADIUM\\%s", Config.Kernel);
 
         /* The module name is fixed though (always kernel.exe, as that's what every driver
          * expects). */
         OslpLoadedProgram *Program = OslLoadExecutable("kernel.exe", ModulePath);
         if (!Program) {
             break;
-        } else {
-            RtAppendDList(&LoadedPrograms, &Program->ListHeader);
         }
+
+        RtAppendDList(&LoadedPrograms, &Program->ListHeader);
 
         /* Proceed by loading up the correct KDNET extensibility DLL (we automatically find it by
          * iterating over the ethernet PCI devices). TODO: Should this section be in a separate file
@@ -202,7 +202,7 @@ EFI_STATUS OslMain(EFI_HANDLE *ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
             uint32_t Offset = *(uint32_t *)((char *)KdnetDll->PhysicalAddress + 0x3C);
             PeHeader *ExecHeader = (PeHeader *)((char *)KdnetDll->PhysicalAddress + Offset);
             if (KdnetDll->ExportTableSize != 1 ||
-                strcmp(KdnetDll->ExportTable[0].Name, "KdInitializeLibrary") ||
+                strcmp(KdnetDll->ExportTable[0].Name, "KdInitializeLibrary") != 0 ||
                 ExecHeader->DataDirectories.ImportTable.Size) {
                 OslPrint("Failed to load the KDNET module.\r\n");
                 OslPrint("The extensibility module %s is not valid.\r\n", KdnetDllPath);
@@ -294,7 +294,7 @@ EFI_STATUS OslMain(EFI_HANDLE *ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
         if (!OslpCreateMemoryDescriptors(
                 &LoadedPrograms,
                 FrontBufferPhys,
-                FramebufferHeight * FramebufferPitch,
+                (UINTN)(FramebufferHeight * FramebufferPitch),
                 &MemoryDescriptorListHead,
                 &MemoryDescriptorStack,
                 &MemoryMapSize,
@@ -354,7 +354,7 @@ EFI_STATUS OslMain(EFI_HANDLE *ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
             MemoryDescriptorListHead,
             &MemoryDescriptorStack,
             &LoadedPrograms,
-            FramebufferHeight * FramebufferPitch,
+            (uint64_t)(FramebufferHeight * FramebufferPitch),
             BackBufferPhys,
             BackBufferVirt,
             FrontBufferPhys,

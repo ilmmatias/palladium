@@ -132,8 +132,8 @@ void DriverEntry(void) {
     if (Fadt->SmiCommandPort && Fadt->AcpiEnable &&
         !(AcpipReadIoSpace(Fadt->Pm1aControlBlock, 2) & 1)) {
         AcpipWriteIoSpace(Fadt->SmiCommandPort, 1, Fadt->AcpiEnable);
-        while (!(AcpipReadIoSpace(Fadt->Pm1aControlBlock, 2) & 1))
-            ;
+        while (!(AcpipReadIoSpace(Fadt->Pm1aControlBlock, 2) & 1)) {
+        }
     }
 
     AcpipShowInfoMessage("enabled ACPI\n");

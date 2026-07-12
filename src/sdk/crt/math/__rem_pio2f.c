@@ -100,7 +100,7 @@ double __rem_pio2f(float x, int *q) {
     uint32_t xi = __from_float(x);
     if ((xi & ~0x80000000) < REM_PIO2_THRESHOLD) {
         return rem_pio2f_fast(x, q);
-    } else {
-        return rem_pio2f_slow(xi, q);
     }
+
+    return rem_pio2f_slow(xi, q);
 }

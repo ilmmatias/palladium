@@ -43,7 +43,7 @@ static int GetSubtreeSize(RtAvlNode *Node) {
  *     Values below 1 means the node is right-heavy, values above 1 means the node is left-heavy,
  *     0 means the node is balanced.
  *-----------------------------------------------------------------------------------------------*/
-static int GetBalance(RtAvlNode* Node) {
+static int GetBalance(RtAvlNode *Node) {
     return GetHeight(Node->Left) - GetHeight(Node->Right);
 }
 
@@ -57,7 +57,7 @@ static int GetBalance(RtAvlNode* Node) {
  * RETURN VALUE:
  *     New height to be assigned into Node->Height.
  *-----------------------------------------------------------------------------------------------*/
-static int RecalculateHeight(RtAvlNode* Node) {
+static int RecalculateHeight(RtAvlNode *Node) {
     int LeftHeight = GetHeight(Node->Left);
     int RightHeight = GetHeight(Node->Right);
     return (LeftHeight < RightHeight ? RightHeight : LeftHeight) + 1;
@@ -73,7 +73,7 @@ static int RecalculateHeight(RtAvlNode* Node) {
  * RETURN VALUE:
  *     New size to be assigned into Node->SubtreeSize.
  *-----------------------------------------------------------------------------------------------*/
-static int RecalculateSubtreeSize(RtAvlNode* Node) {
+static int RecalculateSubtreeSize(RtAvlNode *Node) {
     return GetSubtreeSize(Node->Left) + GetSubtreeSize(Node->Right) + 1;
 }
 
@@ -87,10 +87,10 @@ static int RecalculateSubtreeSize(RtAvlNode* Node) {
  * RETURN VALUE:
  *     New node root after the rotation.
  *-----------------------------------------------------------------------------------------------*/
-static RtAvlNode* RotateLeft(RtAvlNode* Node) {
-    RtAvlNode* NewRoot = Node->Right;
-    RtAvlNode* Center = NewRoot->Left;
-    RtAvlNode* OldParent = Node->Parent;
+static RtAvlNode *RotateLeft(RtAvlNode *Node) {
+    RtAvlNode *NewRoot = Node->Right;
+    RtAvlNode *Center = NewRoot->Left;
+    RtAvlNode *OldParent = Node->Parent;
 
     /* Perform the actual rotation. */
     NewRoot->Left = Node;
@@ -122,10 +122,10 @@ static RtAvlNode* RotateLeft(RtAvlNode* Node) {
  * RETURN VALUE:
  *     New node root after the rotation.
  *-----------------------------------------------------------------------------------------------*/
-static RtAvlNode* RotateRight(RtAvlNode* Node) {
-    RtAvlNode* NewRoot = Node->Left;
-    RtAvlNode* Center = NewRoot->Right;
-    RtAvlNode* OldParent = Node->Parent;
+static RtAvlNode *RotateRight(RtAvlNode *Node) {
+    RtAvlNode *NewRoot = Node->Left;
+    RtAvlNode *Center = NewRoot->Right;
+    RtAvlNode *OldParent = Node->Parent;
 
     /* Perform the actual rotation. */
     NewRoot->Right = Node;
@@ -161,9 +161,9 @@ static RtAvlNode* RotateRight(RtAvlNode* Node) {
  *     Insertion point in case we didn't find the node (or EQUAL if we did find it).
  *-----------------------------------------------------------------------------------------------*/
 static RtAvlCompareResult
-SearchNodeOrParent(RtAvlTree* Tree, RtAvlNode* NodeToCompare, RtAvlNode** SearchResult) {
+SearchNodeOrParent(RtAvlTree *Tree, RtAvlNode *NodeToCompare, RtAvlNode **SearchResult) {
     RtAvlCompareResult CompareResult = RT_AVL_COMPARE_RESULT_LEFT;
-    RtAvlNode* ParentNode = NULL;
+    RtAvlNode *ParentNode = NULL;
 
     *SearchResult = Tree->Root;
 
@@ -197,8 +197,8 @@ SearchNodeOrParent(RtAvlTree* Tree, RtAvlNode* NodeToCompare, RtAvlNode** Search
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-static void RebalanceTree(RtAvlTree* Tree, RtAvlNode* StartNode) {
-    RtAvlNode* CurrentNode = StartNode;
+static void RebalanceTree(RtAvlTree *Tree, RtAvlNode *StartNode) {
+    RtAvlNode *CurrentNode = StartNode;
 
     while (CurrentNode) {
         /* Update metrics for the current node. */
@@ -207,8 +207,8 @@ static void RebalanceTree(RtAvlTree* Tree, RtAvlNode* StartNode) {
 
         /* Determine if a rotation is needed. */
         int Balance = GetBalance(CurrentNode);
-        RtAvlNode* ParentNode = CurrentNode->Parent;
-        RtAvlNode* NewRoot = NULL;
+        RtAvlNode *ParentNode = CurrentNode->Parent;
+        RtAvlNode *NewRoot = NULL;
         if (Balance > 1 && GetBalance(CurrentNode->Left) >= 0) {
             NewRoot = RotateRight(CurrentNode);
         } else if (Balance < -1 && GetBalance(CurrentNode->Right) <= 0) {
@@ -247,7 +247,7 @@ static void RebalanceTree(RtAvlTree* Tree, RtAvlNode* StartNode) {
  * RETURN VALUE:
  *     Smallest value in the node, or NULL if the node was NULL.
  *-----------------------------------------------------------------------------------------------*/
-static RtAvlNode* GetMinimumNode(RtAvlNode* CurrentNode) {
+static RtAvlNode *GetMinimumNode(RtAvlNode *CurrentNode) {
     if (!CurrentNode) {
         return NULL;
     }
@@ -269,7 +269,7 @@ static RtAvlNode* GetMinimumNode(RtAvlNode* CurrentNode) {
  * RETURN VALUE:
  *     Successor of the current node, or NULL if there is none (or the node was NULL).
  *-----------------------------------------------------------------------------------------------*/
-static RtAvlNode* GetInOrderSuccessor(RtAvlNode* Node) {
+static RtAvlNode *GetInOrderSuccessor(RtAvlNode *Node) {
     return Node ? GetMinimumNode(Node->Right) : NULL;
 }
 
@@ -288,7 +288,7 @@ static RtAvlNode* GetInOrderSuccessor(RtAvlNode* Node) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void RtInitializeAvlTree(RtAvlTree* Tree, RtAvlCompareRoutine CompareRoutine) {
+void RtInitializeAvlTree(RtAvlTree *Tree, RtAvlCompareRoutine CompareRoutine) {
     Tree->Size = 0;
     Tree->Root = NULL;
     Tree->CompareRoutine = CompareRoutine;
@@ -305,8 +305,8 @@ void RtInitializeAvlTree(RtAvlTree* Tree, RtAvlCompareRoutine CompareRoutine) {
  * RETURN VALUE:
  *     false if the node already existed in the tree, true otherwise.
  *-----------------------------------------------------------------------------------------------*/
-bool RtInsertAvlTree(RtAvlTree* Tree, RtAvlNode* Node) {
-    RtAvlNode* ParentNode;
+bool RtInsertAvlTree(RtAvlTree *Tree, RtAvlNode *Node) {
+    RtAvlNode *ParentNode;
     RtAvlCompareResult CompareResult = SearchNodeOrParent(Tree, Node, &ParentNode);
     if (CompareResult == RT_AVL_COMPARE_RESULT_EQUAL && ParentNode) {
         return false;
@@ -343,20 +343,20 @@ bool RtInsertAvlTree(RtAvlTree* Tree, RtAvlNode* Node) {
  * RETURN VALUE:
  *     Either the removed node, or NULL if we couldn't find it.
  *-----------------------------------------------------------------------------------------------*/
-RtAvlNode* RtRemoveAvlTree(RtAvlTree* Tree, RtAvlNode* NodeToRemove) {
+RtAvlNode *RtRemoveAvlTree(RtAvlTree *Tree, RtAvlNode *NodeToRemove) {
     NodeToRemove = RtLookupAvlTree(Tree, NodeToRemove);
     if (!NodeToRemove) {
         return NULL;
     }
 
-    RtAvlNode* NodeToReplace;
+    RtAvlNode *NodeToReplace;
     if (!NodeToRemove->Left || !NodeToRemove->Right) {
         NodeToReplace = NodeToRemove;
     } else {
         NodeToReplace = GetInOrderSuccessor(NodeToRemove);
     }
 
-    RtAvlNode* ChildNode;
+    RtAvlNode *ChildNode;
     if (NodeToReplace->Left) {
         ChildNode = NodeToReplace->Left;
     } else {
@@ -364,7 +364,7 @@ RtAvlNode* RtRemoveAvlTree(RtAvlTree* Tree, RtAvlNode* NodeToRemove) {
     }
 
     /* Splice out NodeToReplace by linking its child to its parent. */
-    RtAvlNode* RebalanceNode = NodeToReplace->Parent;
+    RtAvlNode *RebalanceNode = NodeToReplace->Parent;
     if (ChildNode) {
         ChildNode->Parent = RebalanceNode;
     }
@@ -419,7 +419,7 @@ RtAvlNode* RtRemoveAvlTree(RtAvlTree* Tree, RtAvlNode* NodeToRemove) {
  * RETURN VALUE:
  *     Either 0 if the tree is empty, or its height.
  *-----------------------------------------------------------------------------------------------*/
-int RtQueryHeightAvlTree(RtAvlTree* Tree) {
+int RtQueryHeightAvlTree(RtAvlTree *Tree) {
     return Tree->Root ? Tree->Root->Height + 1 : 0;
 }
 
@@ -433,7 +433,7 @@ int RtQueryHeightAvlTree(RtAvlTree* Tree) {
  * RETURN VALUE:
  *     Either 0 if the tree is empty, or its size.
  *-----------------------------------------------------------------------------------------------*/
-int RtQuerySizeAvlTree(RtAvlTree* Tree) {
+int RtQuerySizeAvlTree(RtAvlTree *Tree) {
     return Tree->Size;
 }
 
@@ -448,17 +448,14 @@ int RtQuerySizeAvlTree(RtAvlTree* Tree) {
  * RETURN VALUE:
  *     Either the node if it was found, or NULL.
  *-----------------------------------------------------------------------------------------------*/
-RtAvlNode* RtLookupAvlTree(RtAvlTree* Tree, RtAvlNode* NodeToCompare) {
-    RtAvlNode* SearchResult;
-    RtAvlCompareResult CompareResult;
-
-    CompareResult = SearchNodeOrParent(Tree, NodeToCompare, &SearchResult);
-
+RtAvlNode *RtLookupAvlTree(RtAvlTree *Tree, RtAvlNode *NodeToCompare) {
+    RtAvlNode *SearchResult;
+    RtAvlCompareResult CompareResult = SearchNodeOrParent(Tree, NodeToCompare, &SearchResult);
     if (CompareResult == RT_AVL_COMPARE_RESULT_EQUAL) {
         return SearchResult;
-    } else {
-        return NULL;
     }
+
+    return NULL;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -472,8 +469,8 @@ RtAvlNode* RtLookupAvlTree(RtAvlTree* Tree, RtAvlNode* NodeToCompare) {
  * RETURN VALUE:
  *     Either the node if it was found, or NULL.
  *-----------------------------------------------------------------------------------------------*/
-RtAvlNode* RtLookupByIndexAvlTree(RtAvlTree* Tree, int Index) {
-    RtAvlNode* CurrentNode;
+RtAvlNode *RtLookupByIndexAvlTree(RtAvlTree *Tree, int Index) {
+    RtAvlNode *CurrentNode;
     int LeftSize;
 
     if (Index < 0 || Index >= Tree->Size) {
@@ -514,9 +511,9 @@ RtAvlNode* RtLookupByIndexAvlTree(RtAvlTree* Tree, int Index) {
  * RETURN VALUE:
  *     Either the next in-order node, or NULL if we're finished.
  *-----------------------------------------------------------------------------------------------*/
-RtAvlNode* RtEnumerateAvlTree(RtAvlTree* Tree, RtAvlNode** RestartKey) {
-    RtAvlNode* CurrentNode;
-    RtAvlNode* ParentNode;
+RtAvlNode *RtEnumerateAvlTree(RtAvlTree *Tree, RtAvlNode **RestartKey) {
+    RtAvlNode *CurrentNode;
+    RtAvlNode *ParentNode;
 
     if (!*RestartKey) {
         CurrentNode = GetMinimumNode(Tree->Root);

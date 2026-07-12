@@ -17,8 +17,8 @@
 #define FE_ALL_EXCEPT \
     (FE_INVALID | FE_DENORMAL | FE_DIVBYZERO | FE_OVERFLOW | FE_UNDERFLOW | FE_INEXACT)
 
-#define FE_DFL_MODE ((const femode_t*)-1L)
-#define FE_DFL_ENV ((const fenv_t*)-1L)
+#define FE_DFL_MODE ((const femode_t *)-1L)
+#define FE_DFL_ENV ((const fenv_t *)-1L)
 
 typedef uint64_t fexcept_t;
 

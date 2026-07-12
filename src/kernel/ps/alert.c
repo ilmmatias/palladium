@@ -28,7 +28,7 @@ void PsInitializeAlert(PsAlert *Alert, uint64_t Flags, void (*Routine)(void *), 
     Alert->Routine = Routine;
     Alert->Context = Context;
     Alert->Queued = false;
-    Alert->PoolAllocated = (Flags & PS_INIT_ALERT_POOL_ALLOCATED) ? true : false;
+    Alert->PoolAllocated = (bool)(Flags & PS_INIT_ALERT_POOL_ALLOCATED);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -44,14 +44,16 @@ void PsInitializeAlert(PsAlert *Alert, uint64_t Flags, void (*Routine)(void *), 
  *     false if we failed to insert the alert (the thread got terminated, or someone else already
  *     queued this alert), false otherwise.
  *-----------------------------------------------------------------------------------------------*/
-bool PsQueueAlert(PsThread* Thread, PsAlert* Alert) {
+bool PsQueueAlert(PsThread *Thread, PsAlert *Alert) {
     bool ExpectedValue = false;
     KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Thread->AlertLock, KE_IRQL_DISPATCH);
     if (__atomic_load_n(&Thread->AlertListBlocked, __ATOMIC_RELAXED)) {
         KeReleaseSpinLockAndLowerIrql(&Thread->AlertLock, OldIrql);
         return false;
-    } else if (!__atomic_compare_exchange_n(
-                   &Alert->Queued, &ExpectedValue, true, 0, __ATOMIC_RELEASE, __ATOMIC_ACQUIRE)) {
+    }
+
+    if (!__atomic_compare_exchange_n(
+            &Alert->Queued, &ExpectedValue, true, 0, __ATOMIC_RELEASE, __ATOMIC_ACQUIRE)) {
         KeReleaseSpinLockAndLowerIrql(&Thread->AlertLock, OldIrql);
         return false;
     }
@@ -81,16 +83,16 @@ void PspProcessAlertQueue(void) {
         KeFatalError(KE_PANIC_IRQL_NOT_EQUAL, KE_IRQL_ALERT, Irql, 0, 0);
     }
 
-    PsThread* Thread = PsGetCurrentThread();
+    PsThread *Thread = PsGetCurrentThread();
     while (true) {
         KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Thread->AlertLock, KE_IRQL_DISPATCH);
-        RtSList* ListHeader = RtPopSList(&Thread->AlertList);
+        RtSList *ListHeader = RtPopSList(&Thread->AlertList);
         KeReleaseSpinLockAndLowerIrql(&Thread->AlertLock, OldIrql);
         if (!ListHeader) {
             break;
         }
 
-        PsAlert* Alert = CONTAINING_RECORD(ListHeader, PsAlert, ListHeader);
+        PsAlert *Alert = CONTAINING_RECORD(ListHeader, PsAlert, ListHeader);
         __atomic_store_n(&Alert->Queued, false, __ATOMIC_RELEASE);
         Alert->Routine(Alert->Context);
     }

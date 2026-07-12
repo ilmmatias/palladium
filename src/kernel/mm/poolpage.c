@@ -117,8 +117,10 @@ void *MiAllocatePoolPages(uint32_t Pages) {
         uint64_t PhysicalAddress = MmAllocateSinglePage();
         if (!PhysicalAddress) {
             break;
-        } else if (!HalpMapContiguousPages(
-                       VirtualAddress + Offset, PhysicalAddress, MM_PAGE_SIZE, MI_MAP_WRITE)) {
+        }
+
+        if (!HalpMapContiguousPages(
+                VirtualAddress + Offset, PhysicalAddress, MM_PAGE_SIZE, MI_MAP_WRITE)) {
             MmFreeSinglePage(PhysicalAddress);
             break;
         }

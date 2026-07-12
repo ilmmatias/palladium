@@ -22,7 +22,9 @@ AcpiObject *AcpipObjectTree = NULL;
 AcpiObject *AcpiSearchObject(AcpiObject *Parent, const char *Name) {
     if (!Name || !AcpipObjectTree) {
         return NULL;
-    } else if (!Parent) {
+    }
+
+    if (!Parent) {
         Parent = AcpipObjectTree;
     }
 
@@ -67,7 +69,9 @@ bool AcpiEvaluateObject(AcpiObject *Object, AcpiValue *Result, int ExpectedType)
            wrong?*/
         if (Value->Method.Flags & 0x07) {
             return false;
-        } else if (!AcpiExecuteMethod(Object, 0, NULL, &MethodResult)) {
+        }
+
+        if (!AcpiExecuteMethod(Object, 0, NULL, &MethodResult)) {
             return false;
         }
 
@@ -306,13 +310,15 @@ char *AcpiGetObjectPath(AcpiObject *Object) {
     char *Path = AcpipAllocateBlock(Parts ? Parts * 5 + 1 : 2);
     if (!Path) {
         return NULL;
-    } else if (!Parts) {
+    }
+
+    if (!Parts) {
         *Path = '\\';
         *(Path + 1) = 0;
         return Path;
     }
 
-    char *Segment = Path + Parts * 5;
+    char *Segment = Path + (ptrdiff_t)(Parts * 5);
     *Segment = 0;
 
     for (; Object->Parent; Object = Object->Parent) {

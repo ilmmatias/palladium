@@ -81,7 +81,7 @@ OslpLoadedProgram *OslLoadExecutable(const char *ImageName, const char *ImagePat
 
     /* Following the information at https://learn.microsoft.com/en-us/windows/win32/debug/pe-format
        for the implementation. */
-    if (memcmp(Header->Signature, PE_SIGNATURE, 4) || Header->Machine != PE_MACHINE ||
+    if (memcmp(Header->Signature, PE_SIGNATURE, 4) != 0 || Header->Machine != PE_MACHINE ||
         !(Header->Characteristics & 0x2000) || Header->Magic != 0x20B || Header->Subsystem != 1 ||
         (Header->DllCharacteristics & 0x160) != 0x160) {
         OslPrint("Failed to load a kernel/driver file.\r\n");
@@ -91,8 +91,8 @@ OslpLoadedProgram *OslLoadExecutable(const char *ImageName, const char *ImagePat
         return NULL;
     }
 
-    if (Header->SizeOfOptionalHeader < sizeof(PeHeader) - 24 ||
-        !Header->SizeOfImage || Header->SizeOfHeaders > Header->SizeOfImage ||
+    if (Header->SizeOfOptionalHeader < sizeof(PeHeader) - 24 || !Header->SizeOfImage ||
+        Header->SizeOfHeaders > Header->SizeOfImage ||
         !OslpCheckRange(0, Header->SizeOfHeaders, BufferSize) ||
         !OslpCheckRange(
             Offset,
@@ -114,7 +114,8 @@ OslpLoadedProgram *OslLoadExecutable(const char *ImageName, const char *ImagePat
     uint32_t SymbolTableSize = 0;
     if (Header->PointerToSymbolTable && Header->NumberOfSymbols) {
         uint64_t SymbolBytes = (uint64_t)Header->NumberOfSymbols * 18;
-        if (!OslpCheckRange(Header->PointerToSymbolTable, SymbolBytes + sizeof(uint32_t), BufferSize)) {
+        if (!OslpCheckRange(
+                Header->PointerToSymbolTable, SymbolBytes + sizeof(uint32_t), BufferSize)) {
             OslPrint("Failed to load a kernel/driver file.\r\n");
             OslPrint("The file at %s has a malformed COFF symbol table.\r\n", ImagePath);
             OslPrint("The boot process cannot continue.\r\n");
@@ -151,7 +152,7 @@ OslpLoadedProgram *OslLoadExecutable(const char *ImageName, const char *ImagePat
     }
 
     ThisProgram->Name = ImageName;
-    ThisProgram->ImageSize = ImagePages * EFI_PAGE_SIZE;
+    ThisProgram->ImageSize = (uint64_t)(ImagePages * EFI_PAGE_SIZE);
 
     Status = gBS->AllocatePool(
         EfiLoaderData, ImagePages * sizeof(int), (VOID **)&ThisProgram->PageFlags);
@@ -211,7 +212,8 @@ OslpLoadedProgram *OslLoadExecutable(const char *ImageName, const char *ImagePat
 
         if (!OslpCheckRange(Sections[i].VirtualAddress, Size, Header->SizeOfImage) ||
             (Sections[i].SizeOfRawData &&
-             !OslpCheckRange(Sections[i].PointerToRawData, Sections[i].SizeOfRawData, BufferSize))) {
+             !OslpCheckRange(
+                 Sections[i].PointerToRawData, Sections[i].SizeOfRawData, BufferSize))) {
             OslPrint("Failed to load a kernel/driver file.\r\n");
             OslPrint("The file at %s has section data outside the image bounds.\r\n", ImagePath);
             OslPrint("The boot process cannot continue.\r\n");

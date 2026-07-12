@@ -22,9 +22,9 @@ void KeInitializeWork(KeWork *Work, void (*Routine)(void *), void *Context);
 bool KeQueueWork(KeWork *Work, bool HighPriority);
 
 void KeInitializeAffinity(KeAffinity *Mask);
-bool KeGetAffinityBit(KeAffinity *Mask, uint32_t Index);
-void KeSetAffinityBit(KeAffinity *Mask, uint32_t Index);
-void KeClearAffinityBit(KeAffinity *Mask, uint32_t Index);
+bool KeGetAffinityBit(KeAffinity *Mask, uint32_t Number);
+void KeSetAffinityBit(KeAffinity *Mask, uint32_t Number);
+void KeClearAffinityBit(KeAffinity *Mask, uint32_t Number);
 uint32_t KeGetFirstAffinitySetBit(KeAffinity *Mask);
 uint32_t KeGetFirstAffinityClearBit(KeAffinity *Mask);
 uint64_t KeCountAffinitySetBits(KeAffinity *Mask);

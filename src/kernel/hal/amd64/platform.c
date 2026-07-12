@@ -7,6 +7,7 @@
 #include <kernel/ke.h>
 #include <kernel/ki.h>
 #include <os/intrin.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -53,10 +54,10 @@ static void CollectManufacturer(void) {
     if (HalpPlatformMaxExtendedLeaf >= HALP_CPUID_EXTENDED_PROCESSOR_BRAND(2)) {
         for (int i = 0; i < 3; i++) {
             __cpuid(HALP_CPUID_EXTENDED_PROCESSOR_BRAND(i), Eax, Ebx, Ecx, Edx);
-            memcpy(HalpPlatformProcessorBrandString + i * 16, (void *)&Eax, 4);
-            memcpy(HalpPlatformProcessorBrandString + i * 16 + 4, (void *)&Ebx, 4);
-            memcpy(HalpPlatformProcessorBrandString + i * 16 + 8, (void *)&Ecx, 4);
-            memcpy(HalpPlatformProcessorBrandString + i * 16 + 12, (void *)&Edx, 4);
+            memcpy(HalpPlatformProcessorBrandString + (ptrdiff_t)(i * 16), (void *)&Eax, 4);
+            memcpy(HalpPlatformProcessorBrandString + (ptrdiff_t)(i * 16) + 4, (void *)&Ebx, 4);
+            memcpy(HalpPlatformProcessorBrandString + (ptrdiff_t)(i * 16) + 8, (void *)&Ecx, 4);
+            memcpy(HalpPlatformProcessorBrandString + (ptrdiff_t)(i * 16) + 12, (void *)&Edx, 4);
         }
     } else {
         strcpy(HalpPlatformProcessorBrandString, "(unavailable)");

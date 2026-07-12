@@ -98,7 +98,7 @@ float tanf(float x) {
     uint32_t xi_abs = xi & ~0x80000000;
     if (xi_abs >= 0x7f800000) {
         if (!(xi & 0x7fffff)) {
-            __raise_errnof(0.0f / 0.0f, EDOM);
+            __raise_errnof(0.0F / 0.0F, EDOM);
         }
 
         return x - x;

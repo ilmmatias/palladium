@@ -124,11 +124,11 @@ static PsThread *TrySteal(KeProcessor *Processor) {
                     "processor %u got its new thread stolen while idle\n",
                     Processor->Number);
                 continue;
-            } else {
-                __atomic_sub_fetch(&Processor->ThreadCount, 1, __ATOMIC_RELEASE);
-                __atomic_sub_fetch(&PspGlobalThreadCount, 1, __ATOMIC_RELEASE);
-                TargetThread = CONTAINING_RECORD(ListHeader, PsThread, ListHeader);
             }
+
+            __atomic_sub_fetch(&Processor->ThreadCount, 1, __ATOMIC_RELEASE);
+            __atomic_sub_fetch(&PspGlobalThreadCount, 1, __ATOMIC_RELEASE);
+            TargetThread = CONTAINING_RECORD(ListHeader, PsThread, ListHeader);
         }
 
         KeClearAffinityBit(&KiIdleProcessors, Processor->Number);

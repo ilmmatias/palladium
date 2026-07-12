@@ -46,13 +46,15 @@
     EFI_STATUS Status;
     do {
         UINTN MapKey = 0;
-        Status =
-            gBS->GetMemoryMap(&MemoryMapSize, MemoryMap, &MapKey, &DescriptorSize, &DescriptorVersion);
+        Status = gBS->GetMemoryMap(
+            &MemoryMapSize, MemoryMap, &MapKey, &DescriptorSize, &DescriptorVersion);
         if (Status == EFI_BUFFER_TOO_SMALL) {
             OslPrint("The EFI memory map grew after the loader built its descriptor list.\r\n");
             OslPrint("The boot process cannot continue safely.\r\n");
             break;
-        } else if (Status != EFI_SUCCESS) {
+        }
+
+        if (Status != EFI_SUCCESS) {
             OslPrint("Failed to refresh the EFI memory map before ExitBootServices().\r\n");
             OslPrint("The boot process cannot continue.\r\n");
             break;

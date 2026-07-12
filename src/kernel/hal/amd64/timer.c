@@ -44,7 +44,7 @@ void HalpSetActiveTimer(uint64_t Frequency, uint64_t (*GetTicks)(void)) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void HalpInitializeTimer(void) {
-    const char* Source;
+    const char *Source;
     if (HalpGetTscFrequency()) {
         /* Prefer the TSC if we have invariant TSC support (as it has a way lower latency for
          * access, and is guaranteed to be 64-bits). */
@@ -90,8 +90,8 @@ void HalpInitializeApicTimer(void) {
     for (int i = 0; i < 5; i++) {
         uint64_t End = HalGetTimerTicks() + Ticks;
         HalpWriteLapicRegister(HALP_APIC_TIMER_ICR_REG, UINT32_MAX);
-        while (HalGetTimerTicks() < End)
-            ;
+        while (HalGetTimerTicks() < End) {
+        }
         Accum += UINT32_MAX - HalpReadLapicRegister(HALP_APIC_TIMER_CCR_REG);
     }
 

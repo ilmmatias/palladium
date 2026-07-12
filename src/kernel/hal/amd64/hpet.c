@@ -185,7 +185,7 @@ uint64_t HalpGetHpetTicks(void) {
     uint64_t LowPart = ReadHpetRegister(HPET_VAL_REG);
     if (LowPart < OldValue.LowPart) {
         return ((uint64_t)(OldValue.HighPart + 1) << 32) | LowPart;
-    } else {
-        return ((uint64_t)OldValue.HighPart << 32) | LowPart;
     }
+
+    return ((uint64_t)OldValue.HighPart << 32) | LowPart;
 }

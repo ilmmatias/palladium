@@ -2,7 +2,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <crypt/compiler.h>
-#include <crypt/sha2.h>  /* IWYU pragma: keep */
+#include <crypt/sha2.h> /* IWYU pragma: keep */
 #include <stdint.h>
 
 #if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__

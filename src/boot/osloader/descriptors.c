@@ -88,7 +88,7 @@ bool OslpCreateMemoryDescriptors(
         }
 
         /* Leave some room for the allocations we still need to perform before ExitBootServices. */
-        MemoryMapCapacity = ActualMemoryMapSize + (2 * EFI_PAGE_SIZE);
+        MemoryMapCapacity = ActualMemoryMapSize + ((UINTN)(2 * EFI_PAGE_SIZE));
         Status = gBS->AllocatePool(EfiLoaderData, MemoryMapCapacity, (VOID **)MemoryMap);
         if (Status != EFI_SUCCESS) {
             break;
@@ -327,14 +327,17 @@ bool OslpUpdateMemoryDescriptors(
     if (ListHeader == MemoryDescriptorListHead) {
         for (ListHeader = MemoryDescriptorListHead->Next; ListHeader != MemoryDescriptorListHead;) {
             Entry = CONTAINING_RECORD(ListHeader, OslpMemoryDescriptor, ListHeader);
-
             if (Entry->Type != Type) {
                 ListHeader = ListHeader->Next;
                 continue;
-            } else if (Entry->BasePage + Entry->PageCount == BasePage) {
+            }
+
+            if (Entry->BasePage + Entry->PageCount == BasePage) {
                 Entry->PageCount += PageCount;
                 break;
-            } else if (BasePage + PageCount == Entry->BasePage) {
+            } 
+            
+            if (BasePage + PageCount == Entry->BasePage) {
                 Entry->BasePage = BasePage;
                 Entry->PageCount += PageCount;
                 break;

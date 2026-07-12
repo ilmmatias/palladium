@@ -23,8 +23,9 @@
 char *fgets_unlocked(char *CRT_RESTRICT s, int count, FILE *CRT_RESTRICT stream) {
     if (!stream) {
         return NULL;
-    } else if (
-        !s || !count || !(stream->flags & __STDIO_FLAGS_READ) ||
+    }
+
+    if (!s || !count || !(stream->flags & __STDIO_FLAGS_READ) ||
         (stream->flags & __STDIO_FLAGS_WRITING) || (stream->flags & __STDIO_FLAGS_ERROR) ||
         (stream->flags & __STDIO_FLAGS_EOF)) {
         if (!(stream->flags & __STDIO_FLAGS_EOF)) {

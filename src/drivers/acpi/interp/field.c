@@ -135,7 +135,9 @@ static bool SetupEcRegion(AcpiObject *Object) {
         if (Tag == 0x79) {
             /* End tag. */
             break;
-        } else if ((Tag & 0x80) == 0) {
+        }
+
+        if ((Tag & 0x80) == 0) {
             /* Small resource descriptor. */
             uint64_t Length = Tag & 0x07;
             int Type = (Tag >> 3) & 0x0F;
@@ -566,7 +568,7 @@ bool AcpipReadField(AcpiValue *Source, AcpiValue *Target) {
 
     /* Mask-off anything beyond our length, in case we have an unaligned size. */
     if (UnalignedLength) {
-        Item &= (2ull << (UnalignedLength - 1)) - 1;
+        Item &= (2ULL << (UnalignedLength - 1)) - 1;
     }
 
     memcpy(Buffer, &Item, AccessWidth / 8);

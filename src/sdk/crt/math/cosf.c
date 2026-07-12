@@ -59,7 +59,7 @@ float cosf(float x) {
     uint32_t xi_abs = xi & ~0x80000000;
     if (xi_abs >= 0x7f800000) {
         if (!(xi & 0x7fffff)) {
-            __raise_errnof(0.0f / 0.0f, EDOM);
+            __raise_errnof(0.0F / 0.0F, EDOM);
         }
 
         return x - x;
@@ -68,7 +68,7 @@ float cosf(float x) {
     /* For very small values, the rounding errors inherant to float values make cos(x)=1 a
      * properly rounded approximation. */
     if (xi_abs < 0x39800001) {
-        return 1.0f;
+        return 1.0F;
     }
 
     /* The core approx function works on the range [-pi/4;pi/4], if we're inside it, no need

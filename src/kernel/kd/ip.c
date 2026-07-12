@@ -3,6 +3,7 @@
 
 #include <kernel/kd.h>
 #include <kernel/kdp.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -22,7 +23,7 @@ uint16_t KdpCalculateIpChecksum(KdpIpHeader *Header) {
     uint16_t *HeaderData = (uint16_t *)Header;
     uint32_t Sum = 0;
 
-    for (size_t i = 0; i < Header->Length * 2; i++) {
+    for (size_t i = 0; i < (size_t)(Header->Length * 2); i++) {
         Sum += KdpSwapNetworkOrder16(HeaderData[i]);
     }
 
@@ -54,7 +55,9 @@ void KdpParseIpFrame(
     if (Length < sizeof(KdpIpHeader)) {
         KdPrint(KD_TYPE_TRACE, "ignoring invalid IP packet of size %u\n", Length);
         return;
-    } else if (IpFrame->Version != 4) {
+    }
+
+    if (IpFrame->Version != 4) {
         return;
     }
 
@@ -69,7 +72,7 @@ void KdpParseIpFrame(
 
     /* We also only care about UDP, so ignore anything else (while we're at it, also validate that
      * the target IP address is correct/ours). */
-    if (memcmp(IpFrame->DestinationAddress, KdpDebuggeeProtocolAddress, 4) ||
+    if (memcmp(IpFrame->DestinationAddress, KdpDebuggeeProtocolAddress, 4) != 0 ||
         IpFrame->Protocol != 17) {
         return;
     }

@@ -419,10 +419,10 @@ bool HalInitializeInterruptData(HalInterruptData *Data, uint32_t BusVector) {
 
         if (__atomic_fetch_or(&GsiUsed[Data->SourceGsi], 0x01, __ATOMIC_ACQUIRE) & 0x01) {
             return false;
-        } else {
-            Data->HasGsi = true;
-            return true;
         }
+
+        Data->HasGsi = true;
+        return true;
     }
 
     /* For all other cases, we need to allocate a new unused GSI. */

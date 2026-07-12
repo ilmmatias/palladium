@@ -87,7 +87,8 @@ int AcpipExecuteConcatOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Valu
 
                 /* Convert both sides into strings, and append them into a single string. */
                 default: {
-                    if (!AcpipCastToString(Left, true, false) || !AcpipCastToString(Right, true, false)) {
+                    if (!AcpipCastToString(Left, true, false) ||
+                        !AcpipCastToString(Right, true, false)) {
                         AcpiRemoveReference(Left, false);
                         AcpiRemoveReference(Right, false);
                         AcpiRemoveReference(&State->Opcode->FixedArguments[2].TermArg, false);

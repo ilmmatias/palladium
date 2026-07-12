@@ -48,9 +48,9 @@ bool OslpInitializeArchEntropy(void) {
     if (SeedLow || SeedHigh) {
         __srand64(((uint64_t)SeedHigh << 32) | SeedLow);
         return true;
-    } else {
-        return false;
     }
+
+    return false;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -74,11 +74,15 @@ bool OslpCheckArchSupport(void) {
         OslPrint("Your processor does not support the CMPXCHG16B instruction.\r\n");
         OslPrint("The boot process cannot continue.\r\n");
         return false;
-    } else if (!(Edx & bit_TSC)) {
+    }
+
+    if (!(Edx & bit_TSC)) {
         OslPrint("Your processor does not support the RDTSC instruction.\r\n");
         OslPrint("The boot process cannot continue.\r\n");
         return false;
-    } else if (!(Edx & bit_APIC)) {
+    }
+
+    if (!(Edx & bit_APIC)) {
         OslPrint("Your processor does not support APIC operation.\r\n");
         OslPrint("The boot process cannot continue.\r\n");
         return false;
@@ -97,7 +101,7 @@ bool OslpCheckArchSupport(void) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void OslpInitializeArchBootData(OslpBootBlock* BootBlock) {
+void OslpInitializeArchBootData(OslpBootBlock *BootBlock) {
     /* This is our initial (rough) estimate, essentially used only for small delays during the boot
      * process. It should get superseded by either the HPET, another timer, or a more properly
      * calibrated TSC frequency (if we have an invariant TSC) when the kernel gets further in its

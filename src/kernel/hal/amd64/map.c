@@ -134,7 +134,9 @@ static bool GetFrame(uint64_t VirtualAddress, uint64_t *TargetLevel, HalpPageFra
     if (!Frame->Present) {
         *TargetLevel = HALP_PDPT_LEVEL;
         return false;
-    } else if (Frame->PageSize) {
+    }
+
+    if (Frame->PageSize) {
         *TargetLevel = HALP_PDPT_LEVEL;
         *TargetFrame = Frame;
         return true;
@@ -144,7 +146,9 @@ static bool GetFrame(uint64_t VirtualAddress, uint64_t *TargetLevel, HalpPageFra
     if (!Frame->Present) {
         *TargetLevel = HALP_PD_LEVEL;
         return false;
-    } else if (Frame->PageSize) {
+    }
+
+    if (Frame->PageSize) {
         *TargetLevel = HALP_PD_LEVEL;
         *TargetFrame = Frame;
         return true;
@@ -154,10 +158,10 @@ static bool GetFrame(uint64_t VirtualAddress, uint64_t *TargetLevel, HalpPageFra
     *TargetLevel = HALP_PT_LEVEL;
     if (!Frame->Present) {
         return false;
-    } else {
-        *TargetFrame = Frame;
-        return true;
     }
+
+    *TargetFrame = Frame;
+    return true;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -249,9 +253,9 @@ uint64_t HalpGetPhysicalAddress(void *VirtualAddress) {
     if (GetFrame((uint64_t)VirtualAddress, &TargetLevel, &TargetFrame)) {
         return (TargetFrame->Address << HALP_PT_SHIFT) |
                ((uint64_t)VirtualAddress & (TableLevels[TargetLevel].Size - 1));
-    } else {
-        return 0;
     }
+
+    return 0;
 }
 
 /*-------------------------------------------------------------------------------------------------

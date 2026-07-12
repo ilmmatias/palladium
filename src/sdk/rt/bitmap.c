@@ -35,7 +35,7 @@ void RtInitializeBitmap(RtBitmap *Header, uint64_t *Buffer, uint64_t NumberOfBit
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void RtClearBit(RtBitmap *Header, uint64_t Bit) {
-    Header->Buffer[Bit >> 6] &= ~(1ull << (Bit & 0x3F));
+    Header->Buffer[Bit >> 6] &= ~(1ULL << (Bit & 0x3F));
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -111,7 +111,7 @@ void RtClearAllBits(RtBitmap *Header) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void RtSetBit(RtBitmap *Header, uint64_t Bit) {
-    Header->Buffer[Bit >> 6] |= 1ull << (Bit & 0x3F);
+    Header->Buffer[Bit >> 6] |= 1ULL << (Bit & 0x3F);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -231,7 +231,9 @@ static uint64_t FindBitRow(RtBitmap *Header, uint64_t Hint, uint64_t NumberOfBit
 
     if (NumberOfBits > Header->NumberOfBits) {
         return -1;
-    } else if (!NumberOfBits) {
+    }
+
+    if (!NumberOfBits) {
         return Hint;
     }
 

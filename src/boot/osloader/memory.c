@@ -59,9 +59,9 @@ void *OslAllocateVirtualAddress(uint64_t Pages) {
         RtFindClearBitsAndSet(&BitmapHeader, __rand64() % (SpaceSize - Pages + 1), Pages);
     if (StartingIndex != (uint64_t)-1) {
         return (void *)(VIRTUAL_BASE + (StartingIndex << VIRTUAL_RANDOM_SHIFT));
-    } else {
-        return NULL;
     }
+
+    return NULL;
 }
 
 /*-------------------------------------------------------------------------------------------------

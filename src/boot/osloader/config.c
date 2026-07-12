@@ -238,7 +238,9 @@ bool OslLoadConfigFile(const char *Path, OslConfig *Config) {
         if (!*EqualSign) {
             OslPrint("Unterminated command before end of the file %s.\r\n", Path);
             break;
-        } else if (*EqualSign != '=') {
+        }
+
+        if (*EqualSign != '=') {
             OslPrint("Invalid command syntax at line %zu in the file %s.\r\n", LineNumber, Path);
 
             /* For this case, we do need to actually skip the remainder of the line. */
@@ -300,7 +302,9 @@ bool OslLoadConfigFile(const char *Path, OslConfig *Config) {
             if (Config->BootDriverCount >= Config->BootDriverCapacity &&
                 !ExpandBootDriverCapacity(Config)) {
                 return false;
-            } else if (CheckBootDrivers(Config, Value)) {
+            }
+
+            if (CheckBootDrivers(Config, Value)) {
                 OslPrint(
                     "Ignoring duplicate boot driver '%s' at line %zu in the file %s.\r\n",
                     Value,

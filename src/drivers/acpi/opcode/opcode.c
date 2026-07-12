@@ -14,7 +14,8 @@ extern AcpipArgument AcpipGroup1Arguments[256];
     Status = Function(State, Opcode->Opcode, ##__VA_ARGS__); \
     if (!Status) {                                           \
         return false;                                        \
-    } else if (Status > 0) {                                 \
+    }                                                        \
+    if (Status > 0) {                                        \
         break;                                               \
     }
 
@@ -474,9 +475,9 @@ bool AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
                         if (WeakReference) {
                             Value.Type = ACPI_EMPTY;
                             break;
-                        } else {
-                            return false;
                         }
+
+                        return false;
                     }
 
                     if (ObjReference) {

@@ -127,12 +127,14 @@ static PageFrame *PrepareLevel(
                 OslPrint("The system ran out of memory while creating the boot page map.\r\n");
                 OslPrint("The boot process cannot continue.\r\n");
                 return NULL;
-            } else if (!OslpUpdateMemoryDescriptors(
-                           MemoryDescriptorListHead,
-                           MemoryDescriptorStack,
-                           PAGE_TYPE_PAGE_MAP,
-                           PhysicalAddress >> EFI_PAGE_SHIFT,
-                           1)) {
+            }
+
+            if (!OslpUpdateMemoryDescriptors(
+                    MemoryDescriptorListHead,
+                    MemoryDescriptorStack,
+                    PAGE_TYPE_PAGE_MAP,
+                    PhysicalAddress >> EFI_PAGE_SHIFT,
+                    1)) {
                 return NULL;
             }
 
@@ -370,12 +372,14 @@ void *OslpCreatePageMap(
         OslPrint("The system ran out of memory while creating the boot page map.\r\n");
         OslPrint("The boot process cannot continue.\r\n");
         return NULL;
-    } else if (!OslpUpdateMemoryDescriptors(
-                   MemoryDescriptorListHead,
-                   MemoryDescriptorStack,
-                   PAGE_TYPE_PAGE_MAP,
-                   PhysicalAddress >> EFI_PAGE_SHIFT,
-                   1)) {
+    }
+
+    if (!OslpUpdateMemoryDescriptors(
+            MemoryDescriptorListHead,
+            MemoryDescriptorStack,
+            PAGE_TYPE_PAGE_MAP,
+            PhysicalAddress >> EFI_PAGE_SHIFT,
+            1)) {
         return NULL;
     }
 
@@ -487,14 +491,16 @@ void *OslpCreatePageMap(
         OslPrint("The system ran out of memory while creating the boot page map.\r\n");
         OslPrint("The boot process cannot continue.\r\n");
         return NULL;
-    } else if (!MapRange(
-                   MemoryDescriptorListHead,
-                   MemoryDescriptorStack,
-                   PageMap,
-                   (uint64_t)FrontBufferVirt,
-                   (uint64_t)FrontBufferPhys,
-                   AlignedFrameBufferSize,
-                   PAGE_FLAGS_WRITE)) {
+    }
+
+    if (!MapRange(
+            MemoryDescriptorListHead,
+            MemoryDescriptorStack,
+            PageMap,
+            (uint64_t)FrontBufferVirt,
+            (uint64_t)FrontBufferPhys,
+            AlignedFrameBufferSize,
+            PAGE_FLAGS_WRITE)) {
         OslPrint("The system ran out of memory while creating the boot page map.\r\n");
         OslPrint("The boot process cannot continue.\r\n");
         return NULL;

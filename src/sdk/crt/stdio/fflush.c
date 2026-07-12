@@ -21,7 +21,9 @@ int fflush_unlocked(FILE *stream) {
     /* TODO: We need to flush ALL streams if we're NULL, not error out. */
     if (!stream) {
         return EOF;
-    } else if (!(stream->flags & (__STDIO_FLAGS_READING | __STDIO_FLAGS_WRITING))) {
+    }
+
+    if (!(stream->flags & (__STDIO_FLAGS_READING | __STDIO_FLAGS_WRITING))) {
         return 0;
     }
 
@@ -42,7 +44,9 @@ int fflush_unlocked(FILE *stream) {
         stream->unget_size = 0;
         stream->flags &= ~__STDIO_FLAGS_READING;
         return 0;
-    } else if (!stream->buffer || stream->buffer_type == _IONBF || !stream->buffer_pos) {
+    }
+
+    if (!stream->buffer || stream->buffer_type == _IONBF || !stream->buffer_pos) {
         stream->flags &= ~__STDIO_FLAGS_WRITING;
         return 0;
     }

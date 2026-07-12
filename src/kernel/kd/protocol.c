@@ -107,14 +107,18 @@ static void ParseReadPhysicalPacket(KdpDebugReadAddressPacket *Packet, uint32_t 
             "ignoring invalid debug `rp` packet with item size %u\n",
             Packet->ItemSize);
         return;
-    } else if (Packet->ItemCount * Packet->ItemSize != Packet->Length) {
+    }
+
+    if (Packet->ItemCount * Packet->ItemSize != Packet->Length) {
         KdPrint(
             KD_TYPE_TRACE,
             "ignoring invalid debug `rp` packet with length %u (vs expected length of %u)\n",
             Packet->Length,
             Packet->ItemCount * Packet->ItemSize);
         return;
-    } else if (Packet->Address + Packet->Length < Packet->Address) {
+    }
+
+    if (Packet->Address + Packet->Length < Packet->Address) {
         KdPrint(
             KD_TYPE_TRACE,
             "ignoring invalid debug `rp` packet with address 0x%llx (as it overflows when "
@@ -207,14 +211,18 @@ static void ParseReadVirtualPacket(KdpDebugReadAddressPacket *Packet, uint32_t L
             "ignoring invalid debug `rv` packet with item size %u\n",
             Packet->ItemSize);
         return;
-    } else if (Packet->ItemCount * Packet->ItemSize != Packet->Length) {
+    }
+
+    if (Packet->ItemCount * Packet->ItemSize != Packet->Length) {
         KdPrint(
             KD_TYPE_TRACE,
             "ignoring invalid debug `rv` packet with length %u (vs expected length of %u)\n",
             Packet->Length,
             Packet->ItemCount * Packet->ItemSize);
         return;
-    } else if (Packet->Address + Packet->Length < Packet->Address) {
+    }
+
+    if (Packet->Address + Packet->Length < Packet->Address) {
         KdPrint(
             KD_TYPE_TRACE,
             "ignoring invalid debug `rv` packet with address 0x%llx (as it overflows when "
@@ -404,7 +412,9 @@ static void ParseLatePacket(
          * us with a few messages in between connecting (sending the ack) and them actually handling
          * the ack. */
         return;
-    } else if (Packet->Type == KDP_DEBUG_PACKET_READ_PHYSICAL_REQ) {
+    }
+
+    if (Packet->Type == KDP_DEBUG_PACKET_READ_PHYSICAL_REQ) {
         ParseReadPhysicalPacket((KdpDebugReadAddressPacket *)Packet, Length);
     } else if (Packet->Type == KDP_DEBUG_PACKET_READ_VIRTUAL_REQ) {
         ParseReadVirtualPacket((KdpDebugReadAddressPacket *)Packet, Length);
@@ -440,7 +450,9 @@ void KdpParseDebugPacket(
     if (Length < sizeof(KdpDebugPacket)) {
         KdPrint(KD_TYPE_TRACE, "ignoring invalid debug packet of size %u\n", Length);
         return;
-    } else if (State == KDP_STATE_EARLY) {
+    }
+
+    if (State == KDP_STATE_EARLY) {
         ParseEarlyPacket(SourceHardwareAddress, SourceProtocolAddress, SourcePort, Packet, Length);
     } else {
         ParseLatePacket(SourceHardwareAddress, SourceProtocolAddress, SourcePort, Packet, Length);

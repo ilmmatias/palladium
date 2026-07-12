@@ -30,7 +30,9 @@ static long double parse_hex(const char *str, long double sign) {
         if (digit == '.') {
             dot = true;
             continue;
-        } else if (dot) {
+        }
+
+        if (dot) {
             /* Each digit is a nibble (4-bits). */
             p -= 4;
         }
@@ -97,7 +99,9 @@ static long double parse_dec(const char *str, long double sign) {
         if (digit == '.') {
             dot = true;
             continue;
-        } else if (dot) {
+        }
+
+        if (dot) {
             e -= 1;
         }
 

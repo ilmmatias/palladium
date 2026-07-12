@@ -29,8 +29,9 @@ size_t fwrite_unlocked(
     FILE *CRT_RESTRICT stream) {
     if (!stream || !size || !nmemb) {
         return 0;
-    } else if (
-        !ptr || !(stream->flags & __STDIO_FLAGS_WRITE) || (stream->flags & __STDIO_FLAGS_READING) ||
+    }
+
+    if (!ptr || !(stream->flags & __STDIO_FLAGS_WRITE) || (stream->flags & __STDIO_FLAGS_READING) ||
         (stream->flags & __STDIO_FLAGS_ERROR)) {
         stream->flags |= __STDIO_FLAGS_ERROR;
         return 0;

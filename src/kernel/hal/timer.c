@@ -19,6 +19,6 @@
 void HalWaitTimer(uint64_t Time) {
     uint64_t Start = HalGetTimerTicks();
     uint64_t End = Start + (__uint128_t)Time * HalGetTimerFrequency() / EV_SECS;
-    while (HalGetTimerTicks() < End)
-        ;
+    while (HalGetTimerTicks() < End) {
+    }
 }

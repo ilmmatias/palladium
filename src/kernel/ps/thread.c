@@ -329,13 +329,13 @@ void PsYieldThread(void) {
         KeSetAffinityBit(&KiIdleProcessors, Processor->Number);
         KeReleaseSpinLockAndLowerIrql(&Processor->Lock, OldIrql);
         return;
-    } else {
-        /* If we call YieldThread on a tight loop, we need to make sure we clear the idle bit
-         * once the queue isn't empty. */
-        __atomic_sub_fetch(&Processor->ThreadCount, 1, __ATOMIC_RELEASE);
-        __atomic_sub_fetch(&PspGlobalThreadCount, 1, __ATOMIC_RELEASE);
-        KeClearAffinityBit(&KiIdleProcessors, Processor->Number);
     }
+
+    /* If we call YieldThread on a tight loop, we need to make sure we clear the idle bit
+     * once the queue isn't empty. */
+    __atomic_sub_fetch(&Processor->ThreadCount, 1, __ATOMIC_RELEASE);
+    __atomic_sub_fetch(&PspGlobalThreadCount, 1, __ATOMIC_RELEASE);
+    KeClearAffinityBit(&KiIdleProcessors, Processor->Number);
 
     PsThread *TargetThread = CONTAINING_RECORD(ListHeader, PsThread, ListHeader);
     PspSwitchThreads(Processor, CurrentThread, TargetThread, PS_STATE_QUEUED, OldIrql);

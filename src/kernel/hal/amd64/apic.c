@@ -57,9 +57,9 @@ static HalpLapicEntry *GetLapic(uint32_t Id) {
 uint64_t HalpReadLapicRegister(uint32_t Number) {
     if (X2ApicEnabled) {
         return ReadMsr(HALP_MSR_APIC_REG(Number));
-    } else {
-        return *(volatile uint32_t *)((char *)LapicAddress + Number);
     }
+
+    return *(volatile uint32_t *)((char *)LapicAddress + Number);
 }
 
 /*-------------------------------------------------------------------------------------------------

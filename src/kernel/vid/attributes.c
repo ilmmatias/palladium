@@ -26,9 +26,9 @@ extern bool VidpUseLock;
 static KeIrql AcquireSpinLock(void) {
     if (VidpUseLock) {
         return KeAcquireSpinLockAndRaiseIrql(&VidpLock, KE_IRQL_DISPATCH);
-    } else {
-        return 0;
     }
+
+    return 0;
 }
 
 /*-------------------------------------------------------------------------------------------------

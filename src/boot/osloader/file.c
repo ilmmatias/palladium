@@ -79,9 +79,9 @@ bool OslFindFile(const char *Path) {
     if (Status == EFI_SUCCESS) {
         Handle->Close(Handle);
         return true;
-    } else {
-        return false;
     }
+
+    return false;
 }
 
 /*-------------------------------------------------------------------------------------------------

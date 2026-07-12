@@ -25,9 +25,9 @@ long ftell_unlocked(FILE *stream) {
     if (__tell_file(stream->handle, &offset)) {
         stream->flags |= __STDIO_FLAGS_ERROR;
         return -1;
-    } else {
-        return offset + stream->buffer_pos - stream->buffer_read - stream->unget_size;
     }
+
+    return offset + stream->buffer_pos - stream->buffer_read - stream->unget_size;
 }
 
 /*-------------------------------------------------------------------------------------------------

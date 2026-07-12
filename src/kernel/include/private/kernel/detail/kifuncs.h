@@ -19,7 +19,7 @@
 extern "C" {
 #endif /* __cplusplus */
 
-void KiSaveBootStartDrivers(KiLoaderBlock *BootData);
+void KiSaveBootStartDrivers(KiLoaderBlock *LoaderBlock);
 void KiRunBootStartDrivers(void);
 void KiDumpSymbol(void *Address);
 

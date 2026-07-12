@@ -39,12 +39,14 @@ RtSList MiPoolTagListHead[256] = {};
 static uint32_t GetHeadIndex(size_t Size) {
     if (Size <= MM_POOL_SMALL_MAX) {
         return (Size - 1) >> MM_POOL_SMALL_SHIFT;
-    } else if (Size <= MM_POOL_MEDIUM_MAX) {
-        return MM_POOL_SMALL_COUNT + ((Size - MM_POOL_MEDIUM_MIN - 1) >> MM_POOL_MEDIUM_SHIFT);
-    } else {
-        return MM_POOL_SMALL_COUNT + MM_POOL_MEDIUM_COUNT +
-               ((Size - MM_POOL_LARGE_MIN - 1) >> MM_POOL_LARGE_SHIFT);
     }
+
+    if (Size <= MM_POOL_MEDIUM_MAX) {
+        return MM_POOL_SMALL_COUNT + ((Size - MM_POOL_MEDIUM_MIN - 1) >> MM_POOL_MEDIUM_SHIFT);
+    }
+
+    return MM_POOL_SMALL_COUNT + MM_POOL_MEDIUM_COUNT +
+           ((Size - MM_POOL_LARGE_MIN - 1) >> MM_POOL_LARGE_SHIFT);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -60,12 +62,14 @@ static uint32_t GetHeadIndex(size_t Size) {
 static uint64_t GetHeadSize(uint32_t Head) {
     if (Head < MM_POOL_SMALL_COUNT) {
         return (Head + 1) << MM_POOL_SMALL_SHIFT;
-    } else if (Head < MM_POOL_SMALL_COUNT + MM_POOL_MEDIUM_COUNT) {
-        return MM_POOL_MEDIUM_MIN + ((Head - MM_POOL_SMALL_COUNT + 1) << MM_POOL_MEDIUM_SHIFT);
-    } else {
-        return MM_POOL_LARGE_MIN +
-               ((Head - MM_POOL_SMALL_COUNT - MM_POOL_MEDIUM_COUNT + 1) << MM_POOL_LARGE_SHIFT);
     }
+
+    if (Head < MM_POOL_SMALL_COUNT + MM_POOL_MEDIUM_COUNT) {
+        return MM_POOL_MEDIUM_MIN + ((Head - MM_POOL_SMALL_COUNT + 1) << MM_POOL_MEDIUM_SHIFT);
+    }
+
+    return MM_POOL_LARGE_MIN +
+           ((Head - MM_POOL_SMALL_COUNT - MM_POOL_MEDIUM_COUNT + 1) << MM_POOL_LARGE_SHIFT);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -82,11 +86,13 @@ static uint64_t GetHeadSize(uint32_t Head) {
 static uint64_t GetHeadPages(uint32_t Head) {
     if (Head < MM_POOL_SMALL_COUNT) {
         return MM_POOL_SMALL_PAGES;
-    } else if (Head < MM_POOL_SMALL_COUNT + MM_POOL_MEDIUM_COUNT) {
-        return MM_POOL_MEDIUM_PAGES;
-    } else {
-        return MM_POOL_LARGE_PAGES;
     }
+
+    if (Head < MM_POOL_SMALL_COUNT + MM_POOL_MEDIUM_COUNT) {
+        return MM_POOL_MEDIUM_PAGES;
+    }
+
+    return MM_POOL_LARGE_PAGES;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -284,7 +290,7 @@ void MmFreePool(void *Base, const char Tag[4]) {
         }
 
         MiPageEntry *Entry = &MI_PAGE_ENTRY(PhysicalAddress);
-        if (memcmp(Tag, MM_POOL_TAG_NONE, 4) && memcmp(Entry->Tag, Tag, 4)) {
+        if (memcmp(Tag, MM_POOL_TAG_NONE, 4) != 0 && memcmp(Entry->Tag, Tag, 4) != 0) {
             KeFatalError(
                 KE_PANIC_BAD_POOL_HEADER,
                 (uint64_t)Base,
@@ -301,7 +307,7 @@ void MmFreePool(void *Base, const char Tag[4]) {
     }
 
     BlockHeader *Header = (BlockHeader *)Base - 1;
-    if ((memcmp(Tag, MM_POOL_TAG_NONE, 4) && memcmp(Header->Tag, Tag, 4)) ||
+    if ((memcmp(Tag, MM_POOL_TAG_NONE, 4) != 0 && memcmp(Header->Tag, Tag, 4) != 0) ||
         Header->Head >= MM_POOL_BLOCK_COUNT || Header->ListHeader.Next) {
         KeFatalError(
             KE_PANIC_BAD_POOL_HEADER,
