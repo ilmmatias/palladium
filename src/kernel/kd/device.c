@@ -146,10 +146,10 @@ static size_t InitializeBar(
  *-----------------------------------------------------------------------------------------------*/
 void KdpInitializeDeviceDescriptor(KiLoaderBlock *LoaderBlock) {
     /* Shorter names for the debug data fields (to keep the lines a bit smaller). */
-    uint32_t Segment = LoaderBlock->Debug.SegmentNumber;
-    uint32_t Bus = LoaderBlock->Debug.BusNumber;
-    uint32_t Device = LoaderBlock->Debug.DeviceNumber;
-    uint32_t Function = LoaderBlock->Debug.FunctionNumber;
+    uint32_t Segment = LoaderBlock->Debug.KdNet.SegmentNumber;
+    uint32_t Bus = LoaderBlock->Debug.KdNet.BusNumber;
+    uint32_t Device = LoaderBlock->Debug.KdNet.DeviceNumber;
+    uint32_t Function = LoaderBlock->Debug.KdNet.FunctionNumber;
 
     /* We'll be extensively using the PCI config space header, so read it in. */
     HalPciHeader PciHeader;

@@ -175,14 +175,16 @@ bool OslLoadConfigFile(const char *Path, OslConfig *Config) {
     Config->Kernel = "KERNEL.EXE";
     Config->DebugEnabled = false;
     Config->DebugEchoEnabled = false;
+    Config->DebugTransport = OSLP_DEBUG_TRANSPORT_KDNET;
+    Config->DebugDisconnectPolicy = OSLP_DEBUG_DISCONNECT_STOP;
+    Config->DebugDisconnectTimeoutMilliseconds = 5000;
     Config->DebugAddress[0] = 10;
     Config->DebugAddress[1] = 0;
     Config->DebugAddress[2] = 2;
     Config->DebugAddress[3] = 15;
     Config->DebugPort = 50005;
-    Config->DiagnosticType = OSLP_DIAGNOSTIC_NONE;
-    Config->DiagnosticBaudRate = 115200;
-    Config->DiagnosticAddress = 0x3F8;
+    Config->DebugSerialBaudRate = 115200;
+    Config->DebugSerialAddress = 0x2F8;
     Config->BootDriverCount = 0;
     Config->BootDrivers = NULL;
 
@@ -288,6 +290,39 @@ bool OslLoadConfigFile(const char *Path, OslConfig *Config) {
             Config->DebugEnabled = !strcmp(Value, "TRUE");
         } else if (!strcmp(Name, "DEBUGECHOENABLED")) {
             Config->DebugEchoEnabled = !strcmp(Value, "TRUE");
+        } else if (!strcmp(Name, "DEBUGTRANSPORT")) {
+            if (!strcmp(Value, "KDNET")) {
+                Config->DebugTransport = OSLP_DEBUG_TRANSPORT_KDNET;
+            } else if (!strcmp(Value, "PC16550")) {
+                Config->DebugTransport = OSLP_DEBUG_TRANSPORT_PC16550_PIO;
+            } else {
+                Config->DebugTransport = OSLP_DEBUG_TRANSPORT_NONE;
+                OslPrint(
+                    "Invalid debug transport at line %zu in the file %s.\r\n", LineNumber, Path);
+            }
+        } else if (!strcmp(Name, "DEBUGDISCONNECTPOLICY")) {
+            if (!strcmp(Value, "STOP")) {
+                Config->DebugDisconnectPolicy = OSLP_DEBUG_DISCONNECT_STOP;
+            } else if (!strcmp(Value, "CONTINUE")) {
+                Config->DebugDisconnectPolicy = OSLP_DEBUG_DISCONNECT_CONTINUE;
+            } else {
+                Config->DebugDisconnectPolicy = OSLP_DEBUG_DISCONNECT_STOP;
+                OslPrint(
+                    "Invalid debug disconnect policy at line %zu in the file %s.\r\n",
+                    LineNumber,
+                    Path);
+            }
+        } else if (!strcmp(Name, "DEBUGDISCONNECTTIMEOUT")) {
+            char *End = NULL;
+            unsigned long Timeout = strtoul(Value, &End, 0);
+            if (!*Value || *End || !Timeout || Timeout > UINT32_MAX) {
+                OslPrint(
+                    "Invalid debug disconnect timeout at line %zu in the file %s.\r\n",
+                    LineNumber,
+                    Path);
+            } else {
+                Config->DebugDisconnectTimeoutMilliseconds = Timeout;
+            }
         } else if (!strcmp(Name, "DEBUGADDRESS")) {
             if (sscanf(
                     Value,
@@ -302,36 +337,28 @@ bool OslLoadConfigFile(const char *Path, OslConfig *Config) {
             if (sscanf(Value, "%hu", &Config->DebugPort) != 1) {
                 OslPrint("Invalid debug port at line %zu in the file %s.\r\n", LineNumber, Path);
             }
-        } else if (!strcmp(Name, "DIAGNOSTICDEVICE")) {
-            if (!strcmp(Value, "PC16550")) {
-                Config->DiagnosticType = OSLP_DIAGNOSTIC_PC16550_PIO;
-            } else if (!strcmp(Value, "NONE")) {
-                Config->DiagnosticType = OSLP_DIAGNOSTIC_NONE;
-            } else {
-                Config->DiagnosticType = OSLP_DIAGNOSTIC_NONE;
-                OslPrint(
-                    "Invalid diagnostic device at line %zu in the file %s.\r\n", LineNumber, Path);
-            }
-        } else if (!strcmp(Name, "DIAGNOSTICADDRESS")) {
+        } else if (!strcmp(Name, "DEBUGSERIALADDRESS")) {
             char *End = NULL;
             unsigned long long Address = strtoull(Value, &End, 0);
             if (!*Value || *End || Address > UINT16_MAX - 7) {
                 OslPrint(
-                    "Invalid diagnostic address at line %zu in the file %s.\r\n", LineNumber, Path);
+                    "Invalid debug serial address at line %zu in the file %s.\r\n",
+                    LineNumber,
+                    Path);
             } else {
-                Config->DiagnosticAddress = Address;
+                Config->DebugSerialAddress = Address;
             }
-        } else if (!strcmp(Name, "DIAGNOSTICBAUDRATE")) {
+        } else if (!strcmp(Name, "DEBUGSERIALBAUDRATE")) {
             char *End = NULL;
             unsigned long BaudRate = strtoul(Value, &End, 0);
             if (!*Value || *End || !BaudRate || BaudRate > UINT32_MAX || 115200 % BaudRate ||
                 115200 / BaudRate > UINT16_MAX) {
                 OslPrint(
-                    "Invalid diagnostic baud rate at line %zu in the file %s.\r\n",
+                    "Invalid debug serial baud rate at line %zu in the file %s.\r\n",
                     LineNumber,
                     Path);
             } else {
-                Config->DiagnosticBaudRate = BaudRate;
+                Config->DebugSerialBaudRate = BaudRate;
             }
         } else if (!strcmp(Name, "BOOTDRIVER")) {
             if (Config->BootDriverCount >= Config->BootDriverCapacity &&

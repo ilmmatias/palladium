@@ -7,6 +7,7 @@
 #define _KERNEL_DETAIL_KDPTYPES_H_
 
 #include <kernel/detail/kdtypes.h>
+#include <stddef.h>
 #include <stdint.h>
 
 /* clang-format off */
@@ -287,36 +288,176 @@ typedef struct __attribute__((packed)) {
     uint16_t Checksum;
 } KdpUdpHeader;
 
-/* And finally our custom debugger protocol types (which slot right on top of UDP). */
+typedef struct __attribute__((packed)) {
+    char Magic[4];
+    uint8_t Major;
+    uint8_t Minor;
+    uint16_t HeaderSize;
+    uint16_t Type;
+    uint16_t Flags;
+    uint32_t TotalSize;
+    uint32_t Status;
+    uint32_t Reserved;
+    uint64_t SessionId;
+    uint64_t Sequence;
+    uint64_t RequestId;
+} KdpProtocolHeader;
 
 typedef struct __attribute__((packed)) {
-    uint8_t Type;
-} KdpDebugPacket;
+    uint64_t Nonce;
+    uint64_t Capabilities;
+    uint32_t MaximumDatagram;
+    uint32_t Reserved;
+} KdpProtocolHelloRequest;
 
 typedef struct __attribute__((packed)) {
-    uint8_t Type;
-    char Architecture[16];
-} KdpDebugConnectAckPacket;
+    uint64_t Capabilities;
+    uint32_t MaximumDatagram;
+    uint16_t Architecture;
+    uint16_t ContextVersion;
+    uint32_t ProcessorCount;
+    uint32_t TargetState;
+    uint32_t Transport;
+    uint32_t DisconnectPolicy;
+    uint32_t DisconnectTimeoutMilliseconds;
+    uint32_t Reserved;
+} KdpProtocolHelloResponse;
 
 typedef struct __attribute__((packed)) {
-    uint8_t Type;
+    uint32_t Size;
+    uint16_t Architecture;
+    uint16_t Version;
+    uint64_t ValidFields;
+    uint64_t Gpr[16];
+    uint64_t Rip;
+    uint64_t Rflags;
+    uint64_t Cr2;
+    uint64_t ErrorCode;
+    uint64_t Mxcsr;
+    uint16_t Cs;
+    uint16_t Ss;
+    uint32_t Reserved;
+    uint8_t Xmm[16][16];
+} KdpAmd64Context;
+
+typedef struct __attribute__((packed)) {
+    uint32_t Reason;
+    uint32_t Flags;
+    uint64_t Generation;
+    uint32_t Processor;
+    uint32_t ProcessorCount;
     uint64_t Address;
-    uint8_t ItemSize;
+    uint32_t ExceptionCode;
+    uint32_t Reserved;
+    KdpAmd64Context Context;
+} KdpProtocolStopEvent;
+
+typedef struct __attribute__((packed)) {
+    uint32_t Severity;
+    uint32_t Length;
+} KdpProtocolOutput;
+
+typedef struct __attribute__((packed)) {
+    uint32_t TargetState;
+    uint32_t OwnerProcessor;
+    uint64_t Generation;
+    uint32_t ProcessorCount;
+    uint32_t BreakpointCount;
+    uint64_t Capabilities;
+    uint32_t DisconnectPolicy;
+    uint32_t DisconnectTimeoutMilliseconds;
+} KdpProtocolStatus;
+
+typedef struct __attribute__((packed)) {
+    uint32_t StartIndex;
+    uint32_t MaximumEntries;
+} KdpProtocolListRequest;
+
+typedef struct __attribute__((packed)) {
+    uint32_t TotalCount;
+    uint32_t ReturnedCount;
+} KdpProtocolListResponse;
+
+typedef struct __attribute__((packed)) {
+    uint32_t Processor;
+    uint32_t Flags;
+    uint64_t Generation;
+} KdpProtocolProcessorEntry;
+
+typedef struct __attribute__((packed)) {
+    uint32_t Processor;
+    uint32_t Reserved;
+} KdpProtocolContextRequest;
+
+typedef struct __attribute__((packed)) {
+    uint32_t Processor;
+    uint32_t Reserved;
+    uint64_t Generation;
+    KdpAmd64Context Context;
+} KdpProtocolContextResponse;
+
+typedef struct __attribute__((packed)) {
+    uint64_t Address;
+    uint32_t ItemSize;
+    uint32_t ItemCount;
+} KdpProtocolReadMemoryRequest;
+
+typedef struct __attribute__((packed)) {
+    uint64_t Address;
+    uint32_t ItemSize;
     uint32_t ItemCount;
     uint32_t Length;
-} KdpDebugReadAddressPacket;
+    uint32_t Reserved;
+} KdpProtocolReadMemoryResponse;
 
 typedef struct __attribute__((packed)) {
-    uint8_t Type;
-    uint64_t Address;
+    uint16_t Port;
     uint8_t Size;
-} KdpDebugReadPortReqPacket;
+    uint8_t Reserved;
+} KdpProtocolReadPortRequest;
 
 typedef struct __attribute__((packed)) {
-    uint8_t Type;
-    uint64_t Address;
+    uint16_t Port;
     uint8_t Size;
-    uint32_t Value;
-} KdpDebugReadPortAckPacket;
+    uint8_t Reserved;
+    uint64_t Value;
+} KdpProtocolReadPortResponse;
+
+typedef struct __attribute__((packed)) {
+    uint64_t Address;
+} KdpProtocolBreakpointAddRequest;
+
+typedef struct __attribute__((packed)) {
+    uint32_t Identifier;
+    uint32_t Reserved;
+} KdpProtocolBreakpointRequest;
+
+typedef struct __attribute__((packed)) {
+    uint32_t Identifier;
+    uint32_t Flags;
+    uint64_t Address;
+    uint64_t HitCount;
+} KdpProtocolBreakpointEntry;
+
+typedef struct {
+    uint8_t Data[32];
+    uint8_t Size;
+} KdpTransportPeer;
+
+typedef struct {
+    bool (*Receive)(KdpTransportPeer *Peer, void *Buffer, size_t Capacity, size_t *Size);
+    bool (*Send)(const KdpTransportPeer *Peer, const void *Buffer, size_t Size);
+    void (*Service)(void);
+    bool (*PeerEqual)(const KdpTransportPeer *Left, const KdpTransportPeer *Right);
+} KdpTransportOps;
+
+static_assert(sizeof(KdpProtocolHeader) == KDP_PROTOCOL_HEADER_SIZE);
+static_assert(sizeof(KdpProtocolHelloRequest) == 24);
+static_assert(sizeof(KdpProtocolHelloResponse) == 40);
+static_assert(sizeof(KdpAmd64Context) == 448);
+static_assert(sizeof(KdpProtocolStopEvent) == 488);
+static_assert(sizeof(KdpProtocolStatus) == 40);
+static_assert(sizeof(KdpProtocolContextResponse) == 464);
+static_assert(sizeof(KdpProtocolBreakpointEntry) == 24);
 
 #endif /* _KERNEL_DETAIL_KDPTYPES_H_ */

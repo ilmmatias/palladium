@@ -17,7 +17,9 @@
 .extern HalpHandleTimer
 .extern HalpSendEoi
 .extern KiHandleIpi
+.extern KdpHandleDebuggerIpi
 .extern KiProcessWorkQueue
+.extern KdpQueuePoll
 .extern PspProcessQueue
 .extern PspProcessAlertQueue
 
@@ -366,6 +368,7 @@ HalpTimerEntry:
     call HalpHandleTimer
     mov %rsp, %rcx
     call EvpHandleTimer
+    call KdpQueuePoll
     call HalpSendEoi
     LEAVE_INTERRUPT
 .seh_endproc
@@ -380,6 +383,28 @@ HalpIpiEntry:
     call KiHandleIpi
     call HalpSendEoi
     LEAVE_INTERRUPT
+.seh_endproc
+
+.seh_proc HalpDebuggerEntry
+.global HalpDebuggerEntry
+.align 16
+HalpDebuggerEntry:
+    ENTER_INTERRUPT (INTERRUPT_FLAGS_NONE)
+    mov $HALP_INT_IPI_IRQL, %rcx
+    mov %rcx, %cr8
+    call HalpDebuggerExceptionEntry
+    LEAVE_INTERRUPT
+.seh_endproc
+
+.seh_proc HalpDebuggerExceptionEntry
+.align 16
+HalpDebuggerExceptionEntry:
+    ENTER_EXCEPTION
+    call HalpSendEoi
+    mov %rsp, %rcx
+    lea EXCEPTION_FRAME_SIZE(%rsp), %rdx
+    call KdpHandleDebuggerIpi
+    LEAVE_EXCEPTION
 .seh_endproc
 
 .seh_proc HalpSpuriousEntry

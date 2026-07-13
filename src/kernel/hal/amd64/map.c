@@ -342,6 +342,90 @@ uint64_t HalpGetPhysicalAddress(void *VirtualAddress) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
+ *     This function safely reads one byte from a present supervisor mapping through the debugger
+ *     alias.
+ *
+ * PARAMETERS:
+ *     VirtualAddress - Kernel virtual address to read.
+ *     Value - Destination byte.
+ *
+ * RETURN VALUE:
+ *     true if the mapping was valid and the byte was read, false otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+bool HalpReadDebuggerByte(void *VirtualAddress, uint8_t *Value) {
+    uint64_t Address = (uint64_t)VirtualAddress;
+    uint64_t TargetLevel = 0;
+    HalpPageFrame *TargetFrame = NULL;
+    if (!Value || (Address >> 48 != 0xFFFF) || !GetFrame(Address, &TargetLevel, &TargetFrame) ||
+        TargetFrame->User) {
+        return false;
+    }
+
+    uint64_t PhysicalAddress =
+        (TargetFrame->Address << HALP_PT_SHIFT) | (Address & (TableLevels[TargetLevel].Size - 1));
+    volatile uint8_t *Alias = HalpMapDebuggerMemory(PhysicalAddress, 1, 0);
+    if (!Alias) {
+        return false;
+    }
+
+    *Value = *Alias;
+    HalpUnmapDebuggerMemory((void *)Alias, 1);
+    return true;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function replaces one byte in an executable kernel mapping through the debugger alias.
+ *
+ * PARAMETERS:
+ *     VirtualAddress - Executable kernel address to patch.
+ *     Expected - Byte that must currently be present.
+ *     Value - Replacement byte.
+ *
+ * RETURN VALUE:
+ *     true if the expected byte was replaced, false otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+bool HalpPatchDebuggerByte(void *VirtualAddress, uint8_t Expected, uint8_t Value) {
+    uint64_t Address = (uint64_t)VirtualAddress;
+    uint64_t TargetLevel = 0;
+    HalpPageFrame *TargetFrame = NULL;
+    if ((Address >> 48 != 0xFFFF) || !GetFrame(Address, &TargetLevel, &TargetFrame) ||
+        TargetFrame->User || TargetFrame->NoExecute) {
+        return false;
+    }
+
+    uint64_t PhysicalAddress =
+        (TargetFrame->Address << HALP_PT_SHIFT) | (Address & (TableLevels[TargetLevel].Size - 1));
+    volatile uint8_t *Alias = HalpMapDebuggerMemory(PhysicalAddress, 1, MI_MAP_WRITE);
+    if (!Alias) {
+        return false;
+    }
+
+    bool Replaced = *Alias == Expected;
+    if (Replaced) {
+        *Alias = Value;
+        __asm__ volatile("mfence" : : : "memory");
+        uint32_t Leaf = 0;
+        uint32_t A = 0;
+        uint32_t B = 0;
+        uint32_t C = 0;
+        uint32_t D = 0;
+        __asm__ volatile("cpuid"
+                         : "=a"(A), "=b"(B), "=c"(C), "=d"(D)
+                         : "a"(Leaf), "c"(0)
+                         : "memory");
+        (void)A;
+        (void)B;
+        (void)C;
+        (void)D;
+    }
+
+    HalpUnmapDebuggerMemory((void *)Alias, 1);
+    return Replaced;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
  *     This function walks the page tables until we reach the lowest level (PTE), allocating all
  *     levels along the way (or we fail because we encoutered a large page). This should only be
  *     used when mapping new pages!
@@ -616,6 +700,11 @@ void *HalpMapDebuggerMemory(uint64_t PhysicalAddress, size_t Size, int Flags) {
     }
 
     /* Block anything that needs more pages than we have reserved. */
+    if (PhysicalAddress > UINT64_MAX - Size ||
+        PhysicalAddress + Size > UINT64_MAX - (HALP_PT_SIZE - 1)) {
+        return NULL;
+    }
+
     uint64_t PhysicalStart = PhysicalAddress & ~(HALP_PT_SIZE - 1);
     uint64_t PhysicalEnd = (PhysicalAddress + Size + HALP_PT_SIZE - 1) & ~(HALP_PT_SIZE - 1);
     uint64_t Pages = (PhysicalEnd - PhysicalStart) >> HALP_PT_SHIFT;
@@ -658,7 +747,13 @@ void HalpUnmapDebuggerMemory(void *VirtualAddress, size_t Size) {
     }
 
     uint64_t VirtualStart = (uint64_t)VirtualAddress & ~(HALP_PT_SIZE - 1);
-    uint64_t VirtualEnd = ((uint64_t)VirtualAddress + Size + HALP_PT_SIZE) & ~(HALP_PT_SIZE - 1);
+    if ((uint64_t)VirtualAddress > UINT64_MAX - Size ||
+        (uint64_t)VirtualAddress + Size > UINT64_MAX - (HALP_PT_SIZE - 1)) {
+        return;
+    }
+
+    uint64_t VirtualEnd =
+        ((uint64_t)VirtualAddress + Size + HALP_PT_SIZE - 1) & ~(HALP_PT_SIZE - 1);
     uint64_t Pages = (VirtualEnd - VirtualStart) >> HALP_PT_SHIFT;
     if (Pages > 2) {
         return;

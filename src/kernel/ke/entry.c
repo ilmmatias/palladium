@@ -30,7 +30,6 @@ static void InitializeBootProcessor(KiLoaderBlock *LoaderBlock) {
      * resources like exception/interrupt handling). */
     __srand64(LoaderBlock->Basic.RandomSeed);
     VidpInitialize(LoaderBlock);
-    HalpInitializeDiagnosticDevice(LoaderBlock);
     MiInitializeEarlyPageAllocator(LoaderBlock);
     HalpInitializePlatform(LoaderBlock);
 

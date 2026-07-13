@@ -40,39 +40,43 @@ typedef struct __attribute__((packed)) {
 } KiLoaderGraphicsData;
 
 typedef struct __attribute__((packed)) {
-    bool Enabled;
-    bool EchoEnabled;
-    uint8_t Address[4];
-    uint16_t Port;
-    uint32_t SegmentNumber;
-    uint32_t BusNumber;
-    uint32_t DeviceNumber;
-    uint32_t FunctionNumber;
-    void *Initializer;
-} KiLoaderDebugData;
-
-typedef struct __attribute__((packed)) {
     uint32_t Type;
-    uint32_t BaudRate;
-    uint64_t Address;
-} KiLoaderDiagnosticData;
+    uint32_t Flags;
+    uint32_t DisconnectPolicy;
+    uint32_t DisconnectTimeoutMilliseconds;
+    union {
+        struct __attribute__((packed)) {
+            uint8_t Address[4];
+            uint16_t Port;
+            uint16_t Reserved;
+            uint32_t SegmentNumber;
+            uint32_t BusNumber;
+            uint32_t DeviceNumber;
+            uint32_t FunctionNumber;
+            void *Initializer;
+        } KdNet;
+        struct __attribute__((packed)) {
+            uint64_t Address;
+            uint32_t BaudRate;
+            uint8_t Reserved[20];
+        } Serial;
+    };
+} KiLoaderDebugData;
 
 typedef struct __attribute__((packed)) {
     KiLoaderBasicData Basic;
     KiLoaderAcpiData Acpi;
     KiLoaderGraphicsData Graphics;
     KiLoaderDebugData Debug;
-    KiLoaderDiagnosticData Diagnostic;
     KiLoaderArchData Arch;
 } KiLoaderBlock;
 
 static_assert(sizeof(KiLoaderBasicData) == 40);
-static_assert(sizeof(KiLoaderDiagnosticData) == 16);
+static_assert(sizeof(KiLoaderDebugData) == 48);
 static_assert(offsetof(KiLoaderBlock, Basic) == 0);
 static_assert(offsetof(KiLoaderBlock, Acpi) == 40);
 static_assert(offsetof(KiLoaderBlock, Graphics) == 64);
 static_assert(offsetof(KiLoaderBlock, Debug) == 92);
-static_assert(offsetof(KiLoaderBlock, Diagnostic) == 124);
 static_assert(offsetof(KiLoaderBlock, Arch) == 140);
 static_assert(sizeof(KiLoaderBlock) == 148);
 

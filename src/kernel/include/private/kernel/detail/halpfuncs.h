@@ -25,9 +25,6 @@ extern uint32_t HalpOnlineProcessorCount;
 extern KeProcessor **HalpProcessorList;
 
 void HalpInitializeBootStack(KiLoaderBlock *LoaderBlock);
-void HalpInitializeDiagnosticDevice(KiLoaderBlock *LoaderBlock);
-bool HalpDiagnosticDeviceEnabled(void);
-void HalpWriteDiagnosticDevice(const char *Buffer, size_t Size);
 void HalpInitializePlatform(KiLoaderBlock *LoaderBlock);
 void HalpInitializeBootProcessor(void);
 void HalpInitializeApplicationProcessor(KeProcessor *Processor);
@@ -41,6 +38,8 @@ void HalpUnmapEarlyMemory(void *VirtualAddress, size_t Size);
 void HalpInitializeLateAcpi(KiLoaderBlock *LoaderBlock);
 
 uint64_t HalpGetPhysicalAddress(void *VirtualAddress);
+bool HalpReadDebuggerByte(void *VirtualAddress, uint8_t *Value);
+bool HalpPatchDebuggerByte(void *VirtualAddress, uint8_t Expected, uint8_t Value);
 bool HalpMapContiguousPages(
     void *VirtualAddress,
     uint64_t PhysicalAddresses,
@@ -59,6 +58,7 @@ uint64_t HalpGetPageTableAllocationCount(void);
 #endif /* PALLADIUM_ENABLE_SELF_TESTS */
 
 void HalpBroadcastIpi(void);
+void HalpBroadcastDebuggerIpi(void);
 void HalpBroadcastFreeze(void);
 void HalpNotifyProcessor(KeProcessor *Processor, KeIrql TargetIrql);
 

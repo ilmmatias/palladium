@@ -3,6 +3,7 @@
 
 #include <kernel/hal.h>
 #include <kernel/halp.h>
+#include <kernel/kdp.h>
 #include <kernel/ke.h>
 #include <kernel/mm.h>
 #include <os/containing_record.h>
@@ -48,6 +49,7 @@ extern void HalpFastFailEntry(void);
 extern void HalpDispatchEntry(void);
 extern void HalpTimerEntry(void);
 extern void HalpIpiEntry(void);
+extern void HalpDebuggerEntry(void);
 extern void HalpSpuriousEntry(void);
 
 static struct {
@@ -142,6 +144,10 @@ void HalpDispatchException(
     uint32_t ExceptionCode,
     HalInterruptFrame *InterruptFrame,
     HalExceptionFrame *ExceptionFrame) {
+    if (KdpHandleException(ExceptionCode, InterruptFrame, ExceptionFrame)) {
+        return;
+    }
+
     /* Build the exception record. */
     RtExceptionRecord ExceptionRecord;
     memset(&ExceptionRecord, 0, sizeof(RtExceptionRecord));
@@ -366,6 +372,8 @@ void HalpInitializeIdt(KeProcessor *Processor) {
             Base = (uint64_t)HalpTimerEntry;
         } else if (i == HALP_INT_IPI_VECTOR) {
             Base = (uint64_t)HalpIpiEntry;
+        } else if (i == HALP_INT_DEBUGGER_VECTOR) {
+            Base = (uint64_t)HalpDebuggerEntry;
         } else if (i == HALP_INT_SPURIOUS_VECTOR) {
             Base = (uint64_t)HalpSpuriousEntry;
         }

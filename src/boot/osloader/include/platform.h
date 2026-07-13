@@ -14,10 +14,16 @@
 #endif /* __has_include */
 
 #define OSLP_BOOT_MAGIC "OLDR"
-#define OSLP_BOOT_VERSION 0x0000'0000'00000007
+#define OSLP_BOOT_VERSION 0x0000'0000'00000008
 
-#define OSLP_DIAGNOSTIC_NONE 0
-#define OSLP_DIAGNOSTIC_PC16550_PIO 1
+#define OSLP_DEBUG_TRANSPORT_NONE 0
+#define OSLP_DEBUG_TRANSPORT_KDNET 1
+#define OSLP_DEBUG_TRANSPORT_PC16550_PIO 2
+
+#define OSLP_DEBUG_FLAG_ECHO_ENABLED (1u << 0)
+
+#define OSLP_DEBUG_DISCONNECT_STOP 0
+#define OSLP_DEBUG_DISCONNECT_CONTINUE 1
 
 typedef struct __attribute__((packed)) {
     char Magic[4];
@@ -44,39 +50,43 @@ typedef struct __attribute__((packed)) {
 } OslpBootGraphicsData;
 
 typedef struct __attribute__((packed)) {
-    bool Enabled;
-    bool EchoEnabled;
-    uint8_t Address[4];
-    uint16_t Port;
-    uint32_t SegmentNumber;
-    uint32_t BusNumber;
-    uint32_t DeviceNumber;
-    uint32_t FunctionNumber;
-    void *Initializer;
-} OslpBootDebugData;
-
-typedef struct __attribute__((packed)) {
     uint32_t Type;
-    uint32_t BaudRate;
-    uint64_t Address;
-} OslpBootDiagnosticData;
+    uint32_t Flags;
+    uint32_t DisconnectPolicy;
+    uint32_t DisconnectTimeoutMilliseconds;
+    union {
+        struct __attribute__((packed)) {
+            uint8_t Address[4];
+            uint16_t Port;
+            uint16_t Reserved;
+            uint32_t SegmentNumber;
+            uint32_t BusNumber;
+            uint32_t DeviceNumber;
+            uint32_t FunctionNumber;
+            void *Initializer;
+        } KdNet;
+        struct __attribute__((packed)) {
+            uint64_t Address;
+            uint32_t BaudRate;
+            uint8_t Reserved[20];
+        } Serial;
+    };
+} OslpBootDebugData;
 
 typedef struct __attribute__((packed)) {
     OslpBootBasicData Basic;
     OslpBootAcpiData Acpi;
     OslpBootGraphicsData Graphics;
     OslpBootDebugData Debug;
-    OslpBootDiagnosticData Diagnostic;
     OslpBootArchData Arch;
 } OslpBootBlock;
 
 static_assert(sizeof(OslpBootBasicData) == 40);
-static_assert(sizeof(OslpBootDiagnosticData) == 16);
+static_assert(sizeof(OslpBootDebugData) == 48);
 static_assert(offsetof(OslpBootBlock, Basic) == 0);
 static_assert(offsetof(OslpBootBlock, Acpi) == 40);
 static_assert(offsetof(OslpBootBlock, Graphics) == 64);
 static_assert(offsetof(OslpBootBlock, Debug) == 92);
-static_assert(offsetof(OslpBootBlock, Diagnostic) == 124);
 static_assert(offsetof(OslpBootBlock, Arch) == 140);
 static_assert(sizeof(OslpBootBlock) == 148);
 

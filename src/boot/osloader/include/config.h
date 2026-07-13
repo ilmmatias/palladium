@@ -11,11 +11,13 @@ typedef struct {
     char *Kernel;
     bool DebugEnabled;
     bool DebugEchoEnabled;
+    uint32_t DebugTransport;
+    uint32_t DebugDisconnectPolicy;
+    uint32_t DebugDisconnectTimeoutMilliseconds;
     uint8_t DebugAddress[4];
     uint16_t DebugPort;
-    uint32_t DiagnosticType;
-    uint32_t DiagnosticBaudRate;
-    uint64_t DiagnosticAddress;
+    uint32_t DebugSerialBaudRate;
+    uint64_t DebugSerialAddress;
     size_t BootDriverCapacity;
     size_t BootDriverCount;
     char **BootDrivers;
