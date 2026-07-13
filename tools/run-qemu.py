@@ -44,7 +44,7 @@ FAILURES = (
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="mode", required=True)
-    for name in ("smoke", "selftest", "interactive"):
+    for name in ("smoke", "selftest", "debugger", "interactive"):
         command = subparsers.add_parser(name)
         command.add_argument("--image", required=True, type=Path, help="ISO or FAT image")
         command.add_argument("--ovmf-code", required=True, type=Path)
@@ -53,20 +53,88 @@ def parse_arguments() -> argparse.Namespace:
         command.add_argument("--timeout", type=float, default=120.0 if name == "selftest" else 60.0)
         command.add_argument("--repeat", type=int, default=1)
         command.add_argument("--qemu", default="qemu-system-x86_64")
-        if name == "selftest":
+        if name in ("selftest", "debugger"):
             command.add_argument("--smp", type=int, choices=(1, 2, 4), default=1)
+        if name == "debugger":
+            sources = command.add_mutually_exclusive_group()
+            sources.add_argument("--script", metavar="PATH",
+                                 help="serial debugger UTF-8 command script")
+            sources.add_argument("--command", action="append", default=[], metavar="COMMAND",
+                                 help="serial debugger command (repeatable)")
         command.add_argument("qemu_args", nargs=argparse.REMAINDER,
                              help="extra QEMU arguments after --")
     arguments = parser.parse_args()
     if arguments.qemu_args[:1] == ["--"]:
         arguments.qemu_args = arguments.qemu_args[1:]
-    if arguments.mode in ("smoke", "selftest") and arguments.qemu_args:
+    if arguments.mode in ("smoke", "selftest", "debugger") and arguments.qemu_args:
         parser.error(f"the fixed {arguments.mode} profile does not accept extra QEMU arguments")
     return arguments
 
 
 def normalize_output(value: str) -> str:
     return ANSI_ESCAPE.sub("", value).replace("\r\n", "\n").replace("\r", "\n")
+
+
+def debugger_command(
+    socket_path: Path,
+    script: str | None = None,
+    commands: list[str] | None = None,
+) -> list[str]:
+    """Return the repository debugger's fixed serial headless invocation."""
+    command = [
+        "python3",
+        "-m",
+        "src.debugger",
+        "serial",
+        f"unix:{socket_path}",
+        "--headless",
+        "--format",
+        "jsonl",
+    ]
+    if script:
+        command += ["--wait-output", "enabled ACPI", "--script", script]
+    elif commands:
+        command += ["--wait-output", "enabled ACPI"]
+        for item in commands:
+            command += ["--command", item]
+    return command
+
+
+def debugger_target_output(path: Path) -> str:
+    """Extract target output from the debugger's JSONL stream.
+
+    Debugger diagnostics and connection events are retained in the raw JSONL artifact but do not
+    participate in boot-marker matching. Schema 1 is accepted for compatibility with an older
+    client; the serial client emits schema 2.
+    """
+    try:
+        lines = path.read_text(errors="replace").splitlines()
+    except OSError:
+        return ""
+    output: list[str] = []
+    for line in lines:
+        try:
+            value = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if value.get("event") != "target_output":
+            continue
+        data = value.get("data")
+        if isinstance(data, dict) and isinstance(data.get("text"), str):
+            output.append(data["text"])
+    return normalize_output("".join(output))
+
+
+def aggregate_output(loader_path: Path, debugger_path: Path | None = None) -> str:
+    """Combine loader ConOut (COM1) with target output received by serial KD (COM2)."""
+    try:
+        loader = normalize_output(loader_path.read_text(errors="replace"))
+    except OSError:
+        loader = ""
+    target = debugger_target_output(debugger_path) if debugger_path is not None else ""
+    if loader and target and not loader.endswith("\n"):
+        loader += "\n"
+    return loader + target
 
 
 class MarkerTracker:
@@ -95,12 +163,13 @@ class MarkerTracker:
 
 def markers_for(args: argparse.Namespace) -> tuple[tuple[str, str], ...]:
     markers = list(SMOKE_MARKERS)
-    if args.mode == "selftest":
-        processor_count = args.smp
+    if args.mode in ("selftest", "debugger"):
+        processor_count = getattr(args, "smp", 1)
         markers[4] = (
             "processor-online",
             rf"{processor_count} processor{'s' if processor_count != 1 else ''} online",
         )
+    if args.mode == "selftest":
         markers.extend(SELF_TEST_MARKERS)
     return tuple(markers)
 
@@ -188,10 +257,48 @@ def stop_qemu(process: subprocess.Popen[bytes], qmp: socket.socket | None) -> st
         return "kill"
 
 
-def build_command(args: argparse.Namespace, vars_copy: Path, serial_path: Path, qmp_path: Path) -> list[str]:
+def capture_screenshot(qmp: socket.socket | None, path: Path, log_path: Path) -> bool:
+    """Ask QMP for a framebuffer dump while a failed guest is still alive."""
+    if qmp is None:
+        return False
+    request = json.dumps({
+        "execute": "screendump",
+        "arguments": {"filename": str(path)},
+    }, separators=(",", ":")).encode() + b"\r\n"
+    try:
+        qmp.sendall(request)
+        qmp.settimeout(1.0)
+        response = qmp.recv(65536)
+        with log_path.open("ab") as log:
+            log.write(response)
+        return path.exists()
+    except (AttributeError, OSError, TimeoutError):
+        return False
+
+
+def stop_debugger(process: subprocess.Popen[bytes] | None) -> str:
+    if process is None or process.poll() is not None:
+        return "already-exited" if process is not None else "not-started"
+    process.terminate()
+    try:
+        process.wait(timeout=5)
+        return "terminate"
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait()
+        return "kill"
+
+
+def build_command(
+    args: argparse.Namespace,
+    vars_copy: Path,
+    loader_serial_path: Path,
+    qmp_path: Path,
+    kd_socket_path: Path | None = None,
+) -> list[str]:
     command = [args.qemu]
-    if args.mode in ("smoke", "selftest"):
-        processor_count = 1 if args.mode == "smoke" else args.smp
+    if args.mode in ("smoke", "selftest", "debugger"):
+        processor_count = 1 if args.mode == "smoke" else getattr(args, "smp", 1)
         command += [
             "-accel",
             "tcg",
@@ -240,7 +347,19 @@ def build_command(args: argparse.Namespace, vars_copy: Path, serial_path: Path, 
         "-drive",
         f"if=pflash,format=raw,unit=1,file={vars_copy}",
         "-serial",
-        f"file:{serial_path}",
+        f"file:{loader_serial_path}",
+    ]
+    if args.mode in ("smoke", "selftest", "debugger"):
+        if kd_socket_path is None:
+            kd_socket_path = loader_serial_path.with_name("kd.sock")
+        command += [
+            "-chardev",
+            f"socket,id=kd,path={kd_socket_path},server=on,wait=off,"
+            f"logfile={kd_socket_path.with_name('kd-stream.log')}",
+            "-serial",
+            "chardev:kd",
+        ]
+    command += [
         "-qmp",
         f"unix:{qmp_path},server=on,wait=off",
         "-no-reboot",
@@ -259,13 +378,27 @@ def run_once(args: argparse.Namespace, run_number: int, version: str) -> dict[st
     run_dir.mkdir()
     vars_copy = run_dir / "ovmf-vars.fd"
     shutil.copyfile(args.ovmf_vars, vars_copy)
+    loader_serial_path = run_dir / "loader.log"
     serial_path = run_dir / "serial.log"
+    debugger_log_path = run_dir / "debugger.jsonl"
+    debugger_error_path = run_dir / "debugger.stderr.log"
     qmp_log_path = run_dir / "qmp.log"
     qmp_socket_path = run_dir / "qmp.sock"
+    kd_socket_path = run_dir / "kd.sock"
+    screenshot_path = run_dir / "screenshot.ppm"
     result_path = run_dir / "result.json"
+    loader_serial_path.touch()
     serial_path.touch()
+    debugger_log_path.touch()
+    debugger_error_path.touch()
     qmp_log_path.touch()
-    command = build_command(args, vars_copy, serial_path, qmp_socket_path)
+    command = build_command(args, vars_copy, loader_serial_path, qmp_socket_path, kd_socket_path)
+    debug_command = debugger_command(
+        kd_socket_path,
+        (str(Path(args.script).resolve()) if getattr(args, "script", None) not in (None, "-")
+         else getattr(args, "script", None)),
+        getattr(args, "command", None),
+    )
     started = time.monotonic()
     markers = markers_for(args)
     tracker = MarkerTracker(markers)
@@ -273,28 +406,77 @@ def run_once(args: argparse.Namespace, run_number: int, version: str) -> dict[st
     status = "launch-error"
     stop_method = "not-started"
     process: subprocess.Popen[bytes] | None = None
+    debugger_process: subprocess.Popen[bytes] | None = None
     qmp = None
+    screenshot_captured = False
 
     try:
         process = subprocess.Popen(command)
         qmp = connect_qmp(qmp_socket_path, process, qmp_log_path)
+        debugger_ready = True
+        if args.mode in ("smoke", "selftest", "debugger"):
+            # OVMF exposes the UARTs as firmware consoles. Sending binary KD frames before the
+            # loader is running can therefore be interpreted as firmware keyboard input. Wait for
+            # both loader records on COM1 before connecting the COM2 debugger client.
+            loader_deadline = started + args.timeout
+            debugger_ready = False
+            while time.monotonic() < loader_deadline:
+                loader_output = normalize_output(loader_serial_path.read_text(errors="replace"))
+                if all(re.search(pattern, loader_output, re.IGNORECASE)
+                       for _, pattern in SMOKE_MARKERS[:2]):
+                    debugger_ready = True
+                    break
+                if process.poll() is not None:
+                    status = "early-exit"
+                    break
+                time.sleep(0.05)
+            if not debugger_ready and status != "early-exit":
+                status = "timeout"
+            if debugger_ready:
+                with debugger_log_path.open("ab") as debugger_log, \
+                        debugger_error_path.open("ab") as debugger_error:
+                    debugger_process = subprocess.Popen(
+                        debug_command,
+                        cwd=Path(__file__).resolve().parents[1],
+                        stdin=(None if getattr(args, "script", None) == "-" else subprocess.DEVNULL),
+                        stdout=debugger_log,
+                        stderr=debugger_error,
+                    )
         if args.mode == "interactive":
             process.wait()
             status = "exited"
-        else:
+        elif debugger_ready:
             deadline = time.monotonic() + args.timeout
             while time.monotonic() < deadline:
-                output = normalize_output(serial_path.read_text(errors="replace"))
+                output = aggregate_output(loader_serial_path, debugger_log_path)
+                serial_path.write_text(output)
                 tracker.scan(output, time.monotonic() - started)
                 failure = find_failure(output)
                 if failure:
                     status = "failed-marker"
                     break
                 if tracker.complete:
-                    status = "passed"
-                    break
+                    if args.mode != "debugger":
+                        status = "passed"
+                        break
+                    if debugger_process is not None and debugger_process.poll() is not None:
+                        status = "passed" if debugger_process.returncode == 0 else "debugger-exit"
+                        if debugger_process.returncode:
+                            failure = {
+                                "name": "debugger-exit",
+                                "message":
+                                    f"serial debugger exited with code {debugger_process.returncode}",
+                            }
+                        break
                 if process.poll() is not None:
                     status = "early-exit"
+                    break
+                if debugger_process is not None and debugger_process.poll() is not None:
+                    status = "debugger-exit"
+                    failure = {
+                        "name": "debugger-exit",
+                        "message": f"serial debugger exited with code {debugger_process.returncode}",
+                    }
                     break
                 time.sleep(0.1)
             else:
@@ -303,24 +485,36 @@ def run_once(args: argparse.Namespace, run_number: int, version: str) -> dict[st
         status = "launch-error"
         failure = {"name": "launch-error", "message": str(error)}
     finally:
+        serial_path.write_text(aggregate_output(loader_serial_path, debugger_log_path))
+        if status != "passed":
+            screenshot_captured = capture_screenshot(qmp, screenshot_path, qmp_log_path)
         if process is not None:
             stop_method = stop_qemu(process, qmp)
+        debugger_stop_method = stop_debugger(debugger_process)
         if qmp is not None:
             qmp.close()
+
+    aggregate = normalize_output(serial_path.read_text(errors="replace"))
 
     result = {
         "status": status,
         "passed": status == "passed"
-        if args.mode in ("smoke", "selftest")
+        if args.mode in ("smoke", "selftest", "debugger")
         else bool(process and process.returncode == 0),
         "return_code": process.returncode if process is not None else None,
         "stop_method": stop_method,
         "duration_seconds": round(time.monotonic() - started, 3),
         "matched_markers": tracker.matches,
         "expected_markers": [{"name": name, "pattern": pattern} for name, pattern in markers],
-        "self_tests": parse_self_test_records(normalize_output(serial_path.read_text(errors="replace"))),
+        "self_tests": parse_self_test_records(aggregate),
         "failure": failure,
         "command": command,
+        "debugger_command": debug_command,
+        "debugger_stop_method": debugger_stop_method,
+        "loader_serial_log": str(loader_serial_path),
+        "debugger_log": str(debugger_log_path),
+        "debugger_stderr_log": str(debugger_error_path),
+        "screenshot": str(screenshot_path) if screenshot_captured else None,
         "qemu_version": version,
         "inputs": {
             "image": {"path": str(args.image), "sha256": file_hash(args.image)},

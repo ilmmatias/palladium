@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import importlib.util
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -88,6 +89,47 @@ M1TEST COMPLETE cases=3
         failure = RUN_QEMU.find_failure("M1TEST FAIL suite=mm case=3 code=9\n")
         self.assertEqual(failure["name"], "self-test-failure")
 
+    def test_aggregates_loader_and_serial_debugger_output(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "loader.log").write_text(
+                "loading up \\EFI\\PALLADIUM\\KERNEL.EXE\n"
+                "loading up \\EFI\\PALLADIUM\\ACPI.SYS\n")
+            (root / "debugger.jsonl").write_text(json.dumps({
+                "schema": 2,
+                "seq": 0,
+                "event": "target_output",
+                "data": {"text": "palladium kernel for amd64, git commit abc release build\n"},
+            }) + "\n" + json.dumps({
+                "schema": 2,
+                "seq": 1,
+                "event": "target_output",
+                "data": {"text": "managing 256 MiB of memory\n1 processor online\n"
+                                  "enabled ACPI\n"},
+            }) + "\n")
+            aggregate = RUN_QEMU.aggregate_output(root / "loader.log", root / "debugger.jsonl")
+        tracker = RUN_QEMU.MarkerTracker()
+        tracker.scan(aggregate, 1.0)
+        self.assertTrue(tracker.complete)
+
+    def test_serial_debugger_command_uses_frozen_headless_form(self):
+        command = RUN_QEMU.debugger_command(Path("/tmp/run-001/kd.sock"))
+        self.assertEqual(
+            command,
+            [
+                "python3", "-m", "src.debugger", "serial", "unix:/tmp/run-001/kd.sock",
+                "--headless", "--format", "jsonl",
+            ],
+        )
+
+    def test_serial_debugger_command_accepts_one_script_or_commands(self):
+        scripted = RUN_QEMU.debugger_command(Path("/tmp/kd.sock"), script="commands.kd")
+        self.assertEqual(scripted[-2:], ["--script", "commands.kd"])
+        commands = RUN_QEMU.debugger_command(
+            Path("/tmp/kd.sock"), commands=["status", "continue", "detach"])
+        self.assertEqual(commands[-6:], ["--command", "status", "--command", "continue",
+                                         "--command", "detach"])
+
 
 class FakeProcess:
     def __init__(self, return_code=None):
@@ -148,6 +190,9 @@ class RunnerTests(unittest.TestCase):
             self.root / "run-002" / "serial.log", self.root / "run-002" / "qmp.sock")
         self.assertIn("pc-q35-8.2", first)
         self.assertEqual(first[first.index("-nic") + 1], "none")
+        self.assertIn("-chardev", first)
+        self.assertIn("socket,id=kd", first[first.index("-chardev") + 1])
+        self.assertEqual(first[first.index("-serial", first.index("-chardev")) + 1], "chardev:kd")
         self.assertNotEqual(first, second)
 
     def test_selftest_profile_uses_requested_processor_count(self):
@@ -162,6 +207,20 @@ class RunnerTests(unittest.TestCase):
         )
         self.assertEqual(command[command.index("-smp") + 1], "4")
         self.assertEqual(command[command.index("-nic") + 1], "none")
+
+    def test_debugger_profile_is_fixed_one_cpu_and_accepts_serial_channel(self):
+        args = self.arguments("unused")
+        args.mode = "debugger"
+        command = RUN_QEMU.build_command(
+            args,
+            self.root / "run-001" / "vars.fd",
+            self.root / "run-001" / "loader.log",
+            self.root / "run-001" / "qmp.sock",
+        )
+        self.assertEqual(command[command.index("-smp") + 1], "1")
+        self.assertEqual(command[command.index("-serial") + 1],
+                         "file:" + str(self.root / "run-001" / "loader.log"))
+        self.assertIn("chardev:kd", command)
 
     def test_early_exit_fails_and_preserves_fresh_variable_copy(self):
         args = self.arguments("early")
@@ -189,7 +248,9 @@ class RunnerTests(unittest.TestCase):
         args.output_dir.mkdir()
         process = FakeProcess()
 
-        def launch(command):
+        def launch(command, **_kwargs):
+            if "-serial" not in command:
+                return FakeProcess()
             serial = Path(command[command.index("-serial") + 1].removeprefix("file:"))
             serial.write_text(
                 "loading up \\EFI\\PALLADIUM\\KERNEL.EXE\n"

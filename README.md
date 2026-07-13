@@ -42,20 +42,22 @@ privilege:
 ```sh
 tools/build-image.sh \
   --build-dir build.amd64.rel \
-  --output-dir build.amd64.rel/images \
-  --diagnostic-serial
+  --output-dir build.amd64.rel/images
 ```
 
 The output directory must be absent or empty. The command creates a 64-MiB FAT image, ISO, and the
-generated `boot.cfg`. `--diagnostic-serial` enables the opt-in PC16550 diagnostic sink used by the
-headless smoke runner; ordinary images remain framebuffer-only unless configured.
+generated `boot.cfg`. Ordinary images remain framebuffer-only and debugger-disabled unless a debug
+option is explicitly selected.
 
-The corresponding boot configuration is:
+The smoke/self-test evidence images select the Palladium-owned PC16550 serial debugger on COM2:
 
 ```text
-DiagnosticDevice=PC16550
-DiagnosticAddress=0x3F8
-DiagnosticBaudRate=115200
+DebugEnabled=TRUE
+DebugTransport=PC16550
+DebugSerialAddress=0x2F8
+DebugSerialBaudRate=115200
+DebugDisconnectPolicy=STOP
+DebugDisconnectTimeout=5000
 ```
 
 For the one-command proprietary-free evidence lane, build the image and boot it headlessly with:
@@ -70,6 +72,9 @@ tools/smoke.sh \
 
 The smoke runner requires Python 3, QEMU, and matching OVMF code/variable templates:
 
+When invoking the runner directly, build its image with `--debug-serial` so the COM2 debugger
+endpoint is present.
+
 ```sh
 tools/run-qemu.py smoke \
   --image build.amd64.rel/images/iso9660.iso \
@@ -79,17 +84,19 @@ tools/run-qemu.py smoke \
 ```
 
 It uses a fixed one-CPU TCG profile, a fresh variable store, a 60-second timeout, ordered loader/
-kernel/MM/processor/ACPI markers, and QMP shutdown. Logs and `result.json` remain in the output
-directory on success or failure. Before changing the required CI gate, exercise its repeat mode:
+kernel/MM/processor/ACPI markers, and QMP shutdown. UEFI loader ConOut is retained on COM1; the
+headless serial KD client is attached to COM2 and its target-output events are merged with loader
+markers. Logs, the raw debugger JSONL stream, and `result.json` remain in the output directory on
+success or failure. Failed runs also request a QMP framebuffer screenshot. Before changing the
+required CI gate, exercise its repeat mode:
 
 ```sh
 tools/run-qemu.py ... --repeat 20
 ```
 
 For the historical interactive workflow, run `run.sh` from the build directory with
-`OVMF_CODE_PATH`, `OVMF_VARS_PATH`, and an absent/empty `PALLADIUM_RUN_OUTPUT`. Set
-`BOOT_DIAGNOSTIC_SERIAL=true` to retain serial diagnostics. The wrapper uses KVM and the host CPU
-when available, otherwise TCG, and gives every run a fresh OVMF variable store.
+`OVMF_CODE_PATH`, `OVMF_VARS_PATH`, and an absent/empty `PALLADIUM_RUN_OUTPUT`. The wrapper uses KVM
+and the host CPU when available, otherwise TCG, and gives every run a fresh OVMF variable store.
 
 The runner can also be invoked directly. Deliberate extra QEMU arguments belong after `--` and are
 accepted only by the interactive profile:
@@ -125,7 +132,7 @@ cmake --build build.amd64.selftest
 tools/build-image.sh \
   --build-dir build.amd64.selftest \
   --output-dir build.amd64.selftest/images \
-  --diagnostic-serial
+  --debug-serial
 tools/run-qemu.py selftest \
   --image build.amd64.selftest/images/iso9660.iso \
   --ovmf-code /path/to/OVMF_CODE.fd \
@@ -151,6 +158,17 @@ The existing TUI invocation remains:
 python3 -m src.debugger <ipv4-or-localhost> <port>
 ```
 
+The fixed QEMU evidence profiles launch the serial headless client automatically on COM2. To attach
+manually to a Unix serial endpoint, use:
+
+```sh
+python3 -m src.debugger serial unix:/path/to/kd.sock --headless --format jsonl
+```
+
+For a non-gating scripted debugger profile, use `tools/run-qemu.py debugger` with either
+`--script commands.kd` or repeatable `--command` options (`status`, `r`, `bp`, `continue`,
+`step`, and `detach`).
+
 Headless mode accepts standard input, a UTF-8 script, or repeatable commands and emits stable text
 or versioned JSONL:
 
@@ -166,11 +184,14 @@ Run its host tests with:
 python3 -m unittest discover -s src/debugger/tests
 ```
 
-The fake UDP target tests the Python codec/session and malformed-datagram behavior only. It does not
-exercise the kernel's raw Ethernet/KD extension path.
+The fake host targets test the Python codec/session plus UDP-datagram and serial-framing failure
+behavior. The QEMU profiles additionally exercise the kernel's serial framing, target-output
+aggregation, resumable stops, and SMP context capture. They do not exercise the raw Ethernet/KDNET
+extension path; repeated reconnect/loss qualification is not yet a required hosted lane.
 
 The implementation and qualification record for this milestone is in
-[the M0 evidence-plane notes](docs/M0EvidencePlane.md).
+[the M0 evidence-plane notes](docs/M0EvidencePlane.md) and
+[the M2 serial debugger evidence notes](docs/M2Debugger.md).
 
 When `BOOT_DEBUG_ENABLED=true`, the kernel intentionally waits for the client during early
 initialization. The current KDNET extensibility modules must be extracted from a legally obtained

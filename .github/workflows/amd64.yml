@@ -153,7 +153,7 @@ jobs:
         palladium/tools/build-image.sh \
           --build-dir build.selftest \
           --output-dir build.selftest/evidence/image \
-          --diagnostic-serial
+          --debug-serial
         palladium/tools/run-qemu.py selftest \
           --image build.selftest/evidence/image/iso9660.iso \
           --ovmf-code "$OVMF_CODE_PATH" \

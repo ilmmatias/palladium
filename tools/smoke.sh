@@ -9,7 +9,7 @@ usage() {
 Usage: tools/smoke.sh --build-dir DIR --output-dir DIR \
     --ovmf-code PATH --ovmf-vars PATH [--repeat COUNT] [--timeout SECONDS]
 
-Build a proprietary-free diagnostic image and run the fixed amd64 QEMU TCG smoke profile.
+Build a proprietary-free serial-KD image and run the fixed amd64 QEMU TCG smoke profile.
 EOF
 }
 
@@ -54,7 +54,7 @@ run_dir=$output_dir/qemu
 "$repo_dir/tools/build-image.sh" \
     --build-dir "$build_dir" \
     --output-dir "$image_dir" \
-    --diagnostic-serial
+    --debug-serial
 "$repo_dir/tools/run-qemu.py" smoke \
     --image "$image_dir/iso9660.iso" \
     --ovmf-code "$ovmf_code" \

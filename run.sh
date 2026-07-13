@@ -23,7 +23,6 @@ if [[ -n ${BOOT_DRIVERS:-} ]]; then
 fi
 [[ ${BOOT_DEBUG_ENABLED:-false} != true ]] || builder+=(--debug-enabled)
 [[ ${BOOT_DEBUG_ECHO_ENABLED:-false} != true ]] || builder+=(--debug-echo-enabled)
-[[ ${BOOT_DIAGNOSTIC_SERIAL:-false} != true ]] || builder+=(--diagnostic-serial)
 [[ -z ${BOOT_DEBUG_ADDRESS:-} ]] || builder+=(--debug-address "$BOOT_DEBUG_ADDRESS")
 [[ -z ${BOOT_DEBUG_PORT:-} ]] || builder+=(--debug-port "$BOOT_DEBUG_PORT")
 for module in ${BOOT_DEBUG_DRIVERS:-}; do
