@@ -30,15 +30,21 @@ keyboard controls:
 mouse controls:
     scroll up/down             - scroll the focused log up/down
 
-commands:
-    dp[/count] <address>       - disassemble physical memory
-    dv[/count] <address>       - disassemble virtual memory
-    el[/target] <path>         - export the focused, kernel (`k`), or command (`c`) log
-    h | help                   - show this help dialog
-    ip/<size> <address>        - read an 8-, 16-, or 32-bit port value
-    q | quit                   - close the debugger
-    rp/<size>[count] <address> - read physical memory
-    rv/<size>[count] <address> - read virtual memory
+    commands:
+        status | cpus              - query target state or processors
+        r[/cpu] | rx[/cpu]         - read amd64 context (extended alias)
+        dp[/count] <address>       - disassemble physical memory
+        dv[/count] <address>       - disassemble virtual memory
+        el[/target] <path>         - export the focused, kernel (`k`), or command (`c`) log
+        ip/<size> <address>        - read an 8-, 16-, or 32-bit port value
+        rp/<size>[count] <address> - read physical memory
+        rv/<size>[count] <address> - read virtual memory
+        stop | continue | step    - control target execution
+        bp <address>               - add software breakpoint
+        bl | be/bd/bc <id>         - list/enable/disable/remove breakpoint
+        detach                     - detach and close the debugger
+        h | help                   - show this help dialog
+        q | quit                   - close the debugger
 
 Memory sizes are `b`, `w`, `d`, or `q`; port sizes are `b`, `w`, or `d`. Addresses are hexadecimal.
 Memory reads default to 128 bytes and disassembly defaults to 128 bytes.

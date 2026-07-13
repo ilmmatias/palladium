@@ -28,6 +28,7 @@ def KdpPrintDisassemblyData(
     # Add any architectures here as needed!
     ArchitectureMap = {
         "amd64": (capstone.CS_ARCH_X86, capstone.CS_MODE_64),
+        0x8664: (capstone.CS_ARCH_X86, capstone.CS_MODE_64),
     }
 
     Parameters = ArchitectureMap.get(Architecture)
