@@ -77,6 +77,10 @@ void VidpReleaseSpinLock(KeIrql OldIrql) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void VidpFlush(void) {
+    if (!VidpHeight) {
+        return;
+    }
+
     uint16_t FrontY = (VidpRingTop + VidpFlushY) % VidpHeight;
     uint16_t WrapLine = VidpHeight - FrontY;
 

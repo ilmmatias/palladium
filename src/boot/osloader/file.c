@@ -137,7 +137,7 @@ void *OslReadFile(const char *Path, uint64_t *Size) {
         }
     }
 
-    if (Status != EFI_SUCCESS) {
+    if (Status != EFI_SUCCESS || !FileInfo || FileInfoSize < sizeof(EFI_FILE_INFO)) {
         if (FileInfo) {
             gBS->FreePool(FileInfo);
         }

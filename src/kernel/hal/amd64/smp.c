@@ -143,6 +143,28 @@ void HalpBroadcastIpi(void) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
+ *     This function requests every other online processor to enter the debugger rendezvous.
+ *
+ * PARAMETERS:
+ *     None.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void HalpBroadcastDebuggerIpi(void) {
+    KeProcessor *CurrentProcessor = KeGetCurrentProcessor();
+    for (uint32_t i = 0; i < HalpOnlineProcessorCount; i++) {
+        if (i != CurrentProcessor->Number) {
+            HalpSendIpi(
+                HalpProcessorList[i]->ApicId,
+                HALP_INT_DEBUGGER_VECTOR,
+                HALP_APIC_ICR_DELIVERY_FIXED);
+        }
+    }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
  *     This function notifies all but the current processor that they should stop running.
  *
  * PARAMETERS:

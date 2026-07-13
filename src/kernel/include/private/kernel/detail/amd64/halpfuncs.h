@@ -54,6 +54,10 @@ void HalpInitializeApicTimer(void);
 
 void HalpInitializeSmp(void);
 
+bool HalpInitializeSerialPort(HalpSerialPort *Port, uint64_t Address, uint32_t BaudRate);
+bool HalpReadSerialPort(HalpSerialPort *Port, uint8_t *Byte);
+bool HalpWriteSerialPort(HalpSerialPort *Port, uint8_t Byte);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

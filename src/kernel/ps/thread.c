@@ -23,6 +23,9 @@ uint64_t PspGlobalThreadCount = 0;
 [[noreturn]] extern void PspIdleThread(void *);
 [[noreturn]] extern void KiContinueSystemStartup(void *);
 
+static_assert(offsetof(PsThread, EventHeader) == 0);
+static_assert(sizeof(((PsThread *)0)->EventHeader) == sizeof(EvHeader));
+
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function does the actual creation of the thread, together with creating the stack if
@@ -64,6 +67,7 @@ static PsThread *CreateThread(void (*EntryPoint)(void *), void *Parameter, void 
     /* Initialize the event header (used when waiting for the thread's completion). */
     Thread->EventHeader.Type = EV_TYPE_THREAD;
     RtInitializeDList(&Thread->EventHeader.WaitList);
+    RtInitializeDList(&Thread->OwnedMutexList);
 
     return Thread;
 }
@@ -93,6 +97,10 @@ static void QueueThreadIn(PsThread *Thread, KeProcessor *Processor, bool EventQu
     __atomic_add_fetch(&Processor->ThreadCount, 1, __ATOMIC_RELEASE);
     __atomic_add_fetch(&PspGlobalThreadCount, 1, __ATOMIC_RELEASE);
     KeReleaseSpinLockAtCurrentIrql(&Processor->Lock);
+
+    if (Processor != KeGetCurrentProcessor()) {
+        HalpNotifyProcessor(Processor, KE_IRQL_DISPATCH);
+    }
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -159,13 +167,26 @@ void PspQueueThread(PsThread *Thread, bool EventQueue) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void PspSetupThreadWait(KeProcessor *Processor, PsThread *Thread, uint64_t Time) {
-    Thread->WaitTicks = Processor->Ticks + (Time + EVP_TICK_PERIOD - 1) / EVP_TICK_PERIOD;
+    uint64_t WaitTicks = Time / EVP_TICK_PERIOD;
+    if (Time % EVP_TICK_PERIOD) {
+        WaitTicks++;
+    }
+
+    if (WaitTicks >= UINT64_MAX - Processor->Ticks) {
+        Thread->WaitTicks = UINT64_MAX - 1;
+    } else {
+        Thread->WaitTicks = Processor->Ticks + WaitTicks;
+    }
 
     if (Thread->WaitTicks < Processor->ClosestWaitTick) {
         Processor->ClosestWaitTick = Thread->WaitTicks;
     }
 
-    RtInsertAvlTree(&Processor->WaitTree, &Thread->WaitTreeNode);
+    if (!RtInsertAvlTree(&Processor->WaitTree, &Thread->WaitTreeNode)) {
+        KeFatalError(KE_PANIC_BAD_THREAD_STATE, Thread->State, PS_STATE_WAITING, 2, 0);
+    }
+
+    Thread->WaitTreeLinked = true;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -249,7 +270,36 @@ PsThread *PsCreateThread(uint64_t Flags, void (*EntryPoint)(void *), void *Param
 }
 
 /*-------------------------------------------------------------------------------------------------
- * PURPOSE:__ATOMIC_RELAXED
+ * PURPOSE:
+ *     This function queues a newly created suspended thread. It supports exactly one successful
+ *     SUSPENDED to QUEUED transition.
+ *
+ * PARAMETERS:
+ *     Thread - Suspended thread to resume.
+ *
+ * RETURN VALUE:
+ *     true if this call performed the transition, false if the thread was not suspended.
+ *-----------------------------------------------------------------------------------------------*/
+bool PsResumeThread(PsThread *Thread) {
+    uint8_t ExpectedState = PS_STATE_SUSPENDED;
+    if (!__atomic_compare_exchange_n(
+            &Thread->State,
+            &ExpectedState,
+            PS_STATE_QUEUED,
+            false,
+            __ATOMIC_ACQ_REL,
+            __ATOMIC_ACQUIRE)) {
+        return false;
+    }
+
+    KeIrql OldIrql = KeRaiseIrql(KE_IRQL_SYNCH);
+    PspQueueThread(Thread, false);
+    KeLowerIrql(OldIrql);
+    return true;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
  *     This function marks the current thread for deletion, and yields out into the next thread.
  *
  * PARAMETERS:
@@ -269,6 +319,17 @@ PsThread *PsCreateThread(uint64_t Flags, void (*EntryPoint)(void *), void *Param
         KeFatalError(KE_PANIC_BAD_THREAD_STATE, CurrentThread->State, PS_STATE_RUNNING, 0, 0);
     }
 
+    if (CurrentThread->OwnedMutexList.Next != &CurrentThread->OwnedMutexList) {
+        EvMutex *Mutex =
+            CONTAINING_RECORD(CurrentThread->OwnedMutexList.Next, EvMutex, OwnerListHeader);
+        KeFatalError(
+            KE_PANIC_THREAD_OWNS_MUTEX,
+            (uint64_t)CurrentThread,
+            (uint64_t)Mutex,
+            Mutex->Recursion,
+            Mutex->Contention);
+    }
+
     /* Signal to anyone waiting for us (should we do this here at the start, or somewhere else?) */
     KeAcquireSpinLockAtCurrentIrql(&CurrentThread->EventHeader.Lock);
     CurrentThread->EventHeader.Signaled = true;
@@ -277,16 +338,21 @@ PsThread *PsCreateThread(uint64_t Flags, void (*EntryPoint)(void *), void *Param
 
     /* Disable anyone from sending us alerts from now on (so that we can clean up the signal
      * list). */
+    RtSList DiscardedAlerts = {0};
     KeAcquireSpinLockAtCurrentIrql(&CurrentThread->AlertLock);
     __atomic_store_n(&CurrentThread->AlertListBlocked, true, __ATOMIC_SEQ_CST);
-    while (CurrentThread->AlertList.Next) {
-        PsAlert *Alert =
-            CONTAINING_RECORD(RtPopSList(&CurrentThread->AlertList), PsAlert, ListHeader);
+    RtSpliceSList(&DiscardedAlerts, &CurrentThread->AlertList);
+    KeReleaseSpinLockAtCurrentIrql(&CurrentThread->AlertLock);
+
+    while (DiscardedAlerts.Next) {
+        PsAlert *Alert = CONTAINING_RECORD(RtPopSList(&DiscardedAlerts), PsAlert, ListHeader);
         if (Alert->PoolAllocated) {
-            MmFreePool(Alert, MM_POOL_TAG_NONE);
+            RtPushSList(&CurrentThread->AlertList, &Alert->ListHeader);
+        } else {
+            __atomic_store_n(&Alert->Queued, false, __ATOMIC_RELEASE);
+            ObDereferenceObject(CurrentThread);
         }
     }
-    KeReleaseSpinLockAtCurrentIrql(&CurrentThread->AlertLock);
 
     /* Mark ourselves for termination, and switch out (the next dispatch event should clean up the
      * thread for us). */
@@ -376,6 +442,10 @@ void PsDelayThread(uint64_t Time) {
     /* Do the wait list manipulation (that also calculates the target ticks) as early as
      * possible (so that we don't overshoot the wait too much). */
     CurrentThread->WaitObject = NULL;
+    CurrentThread->WaitGeneration++;
+    CurrentThread->WaitCompletion = PS_WAIT_COMPLETION_NONE;
+    CurrentThread->WaitListLinked = false;
+    CurrentThread->WaitTreeLinked = false;
     PspSetupThreadWait(Processor, CurrentThread, Time);
     PspSuspendExecution(Processor, CurrentThread, PS_STATE_WAITING, OldIrql);
 }

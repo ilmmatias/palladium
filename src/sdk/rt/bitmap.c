@@ -192,10 +192,10 @@ void RtSetAllBits(RtBitmap *Header) {
 static uint64_t
 CountBitRow(RtBitmap *Header, uint64_t Offset, uint64_t NumberOfBits, bool Inverse) {
     uint64_t *Buffer = Header->Buffer + (Offset >> 6);
-    uint64_t *End = Buffer + ((NumberOfBits + 63) >> 6);
+    uint64_t LeadingBits = Offset & 0x3F;
+    uint64_t *End = Buffer + ((LeadingBits + NumberOfBits + 63) >> 6);
 
     /* Do not consider anything before the given offset */
-    uint64_t LeadingBits = Offset & 0x3F;
     uint64_t Value = (Inverse ? ~*Buffer : *Buffer) >> LeadingBits << LeadingBits;
 
     /* Read up all zeroes we can; We only need to ctz() if we find something that's not empty. */
@@ -243,9 +243,9 @@ static uint64_t FindBitRow(RtBitmap *Header, uint64_t Hint, uint64_t NumberOfBit
     uint64_t End = Header->NumberOfBits;
 
     do {
-        while (Offset + NumberOfBits < End) {
+        while (Offset <= End && NumberOfBits <= End - Offset) {
             Offset += CountBitRow(Header, Offset, Header->NumberOfBits - Offset, !Inverse);
-            if (Offset + NumberOfBits > End) {
+            if (Offset > End || NumberOfBits > End - Offset) {
                 break;
             }
 

@@ -6,23 +6,211 @@ Palladium is a modular/hybrid NT-inspired (but not binary nor source compatible)
 
 ## How to build and run this?
 
-To build the source, you need to have a full LLVM toolchain, ninja, and cmake installed.
+To build the source, you need CMake 3.21+, Ninja, a full Clang/LLVM toolchain, and the bare-metal
+compiler-rt builtins. LLVM supplies the cross compiler; build and install the builtins with:
 
-LLVM comes with cross-compiling support by default, and you only need to rebuild compiler-rt for the baremetal target as of yet.
-This can be done using the [build-compiler-rt.sh](./build-compiler-rt.sh) script, as such: `COMPILER_RT_PATH=llvm-project/compiler-rt COMPILER_RT_TARGET=x86_64 ./build-compiler-rt.sh`.
+```sh
+PALLADIUM_PATH="$PWD" COMPILER_RT_PATH=/path/to/llvm-project/compiler-rt \
+COMPILER_RT_TARGET=x86_64 ./build-compiler-rt.sh
+```
 
-An example of how to build the OS (after having the baremetal compiler-rt) would be: `cmake -Ssrc -Bbuild.amd64.rel -GNinja -DCMAKE_BUILD_TYPE=Release -DARCH=amd64 && cmake --build build.amd64.rel`.
+The only supported target is currently amd64:
 
-To check the sources against clang-tidy, configure CMake with `CMAKE_EXPORT_COMPILE_COMMANDS=ON` and run `run-clang-tidy -p <build-directory> -source-filter='.*\.(c)$'`.
-You can then fix the found issues via `run-clang-tidy -fix -p <build-directory> -source-filter='.*\.(c)$'`.
+```sh
+cmake -S src -B build.amd64.rel -G Ninja -DCMAKE_BUILD_TYPE=Release -DARCH=amd64
+cmake --build build.amd64.rel
+```
 
-After this, we provide [run.sh](./run.sh) to create and run a test ISO on QEMU (x86-64/amd64 only). This script requires mtools and mkisofs (cdrtools). There is also a set of required environment variables; In specific, `BOOT_DRIVERS=<space separated list...>` (which should contain at least `acpi`), `OVMF_CODE_PATH=<path to the OVMF ROM file>`, and `OVMF_VARS_PATH=<path to the OVMF vars file>`. You can also configure remote debugging support using `BOOT_DEBUG_ENABLED=true/false`, `BOOT_DEBUG_ECHO_ENABLED=<true/false, depending on if you want the KdPrint messages to show on the target display as well>`, `BOOT_DEBUG_ADDRESS=x.x.x.x`, `BOOT_DEBUG_PORT=<uint16 value>`, `BOOT_DEBUG_DRIVER_PREFIX=<where to find the KDNET extensibility modules>`, and `BOOT_DEBUG_DRIVERS=<space separated list of what KDNET extensibility modules to copy>`. The specific network device that will be used by QEMU when `BOOT_DEBUG_ENABLED=true` can also be configured via `BOOT_DEBUG_DEVICE`. For example, you could run `pushd build.amd64.rel && OVMF_CODE_PATH=<path> OVMF_VARS_PATH=<path> BOOT_DRIVERS="acpi" ../run.sh && popd` after building the OS.
+For clang-tidy, configure with `-DCMAKE_EXPORT_COMPILE_COMMANDS=ON`, then run:
 
-The KDNET extensibility modules from `BOOT_DEBUG_DRIVERS` should be extracted from a legally obtained Windows system, in specific Windows 10 version 19H2 or newer, but preferably Windows 11 version 24H2, as that is the version tested during development (for the extra network card compatibility).
+```sh
+run-clang-tidy -p build.amd64.rel -source-filter='.*\.(c)$'
+```
 
-When `BOOT_DEBUG_ENABLED` is `true`, the kernel will attempt to connect to the remote debugger during the early initialization (and wait until the connection is established). A simple Python 3 tool is included at `src/debugger` for connecting with the kernel. It currently only depends on curses, and can be run as such: `python3 -m src.debugger <ip> <port>`, with the `<ip>` matching the `BOOT_DEBUG_ADDRESS` value (or `localhost`, when running under QEMU).
+Do not apply clang-tidy `-fix` across unrelated source. The LLVM-versioned warning classification
+is recorded in [the M1 baseline](docs/roadmap/M1ClangTidyBaseline.md). The selected analyzer gate is:
 
-For amd64 (the only currently supported configuration), use COMPILER_RT_TARGET=`x86_64` when building compiler-rt, and `ARCH=amd64` when building the OS.
+```sh
+tools/run-clang-tidy-high-signal.sh build.amd64.rel
+```
+
+### Images and reproducible QEMU smoke boot
+
+Image construction requires Bash, mtools, and mkisofs/cdrtools. It never mounts the image or needs
+privilege:
+
+```sh
+tools/build-image.sh \
+  --build-dir build.amd64.rel \
+  --output-dir build.amd64.rel/images
+```
+
+The output directory must be absent or empty. The command creates a 64-MiB FAT image, ISO, and the
+generated `boot.cfg`. Ordinary images remain framebuffer-only and debugger-disabled unless a debug
+option is explicitly selected.
+
+The smoke/self-test evidence images select the Palladium-owned PC16550 serial debugger on COM2:
+
+```text
+DebugEnabled=TRUE
+DebugTransport=PC16550
+DebugSerialAddress=0x2F8
+DebugSerialBaudRate=115200
+DebugDisconnectPolicy=STOP
+DebugDisconnectTimeout=5000
+```
+
+For the one-command proprietary-free evidence lane, build the image and boot it headlessly with:
+
+```sh
+tools/smoke.sh \
+  --build-dir build.amd64.rel \
+  --output-dir build.amd64.rel/evidence \
+  --ovmf-code /path/to/OVMF_CODE.fd \
+  --ovmf-vars /path/to/OVMF_VARS.fd
+```
+
+The smoke runner requires Python 3, QEMU, and matching OVMF code/variable templates:
+
+When invoking the runner directly, build its image with `--debug-serial` so the COM2 debugger
+endpoint is present.
+
+```sh
+tools/run-qemu.py smoke \
+  --image build.amd64.rel/images/iso9660.iso \
+  --ovmf-code /path/to/OVMF_CODE.fd \
+  --ovmf-vars /path/to/OVMF_VARS.fd \
+  --output-dir build.amd64.rel/qemu-smoke
+```
+
+It uses a fixed one-CPU TCG profile, a fresh variable store, a 60-second timeout, ordered loader/
+kernel/MM/processor/ACPI markers, and QMP shutdown. UEFI loader ConOut is retained on COM1; the
+headless serial KD client is attached to COM2 and its target-output events are merged with loader
+markers. Logs, the raw debugger JSONL stream, and `result.json` remain in the output directory on
+success or failure. Failed runs also request a QMP framebuffer screenshot. Before changing the
+required CI gate, exercise its repeat mode:
+
+```sh
+tools/run-qemu.py ... --repeat 20
+```
+
+For the historical interactive workflow, run `run.sh` from the build directory with
+`OVMF_CODE_PATH`, `OVMF_VARS_PATH`, and an absent/empty `PALLADIUM_RUN_OUTPUT`. The wrapper uses KVM
+and the host CPU when available, otherwise TCG, and gives every run a fresh OVMF variable store.
+
+The runner can also be invoked directly. Deliberate extra QEMU arguments belong after `--` and are
+accepted only by the interactive profile:
+
+```sh
+tools/run-qemu.py interactive \
+  --image build.amd64.rel/images/iso9660.iso \
+  --ovmf-code /path/to/OVMF_CODE.fd \
+  --ovmf-vars /path/to/OVMF_VARS.fd \
+  --output-dir build.amd64.rel/qemu-interactive \
+  -- -device e1000
+```
+
+### M1 host and kernel self-tests
+
+Portable CRT/RT tests compile the production C sources directly with Palladium headers taking
+precedence, builtins disabled, and ASan/UBSan enabled:
+
+```sh
+cmake -S tests/host -B build.host -G Ninja
+cmake --build build.host
+ctest --test-dir build.host --output-on-failure
+```
+
+Private kernel self-tests are available only in a dedicated RelWithDebInfo image. The option is off
+by default, so ordinary kernels do not contain the test entry points or fault/test state:
+
+```sh
+cmake -S src -B build.amd64.selftest -G Ninja \
+  -DCMAKE_BUILD_TYPE=RelWithDebInfo -DARCH=amd64 \
+  -DPALLADIUM_ENABLE_SELF_TESTS=ON
+cmake --build build.amd64.selftest
+tools/build-image.sh \
+  --build-dir build.amd64.selftest \
+  --output-dir build.amd64.selftest/images \
+  --debug-serial
+tools/run-qemu.py selftest \
+  --image build.amd64.selftest/images/iso9660.iso \
+  --ovmf-code /path/to/OVMF_CODE.fd \
+  --ovmf-vars /path/to/OVMF_VARS.fd \
+  --output-dir build.amd64.selftest/qemu-selftest \
+  --smp 1
+```
+
+The self-test profile accepts only `--smp 1`, `2`, or `4`, uses TCG and a 120-second timeout, and
+requires the structured `M1TEST` records to complete without a failure or kernel stop. The 2- and
+4-CPU profiles are qualification lanes rather than substitutes for hardware concurrency testing.
+The contracts and current rollout status are recorded in
+[the M1 executive baseline](docs/M1ExecutiveBaseline.md).
+
+### Kernel debugger client
+
+The Python debugger uses curses for its TUI. Capstone is loaded only when disassembly is requested.
+It is therefore optional for non-disassembly headless use; install the Python `capstone` package to
+use `dp`/`dv`.
+The existing TUI invocation remains:
+
+```sh
+python3 -m src.debugger <ipv4-or-localhost> <port>
+```
+
+The fixed QEMU evidence profiles launch the serial headless client automatically on COM2. To attach
+manually to a Unix serial endpoint, use:
+
+```sh
+python3 -m src.debugger serial unix:/path/to/kd.sock --headless --format jsonl
+```
+
+For a non-gating scripted debugger profile, use `tools/run-qemu.py debugger` with either
+`--script commands.kd` or repeatable `--command` options (`status`, `r`, `bp`, `continue`,
+`step`, and `detach`).
+
+Headless mode accepts standard input, a UTF-8 script, or repeatable commands and emits stable text
+or versioned JSONL:
+
+```sh
+python3 -m src.debugger localhost 50005 --headless --format jsonl \
+  --command 'rp/b16 ffff800000000000' --command quit
+python3 -m src.debugger localhost 50005 --headless --script commands.kd
+```
+
+Run its host tests with:
+
+```sh
+python3 -m unittest discover -s src/debugger/tests
+```
+
+The fake host targets test the Python codec/session plus UDP-datagram and serial-framing failure
+behavior. The QEMU profiles additionally exercise the kernel's serial framing, target-output
+aggregation, resumable stops, and SMP context capture. They do not exercise the raw Ethernet/KDNET
+extension path; repeated reconnect/loss qualification is not yet a required hosted lane.
+
+The implementation and qualification record for this milestone is in
+[the M0 evidence-plane notes](docs/M0EvidencePlane.md) and
+[the M2 serial debugger evidence notes](docs/M2Debugger.md).
+
+When `BOOT_DEBUG_ENABLED=true`, the kernel intentionally waits for the client during early
+initialization. The current KDNET extensibility modules must be extracted from a legally obtained
+supported Windows installation, supplied explicitly through `BOOT_DEBUG_DRIVER_PREFIX` and
+`BOOT_DEBUG_DRIVERS`, and kept outside source control. The image builder and CI never download or
+enable them by default.
+
+For example, a local interactive debug image can be built without copying the module into the
+repository:
+
+```sh
+cd build.amd64.rel
+OVMF_CODE_PATH=/path/to/OVMF_CODE.fd \
+OVMF_VARS_PATH=/path/to/OVMF_VARS.fd \
+BOOT_DEBUG_ENABLED=true \
+BOOT_DEBUG_DRIVER_PREFIX=/path/to/legally-obtained/modules \
+BOOT_DEBUG_DRIVERS='kd_02_8086.dll' \
+../run.sh
+```
 
 ## Contributing
 

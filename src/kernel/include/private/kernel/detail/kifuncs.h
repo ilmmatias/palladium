@@ -22,6 +22,9 @@ extern "C" {
 void KiSaveBootStartDrivers(KiLoaderBlock *LoaderBlock);
 void KiRunBootStartDrivers(void);
 void KiDumpSymbol(void *Address);
+#ifdef PALLADIUM_ENABLE_SELF_TESTS
+void KiRunSelfTests(void);
+#endif /* PALLADIUM_ENABLE_SELF_TESTS */
 
 #ifdef __cplusplus
 }

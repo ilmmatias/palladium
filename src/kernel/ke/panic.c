@@ -19,12 +19,6 @@ extern RtDList KiModuleListHead;
 extern bool KdpDebugEchoEnabled;
 extern bool KdpDebugConnected;
 
-extern uint16_t KdpDebuggeePort;
-
-extern uint8_t KdpDebuggerHardwareAddress[6];
-extern uint8_t KdpDebuggerProtocolAddress[4];
-extern uint16_t KdpDebuggerPort;
-
 static const char *Messages[] = {
     "MANUALLY_INITIATED_CRASH",
     "IRQL_NOT_LESS_OR_EQUAL",
@@ -41,6 +35,9 @@ static const char *Messages[] = {
     "PROCESSOR_LIMIT_EXCEEDED",
     "BAD_THREAD_STATE",
     "MUTEX_NOT_OWNED",
+    "MUTEX_RECURSION_LIMIT",
+    "BAD_OBJECT_REFERENCE_COUNT",
+    "THREAD_OWNS_MUTEX",
 };
 
 static KeSpinLock Lock = {0};
@@ -94,7 +91,7 @@ static KeSpinLock Lock = {0};
     VidSetColor(VID_COLOR_PANIC);
     VidResetDisplay();
     VidPrint("*** STOP: %s\n", Messages[Message]);
-    KdPrint(KD_TYPE_NONE, KDP_ANSI_FG_RED "*** STOP: %s" KDP_ANSI_RESET "\n", Messages[Message]);
+    KdPrint(KD_TYPE_NONE, "*** STOP: %s\n", Messages[Message]);
 
     /* Dump all available parameters. */
     VidPrint(
@@ -105,7 +102,7 @@ static KeSpinLock Lock = {0};
         Parameter4);
     KdPrint(
         KD_TYPE_NONE,
-        KDP_ANSI_FG_RED "*** PARAMETERS: %016llx, %016llx, %016llx, %016llx" KDP_ANSI_RESET "\n",
+        "*** PARAMETERS: %016llx, %016llx, %016llx, %016llx\n",
         Parameter1,
         Parameter2,
         Parameter3,
@@ -121,41 +118,32 @@ static KeSpinLock Lock = {0};
 
         if (CapturedFrames) {
             VidPrint("*** STACK TRACE:\n");
-            KdPrint(KD_TYPE_NONE, KDP_ANSI_FG_RED "*** STACK TRACE:" KDP_ANSI_RESET "\n");
+            KdPrint(KD_TYPE_NONE, "*** STACK TRACE:\n");
 
             for (int Frame = 0; Frame < CapturedFrames; Frame++) {
                 KiDumpSymbol(Frames[Frame]);
             }
         } else {
             VidPutString("*** STACK TRACE NOT AVAILABLE\n");
-            KdPrint(
-                KD_TYPE_NONE, KDP_ANSI_FG_RED "*** STACK TRACE NOT AVAILABLE" KDP_ANSI_RESET "\n");
+            KdPrint(KD_TYPE_NONE, "*** STACK TRACE NOT AVAILABLE\n");
         }
 
         /* Maybe we should add some output flag/signal to RtCaptureStackTrace so we know when
          * there is probably more frames avaliable? For now, this should be enough though. */
         if (CapturedFrames >= 32) {
             VidPrint("(more frames may follow...)\n");
-            KdPrint(
-                KD_TYPE_NONE, KDP_ANSI_FG_RED "(more frames may follow...)" KDP_ANSI_RESET "\n");
+            KdPrint(KD_TYPE_NONE, "(more frames may follow...)\n");
         }
     } else {
         VidPutString("*** STACK TRACE NOT AVAILABLE\n");
-        KdPrint(KD_TYPE_NONE, KDP_ANSI_FG_RED "*** STACK TRACE NOT AVAILABLE" KDP_ANSI_RESET "\n");
+        KdPrint(KD_TYPE_NONE, "*** STACK TRACE NOT AVAILABLE\n");
     }
 
     /* if the debugger is connected, we're free to break into it now (as everyone is frozen, and
      * interrupts are disabled). */
     if (KdpDebugConnected) {
-        KdpDebugPacket BreakPacket;
-        BreakPacket.Type = KDP_DEBUG_PACKET_BREAK;
-        KdpSendUdpPacket(
-            KdpDebuggerHardwareAddress,
-            KdpDebuggerProtocolAddress,
-            KdpDebuggeePort,
-            KdpDebuggerPort,
-            &BreakPacket,
-            sizeof(KdpDebugPacket));
+        KdpSetTargetPanic();
+        KdpSendStopEvent(KDP_STOP_REASON_PANIC, false);
         KdpEnterReceiveLoop(KDP_STATE_LATE);
     }
 

@@ -34,6 +34,10 @@ static size_t InitializeBar(
     uint32_t Function,
     size_t BarIndex,
     HalPciHeader *PciHeader) {
+    if (BarIndex >= 6) {
+        return 1;
+    }
+
     /* All zeroes means this BAR isn't valid (and we can ignore it). */
     KdpDebugDeviceAddress *BaseAddress = &KdpDebugDevice.BaseAddress[BarIndex];
     uint32_t BarOffset = offsetof(HalPciHeader, Type0.BarAddress[BarIndex]);
@@ -55,6 +59,11 @@ static size_t InitializeBar(
         BaseAddress->Type = KDP_RESOURCE_MEMORY;
         Address = BarAddress & ~0x0F;
         if ((BarAddress & 0x06) == 0x04) {
+            if (BarIndex + 1 >= 6) {
+                BaseAddress->Valid = false;
+                return 1;
+            }
+
             BaseAddress->BitWidth = 64;
             Address |= (uint64_t)PciHeader->Type0.BarAddress[BarIndex + 1] << 32;
             BarSize++;
@@ -137,10 +146,10 @@ static size_t InitializeBar(
  *-----------------------------------------------------------------------------------------------*/
 void KdpInitializeDeviceDescriptor(KiLoaderBlock *LoaderBlock) {
     /* Shorter names for the debug data fields (to keep the lines a bit smaller). */
-    uint32_t Segment = LoaderBlock->Debug.SegmentNumber;
-    uint32_t Bus = LoaderBlock->Debug.BusNumber;
-    uint32_t Device = LoaderBlock->Debug.DeviceNumber;
-    uint32_t Function = LoaderBlock->Debug.FunctionNumber;
+    uint32_t Segment = LoaderBlock->Debug.KdNet.SegmentNumber;
+    uint32_t Bus = LoaderBlock->Debug.KdNet.BusNumber;
+    uint32_t Device = LoaderBlock->Debug.KdNet.DeviceNumber;
+    uint32_t Function = LoaderBlock->Debug.KdNet.FunctionNumber;
 
     /* We'll be extensively using the PCI config space header, so read it in. */
     HalPciHeader PciHeader;

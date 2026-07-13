@@ -4,11 +4,26 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define PRIME32_1 0x9E3779B1
-#define PRIME32_2 0x85EBCA77
-#define PRIME32_3 0xC2B2AE3D
-#define PRIME32_4 0x27D4EB2F
-#define PRIME32_5 0x165667B1
+#define PRIME32_1 UINT32_C(0x9E3779B1)
+#define PRIME32_2 UINT32_C(0x85EBCA77)
+#define PRIME32_3 UINT32_C(0xC2B2AE3D)
+#define PRIME32_4 UINT32_C(0x27D4EB2F)
+#define PRIME32_5 UINT32_C(0x165667B1)
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function reads one little-endian 32-bit value without requiring an aligned buffer.
+ *
+ * PARAMETERS:
+ *     Buffer - Data to be read.
+ *
+ * RETURN VALUE:
+ *     The decoded 32-bit value.
+ *-----------------------------------------------------------------------------------------------*/
+static uint32_t ReadUInt32(const uint8_t *Buffer) {
+    return Buffer[0] | ((uint32_t)Buffer[1] << 8) | ((uint32_t)Buffer[2] << 16) |
+           ((uint32_t)Buffer[3] << 24);
+}
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -39,19 +54,19 @@ uint32_t RtGetHash(const void *Buffer, size_t Length) {
         Result += PRIME32_5;
     } else {
         while (Length >= 16) {
-            Accum1 += *((const uint32_t *)Data) * PRIME32_2;
+            Accum1 += ReadUInt32(Data) * PRIME32_2;
             Accum1 = (Accum1 << 13) | (Accum1 >> 19);
             Accum1 *= PRIME32_1;
 
-            Accum2 += *((const uint32_t *)(Data + 4)) * PRIME32_2;
+            Accum2 += ReadUInt32(Data + 4) * PRIME32_2;
             Accum2 = (Accum2 << 13) | (Accum2 >> 19);
             Accum2 *= PRIME32_1;
 
-            Accum3 += *((const uint32_t *)(Data + 8)) * PRIME32_2;
+            Accum3 += ReadUInt32(Data + 8) * PRIME32_2;
             Accum3 = (Accum3 << 13) | (Accum3 >> 19);
             Accum3 *= PRIME32_1;
 
-            Accum4 += *((const uint32_t *)(Data + 12)) * PRIME32_2;
+            Accum4 += ReadUInt32(Data + 12) * PRIME32_2;
             Accum4 = (Accum4 << 13) | (Accum4 >> 19);
             Accum4 *= PRIME32_1;
 
@@ -64,7 +79,7 @@ uint32_t RtGetHash(const void *Buffer, size_t Length) {
     }
 
     while (Length >= 4) {
-        Result += *((const uint32_t *)Data) * PRIME32_3;
+        Result += ReadUInt32(Data) * PRIME32_3;
         Result = ((Result << 17) | (Result >> 15)) * PRIME32_4;
         Data += 4;
         Length -= 4;

@@ -3,6 +3,7 @@
 
 #include <kernel/ev.h>
 #include <kernel/ke.h>
+#include <kernel/ob.h>
 #include <kernel/ps.h>
 #include <kernel/psp.h>
 #include <os/containing_record.h>
@@ -34,6 +35,7 @@ void EvpWakeSingleThread(EvHeader *Header) {
      * with EvWaitForObject (and won't accidentally "see"/try to manipulate a thread in the list
      * before it enters the waiting state). */
     PsThread *Thread = CONTAINING_RECORD(ListHeader, PsThread, WaitListHeader);
+    Thread->WaitListLinked = false;
     KeProcessor *Processor = Thread->Processor;
     KeAcquireSpinLockAtCurrentIrql(&Processor->Lock);
 
@@ -41,8 +43,26 @@ void EvpWakeSingleThread(EvHeader *Header) {
      * can use that as a sanity check). */
     if (Thread->State != PS_STATE_WAITING) {
         KeFatalError(KE_PANIC_BAD_THREAD_STATE, Thread->State, PS_STATE_WAITING, 0, 0);
-    } else if (Thread->WaitTicks) {
-        RtRemoveAvlTree(&Processor->WaitTree, &Thread->WaitTreeNode);
+    }
+
+    uint8_t ExpectedCompletion = PS_WAIT_COMPLETION_NONE;
+    if (!__atomic_compare_exchange_n(
+            &Thread->WaitCompletion,
+            &ExpectedCompletion,
+            PS_WAIT_COMPLETION_SIGNAL,
+            false,
+            __ATOMIC_ACQ_REL,
+            __ATOMIC_ACQUIRE)) {
+        KeReleaseSpinLockAtCurrentIrql(&Processor->Lock);
+        return;
+    }
+
+    if (Thread->WaitTreeLinked) {
+        if (RtRemoveAvlTree(&Processor->WaitTree, &Thread->WaitTreeNode) != &Thread->WaitTreeNode) {
+            KeFatalError(KE_PANIC_BAD_THREAD_STATE, Thread->State, PS_STATE_WAITING, 1, 0);
+        }
+
+        Thread->WaitTreeLinked = false;
         if (Thread->WaitTicks == Processor->ClosestWaitTick &&
             RtQuerySizeAvlTree(&Processor->WaitTree)) {
             Processor->ClosestWaitTick =
@@ -54,9 +74,8 @@ void EvpWakeSingleThread(EvHeader *Header) {
         }
     }
 
-    KeReleaseSpinLockAtCurrentIrql(&Processor->Lock);
     Thread->State = PS_STATE_QUEUED;
-    Thread->WaitTicks = 0;
+    KeReleaseSpinLockAtCurrentIrql(&Processor->Lock);
     PspQueueThread(Thread, true);
 }
 
@@ -89,6 +108,11 @@ void EvpWakeAllThreads(EvHeader *Header) {
  *     false if the timeout expires, true otherwise.
  *-----------------------------------------------------------------------------------------------*/
 bool EvWaitForObject(void *Object, uint64_t Timeout) {
+    KeIrql CurrentIrql = KeGetIrql();
+    if (CurrentIrql >= KE_IRQL_SYNCH) {
+        KeFatalError(KE_PANIC_IRQL_NOT_LESS_OR_EQUAL, CurrentIrql, KE_IRQL_SYNCH, 0, 0);
+    }
+
     /* The object should always start with an EvHeader field. */
     EvHeader *Header = Object;
     KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Header->Lock, KE_IRQL_SYNCH);
@@ -97,6 +121,11 @@ bool EvWaitForObject(void *Object, uint64_t Timeout) {
     if (Header->Signaled) {
         KeReleaseSpinLockAndLowerIrql(&Header->Lock, OldIrql);
         return true;
+    }
+
+    if (!Timeout) {
+        KeReleaseSpinLockAndLowerIrql(&Header->Lock, OldIrql);
+        return false;
     }
 
     /* We're about to modify the scheduler structures, lock the current processor (IRQL is already
@@ -112,7 +141,12 @@ bool EvWaitForObject(void *Object, uint64_t Timeout) {
 
     /* Setup the thread wait as early as possible (because it also does timeout-related
      * calculations). */
+    ObReferenceObject(Object);
     CurrentThread->WaitObject = Object;
+    CurrentThread->WaitGeneration++;
+    CurrentThread->WaitCompletion = PS_WAIT_COMPLETION_NONE;
+    CurrentThread->WaitListLinked = true;
+    CurrentThread->WaitTreeLinked = false;
     RtAppendDList(&Header->WaitList, &CurrentThread->WaitListHeader);
     if (Timeout != EV_TIMEOUT_UNLIMITED) {
         PspSetupThreadWait(Processor, CurrentThread, Timeout);
@@ -136,6 +170,9 @@ bool EvWaitForObject(void *Object, uint64_t Timeout) {
 
     PspSwitchThreads(Processor, CurrentThread, TargetThread, PS_STATE_WAITING, OldIrql);
 
-    /* WaitTicks always gets set to zero whenever we wake up before a timeout. */
-    return !CurrentThread->WaitTicks;
+    bool Result = __atomic_load_n(&CurrentThread->WaitCompletion, __ATOMIC_ACQUIRE) ==
+                  PS_WAIT_COMPLETION_SIGNAL;
+    CurrentThread->WaitObject = NULL;
+    ObDereferenceObject(Object);
+    return Result;
 }

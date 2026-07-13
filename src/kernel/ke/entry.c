@@ -12,6 +12,7 @@
 #include <kernel/psp.h>
 #include <kernel/vidp.h>
 #include <os/intrin.h>
+#include <string.h>
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -66,7 +67,9 @@ static void InitializeBootProcessor(KiLoaderBlock *LoaderBlock) {
     MiInitializePool();
     MiInitializePageAllocator();
     KdPrint(
-        KD_TYPE_INFO, "managing %llu MiB of memory\n", MiTotalSystemPages * MM_PAGE_SIZE / 1048576);
+        KD_TYPE_INFO,
+        "managing %llu MiB of memory\n",
+        MiTotalManagedPages * MM_PAGE_SIZE / 1048576);
 
     /* The loader data will become inaccessible once we release/unmap all the remaining OSLOADER
      * regions, so save the required remaining data. After this, the stack trace on KeFatalError
@@ -123,6 +126,17 @@ static void InitializeApplicationProcessor(KeProcessor *Processor) {
  *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
 [[noreturn]] void KiSystemStartup(KiLoaderBlock *LoaderBlock, KeProcessor *Processor) {
+    /* The loader block is an internal ABI boundary. Validate its fixed header before reading any
+     * other field or using any diagnostic/display data whose layout might not match the kernel. */
+    if (LoaderBlock &&
+        (memcmp(LoaderBlock->Basic.Magic, KI_LOADER_MAGIC, sizeof(LoaderBlock->Basic.Magic)) ||
+         LoaderBlock->Basic.LoaderVersion != KI_LOADER_VERSION ||
+         LoaderBlock->Basic.BlockSize != sizeof(KiLoaderBlock))) {
+        while (true) {
+            StopProcessor();
+        }
+    }
+
     /* Trigger a stack change if we just arrived from the osloader; If your architecture doesn't
      * need this, then feel free to return from HalpInitializeBootStack, and the boot process will
      * continue as usual. */
@@ -156,6 +170,10 @@ static void InitializeApplicationProcessor(KeProcessor *Processor) {
     /* Get all of the required boot modules up; This should let us load the remaining drivers from
      * the disk. */
     KiRunBootStartDrivers();
+
+#ifdef PALLADIUM_ENABLE_SELF_TESTS
+    KiRunSelfTests();
+#endif /* PALLADIUM_ENABLE_SELF_TESTS */
 
     while (true) {
         StopProcessor();

@@ -142,7 +142,7 @@ EFI_STATUS OslMain(EFI_HANDLE *ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
         UINTN FunctionNumber = 0;
         OslpLoadedProgram *KdnetDll = NULL;
         void *KdnetDllInitializer = NULL;
-        if (Config.DebugEnabled) {
+        if (Config.DebugEnabled && Config.DebugTransport == OSLP_DEBUG_TRANSPORT_KDNET) {
             EFI_PCI_IO_PROTOCOL **Devices = NULL;
             UINTN DeviceCount =
                 OslFindPciDevicesByClass(PCI_CLASS_NETWORK, PCI_CLASS_NETWORK_ETHERNET, &Devices);
@@ -325,6 +325,7 @@ EFI_STATUS OslMain(EFI_HANDLE *ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
 
         memcpy(BootBlock->Basic.Magic, OSLP_BOOT_MAGIC, 4);
         BootBlock->Basic.LoaderVersion = OSLP_BOOT_VERSION;
+        BootBlock->Basic.BlockSize = sizeof(OslpBootBlock);
         BootBlock->Basic.MemoryDescriptorListHead = MemoryDescriptorListHead;
         BootBlock->Basic.BootDriverListHead = ModuleListHead;
         BootBlock->Basic.RandomSeed = __rand64();
@@ -337,15 +338,24 @@ EFI_STATUS OslMain(EFI_HANDLE *ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
         BootBlock->Graphics.Width = FramebufferWidth;
         BootBlock->Graphics.Height = FramebufferHeight;
         BootBlock->Graphics.Pitch = FramebufferPitch;
-        BootBlock->Debug.Enabled = Config.DebugEnabled;
-        BootBlock->Debug.EchoEnabled = Config.DebugEchoEnabled;
-        memcpy(BootBlock->Debug.Address, Config.DebugAddress, 4);
-        BootBlock->Debug.Port = Config.DebugPort;
-        BootBlock->Debug.SegmentNumber = SegmentNumber;
-        BootBlock->Debug.BusNumber = BusNumber;
-        BootBlock->Debug.DeviceNumber = DeviceNumber;
-        BootBlock->Debug.FunctionNumber = FunctionNumber;
-        BootBlock->Debug.Initializer = KdnetDllInitializer;
+        memset(&BootBlock->Debug, 0, sizeof(BootBlock->Debug));
+        BootBlock->Debug.Type =
+            Config.DebugEnabled ? Config.DebugTransport : OSLP_DEBUG_TRANSPORT_NONE;
+        BootBlock->Debug.Flags = Config.DebugEchoEnabled ? OSLP_DEBUG_FLAG_ECHO_ENABLED : 0;
+        BootBlock->Debug.DisconnectPolicy = Config.DebugDisconnectPolicy;
+        BootBlock->Debug.DisconnectTimeoutMilliseconds = Config.DebugDisconnectTimeoutMilliseconds;
+        if (BootBlock->Debug.Type == OSLP_DEBUG_TRANSPORT_KDNET) {
+            memcpy(BootBlock->Debug.KdNet.Address, Config.DebugAddress, 4);
+            BootBlock->Debug.KdNet.Port = Config.DebugPort;
+            BootBlock->Debug.KdNet.SegmentNumber = SegmentNumber;
+            BootBlock->Debug.KdNet.BusNumber = BusNumber;
+            BootBlock->Debug.KdNet.DeviceNumber = DeviceNumber;
+            BootBlock->Debug.KdNet.FunctionNumber = FunctionNumber;
+            BootBlock->Debug.KdNet.Initializer = KdnetDllInitializer;
+        } else if (BootBlock->Debug.Type == OSLP_DEBUG_TRANSPORT_PC16550_PIO) {
+            BootBlock->Debug.Serial.Address = Config.DebugSerialAddress;
+            BootBlock->Debug.Serial.BaudRate = Config.DebugSerialBaudRate;
+        }
         OslpInitializeArchBootData(BootBlock);
 
         /* All that's left before trying to transfer execution should be building the page map, so

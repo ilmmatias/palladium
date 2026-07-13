@@ -8,6 +8,11 @@
 
 #include <rt/list.h>
 
+typedef struct {
+    uint16_t Base;
+    bool Enabled;
+} HalpSerialPort;
+
 typedef union {
     struct __attribute__((packed)) {
         uint64_t Present : 1;

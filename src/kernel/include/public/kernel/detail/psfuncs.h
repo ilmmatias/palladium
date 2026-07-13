@@ -19,11 +19,14 @@ extern "C" {
 #endif /* __cplusplus */
 
 PsThread *PsCreateThread(uint64_t Flags, void (*EntryPoint)(void *), void *Parameter);
+bool PsResumeThread(PsThread *Thread);
 [[noreturn]] void PsTerminateThread(void);
 void PsYieldThread(void);
 void PsDelayThread(uint64_t Time);
 
 void PsInitializeAlert(PsAlert *Alert, uint64_t Flags, void (*Routine)(void *), void *Context);
+/* A caller-owned alert must remain alive until its routine runs or the target thread discards it.
+ */
 bool PsQueueAlert(PsThread *Thread, PsAlert *Alert);
 
 #ifdef __cplusplus

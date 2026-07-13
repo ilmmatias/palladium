@@ -21,9 +21,22 @@
  *     Pointer to the start of the virtual memory range on success, NULL otherwise.
  *-----------------------------------------------------------------------------------------------*/
 void *MmMapSpace(int Type, uint64_t PhysicalAddress, size_t Size) {
+    if (!Size || PhysicalAddress > UINT64_MAX - Size) {
+        return NULL;
+    }
+
     /* Align to the page boundary. */
     uint64_t Source = PhysicalAddress & ~(HALP_PT_SIZE - 1);
-    uint64_t End = (PhysicalAddress + Size + HALP_PT_SIZE - 1) & ~(HALP_PT_SIZE - 1);
+    uint64_t UnalignedEnd = PhysicalAddress + Size;
+    if (UnalignedEnd > UINT64_MAX - (HALP_PT_SIZE - 1)) {
+        return NULL;
+    }
+
+    uint64_t End = (UnalignedEnd + HALP_PT_SIZE - 1) & ~(HALP_PT_SIZE - 1);
+    uint64_t Pages = (End - Source) >> MM_PAGE_SHIFT;
+    if (Pages > UINT32_MAX) {
+        return NULL;
+    }
 
     /* Convert the type into proper flags. */
     int Flags = MI_MAP_WRITE | MI_MAP_UC;
@@ -34,16 +47,18 @@ void *MmMapSpace(int Type, uint64_t PhysicalAddress, size_t Size) {
     }
 
     /* Grab some virtual memory.  */
-    void *VirtualAddress = MiAllocatePoolSpace((End - Source) >> MM_PAGE_SHIFT);
+    void *VirtualAddress = MiAllocatePoolSpace(Pages);
     if (!VirtualAddress) {
         return NULL;
     }
 
     /* And now we just delegate to the HAL to do the actual mapping. */
     if (!HalpMapContiguousPages(VirtualAddress, Source, End - Source, Flags)) {
-        /* TODO: If HalpMapContiguousPages returns false, we're left in an annoying situation where
-         * we have no idea how much memory we need to unmap, so we probably should find a better way
-         * of handling this than just leaking the virtual space... */
+        /* Pool virtual space is freshly allocated, so it cannot contain a preexisting mapping.
+         * Unmapping the complete requested range rolls back any prefix the HAL installed before
+         * reporting failure, including now-empty page-table levels. */
+        HalpUnmapPages(VirtualAddress, End - Source);
+        MiFreePoolSpace(VirtualAddress, Pages);
         return NULL;
     }
 
@@ -63,8 +78,22 @@ void *MmMapSpace(int Type, uint64_t PhysicalAddress, size_t Size) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void MmUnmapSpace(void *VirtualAddress, size_t Size) {
+    if (!Size || (uintptr_t)VirtualAddress > UINTPTR_MAX - Size) {
+        return;
+    }
+
     uintptr_t Source = (uintptr_t)VirtualAddress & ~(HALP_PT_SIZE - 1);
-    uintptr_t End = ((uintptr_t)VirtualAddress + Size + HALP_PT_SIZE - 1) & ~(HALP_PT_SIZE - 1);
+    uintptr_t UnalignedEnd = (uintptr_t)VirtualAddress + Size;
+    if (UnalignedEnd > UINTPTR_MAX - (HALP_PT_SIZE - 1)) {
+        return;
+    }
+
+    uintptr_t End = (UnalignedEnd + HALP_PT_SIZE - 1) & ~(HALP_PT_SIZE - 1);
+    uint64_t Pages = (End - Source) >> MM_PAGE_SHIFT;
+    if (Pages > UINT32_MAX) {
+        return;
+    }
+
     HalpUnmapPages((void *)Source, End - Source);
-    MiFreePoolSpace((void *)Source, (End - Source) >> MM_PAGE_SHIFT);
+    MiFreePoolSpace((void *)Source, Pages);
 }

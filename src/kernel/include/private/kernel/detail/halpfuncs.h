@@ -38,6 +38,8 @@ void HalpUnmapEarlyMemory(void *VirtualAddress, size_t Size);
 void HalpInitializeLateAcpi(KiLoaderBlock *LoaderBlock);
 
 uint64_t HalpGetPhysicalAddress(void *VirtualAddress);
+bool HalpReadDebuggerByte(void *VirtualAddress, uint8_t *Value);
+bool HalpPatchDebuggerByte(void *VirtualAddress, uint8_t Expected, uint8_t Value);
 bool HalpMapContiguousPages(
     void *VirtualAddress,
     uint64_t PhysicalAddresses,
@@ -50,7 +52,13 @@ bool HalpMapNonContiguousPages(
     int Flags);
 void HalpUnmapPages(void *VirtualAddress, uint64_t Size);
 
+#ifdef PALLADIUM_ENABLE_SELF_TESTS
+void HalpSetPageTableAllocationFailure(uint64_t Index);
+uint64_t HalpGetPageTableAllocationCount(void);
+#endif /* PALLADIUM_ENABLE_SELF_TESTS */
+
 void HalpBroadcastIpi(void);
+void HalpBroadcastDebuggerIpi(void);
 void HalpBroadcastFreeze(void);
 void HalpNotifyProcessor(KeProcessor *Processor, KeIrql TargetIrql);
 

@@ -9,6 +9,7 @@
 #include <kernel/detail/mmtypes.h>
 #include <rt/atomic.h>
 #include <rt/list.h>
+#include <stddef.h>
 
 /* clang-format off */
 #if __has_include(ARCH_MAKE_INCLUDE_PATH(kernel/detail, mitypes.h))
@@ -22,6 +23,12 @@ typedef struct {
     uint64_t BasePage;
     uint64_t PageCount;
 } MiMemoryDescriptor;
+
+static_assert(sizeof(MiMemoryDescriptor) == 40);
+static_assert(offsetof(MiMemoryDescriptor, ListHeader) == 0);
+static_assert(offsetof(MiMemoryDescriptor, Type) == 16);
+static_assert(offsetof(MiMemoryDescriptor, BasePage) == 24);
+static_assert(offsetof(MiMemoryDescriptor, PageCount) == 32);
 
 typedef struct {
     RtSList ListHeader;

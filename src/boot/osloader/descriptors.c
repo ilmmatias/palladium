@@ -335,8 +335,8 @@ bool OslpUpdateMemoryDescriptors(
             if (Entry->BasePage + Entry->PageCount == BasePage) {
                 Entry->PageCount += PageCount;
                 break;
-            } 
-            
+            }
+
             if (BasePage + PageCount == Entry->BasePage) {
                 Entry->BasePage = BasePage;
                 Entry->PageCount += PageCount;

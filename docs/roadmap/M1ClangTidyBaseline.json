@@ -1,0 +1,54 @@
+{
+  "schema": 1,
+  "tool": {
+    "name": "clang-tidy",
+    "version": "LLVM 22.1.8"
+  },
+  "scope": {
+    "command": "run-clang-tidy -p build -source-filter=.*\\.(c)$",
+    "architecture": "amd64",
+    "build_type": "RelWithDebInfo",
+    "diagnostics": 690
+  },
+  "by_check_family": {
+    "bugprone-macro-parentheses": 478,
+    "narrowing-conversion": 86,
+    "switch-missing-default": 21,
+    "signed-char-misuse": 19,
+    "recursion": 9,
+    "multi-level-pointer-conversion": 9,
+    "branch-clone": 9,
+    "redundant-expression-or-condition": 7,
+    "fixed-address-or-int-to-pointer": 7,
+    "cert-err33-c": 7,
+    "insecure-string-copy": 6,
+    "widening-conversion": 5,
+    "suspicious-include": 4,
+    "undefined-binary-operator-result": 3,
+    "null-dereference": 3,
+    "increment-decrement-side-effect": 3,
+    "cast-to-void": 3,
+    "array-bound": 2,
+    "dead-store": 2,
+    "unchecked-conversion": 2,
+    "undefined-return": 1,
+    "divide-by-zero": 1,
+    "call-and-message": 1,
+    "invalid-shift": 1,
+    "suspicious-comparison": 1
+  },
+  "directly_attributed_by_subsystem": {
+    "crt": 84,
+    "acpi": 64,
+    "kernel": 26,
+    "osloader": 26,
+    "rt": 7,
+    "crypt": 5
+  },
+  "disposition": {
+    "high_signal": "zero-tolerance in tools/run-clang-tidy-high-signal.sh",
+    "macro_parentheses": "classified non-gating generated or definition-site review queue",
+    "intentional_narrowing": "classified non-gating until a demonstrated range defect exists",
+    "low_level_patterns": "require narrow local justification; blanket suppression prohibited"
+  }
+}

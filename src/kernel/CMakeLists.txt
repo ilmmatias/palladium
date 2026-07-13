@@ -18,11 +18,16 @@ if(ARCH STREQUAL "amd64")
         hal/${ARCH}/map.c
         hal/${ARCH}/pci.c
         hal/${ARCH}/platform.c
+        hal/${ARCH}/serial.c
         hal/${ARCH}/smp.c
         hal/${ARCH}/smp.S
         hal/${ARCH}/timer.c
         hal/${ARCH}/tsc.c)
     set(ARCH_STR "amd64")
+endif()
+
+if(PALLADIUM_ENABLE_SELF_TESTS)
+    list(APPEND SOURCES test/main.c)
 endif()
 
 add_library(kernel "kernel" SHARED
@@ -37,6 +42,7 @@ add_library(kernel "kernel" SHARED
     hal/timer.c
 
     kd/arp.c
+    kd/control.c
     kd/device.c
     kd/ethernet.c
     kd/export.c
@@ -45,6 +51,7 @@ add_library(kernel "kernel" SHARED
     kd/ip.c
     kd/print.c
     kd/protocol.c
+    kd/serial.c
     kd/udp.c
 
     ke/affinity.c
@@ -88,6 +95,9 @@ execute_process(
 
 target_include_directories(kernel PRIVATE include/private PUBLIC include/public)
 target_compile_definitions(kernel PRIVATE "-DKE_GIT_HASH=\"${GIT_HASH}\"" PRIVATE "-DKE_ARCH=\"${ARCH_STR}\"")
+if(PALLADIUM_ENABLE_SELF_TESTS)
+    target_compile_definitions(kernel PRIVATE PALLADIUM_ENABLE_SELF_TESTS=1)
+endif()
 target_link_options(kernel PRIVATE -Wl,--subsystem=native,--entry=KiSystemStartup)
 set_target_properties(kernel PROPERTIES SUFFIX ".exe")
 set_target_properties(kernel PROPERTIES ENABLE_EXPORTS TRUE)

@@ -108,7 +108,7 @@ static uint64_t GetHeadPages(uint32_t Head) {
 void MiInitializePool(void) {
     /* It doesn't make much sense to go over the physical memory limit in the pool, so, let's limit
      * it to 75% of the physical memory size (or the max pool size, whichever is smaller). */
-    uint64_t MemorySize = MiTotalSystemPages * MM_PAGE_SIZE;
+    uint64_t MemorySize = MiTotalManagedPages * MM_PAGE_SIZE;
     uint64_t PoolSize = ((MemorySize * 75) / 100 + MM_PAGE_SIZE - 1) & ~(MM_PAGE_SIZE - 1);
     if (PoolSize > MI_POOL_MAX_SIZE) {
         PoolSize = MI_POOL_MAX_SIZE;
@@ -188,10 +188,18 @@ void *MmAllocatePool(size_t Size, const char Tag[4]) {
      * can try popping a free entry from the matching bucket (either from the local list, or from
      * the global list after acquiring its lock). */
     uint32_t Head = GetHeadIndex(Size);
+    if (Head >= MM_POOL_BLOCK_COUNT) {
+        KeFatalError(KE_PANIC_BAD_POOL_HEADER, Size, Head, MM_POOL_BLOCK_COUNT, 0);
+        return NULL;
+    }
+
     uint32_t HeadPages = GetHeadPages(Head);
     uint64_t HeadSize = GetHeadSize(Head);
     uint64_t FullSize = HeadSize + sizeof(BlockHeader);
     KeProcessor *Processor = KeGetCurrentProcessor();
+    /* Head is rejected above unless it is in the numeric 0..MM_POOL_BLOCK_COUNT-1 range shared by
+       this field and the global buckets. */
+    /* NOLINTNEXTLINE(clang-analyzer-security.ArrayBound) */
     if (Processor->FreePoolBlockListHead[Head].Next) {
         BlockHeader *Header = CONTAINING_RECORD(
             RtPopSList(&Processor->FreePoolBlockListHead[Head]), BlockHeader, ListHeader);

@@ -21,6 +21,12 @@ typedef struct {
     void (*Delete)(void *);
 } ObType;
 
+typedef enum {
+    OB_LOOKUP_STATUS_SUCCESS,
+    OB_LOOKUP_STATUS_NOT_FOUND,
+    OB_LOOKUP_STATUS_BUFFER_TOO_SMALL,
+} ObLookupStatus;
+
 typedef struct {
     RtDList HashHeads[32];
     KeSpinLock Lock;

@@ -28,6 +28,17 @@ void KdpInitializeImports(void);
 void KdpAcquireOwnership(void);
 void KdpReleaseOwnership(void);
 void KdpEnterReceiveLoop(int State);
+void KdpQueuePoll(void);
+void KdpCheckHeartbeat(void);
+void KdpPollTransport(int State);
+bool KdpSendProtocolPacket(
+    uint16_t Type,
+    uint16_t Flags,
+    uint32_t Status,
+    uint64_t RequestId,
+    const void *Payload,
+    size_t PayloadSize);
+void KdpSendStopEvent(uint32_t Reason, bool Resumable);
 
 void KdpParseEthernetFrame(int State, KdpEthernetHeader *EthFrame, uint32_t Length);
 
@@ -64,8 +75,38 @@ void KdpParseDebugPacket(
     uint8_t SourceHardwareAddress[6],
     uint8_t SourceProtocolAddress[4],
     uint16_t SourcePort,
-    KdpDebugPacket *Packet,
+    void *Packet,
     uint32_t Length);
+
+bool KdpInitializeSerialTransport(KiLoaderBlock *LoaderBlock);
+void KdpPollSerialTransport(int State);
+bool KdpSendSerialDatagram(const void *Buffer, size_t Size);
+
+bool KdpHandleException(
+    uint32_t ExceptionCode,
+    HalInterruptFrame *InterruptFrame,
+    HalExceptionFrame *ExceptionFrame);
+void KdpHandleDebuggerIpi(HalExceptionFrame *ExceptionFrame, HalInterruptFrame *InterruptFrame);
+bool KdpGetContext(uint32_t Processor, uint64_t *Generation, KdpAmd64Context *Context);
+bool KdpRequestStop(void);
+bool KdpRequestDisconnect(bool Continue);
+void KdpHandleStoppedDisconnect(bool Continue);
+uint32_t KdpResume(bool Step);
+uint32_t KdpAddBreakpoint(uint64_t Address, KdpProtocolBreakpointEntry *Result);
+uint32_t KdpChangeBreakpoint(uint32_t Identifier, int Operation);
+uint32_t KdpListBreakpoints(
+    uint32_t StartIndex,
+    uint32_t MaximumEntries,
+    KdpProtocolBreakpointEntry *Entries,
+    uint32_t *TotalCount,
+    uint32_t *ReturnedCount);
+uint32_t KdpGetTargetState(void);
+uint32_t KdpGetStopOwner(void);
+uint64_t KdpGetStopGeneration(void);
+uint32_t KdpGetBreakpointCount(void);
+uint32_t KdpGetStopReason(void);
+void KdpSetTargetRunning(void);
+void KdpSetTargetPanic(void);
 
 uint32_t KdpInitializeController(KdpExtensibilityData *KdNet);
 void KdpShutdownController(void *Adapter);

@@ -21,6 +21,9 @@ extern uint32_t KdpDebugHardwareId;
 bool KdpDebugEnabled = false;
 bool KdpDebugEchoEnabled = true;
 bool KdpDebugConnected = false;
+uint32_t KdpDebugTransport = KI_LOADER_DEBUG_TRANSPORT_NONE;
+uint32_t KdpDebugDisconnectPolicy = KI_LOADER_DEBUG_DISCONNECT_STOP;
+uint32_t KdpDebugDisconnectTimeoutMilliseconds = 5000;
 void *KdpDebugAdapter = NULL;
 KdpExtensibilityData KdpDebugData = {};
 
@@ -31,7 +34,73 @@ uint16_t KdpDebuggeePort = 0;
 uint8_t KdpDebuggerHardwareAddress[6] = {0};
 uint8_t KdpDebuggerProtocolAddress[4] = {0};
 uint16_t KdpDebuggerPort = 0;
-bool KdpDebuggerConnected = false;
+static KeWork PollWork;
+static bool RuntimePollingEnabled;
+static bool RuntimePollingAnnounced;
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function performs one bounded debugger transport poll at dispatch level.
+ *
+ * PARAMETERS:
+ *     Context - Unused work context.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+static void PollRoutine(void *) {
+    if (!RuntimePollingAnnounced) {
+        RuntimePollingAnnounced = true;
+        KdPrint(KD_TYPE_INFO, "runtime debugger polling enabled\n");
+    }
+    KdpPollTransport(KDP_STATE_LATE);
+    KdpCheckHeartbeat();
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function queues the single static runtime debugger poll operation.
+ *
+ * PARAMETERS:
+ *     None.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void KdpQueuePoll(void) {
+    if (RuntimePollingEnabled && KeGetCurrentProcessor()->Number == 0) {
+        KeQueueWork(&PollWork, true);
+    }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function polls whichever debugger transport was selected by the loader.
+ *
+ * PARAMETERS:
+ *     State - Early handshake or runtime debugger state.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void KdpPollTransport(int State) {
+    if (KdpDebugTransport == KI_LOADER_DEBUG_TRANSPORT_PC16550_PIO) {
+        KdpPollSerialTransport(State);
+        return;
+    }
+
+    if (KdpDebugTransport != KI_LOADER_DEBUG_TRANSPORT_KDNET) {
+        return;
+    }
+
+    uint32_t Handle = 0;
+    void *Packet = NULL;
+    uint32_t Length = 0;
+    if (!KdpGetRxPacket(KdpDebugAdapter, &Handle, &Packet, &Length)) {
+        KdpParseEthernetFrame(State, Packet, Length);
+        KdpReleaseRxPacket(KdpDebugAdapter, Handle);
+    }
+}
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -91,25 +160,16 @@ void KdpEnterReceiveLoop(int State) {
         /* Early initialization has a condition to exit this loop (KdpDebuggerConnected switching to
          * true), but late/break receive loops just run forever (at least until we allow unbreaking
          * the execution). */
-        if (State == KDP_STATE_EARLY && KdpDebuggerConnected) {
+        if (State == KDP_STATE_EARLY && KdpDebugConnected) {
             break;
         }
 
-        /* Wait for any incoming packet. */
-        uint32_t Handle = 0;
-        void *Packet = NULL;
-        uint32_t Length = 0;
-        uint32_t Status = KdpGetRxPacket(KdpDebugAdapter, &Handle, &Packet, &Length);
-        if (Status) {
-            continue;
+        if (State == KDP_STATE_LATE && KdpGetTargetState() == KDP_TARGET_RUNNING) {
+            break;
         }
 
-        /* Attempt to parse the ethernet frame (which hopefully contains either an ARP request, or a
-         * valid debug packet). */
-        KdpParseEthernetFrame(State, Packet, Length);
-
-        /* Return the resources back to the ethernet controller. */
-        KdpReleaseRxPacket(KdpDebugAdapter, Handle);
+        KdpPollTransport(State);
+        PauseProcessor();
     }
 
     if (State == KDP_STATE_EARLY) {
@@ -136,102 +196,121 @@ void KdpEnterReceiveLoop(int State) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void KdpInitializeDebugger(KiLoaderBlock *LoaderBlock) {
-    if (!LoaderBlock->Debug.Enabled) {
+    if (LoaderBlock->Debug.Type == KI_LOADER_DEBUG_TRANSPORT_NONE) {
         KdPrint(KD_TYPE_INFO, "debugger disabled\n");
         return;
     }
 
-    /* Environment initialization, required for all KDNET functions. */
     KdpDebugEnabled = true;
-    KdpInitializeDeviceDescriptor(LoaderBlock);
-    KdpInitializeExports();
-    KdpInitializeImports();
+    KdpDebugTransport = LoaderBlock->Debug.Type;
+    KdpDebugDisconnectPolicy = LoaderBlock->Debug.DisconnectPolicy;
+    KdpDebugDisconnectTimeoutMilliseconds = LoaderBlock->Debug.DisconnectTimeoutMilliseconds;
 
-    /* Attempt to initialize the extensibility module; They don't have any direct imports (via
-     * OSLOADER), but they take in some simple kernel functions via the first parameter (and also
-     * output some functions we can use via it). */
-    uint32_t Status = ((KdpInitializeLibraryFn)LoaderBlock->Debug.Initializer)(
-        &KdpDebugImports, NULL, &KdpDebugDevice);
-    if (Status) {
-        DumpErrorString();
-        KeFatalError(
-            KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
-            KE_PANIC_PARAMETER_DEBUGGER_INITIALIZATION_FAILURE,
-            (uint64_t)Status,
-            (uint64_t)KdpDebugErrorStatus,
-            (uint64_t)KdpDebugHardwareId);
-    }
-
-    /* Start filling in the shared data structure. */
-    memset(&KdpDebugData, 0, sizeof(KdpExtensibilityData));
-    memset(&KdpDebuggeeHardwareAddress, 0, sizeof(KdpDebuggeeHardwareAddress));
-    KdpDebugData.Device = &KdpDebugDevice;
-    KdpDebugData.TargetMacAddress = KdpDebuggeeHardwareAddress;
-
-    /* Is there even any driver that doesn't request memory? Anyways, we're too early to use the
-     * normal allocator, so use the HAL early allocator. */
-    uint32_t Size = KdpGetHardwareContextSize(&KdpDebugDevice);
-    if (Size) {
-        uint32_t Pages = (Size + MM_PAGE_SIZE - 1) >> MM_PAGE_SHIFT;
-        uint64_t PhysicalAddress = MiAllocateEarlyPages(Pages);
-        if (!PhysicalAddress) {
+    if (KdpDebugTransport == KI_LOADER_DEBUG_TRANSPORT_PC16550_PIO) {
+        if (!KdpInitializeSerialTransport(LoaderBlock)) {
             KeFatalError(
                 KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
                 KE_PANIC_PARAMETER_DEBUGGER_INITIALIZATION_FAILURE,
-                KE_PANIC_PARAMETER_OUT_OF_RESOURCES,
+                0,
                 0,
                 0);
         }
+    } else if (KdpDebugTransport == KI_LOADER_DEBUG_TRANSPORT_KDNET) {
+        /* Environment initialization required by the legally supplied KDNET module. */
+        KdpInitializeDeviceDescriptor(LoaderBlock);
+        KdpInitializeExports();
+        KdpInitializeImports();
 
-        void *VirtualAddress =
-            HalpMapEarlyMemory(PhysicalAddress, Pages << MM_PAGE_SHIFT, MI_MAP_WRITE);
-        if (!VirtualAddress) {
+        uint32_t Status = ((KdpInitializeLibraryFn)LoaderBlock->Debug.KdNet.Initializer)(
+            &KdpDebugImports, NULL, &KdpDebugDevice);
+        if (Status) {
+            DumpErrorString();
             KeFatalError(
                 KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
                 KE_PANIC_PARAMETER_DEBUGGER_INITIALIZATION_FAILURE,
-                KE_PANIC_PARAMETER_OUT_OF_RESOURCES,
-                0,
-                0);
+                (uint64_t)Status,
+                (uint64_t)KdpDebugErrorStatus,
+                (uint64_t)KdpDebugHardwareId);
         }
 
-        KdpDebugDevice.Memory.Start = (KdpPhysicalAddress){.QuadPart = PhysicalAddress};
-        KdpDebugDevice.Memory.VirtualAddress = VirtualAddress;
-        KdpDebugDevice.Memory.Length = Size;
-        KdpDebugDevice.Memory.Cached = true;
-        KdpDebugDevice.Memory.Aligned = true;
-        KdpDebugDevice.TransportData.HwContextSize = Size;
-        KdpDebugDevice.Flags |= KDP_DEVICE_FLAGS_HAL_SCRATCH_ALLOCATED;
-        KdpDebugData.Hardware = VirtualAddress;
-        KdpDebugAdapter = VirtualAddress;
-    }
+        memset(&KdpDebugData, 0, sizeof(KdpExtensibilityData));
+        memset(&KdpDebuggeeHardwareAddress, 0, sizeof(KdpDebuggeeHardwareAddress));
+        KdpDebugData.Device = &KdpDebugDevice;
+        KdpDebugData.TargetMacAddress = KdpDebuggeeHardwareAddress;
 
-    /* Attempt to bring up the network card; Main error we might find is if the host has a network
-     * card of a supported vendor, but the device model itself is unsupported (and that's a panic
-     * for us, disable debugging in the config file in this case). */
-    KdPrint(KD_TYPE_DEBUG, "initializing the debug device controller\n");
-    Status = KdpInitializeController(&KdpDebugData);
-    if (Status) {
-        DumpErrorString();
+        /* Is there even any driver that doesn't request memory? Anyways, we're too early to use the
+         * normal allocator, so use the HAL early allocator. */
+        uint32_t Size = KdpGetHardwareContextSize(&KdpDebugDevice);
+        if (Size) {
+            uint32_t Pages = (Size + MM_PAGE_SIZE - 1) >> MM_PAGE_SHIFT;
+            uint64_t PhysicalAddress = MiAllocateEarlyPages(Pages);
+            if (!PhysicalAddress) {
+                KeFatalError(
+                    KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+                    KE_PANIC_PARAMETER_DEBUGGER_INITIALIZATION_FAILURE,
+                    KE_PANIC_PARAMETER_OUT_OF_RESOURCES,
+                    0,
+                    0);
+            }
+
+            void *VirtualAddress =
+                HalpMapEarlyMemory(PhysicalAddress, Pages << MM_PAGE_SHIFT, MI_MAP_WRITE);
+            if (!VirtualAddress) {
+                KeFatalError(
+                    KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+                    KE_PANIC_PARAMETER_DEBUGGER_INITIALIZATION_FAILURE,
+                    KE_PANIC_PARAMETER_OUT_OF_RESOURCES,
+                    0,
+                    0);
+            }
+
+            KdpDebugDevice.Memory.Start = (KdpPhysicalAddress){.QuadPart = PhysicalAddress};
+            KdpDebugDevice.Memory.VirtualAddress = VirtualAddress;
+            KdpDebugDevice.Memory.Length = Size;
+            KdpDebugDevice.Memory.Cached = true;
+            KdpDebugDevice.Memory.Aligned = true;
+            KdpDebugDevice.TransportData.HwContextSize = Size;
+            KdpDebugDevice.Flags |= KDP_DEVICE_FLAGS_HAL_SCRATCH_ALLOCATED;
+            KdpDebugData.Hardware = VirtualAddress;
+            KdpDebugAdapter = VirtualAddress;
+        }
+
+        /* Attempt to bring up the network card; Main error we might find is if the host has a
+         * network card of a supported vendor, but the device model itself is unsupported (and
+         * that's a panic for us, disable debugging in the config file in this case). */
+        KdPrint(KD_TYPE_DEBUG, "initializing the debug device controller\n");
+        Status = KdpInitializeController(&KdpDebugData);
+        if (Status) {
+            DumpErrorString();
+            KeFatalError(
+                KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+                KE_PANIC_PARAMETER_DEBUGGER_INITIALIZATION_FAILURE,
+                (uint64_t)Status,
+                (uint64_t)KdpDebugErrorStatus,
+                (uint64_t)KdpDebugHardwareId);
+        }
+
+        memcpy(KdpDebuggeeProtocolAddress, LoaderBlock->Debug.KdNet.Address, 4);
+        KdpDebuggeePort = LoaderBlock->Debug.KdNet.Port;
+    } else {
         KeFatalError(
             KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
             KE_PANIC_PARAMETER_DEBUGGER_INITIALIZATION_FAILURE,
-            (uint64_t)Status,
-            (uint64_t)KdpDebugErrorStatus,
-            (uint64_t)KdpDebugHardwareId);
+            0,
+            0,
+            0);
     }
 
-    /* Now our receive/send packet functions should be online. Wait until the remote debugger
-     * connects to us. */
-    memcpy(KdpDebuggeeProtocolAddress, LoaderBlock->Debug.Address, 4);
-    KdpDebuggeePort = LoaderBlock->Debug.Port;
     KdpEnterReceiveLoop(KDP_STATE_EARLY);
 
     /* From now on, we respect the echo enabled settings (as the debugger is online, and can receive
      * the messages even if we don't print them out in the display). */
-    if (!LoaderBlock->Debug.EchoEnabled) {
+    if (!(LoaderBlock->Debug.Flags & KI_LOADER_DEBUG_FLAG_ECHO_ENABLED)) {
         KdPrint(KD_TYPE_INFO, "debug echoing disabled\n");
         KdpDebugEchoEnabled = false;
     }
 
-    KdpDebugConnected = true;
+    KdpSetTargetRunning();
+    KeInitializeWork(&PollWork, PollRoutine, NULL);
+    RuntimePollingEnabled = true;
 }

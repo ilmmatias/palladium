@@ -1,11 +1,9 @@
 # SPDX-FileCopyrightText: (C) 2025 ilmmatias
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-import capstone
 import struct
 
 from . import interface
-from . import protocol
 
 #--------------------------------------------------------------------------------------------------
 # PURPOSE:
@@ -20,18 +18,25 @@ from . import protocol
 # RETURN VALUE:
 #     None.
 #--------------------------------------------------------------------------------------------------
-def KdpPrintDisassemblyData(Kind: str, Payload: bytes, Address: int, Length: int) -> None:
+def KdpPrintDisassemblyData(
+    Kind: str,
+    Payload: bytes,
+    Address: int,
+    Length: int,
+    Architecture: str) -> None:
+    import capstone
     # Add any architectures here as needed!
     ArchitectureMap = {
         "amd64": (capstone.CS_ARCH_X86, capstone.CS_MODE_64),
+        0x8664: (capstone.CS_ARCH_X86, capstone.CS_MODE_64),
     }
 
-    Parameters = ArchitectureMap.get(protocol.KdpCurrentArchitecture)
+    Parameters = ArchitectureMap.get(Architecture)
     if not Parameters:
         interface.KdPrint(
             interface.KD_DEST_COMMAND,
             interface.KD_TYPE_NONE,
-            f"current architecture `{protocol.KdpCurrentArchitecture}` " +
+            f"current architecture `{Architecture}` " +
             "is unsupported for the disassembler!\n")
         return
 

@@ -1,6 +1,7 @@
 /* SPDX-FileCopyrightText: (C) 2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
+#include <kernel/halp.h>
 #include <kernel/kd.h>
 #include <kernel/kdp.h>
 #include <kernel/ke.h>
@@ -9,6 +10,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 extern const VidpFontData VidpFont;
 
@@ -81,7 +83,7 @@ void KdpReleaseOwnership(void) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void KdPrintVariadic(int Type, const char *Message, va_list Arguments) {
-    /* Don't bother if neither echoing is enabled nor the debugger is connected. */
+    /* Don't bother if neither the display nor debugger sinks are available. */
     if (!KdpDebugEchoEnabled && !KdpDebugConnected) {
         return;
     }
@@ -93,8 +95,9 @@ void KdPrintVariadic(int Type, const char *Message, va_list Arguments) {
     }
 
     /* Lock any other processors from messing with our buffer while we do it. */
-    KeIrql OldIrql;
-    if (UseLock) {
+    bool Locked = UseLock;
+    KeIrql OldIrql = 0;
+    if (Locked) {
         OldIrql = KeAcquireSpinLockAndRaiseIrql(&Lock, KE_IRQL_DISPATCH);
     }
 
@@ -109,28 +112,23 @@ void KdPrintVariadic(int Type, const char *Message, va_list Arguments) {
     }
 
     /* Extract out the prefix string + color out of the type. */
-    const char *ColorPrefix = NULL;
     const char *Prefix = NULL;
     if (Type == KD_TYPE_ERROR) {
-        ColorPrefix = KDP_ANSI_FG_RED;
         Prefix = "* error: ";
         if (KdpDebugEchoEnabled) {
             VidpForeground = 0xFF0000;
         }
     } else if (Type == KD_TYPE_TRACE) {
-        ColorPrefix = KDP_ANSI_FG_GREEN;
         Prefix = "* trace: ";
         if (KdpDebugEchoEnabled) {
             VidpForeground = 0x00FF00;
         }
     } else if (Type == KD_TYPE_DEBUG) {
-        ColorPrefix = KDP_ANSI_FG_YELLOW;
         Prefix = "* debug: ";
         if (KdpDebugEchoEnabled) {
             VidpForeground = 0xFFFF00;
         }
     } else if (Type == KD_TYPE_INFO) {
-        ColorPrefix = KDP_ANSI_FG_BLUE;
         Prefix = "* info: ";
         if (KdpDebugEchoEnabled) {
             VidpForeground = 0x00FFFF;
@@ -146,20 +144,19 @@ void KdPrintVariadic(int Type, const char *Message, va_list Arguments) {
         }
     }
 
-    int Offset = sizeof(KdpDebugPacket);
-    if (ColorPrefix && Prefix) {
-        Offset += snprintf(
-            Buffer + Offset, sizeof(Buffer) - Offset, "%s%s" KDP_ANSI_RESET, ColorPrefix, Prefix);
-    }
-
     /* And the main message on gray-white foreground + black background. */
-    int Size = vsnprintf(Buffer + Offset, sizeof(Buffer) - Offset, Message, Arguments);
+    int FormattedSize = vsnprintf(Buffer, sizeof(Buffer), Message, Arguments);
+    int Size = 0;
+    if (FormattedSize > 0) {
+        size_t Available = sizeof(Buffer);
+        Size = (size_t)FormattedSize < Available ? FormattedSize : Available - 1;
+    }
 
     if (KdpDebugEchoEnabled) {
         /* The start of the buffer contains the header + color prefix for the debugger, but our
          * PutString function can't handle that, so ignore the initial characters. */
         VidpForeground = 0xAAAAAA;
-        VidpPutString(Buffer + Offset);
+        VidpPutString(Buffer);
 
         /* Then restore everything (and flush the screen), and we're done on the echoing side. */
         VidpBackground = OldBackground;
@@ -173,22 +170,27 @@ void KdPrintVariadic(int Type, const char *Message, va_list Arguments) {
         VidpReleaseSpinLock(KE_IRQL_DISPATCH);
     }
 
-    /* We still do need to handle sending the message to the debugger; We already appended the
-     * prefix (with the right ANSI color code), so we can just mount and send the debugger
-     * packet (inside the buffer start, as we also reserved some space for the header there). */
+    /* The protocol carries severity separately from UTF-8 text; frontends own any ANSI styling. */
     if (KdpDebugConnected) {
-        KdpDebugPacket *Packet = (KdpDebugPacket *)Buffer;
-        Packet->Type = KDP_DEBUG_PACKET_PRINT;
-        KdpSendUdpPacket(
-            KdpDebuggerHardwareAddress,
-            KdpDebuggerProtocolAddress,
-            KdpDebuggeePort,
-            KdpDebuggerPort,
-            Buffer,
-            Offset + Size);
+        uint8_t Payload[KDP_PROTOCOL_MAX_PAYLOAD];
+        KdpProtocolOutput *Output = (void *)Payload;
+        size_t OutputSize = Size;
+        if (OutputSize > sizeof(Payload) - sizeof(*Output)) {
+            OutputSize = sizeof(Payload) - sizeof(*Output);
+        }
+        Output->Severity = Type;
+        Output->Length = OutputSize;
+        memcpy(Output + 1, Buffer, OutputSize);
+        KdpSendProtocolPacket(
+            KDP_PROTOCOL_TARGET_OUTPUT,
+            KDP_PROTOCOL_FLAG_EVENT,
+            KDP_PROTOCOL_STATUS_SUCCESS,
+            0,
+            Payload,
+            sizeof(*Output) + OutputSize);
     }
 
-    if (UseLock) {
+    if (Locked) {
         KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
     }
 }

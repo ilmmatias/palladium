@@ -23,7 +23,7 @@ static const int UnwindOpSlots[] = {
     /* RT_UWOP_SAVE_NONVOL_FAR */
     3,
     /* RT_UWOP_EPILOG */
-    2,
+    1,
     /* RT_UWOP_SPARE_CODE */
     3,
     /* RT_UWOP_SAVE_XMM128 */
@@ -44,12 +44,163 @@ static const int UnwindOpSlots[] = {
  * RETURN VALUE:
  *     How many slots the op takes.
  *-----------------------------------------------------------------------------------------------*/
-static int GetUnwindOpSlots(RtUnwindCode *Code) {
+static int GetUnwindOpSlots(RtUnwindInfo *UnwindInfo, int OpIndex) {
+    RtUnwindCode *Code = &UnwindInfo->UnwindCode[OpIndex];
+    if (Code->UnwindOp > RT_UWOP_PUSH_MACHFRAME || Code->UnwindOp == RT_UWOP_SPARE_CODE ||
+        (Code->UnwindOp == RT_UWOP_EPILOG && UnwindInfo->Version != 2) ||
+        (Code->UnwindOp == RT_UWOP_ALLOC_LARGE && Code->OpInfo > 1) ||
+        (Code->UnwindOp == RT_UWOP_SET_FPREG && Code->OpInfo) ||
+        (Code->UnwindOp == RT_UWOP_PUSH_MACHFRAME && Code->OpInfo > 1)) {
+        return 0;
+    }
+
     if (Code->UnwindOp == RT_UWOP_ALLOC_LARGE && Code->OpInfo) {
         return 3;
     }
 
     return UnwindOpSlots[Code->UnwindOp];
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function validates the version and slot relationships in an unwind-code array.
+ *
+ * PARAMETERS:
+ *     UnwindInfo - Pointer to the function's unwind/exception data.
+ *
+ * RETURN VALUE:
+ *     true if the code array is structurally valid, false otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+static bool ValidateUnwindCodes(RtUnwindInfo *UnwindInfo) {
+    if (UnwindInfo->Version != 1 && UnwindInfo->Version != 2) {
+        return false;
+    }
+    if ((!UnwindInfo->FrameRegister && UnwindInfo->FrameOffset) ||
+        ((UnwindInfo->Flags & RT_UNW_FLAG_CHAININFO) &&
+         (UnwindInfo->Flags & (RT_UNW_FLAG_EHANDLER | RT_UNW_FLAG_UHANDLER)))) {
+        return false;
+    }
+
+    int OpIndex = 0;
+    if (UnwindInfo->Version == 2 && UnwindInfo->CountOfCodes &&
+        UnwindInfo->UnwindCode[0].UnwindOp == RT_UWOP_EPILOG) {
+        RtUnwindCode *SizeCode = &UnwindInfo->UnwindCode[0];
+        if (!SizeCode->CodeOffset || SizeCode->OpInfo > 1) {
+            return false;
+        }
+
+        OpIndex++;
+        while (OpIndex < UnwindInfo->CountOfCodes &&
+               UnwindInfo->UnwindCode[OpIndex].UnwindOp == RT_UWOP_EPILOG) {
+            OpIndex++;
+        }
+    }
+
+    while (OpIndex < UnwindInfo->CountOfCodes) {
+        RtUnwindCode *Code = &UnwindInfo->UnwindCode[OpIndex];
+        int Slots = GetUnwindOpSlots(UnwindInfo, OpIndex);
+        if (!Slots || Code->UnwindOp == RT_UWOP_EPILOG ||
+            Slots > UnwindInfo->CountOfCodes - OpIndex) {
+            return false;
+        }
+
+        OpIndex += Slots;
+    }
+
+    return true;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function skips the version-2 epilog descriptors at the front of an unwind-code array.
+ *
+ * PARAMETERS:
+ *     UnwindInfo - Pointer to the function's unwind/exception data.
+ *
+ * RETURN VALUE:
+ *     Index of the first prolog unwind operation.
+ *-----------------------------------------------------------------------------------------------*/
+static int GetFirstPrologOp(RtUnwindInfo *UnwindInfo) {
+    int OpIndex = 0;
+    if (UnwindInfo->Version != 2 || !UnwindInfo->CountOfCodes ||
+        UnwindInfo->UnwindCode[0].UnwindOp != RT_UWOP_EPILOG) {
+        return OpIndex;
+    }
+
+    do {
+        OpIndex++;
+    } while (OpIndex < UnwindInfo->CountOfCodes &&
+             UnwindInfo->UnwindCode[OpIndex].UnwindOp == RT_UWOP_EPILOG);
+    return OpIndex;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function determines whether an instruction belongs to a version-2 described epilog.
+ *
+ * PARAMETERS:
+ *     FunctionEntry - Exception/unwind data about the function.
+ *     UnwindInfo - Pointer to the function's unwind/exception data.
+ *     Offset - Instruction offset from the start of the function.
+ *     InEpilog - Output; Whether the instruction is inside a described epilog.
+ *
+ * RETURN VALUE:
+ *     true if all epilog descriptors are valid, false otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+static bool IsInVersion2Epilog(
+    RtRuntimeFunction *FunctionEntry,
+    RtUnwindInfo *UnwindInfo,
+    uint64_t Offset,
+    bool *InEpilog) {
+    *InEpilog = false;
+    if (!UnwindInfo->CountOfCodes || UnwindInfo->UnwindCode[0].UnwindOp != RT_UWOP_EPILOG) {
+        return true;
+    }
+
+    uint32_t FunctionSize = FunctionEntry->EndAddress - FunctionEntry->BeginAddress;
+    RtUnwindCode *SizeCode = &UnwindInfo->UnwindCode[0];
+    uint32_t EpilogSize = SizeCode->CodeOffset;
+    if (EpilogSize > FunctionSize) {
+        return false;
+    }
+
+    if (SizeCode->OpInfo) {
+        uint32_t EpilogStart = FunctionSize - EpilogSize;
+        if (EpilogStart < UnwindInfo->SizeOfProlog) {
+            return false;
+        }
+        *InEpilog = Offset >= EpilogStart && Offset < FunctionSize;
+    }
+
+    for (int OpIndex = 1; OpIndex < UnwindInfo->CountOfCodes &&
+                          UnwindInfo->UnwindCode[OpIndex].UnwindOp == RT_UWOP_EPILOG;
+         OpIndex++) {
+        RtUnwindCode *Code = &UnwindInfo->UnwindCode[OpIndex];
+        uint32_t EpilogOffset = ((uint32_t)Code->OpInfo << 8) | Code->CodeOffset;
+
+        /* A zero entry is alignment padding and must terminate the descriptor sequence. */
+        if (!EpilogOffset) {
+            if (OpIndex + 1 < UnwindInfo->CountOfCodes &&
+                UnwindInfo->UnwindCode[OpIndex + 1].UnwindOp == RT_UWOP_EPILOG) {
+                return false;
+            }
+            break;
+        }
+
+        if (EpilogOffset > FunctionSize || EpilogSize > EpilogOffset) {
+            return false;
+        }
+
+        uint32_t EpilogStart = FunctionSize - EpilogOffset;
+        if (EpilogStart < UnwindInfo->SizeOfProlog) {
+            return false;
+        }
+        if (Offset >= EpilogStart && Offset < (uint64_t)EpilogStart + EpilogSize) {
+            *InEpilog = true;
+        }
+    }
+
+    return true;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -225,8 +376,22 @@ RtExceptionRoutine RtVirtualUnwind(
         return NULL;
     }
 
-    uint64_t Offset = ControlPc - ImageBase - FunctionEntry->BeginAddress;
+    if (ControlPc < ImageBase || FunctionEntry->BeginAddress >= FunctionEntry->EndAddress) {
+        return NULL;
+    }
+
+    uint64_t RelativePc = ControlPc - ImageBase;
+    if (RelativePc < FunctionEntry->BeginAddress || RelativePc >= FunctionEntry->EndAddress ||
+        ImageBase > UINT64_MAX - FunctionEntry->UnwindData) {
+        return NULL;
+    }
+
+    uint64_t Offset = RelativePc - FunctionEntry->BeginAddress;
     RtUnwindInfo *UnwindInfo = (RtUnwindInfo *)(ImageBase + FunctionEntry->UnwindData);
+    if (!ValidateUnwindCodes(UnwindInfo)) {
+        return NULL;
+    }
+
     uint64_t FrameBase = 0;
 
     do {
@@ -241,12 +406,17 @@ RtExceptionRoutine RtVirtualUnwind(
         bool HasSetFpreg =
             Offset >= UnwindInfo->SizeOfProlog || (UnwindInfo->Flags & RT_UNW_FLAG_CHAININFO);
 
-        int OpIndex = 0;
+        int OpIndex = GetFirstPrologOp(UnwindInfo);
         while (!HasSetFpreg && OpIndex < UnwindInfo->CountOfCodes) {
             RtUnwindCode *UnwindCode = &UnwindInfo->UnwindCode[OpIndex];
 
             if (UnwindCode->CodeOffset > Offset || UnwindCode->UnwindOp != RT_UWOP_SET_FPREG) {
-                OpIndex += GetUnwindOpSlots(UnwindCode);
+                int Slots = GetUnwindOpSlots(UnwindInfo, OpIndex);
+                if (!Slots) {
+                    return NULL;
+                }
+
+                OpIndex += Slots;
                 continue;
             }
 
@@ -265,15 +435,18 @@ RtExceptionRoutine RtVirtualUnwind(
         *EstablisherFrame = FrameBase;
     }
 
+    bool DescribedEpilog = false;
     do {
-        if (UnwindInfo->Version >= 2) {
-            break;
+        bool InEpilog = Offset >= UnwindInfo->SizeOfProlog;
+        if (UnwindInfo->Version == 2 &&
+            !IsInVersion2Epilog(FunctionEntry, UnwindInfo, Offset, &InEpilog)) {
+            return NULL;
         }
 
-        /* For versions<2, we're forced to manually detect the epilogue sequence and simulate it. */
-        if (Offset < UnwindInfo->SizeOfProlog) {
+        if (!InEpilog) {
             break;
         }
+        DescribedEpilog = UnwindInfo->Version == 2;
 
         RtContext LocalContext;
         memcpy(&LocalContext, ContextRecord, sizeof(RtContext));
@@ -375,20 +548,36 @@ RtExceptionRoutine RtVirtualUnwind(
         return NULL;
     } while (false);
 
-    if (UnwindInfo->Version >= 2) {
-        /* TODO: For versions>=2, we need to use UWOP_EPILOGUE. */
+    /* A version-2 descriptor owns epilog detection. If its instruction stream did not match a
+       supported epilog, do not apply the full-prolog unwind operations to a partially unwound
+       frame. */
+    if (DescribedEpilog) {
+        return NULL;
     }
 
     while (true) {
-        Offset = ControlPc - ImageBase - FunctionEntry->BeginAddress;
+        RelativePc = ControlPc - ImageBase;
+        if (RelativePc < FunctionEntry->BeginAddress || RelativePc >= FunctionEntry->EndAddress) {
+            return NULL;
+        }
+
+        Offset = RelativePc - FunctionEntry->BeginAddress;
         UnwindInfo = (RtUnwindInfo *)(ImageBase + FunctionEntry->UnwindData);
+        if (!ValidateUnwindCodes(UnwindInfo)) {
+            return NULL;
+        }
 
         /* Skip any ops smaller than the current offset (they don't need to be
          * executed/unwinded). */
-        int OpIndex = 0;
+        int OpIndex = GetFirstPrologOp(UnwindInfo);
         while (OpIndex < UnwindInfo->CountOfCodes &&
                UnwindInfo->UnwindCode[OpIndex].CodeOffset > Offset) {
-            OpIndex += GetUnwindOpSlots(&UnwindInfo->UnwindCode[OpIndex]);
+            int Slots = GetUnwindOpSlots(UnwindInfo, OpIndex);
+            if (!Slots) {
+                return NULL;
+            }
+
+            OpIndex += Slots;
         }
 
         /* Process any remaining unwind ops. */
@@ -397,6 +586,10 @@ RtExceptionRoutine RtVirtualUnwind(
         /* And update the function entry if we have more chained info. */
         if (UnwindInfo->Flags & RT_UNW_FLAG_CHAININFO) {
             FunctionEntry = RtGetChainedFunctionEntry(UnwindInfo);
+            if (FunctionEntry->BeginAddress >= FunctionEntry->EndAddress ||
+                ImageBase > UINT64_MAX - FunctionEntry->UnwindData) {
+                return NULL;
+            }
         } else {
             /* Or pop RIP (fully restoring the frame) if we haven't done that yet. */
             if (!HasMachineFrame) {
@@ -411,7 +604,9 @@ RtExceptionRoutine RtVirtualUnwind(
     /* We want to return the handler/callback if we have one matching the request type. */
     if (Offset > UnwindInfo->SizeOfProlog &&
         (UnwindInfo->Flags & (HandlerType & (RT_UNW_FLAG_EHANDLER | RT_UNW_FLAG_UHANDLER)))) {
-        *HandlerData = RtGetExceptionDataPtr(UnwindInfo);
+        if (HandlerData) {
+            *HandlerData = RtGetExceptionDataPtr(UnwindInfo);
+        }
         return RtGetExceptionHandler(ImageBase, UnwindInfo);
     }
 
@@ -461,8 +656,9 @@ RtUnwind(void *TargetFrame, void *TargetIp, RtExceptionRecord *ExceptionRecord, 
         ExceptionRecord->ExceptionFlags |= RT_EXC_FLAG_EXIT_UNWIND;
     }
 
-    uint64_t EstablisherFrame;
+    uint64_t EstablisherFrame = ActiveContext.Rsp;
     while (ActiveContext.Rsp >= StackBase && ActiveContext.Rsp < StackLimit) {
+        EstablisherFrame = ActiveContext.Rsp;
         uint64_t ControlPc = ActiveContext.Rip;
         uint64_t ImageBase = RtLookupImageBase(ControlPc);
         if (!ImageBase) {

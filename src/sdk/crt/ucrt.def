@@ -35,13 +35,9 @@ EXPORTS
     ftell
     fwrite
     getchar
-    getchar
-    gets
     gets
     printf
     putchar
-    putchar
-    puts
     puts
     rewind
     scanf

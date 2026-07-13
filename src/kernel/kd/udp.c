@@ -35,6 +35,11 @@ uint32_t KdpSendUdpPacket(
     uint16_t DestinationPort,
     void *Buffer,
     size_t Size) {
+    if (Size > KDP_PROTOCOL_MAX_DATAGRAM || Size > UINT32_MAX - sizeof(KdpEthernetHeader) -
+                                                       sizeof(KdpIpHeader) - sizeof(KdpUdpHeader)) {
+        return 0xC0000004;
+    }
+
     uint32_t Handle = 0;
     uint32_t Status = KdpGetTxPacket(KdpDebugAdapter, &Handle);
     if (Status) {
@@ -43,6 +48,12 @@ uint32_t KdpSendUdpPacket(
 
     KdpEthernetHeader *EthFrame = KdpGetPacketAddress(KdpDebugAdapter, Handle);
     if (!EthFrame) {
+        KdpSendTxPacket(KdpDebugAdapter, Handle, 0);
+        return 0xC0000004;
+    }
+    size_t PacketSize =
+        sizeof(KdpEthernetHeader) + sizeof(KdpIpHeader) + sizeof(KdpUdpHeader) + Size;
+    if (PacketSize > KdpGetPacketLength(KdpDebugAdapter, Handle)) {
         KdpSendTxPacket(KdpDebugAdapter, Handle, 0);
         return 0xC0000004;
     }
@@ -76,10 +87,7 @@ uint32_t KdpSendUdpPacket(
     UdpFrame->Checksum = 0;
     memcpy(UdpFrame + 1, Buffer, Size);
 
-    return KdpSendTxPacket(
-        KdpDebugAdapter,
-        Handle,
-        sizeof(KdpEthernetHeader) + sizeof(KdpIpHeader) + sizeof(KdpUdpHeader) + Size);
+    return KdpSendTxPacket(KdpDebugAdapter, Handle, PacketSize);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -107,6 +115,11 @@ void KdpParseUdpFrame(
         return;
     }
 
+    uint32_t DatagramLength = KdpSwapNetworkOrder16(UdpFrame->Length);
+    if (DatagramLength < sizeof(KdpUdpHeader) || DatagramLength > Length) {
+        return;
+    }
+
     /* Check for incoming connections on the debug port, and pass them along to the debug packet
      * handler. */
     if (KdpSwapNetworkOrder16(UdpFrame->DestinationPort) != KdpDebuggeePort) {
@@ -119,5 +132,5 @@ void KdpParseUdpFrame(
         SourceProtocolAddress,
         KdpSwapNetworkOrder16(UdpFrame->SourcePort),
         (void *)(UdpFrame + 1),
-        Length - sizeof(KdpUdpHeader));
+        DatagramLength - sizeof(KdpUdpHeader));
 }

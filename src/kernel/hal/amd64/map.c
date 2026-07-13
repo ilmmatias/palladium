@@ -15,6 +15,11 @@ extern bool HalpSmpInitializationComplete;
 
 static KeSpinLock Lock = {0};
 
+#ifdef PALLADIUM_ENABLE_SELF_TESTS
+static uint64_t AllocationFailureIndex;
+static uint64_t AllocationCounter;
+#endif /* PALLADIUM_ENABLE_SELF_TESTS */
+
 static uint64_t EarlyMapBitmapBuffer[((HALP_EARLY_MAP_PAGES + 63) >> 6) << 3] = {};
 static RtBitmap EarlyMapBitmap = {};
 static uint64_t EarlyMapHint = 2;
@@ -92,6 +97,12 @@ static bool AllocateFrame(HalpPageFrame *CurrentFrame, HalpPageFrame *NextFrame)
         return true;
     }
 
+#ifdef PALLADIUM_ENABLE_SELF_TESTS
+    if (AllocationFailureIndex && ++AllocationCounter == AllocationFailureIndex) {
+        return false;
+    }
+#endif /* PALLADIUM_ENABLE_SELF_TESTS */
+
     /* Allocate a new page frame; This shouldn't require any invlpg/TLB shootdown. */
     uint64_t Page = MiPageList ? MmAllocateSinglePage() : MiAllocateEarlyPages(1);
     if (!Page) {
@@ -109,6 +120,37 @@ static bool AllocateFrame(HalpPageFrame *CurrentFrame, HalpPageFrame *NextFrame)
     __atomic_add_fetch(&MiTotalPtePages, 1, __ATOMIC_RELAXED);
     return true;
 }
+
+#ifdef PALLADIUM_ENABLE_SELF_TESTS
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function configures a deterministic page-table allocation failure for kernel tests.
+ *
+ * PARAMETERS:
+ *     Index - One-based allocation to fail, or zero to disable the hook.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void HalpSetPageTableAllocationFailure(uint64_t Index) {
+    AllocationCounter = 0;
+    AllocationFailureIndex = Index;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function returns how many page-table allocation points the active test observed.
+ *
+ * PARAMETERS:
+ *     None.
+ *
+ * RETURN VALUE:
+ *     Allocation-point count since the failure hook was configured.
+ *-----------------------------------------------------------------------------------------------*/
+uint64_t HalpGetPageTableAllocationCount(void) {
+    return AllocationCounter;
+}
+#endif /* PALLADIUM_ENABLE_SELF_TESTS */
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -202,10 +244,13 @@ static bool CleanFrame(uint64_t VirtualAddress, uint64_t TargetLevel) {
         /* If so, free up ourselves in the parent, and keep on going. */
         HalpPageFrame *ParentFrame = &Parent.Base[ParentIndex];
 
+        uint64_t PhysicalAddress = ParentFrame->Address << MM_PAGE_SHIFT;
         if (MiPageList) {
-            MmFreeSinglePage(ParentFrame->Address << MM_PAGE_SHIFT);
-            __atomic_sub_fetch(&MiTotalPtePages, 1, __ATOMIC_RELAXED);
+            MmFreeSinglePage(PhysicalAddress);
+        } else {
+            MiReleaseEarlyPage(PhysicalAddress);
         }
+        __atomic_sub_fetch(&MiTotalPtePages, 1, __ATOMIC_RELAXED);
 
         ParentFrame->RawData = 0;
         TargetLevel--;
@@ -213,6 +258,43 @@ static bool CleanFrame(uint64_t VirtualAddress, uint64_t TargetLevel) {
     }
 
     return Result;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function rolls back leaf mappings and empty page-table levels while the map lock is
+ *     held.
+ *
+ * PARAMETERS:
+ *     Start - First virtual address changed by the mapping attempt.
+ *     End - Address immediately after the last virtual page which may have changed.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+static void RollbackMap(uint64_t Start, uint64_t End) {
+    if (End < Start) {
+        KeFatalError(KE_PANIC_BAD_PFN_HEADER, Start, End, 0, 0);
+    }
+
+    uint64_t Address = Start;
+    while (Address < End) {
+        uint64_t TargetLevel = 0;
+        HalpPageFrame *TargetFrame = NULL;
+        bool Present = GetFrame(Address, &TargetLevel, &TargetFrame);
+        if (Present && TargetLevel == HALP_PT_LEVEL) {
+            TargetFrame->RawData = 0;
+            CleanFrame(Address, TargetLevel);
+        } else if (!Present) {
+            /* WalkPageTable might have allocated only a prefix of the containing hierarchy. */
+            CleanFrame(Address, TargetLevel);
+        }
+
+        if (End - Address <= HALP_PT_SIZE) {
+            break;
+        }
+        Address += HALP_PT_SIZE;
+    }
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -256,6 +338,90 @@ uint64_t HalpGetPhysicalAddress(void *VirtualAddress) {
     }
 
     return 0;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function safely reads one byte from a present supervisor mapping through the debugger
+ *     alias.
+ *
+ * PARAMETERS:
+ *     VirtualAddress - Kernel virtual address to read.
+ *     Value - Destination byte.
+ *
+ * RETURN VALUE:
+ *     true if the mapping was valid and the byte was read, false otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+bool HalpReadDebuggerByte(void *VirtualAddress, uint8_t *Value) {
+    uint64_t Address = (uint64_t)VirtualAddress;
+    uint64_t TargetLevel = 0;
+    HalpPageFrame *TargetFrame = NULL;
+    if (!Value || (Address >> 48 != 0xFFFF) || !GetFrame(Address, &TargetLevel, &TargetFrame) ||
+        TargetFrame->User) {
+        return false;
+    }
+
+    uint64_t PhysicalAddress =
+        (TargetFrame->Address << HALP_PT_SHIFT) | (Address & (TableLevels[TargetLevel].Size - 1));
+    volatile uint8_t *Alias = HalpMapDebuggerMemory(PhysicalAddress, 1, 0);
+    if (!Alias) {
+        return false;
+    }
+
+    *Value = *Alias;
+    HalpUnmapDebuggerMemory((void *)Alias, 1);
+    return true;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function replaces one byte in an executable kernel mapping through the debugger alias.
+ *
+ * PARAMETERS:
+ *     VirtualAddress - Executable kernel address to patch.
+ *     Expected - Byte that must currently be present.
+ *     Value - Replacement byte.
+ *
+ * RETURN VALUE:
+ *     true if the expected byte was replaced, false otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+bool HalpPatchDebuggerByte(void *VirtualAddress, uint8_t Expected, uint8_t Value) {
+    uint64_t Address = (uint64_t)VirtualAddress;
+    uint64_t TargetLevel = 0;
+    HalpPageFrame *TargetFrame = NULL;
+    if ((Address >> 48 != 0xFFFF) || !GetFrame(Address, &TargetLevel, &TargetFrame) ||
+        TargetFrame->User || TargetFrame->NoExecute) {
+        return false;
+    }
+
+    uint64_t PhysicalAddress =
+        (TargetFrame->Address << HALP_PT_SHIFT) | (Address & (TableLevels[TargetLevel].Size - 1));
+    volatile uint8_t *Alias = HalpMapDebuggerMemory(PhysicalAddress, 1, MI_MAP_WRITE);
+    if (!Alias) {
+        return false;
+    }
+
+    bool Replaced = *Alias == Expected;
+    if (Replaced) {
+        *Alias = Value;
+        __asm__ volatile("mfence" : : : "memory");
+        uint32_t Leaf = 0;
+        uint32_t A = 0;
+        uint32_t B = 0;
+        uint32_t C = 0;
+        uint32_t D = 0;
+        __asm__ volatile("cpuid"
+                         : "=a"(A), "=b"(B), "=c"(C), "=d"(D)
+                         : "a"(Leaf), "c"(0)
+                         : "memory");
+        (void)A;
+        (void)B;
+        (void)C;
+        (void)D;
+    }
+
+    HalpUnmapDebuggerMemory((void *)Alias, 1);
+    return Replaced;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -312,8 +478,9 @@ bool HalpMapContiguousPages(
     uint64_t Size,
     int Flags) {
     /* Ensure 4KiB alignment on small pages. */
-    if (((uint64_t)VirtualAddress & (HALP_PT_SIZE - 1)) || (PhysicalAddress & (HALP_PT_SIZE - 1)) ||
-        (Size & (HALP_PT_SIZE - 1))) {
+    if (!Size || ((uint64_t)VirtualAddress & (HALP_PT_SIZE - 1)) ||
+        (PhysicalAddress & (HALP_PT_SIZE - 1)) || (Size & (HALP_PT_SIZE - 1)) ||
+        (uint64_t)VirtualAddress > UINT64_MAX - Size || PhysicalAddress > UINT64_MAX - Size) {
         return false;
     }
 
@@ -324,6 +491,7 @@ bool HalpMapContiguousPages(
     /* Fully walk the page table (once, it should be enough for most cases). */
     HalpPageFrame *CurrentFrame = WalkPageTable(Target);
     if (!CurrentFrame) {
+        RollbackMap((uint64_t)VirtualAddress, Target + HALP_PT_SIZE);
         KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
         return false;
     }
@@ -334,15 +502,20 @@ bool HalpMapContiguousPages(
         if (Offset && !(Target & (HALP_PD_SIZE - 1))) {
             CurrentFrame = WalkPageTable(Target);
             if (!CurrentFrame) {
+                RollbackMap((uint64_t)VirtualAddress, Target + HALP_PT_SIZE);
                 KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
                 return false;
             }
         }
 
-        /* Maybe we should return failure on already mapped pages instead? */
-        if (!CurrentFrame->Present) {
-            BuildFrame(CurrentFrame, Source, HALP_PT_LEVEL, Flags);
+        /* Mapping calls own a previously empty virtual range. Refuse to replace an existing
+           mapping so that failure can restore the exact prior state. */
+        if (CurrentFrame->Present) {
+            RollbackMap((uint64_t)VirtualAddress, Target);
+            KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
+            return false;
         }
+        BuildFrame(CurrentFrame, Source, HALP_PT_LEVEL, Flags);
 
         Target += HALP_PT_SIZE;
         Source += HALP_PT_SIZE;
@@ -376,7 +549,8 @@ bool HalpMapNonContiguousPages(
      * PhysicalAddresses list using the current offset; As such, no comments needed (just take a
      * look at the other function). */
 
-    if (((uint64_t)VirtualAddress & (HALP_PT_SIZE - 1)) || (Size & (HALP_PT_SIZE - 1))) {
+    if (!PhysicalAddresses || !Size || ((uint64_t)VirtualAddress & (HALP_PT_SIZE - 1)) ||
+        (Size & (HALP_PT_SIZE - 1)) || (uint64_t)VirtualAddress > UINT64_MAX - Size) {
         return false;
     }
 
@@ -392,6 +566,7 @@ bool HalpMapNonContiguousPages(
 
     HalpPageFrame *CurrentFrame = WalkPageTable(Target);
     if (!CurrentFrame) {
+        RollbackMap((uint64_t)VirtualAddress, Target + HALP_PT_SIZE);
         KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
         return false;
     }
@@ -400,14 +575,18 @@ bool HalpMapNonContiguousPages(
         if (Offset && !(Target & (HALP_PD_SIZE - 1))) {
             CurrentFrame = WalkPageTable(Target);
             if (!CurrentFrame) {
+                RollbackMap((uint64_t)VirtualAddress, Target + HALP_PT_SIZE);
                 KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
                 return false;
             }
         }
 
-        if (!CurrentFrame->Present) {
-            BuildFrame(CurrentFrame, *Source, HALP_PT_LEVEL, Flags);
+        if (CurrentFrame->Present) {
+            RollbackMap((uint64_t)VirtualAddress, Target);
+            KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
+            return false;
         }
+        BuildFrame(CurrentFrame, *Source, HALP_PT_LEVEL, Flags);
 
         Target += HALP_PT_SIZE;
         Source++;
@@ -521,6 +700,11 @@ void *HalpMapDebuggerMemory(uint64_t PhysicalAddress, size_t Size, int Flags) {
     }
 
     /* Block anything that needs more pages than we have reserved. */
+    if (PhysicalAddress > UINT64_MAX - Size ||
+        PhysicalAddress + Size > UINT64_MAX - (HALP_PT_SIZE - 1)) {
+        return NULL;
+    }
+
     uint64_t PhysicalStart = PhysicalAddress & ~(HALP_PT_SIZE - 1);
     uint64_t PhysicalEnd = (PhysicalAddress + Size + HALP_PT_SIZE - 1) & ~(HALP_PT_SIZE - 1);
     uint64_t Pages = (PhysicalEnd - PhysicalStart) >> HALP_PT_SHIFT;
@@ -563,7 +747,13 @@ void HalpUnmapDebuggerMemory(void *VirtualAddress, size_t Size) {
     }
 
     uint64_t VirtualStart = (uint64_t)VirtualAddress & ~(HALP_PT_SIZE - 1);
-    uint64_t VirtualEnd = ((uint64_t)VirtualAddress + Size + HALP_PT_SIZE) & ~(HALP_PT_SIZE - 1);
+    if ((uint64_t)VirtualAddress > UINT64_MAX - Size ||
+        (uint64_t)VirtualAddress + Size > UINT64_MAX - (HALP_PT_SIZE - 1)) {
+        return;
+    }
+
+    uint64_t VirtualEnd =
+        ((uint64_t)VirtualAddress + Size + HALP_PT_SIZE - 1) & ~(HALP_PT_SIZE - 1);
     uint64_t Pages = (VirtualEnd - VirtualStart) >> HALP_PT_SHIFT;
     if (Pages > 2) {
         return;
