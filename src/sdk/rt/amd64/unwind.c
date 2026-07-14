@@ -39,12 +39,22 @@ static const int UnwindOpSlots[] = {
  *     This function gets how many slots the given UWOP takes.
  *
  * PARAMETERS:
- *     Code - Which op we're parsing/ignoring.
+ *     UnwindInfo - Pointer to the function's unwind/exception data.
+ *     OpIndex - Where to start parsing the opcodes.
  *
  * RETURN VALUE:
  *     How many slots the op takes.
  *-----------------------------------------------------------------------------------------------*/
-static int GetUnwindOpSlots(RtUnwindCode *Code) {
+static int GetUnwindOpSlots(RtUnwindInfo *UnwindInfo, int OpIndex) {
+    RtUnwindCode *Code = &UnwindInfo->UnwindCode[OpIndex];
+    if (Code->UnwindOp > RT_UWOP_PUSH_MACHFRAME || Code->UnwindOp == RT_UWOP_SPARE_CODE ||
+        Code->UnwindOp == RT_UWOP_EPILOG ||
+        (Code->UnwindOp == RT_UWOP_ALLOC_LARGE && Code->OpInfo > 1) ||
+        (Code->UnwindOp == RT_UWOP_SET_FPREG && Code->OpInfo) ||
+        (Code->UnwindOp == RT_UWOP_PUSH_MACHFRAME && Code->OpInfo > 1)) {
+        return 0;
+    }
+
     if (Code->UnwindOp == RT_UWOP_ALLOC_LARGE && Code->OpInfo) {
         return 3;
     }
@@ -225,7 +235,17 @@ RtExceptionRoutine RtVirtualUnwind(
         return NULL;
     }
 
-    uint64_t Offset = ControlPc - ImageBase - FunctionEntry->BeginAddress;
+    if (ControlPc < ImageBase || FunctionEntry->BeginAddress >= FunctionEntry->EndAddress) {
+        return NULL;
+    }
+
+    uint64_t RelativePc = ControlPc - ImageBase;
+    if (RelativePc < FunctionEntry->BeginAddress || RelativePc >= FunctionEntry->EndAddress ||
+        ImageBase > UINT64_MAX - FunctionEntry->UnwindData) {
+        return NULL;
+    }
+
+    uint64_t Offset = RelativePc - FunctionEntry->BeginAddress;
     RtUnwindInfo *UnwindInfo = (RtUnwindInfo *)(ImageBase + FunctionEntry->UnwindData);
     uint64_t FrameBase = 0;
 
@@ -246,7 +266,12 @@ RtExceptionRoutine RtVirtualUnwind(
             RtUnwindCode *UnwindCode = &UnwindInfo->UnwindCode[OpIndex];
 
             if (UnwindCode->CodeOffset > Offset || UnwindCode->UnwindOp != RT_UWOP_SET_FPREG) {
-                OpIndex += GetUnwindOpSlots(UnwindCode);
+                int Slots = GetUnwindOpSlots(UnwindInfo, OpIndex);
+                if (!Slots) {
+                    return NULL;
+                }
+
+                OpIndex += Slots;
                 continue;
             }
 
@@ -380,7 +405,12 @@ RtExceptionRoutine RtVirtualUnwind(
     }
 
     while (true) {
-        Offset = ControlPc - ImageBase - FunctionEntry->BeginAddress;
+        RelativePc = ControlPc - ImageBase;
+        if (RelativePc < FunctionEntry->BeginAddress || RelativePc >= FunctionEntry->EndAddress) {
+            return NULL;
+        }
+
+        Offset = RelativePc - FunctionEntry->BeginAddress;
         UnwindInfo = (RtUnwindInfo *)(ImageBase + FunctionEntry->UnwindData);
 
         /* Skip any ops smaller than the current offset (they don't need to be
@@ -388,7 +418,12 @@ RtExceptionRoutine RtVirtualUnwind(
         int OpIndex = 0;
         while (OpIndex < UnwindInfo->CountOfCodes &&
                UnwindInfo->UnwindCode[OpIndex].CodeOffset > Offset) {
-            OpIndex += GetUnwindOpSlots(&UnwindInfo->UnwindCode[OpIndex]);
+            int Slots = GetUnwindOpSlots(UnwindInfo, OpIndex);
+            if (!Slots) {
+                return NULL;
+            }
+
+            OpIndex += Slots;
         }
 
         /* Process any remaining unwind ops. */
@@ -397,6 +432,10 @@ RtExceptionRoutine RtVirtualUnwind(
         /* And update the function entry if we have more chained info. */
         if (UnwindInfo->Flags & RT_UNW_FLAG_CHAININFO) {
             FunctionEntry = RtGetChainedFunctionEntry(UnwindInfo);
+            if (FunctionEntry->BeginAddress >= FunctionEntry->EndAddress ||
+                ImageBase > UINT64_MAX - FunctionEntry->UnwindData) {
+                return NULL;
+            }
         } else {
             /* Or pop RIP (fully restoring the frame) if we haven't done that yet. */
             if (!HasMachineFrame) {
@@ -411,7 +450,9 @@ RtExceptionRoutine RtVirtualUnwind(
     /* We want to return the handler/callback if we have one matching the request type. */
     if (Offset > UnwindInfo->SizeOfProlog &&
         (UnwindInfo->Flags & (HandlerType & (RT_UNW_FLAG_EHANDLER | RT_UNW_FLAG_UHANDLER)))) {
-        *HandlerData = RtGetExceptionDataPtr(UnwindInfo);
+        if (HandlerData) {
+            *HandlerData = RtGetExceptionDataPtr(UnwindInfo);
+        }
         return RtGetExceptionHandler(ImageBase, UnwindInfo);
     }
 
@@ -461,8 +502,9 @@ RtUnwind(void *TargetFrame, void *TargetIp, RtExceptionRecord *ExceptionRecord, 
         ExceptionRecord->ExceptionFlags |= RT_EXC_FLAG_EXIT_UNWIND;
     }
 
-    uint64_t EstablisherFrame;
+    uint64_t EstablisherFrame = ActiveContext.Rsp;
     while (ActiveContext.Rsp >= StackBase && ActiveContext.Rsp < StackLimit) {
+        EstablisherFrame = ActiveContext.Rsp;
         uint64_t ControlPc = ActiveContext.Rip;
         uint64_t ImageBase = RtLookupImageBase(ControlPc);
         if (!ImageBase) {

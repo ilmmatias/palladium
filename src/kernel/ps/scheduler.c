@@ -179,6 +179,7 @@ void PspProcessQueue(void) {
                 KeFatalError(KE_PANIC_BAD_THREAD_STATE, Thread->State, PS_STATE_TERMINATED, 0, 0);
             }
 
+            PspDeletePoolAlerts(Thread);
             ObDereferenceObject(Thread);
         }
     }
@@ -205,7 +206,24 @@ void PspProcessQueue(void) {
                 break;
             }
 
-            RtRemoveAvlTree(&Processor->WaitTree, &Thread->WaitTreeNode);
+            if (RtRemoveAvlTree(&Processor->WaitTree, &Thread->WaitTreeNode) !=
+                &Thread->WaitTreeNode) {
+                KeFatalError(KE_PANIC_BAD_THREAD_STATE, Thread->State, PS_STATE_WAITING, 3, 0);
+            }
+
+            Thread->WaitTreeLinked = false;
+            uint8_t ExpectedCompletion = PS_WAIT_COMPLETION_NONE;
+            if (!__atomic_compare_exchange_n(
+                    &Thread->WaitCompletion,
+                    &ExpectedCompletion,
+                    PS_WAIT_COMPLETION_TIMEOUT,
+                    false,
+                    __ATOMIC_ACQ_REL,
+                    __ATOMIC_ACQUIRE)) {
+                KeReleaseSpinLockAtCurrentIrql(&Processor->Lock);
+                continue;
+            }
+
             KeReleaseSpinLockAtCurrentIrql(&Processor->Lock);
 
             /* Shortcut for DelayThread(), we always want to queue the thread in that case. */
@@ -216,27 +234,17 @@ void PspProcessQueue(void) {
                 continue;
             }
 
-            do {
-                /* Now with the processor lock released, acquire the event lock (to modify the
-                 * per-event wait list). */
-                KeAcquireSpinLockAtCurrentIrql(&Event->Lock);
-
-                /* Is this the best way of checking if we're still linked? Not sure, maybe we should
-                 * add some other signal to say we're still inserted? */
-                if (Thread->WaitListHeader.Prev->Next != &Thread->WaitListHeader) {
-                    KeReleaseSpinLockAtCurrentIrql(&Event->Lock);
-                    break;
-                }
-
+            /* Now with the processor lock released, acquire the event lock and unlink only if the
+             * signal side did not already remove this waiter after losing the winner race. */
+            KeAcquireSpinLockAtCurrentIrql(&Event->Lock);
+            if (Thread->WaitListLinked) {
                 RtUnlinkDList(&Thread->WaitListHeader);
-                KeReleaseSpinLockAtCurrentIrql(&Event->Lock);
+                Thread->WaitListLinked = false;
+            }
+            KeReleaseSpinLockAtCurrentIrql(&Event->Lock);
 
-                /* Now that we know the event didn't get signaled just as we reached a timeout (and
-                 * that can't happen anymore because we already unlinked), we can requeue the
-                 * thread. */
-                Thread->State = PS_STATE_QUEUED;
-                PspQueueThread(Thread, true);
-            } while (false);
+            Thread->State = PS_STATE_QUEUED;
+            PspQueueThread(Thread, true);
         }
 
         if (!RtQuerySizeAvlTree(&Processor->WaitTree)) {

@@ -3,6 +3,8 @@
 
 #include <kernel/halp.h>
 #include <kernel/ke.h>
+#include <kernel/mm.h>
+#include <kernel/ob.h>
 #include <kernel/ps.h>
 #include <os/containing_record.h>
 #include <rt/list.h>
@@ -58,6 +60,7 @@ bool PsQueueAlert(PsThread *Thread, PsAlert *Alert) {
         return false;
     }
 
+    ObReferenceObject(Thread);
     RtPushSList(&Thread->AlertList, &Alert->ListHeader);
     KeReleaseSpinLockAndLowerIrql(&Thread->AlertLock, OldIrql);
     if (Thread->State == PS_STATE_RUNNING) {
@@ -93,7 +96,36 @@ void PspProcessAlertQueue(void) {
         }
 
         PsAlert *Alert = CONTAINING_RECORD(ListHeader, PsAlert, ListHeader);
-        __atomic_store_n(&Alert->Queued, false, __ATOMIC_RELEASE);
         Alert->Routine(Alert->Context);
+        if (Alert->PoolAllocated) {
+            MmFreePool(Alert, MM_POOL_TAG_THREAD_ALERT);
+        } else {
+            __atomic_store_n(&Alert->Queued, false, __ATOMIC_RELEASE);
+        }
+
+        ObDereferenceObject(Thread);
+    }
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function frees pool-owned alerts discarded by a terminated thread. The caller must run
+ *     at DISPATCH or lower.
+ *
+ * PARAMETERS:
+ *     Thread - Terminated thread whose alert list contains only discarded pool alerts.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+void PspDeletePoolAlerts(PsThread *Thread) {
+    while (Thread->AlertList.Next) {
+        PsAlert *Alert = CONTAINING_RECORD(RtPopSList(&Thread->AlertList), PsAlert, ListHeader);
+        if (!Alert->PoolAllocated) {
+            KeFatalError(KE_PANIC_BAD_THREAD_STATE, (uint64_t)Thread, (uint64_t)Alert, 4, 0);
+        }
+
+        MmFreePool(Alert, MM_POOL_TAG_THREAD_ALERT);
+        ObDereferenceObject(Thread);
     }
 }

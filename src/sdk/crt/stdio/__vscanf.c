@@ -1,4 +1,4 @@
-/* SPDX-FileCopyrightText: (C) 2023-2026 ilmmatias
+/* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <ctype.h>
@@ -256,12 +256,12 @@ int __vscanf(
     int read = 0;
 
     while (*format) {
-        int ch = *(format++);
+        int ch = (int)*(format++);
 
         if (isspace(ch)) {
-            ch = *format;
+            ch = (int)*format;
             while (isspace(ch)) {
-                ch = *(++format);
+                ch = (int)*(++format);
             }
 
             while (true) {
@@ -340,14 +340,17 @@ int __vscanf(
                 format++;
                 mod = MOD_L;
                 break;
+            default:
+                break;
         }
 
         uintmax_t unsigned_value;
         intmax_t signed_value;
         char *str_start;
         char *str;
+        int converted;
 
-        ch = *(format++);
+        ch = (int)*(format++);
 
         /* At last, handle the specifiers. */
         switch (ch) {
@@ -370,9 +373,10 @@ int __vscanf(
                 }
 
                 width = width_set ? width : 1;
+                converted = 0;
                 while (width-- > 0) {
                     int ch = read_ch(context);
-                    if (ch == EOF && str - str_start) {
+                    if (ch == EOF && converted) {
                         break;
                     }
 
@@ -381,9 +385,10 @@ int __vscanf(
                     }
 
                     if (!supress) {
-                        *(str++) = ch;
+                        *(str++) = (char)ch;
                     }
 
+                    converted++;
                     read++;
                 }
 
@@ -408,13 +413,14 @@ int __vscanf(
                 }
 
                 unread_ch(context, ch);
+                converted = 0;
                 while (true) {
                     if (width_set && width-- <= 0) {
                         break;
                     }
 
                     ch = read_ch(context);
-                    if (ch == EOF && str - str_start) {
+                    if (ch == EOF && converted) {
                         break;
                     }
 
@@ -428,9 +434,10 @@ int __vscanf(
                     }
 
                     if (!supress) {
-                        *(str++) = ch;
+                        *(str++) = (char)ch;
                     }
 
+                    converted++;
                     read++;
                 }
 
@@ -456,28 +463,28 @@ int __vscanf(
                 if (!supress) {
                     switch (mod) {
                         case MOD_hh:
-                            *va_arg(vlist, char *) = signed_value;
+                            *va_arg(vlist, char *) = (char)signed_value;
                             break;
                         case MOD_h:
-                            *va_arg(vlist, short *) = signed_value;
+                            *va_arg(vlist, short *) = (short)signed_value;
                             break;
                         case MOD_l:
-                            *va_arg(vlist, long *) = signed_value;
+                            *va_arg(vlist, long *) = (long)signed_value;
                             break;
                         case MOD_ll:
-                            *va_arg(vlist, long long *) = signed_value;
+                            *va_arg(vlist, long long *) = (long long)signed_value;
                             break;
                         case MOD_j:
                             *va_arg(vlist, intmax_t *) = signed_value;
                             break;
                         case MOD_z:
-                            *va_arg(vlist, size_t *) = signed_value;
+                            *va_arg(vlist, size_t *) = (size_t)signed_value;
                             break;
                         case MOD_t:
-                            *va_arg(vlist, ptrdiff_t *) = signed_value;
+                            *va_arg(vlist, ptrdiff_t *) = (ptrdiff_t)signed_value;
                             break;
                         default:
-                            *va_arg(vlist, int *) = signed_value;
+                            *va_arg(vlist, int *) = (int)signed_value;
                             break;
                     }
 
@@ -509,28 +516,28 @@ int __vscanf(
                 if (!supress) {
                     switch (mod) {
                         case MOD_hh:
-                            *va_arg(vlist, unsigned char *) = unsigned_value;
+                            *va_arg(vlist, unsigned char *) = (unsigned char)unsigned_value;
                             break;
                         case MOD_h:
-                            *va_arg(vlist, unsigned short *) = unsigned_value;
+                            *va_arg(vlist, unsigned short *) = (unsigned short)unsigned_value;
                             break;
                         case MOD_l:
-                            *va_arg(vlist, unsigned long *) = unsigned_value;
+                            *va_arg(vlist, unsigned long *) = (unsigned long)unsigned_value;
                             break;
                         case MOD_ll:
-                            *va_arg(vlist, unsigned long long *) = unsigned_value;
+                            *va_arg(vlist, unsigned long long *) = (unsigned long long)unsigned_value;
                             break;
                         case MOD_j:
                             *va_arg(vlist, uintmax_t *) = unsigned_value;
                             break;
                         case MOD_z:
-                            *va_arg(vlist, size_t *) = unsigned_value;
+                            *va_arg(vlist, size_t *) = (size_t)unsigned_value;
                             break;
                         case MOD_t:
-                            *va_arg(vlist, ptrdiff_t *) = unsigned_value;
+                            *va_arg(vlist, ptrdiff_t *) = (ptrdiff_t)unsigned_value;
                             break;
                         default:
-                            *va_arg(vlist, unsigned int *) = unsigned_value;
+                            *va_arg(vlist, unsigned int *) = (unsigned int)unsigned_value;
                             break;
                     }
 

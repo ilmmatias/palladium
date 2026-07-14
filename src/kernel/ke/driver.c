@@ -113,7 +113,7 @@ void KiDumpSymbol(void *Address) {
         break;
     }
 
-    if (ListHeader == &KiModuleListHead) {
+    if (ListHeader == &KiModuleListHead || !Image) {
         VidPrint("0x%016llx - ??\n", Offset);
         KdPrint(KD_TYPE_NONE, KDP_ANSI_FG_RED "0x%016llx - ??" KDP_ANSI_RESET "\n", Offset);
         return;

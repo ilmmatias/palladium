@@ -66,7 +66,9 @@ static void InitializeBootProcessor(KiLoaderBlock *LoaderBlock) {
     MiInitializePool();
     MiInitializePageAllocator();
     KdPrint(
-        KD_TYPE_INFO, "managing %llu MiB of memory\n", MiTotalSystemPages * MM_PAGE_SIZE / 1048576);
+        KD_TYPE_INFO,
+        "managing %llu MiB of memory\n",
+        MiTotalManagedPages * MM_PAGE_SIZE / 1048576);
 
     /* The loader data will become inaccessible once we release/unmap all the remaining OSLOADER
      * regions, so save the required remaining data. After this, the stack trace on KeFatalError

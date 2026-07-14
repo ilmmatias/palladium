@@ -28,6 +28,7 @@ typedef struct {
 
 typedef struct {
     EvHeader Header;
+    RtDList OwnerListHeader;
     uint64_t Recursion;
     uint64_t Contention;
     void *Owner;

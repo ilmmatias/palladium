@@ -201,11 +201,13 @@ static bool CleanFrame(uint64_t VirtualAddress, uint64_t TargetLevel) {
 
         /* If so, free up ourselves in the parent, and keep on going. */
         HalpPageFrame *ParentFrame = &Parent.Base[ParentIndex];
+        uint64_t PhysicalAddress = ParentFrame->Address << MM_PAGE_SHIFT;
 
         if (MiPageList) {
-            MmFreeSinglePage(ParentFrame->Address << MM_PAGE_SHIFT);
-            __atomic_sub_fetch(&MiTotalPtePages, 1, __ATOMIC_RELAXED);
+            MmFreeSinglePage(PhysicalAddress);
         }
+
+        __atomic_sub_fetch(&MiTotalPtePages, 1, __ATOMIC_RELAXED);
 
         ParentFrame->RawData = 0;
         TargetLevel--;
@@ -213,6 +215,43 @@ static bool CleanFrame(uint64_t VirtualAddress, uint64_t TargetLevel) {
     }
 
     return Result;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function rolls back leaf mappings and empty page-table levels while the map lock is
+ *     held.
+ *
+ * PARAMETERS:
+ *     Start - First virtual address changed by the mapping attempt.
+ *     End - Address immediately after the last virtual page which may have changed.
+ *
+ * RETURN VALUE:
+ *     None.
+ *-----------------------------------------------------------------------------------------------*/
+static void RollbackMap(uint64_t Start, uint64_t End) {
+    if (End < Start) {
+        KeFatalError(KE_PANIC_BAD_PFN_HEADER, Start, End, 0, 0);
+    }
+
+    uint64_t Address = Start;
+    while (Address < End) {
+        uint64_t TargetLevel = 0;
+        HalpPageFrame *TargetFrame = NULL;
+        bool Present = GetFrame(Address, &TargetLevel, &TargetFrame);
+        if (Present && TargetLevel == HALP_PT_LEVEL) {
+            TargetFrame->RawData = 0;
+            CleanFrame(Address, TargetLevel);
+        } else if (!Present) {
+            CleanFrame(Address, TargetLevel);
+        }
+
+        if (End - Address <= HALP_PT_SIZE) {
+            break;
+        }
+
+        Address += HALP_PT_SIZE;
+    }
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -312,8 +351,9 @@ bool HalpMapContiguousPages(
     uint64_t Size,
     int Flags) {
     /* Ensure 4KiB alignment on small pages. */
-    if (((uint64_t)VirtualAddress & (HALP_PT_SIZE - 1)) || (PhysicalAddress & (HALP_PT_SIZE - 1)) ||
-        (Size & (HALP_PT_SIZE - 1))) {
+    if (!Size || ((uint64_t)VirtualAddress & (HALP_PT_SIZE - 1)) ||
+        (PhysicalAddress & (HALP_PT_SIZE - 1)) || (Size & (HALP_PT_SIZE - 1)) ||
+        (uint64_t)VirtualAddress > UINT64_MAX - Size || PhysicalAddress > UINT64_MAX - Size) {
         return false;
     }
 
@@ -324,6 +364,7 @@ bool HalpMapContiguousPages(
     /* Fully walk the page table (once, it should be enough for most cases). */
     HalpPageFrame *CurrentFrame = WalkPageTable(Target);
     if (!CurrentFrame) {
+        RollbackMap((uint64_t)VirtualAddress, Target + HALP_PT_SIZE);
         KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
         return false;
     }
@@ -334,16 +375,21 @@ bool HalpMapContiguousPages(
         if (Offset && !(Target & (HALP_PD_SIZE - 1))) {
             CurrentFrame = WalkPageTable(Target);
             if (!CurrentFrame) {
+                RollbackMap((uint64_t)VirtualAddress, Target + HALP_PT_SIZE);
                 KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
                 return false;
             }
         }
 
-        /* Maybe we should return failure on already mapped pages instead? */
-        if (!CurrentFrame->Present) {
-            BuildFrame(CurrentFrame, Source, HALP_PT_LEVEL, Flags);
+        /* Hard fail if you're just randomly trying to replace a mapping (Unmap it first, before
+         * doing Map again). */
+        if (CurrentFrame->Present) {
+            RollbackMap((uint64_t)VirtualAddress, Target);
+            KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
+            return false;
         }
 
+        BuildFrame(CurrentFrame, Source, HALP_PT_LEVEL, Flags);
         Target += HALP_PT_SIZE;
         Source += HALP_PT_SIZE;
         CurrentFrame++;
@@ -376,7 +422,8 @@ bool HalpMapNonContiguousPages(
      * PhysicalAddresses list using the current offset; As such, no comments needed (just take a
      * look at the other function). */
 
-    if (((uint64_t)VirtualAddress & (HALP_PT_SIZE - 1)) || (Size & (HALP_PT_SIZE - 1))) {
+    if (!PhysicalAddresses || !Size || ((uint64_t)VirtualAddress & (HALP_PT_SIZE - 1)) ||
+        (Size & (HALP_PT_SIZE - 1)) || (uint64_t)VirtualAddress > UINT64_MAX - Size) {
         return false;
     }
 
@@ -392,6 +439,7 @@ bool HalpMapNonContiguousPages(
 
     HalpPageFrame *CurrentFrame = WalkPageTable(Target);
     if (!CurrentFrame) {
+        RollbackMap((uint64_t)VirtualAddress, Target + HALP_PT_SIZE);
         KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
         return false;
     }
@@ -400,15 +448,19 @@ bool HalpMapNonContiguousPages(
         if (Offset && !(Target & (HALP_PD_SIZE - 1))) {
             CurrentFrame = WalkPageTable(Target);
             if (!CurrentFrame) {
+                RollbackMap((uint64_t)VirtualAddress, Target + HALP_PT_SIZE);
                 KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
                 return false;
             }
         }
 
-        if (!CurrentFrame->Present) {
-            BuildFrame(CurrentFrame, *Source, HALP_PT_LEVEL, Flags);
+        if (CurrentFrame->Present) {
+            RollbackMap((uint64_t)VirtualAddress, Target);
+            KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
+            return false;
         }
 
+        BuildFrame(CurrentFrame, *Source, HALP_PT_LEVEL, Flags);
         Target += HALP_PT_SIZE;
         Source++;
         CurrentFrame++;

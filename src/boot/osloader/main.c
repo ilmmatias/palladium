@@ -24,7 +24,7 @@
 #include <string.h>
 #include <support.h>
 
-EFI_HANDLE *gIH = NULL;
+EFI_HANDLE gIH = NULL;
 EFI_SYSTEM_TABLE *gST = NULL;
 EFI_BOOT_SERVICES *gBS = NULL;
 EFI_RUNTIME_SERVICES *gRT = NULL;
@@ -41,7 +41,7 @@ EFI_RUNTIME_SERVICES *gRT = NULL;
  * RETURN VALUE:
  *     Does not return.
  *-----------------------------------------------------------------------------------------------*/
-EFI_STATUS OslMain(EFI_HANDLE *ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
+EFI_STATUS OslMain(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
     do {
         /* Save up any required EFI variables (so that we don't need to pass ImageHandle and
          * SystemTable around). */
@@ -215,7 +215,7 @@ EFI_STATUS OslMain(EFI_HANDLE *ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
             KdnetDllInitializer = (void *)KdnetDll->ExportTable[0].Address;
             KdnetDll->EntryPoint = NULL;
             RtAppendDList(&LoadedPrograms, &KdnetDll->ListHeader);
-            gBS->FreePool(Devices);
+            gBS->FreePool((void *)Devices);
         }
 
         /* The boot drivers do need some extra work for both the full path (just like the kernel)
@@ -241,7 +241,7 @@ EFI_STATUS OslMain(EFI_HANDLE *ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
             /* And then follow by making it lowercase (to use as the module name we'll pass to the
              * kernel). */
             for (size_t j = 0; j < ModuleNameLength; j++) {
-                Config.BootDrivers[i][j] = tolower(Config.BootDrivers[i][j]);
+                Config.BootDrivers[i][j] = (char)tolower(Config.BootDrivers[i][j]);
             }
 
             Program = OslLoadExecutable(Config.BootDrivers[i], ModulePath);
@@ -294,7 +294,7 @@ EFI_STATUS OslMain(EFI_HANDLE *ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
         if (!OslpCreateMemoryDescriptors(
                 &LoadedPrograms,
                 FrontBufferPhys,
-                (UINTN)(FramebufferHeight * FramebufferPitch),
+                (UINTN)FramebufferHeight * FramebufferPitch,
                 &MemoryDescriptorListHead,
                 &MemoryDescriptorStack,
                 &MemoryMapSize,
@@ -354,7 +354,7 @@ EFI_STATUS OslMain(EFI_HANDLE *ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
             MemoryDescriptorListHead,
             &MemoryDescriptorStack,
             &LoadedPrograms,
-            (uint64_t)(FramebufferHeight * FramebufferPitch),
+            (uint64_t)FramebufferHeight * FramebufferPitch,
             BackBufferPhys,
             BackBufferVirt,
             FrontBufferPhys,

@@ -18,7 +18,8 @@ RtDList MiMemoryDescriptorListHead;
 MiPageEntry *MiPageList = NULL;
 RtSList MiFreePageListHead;
 KeSpinLock MiPageListLock = {0};
-uint64_t MiTotalSystemPages = 0;
+uint64_t MiTotalManagedPages = 0;
+uint64_t MiTotalUnmanagedPages = 0;
 uint64_t MiTotalReservedPages = 0;
 uint64_t MiTotalCachedPages = 0;
 uint64_t MiTotalUsedPages = 0;
@@ -28,6 +29,30 @@ uint64_t MiTotalGraphicsPages = 0;
 uint64_t MiTotalPtePages = 0;
 uint64_t MiTotalPfnPages = 0;
 uint64_t MiTotalPoolPages = 0;
+static uint64_t MiPageCount = 0;
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function counts the pages in a managed descriptor that overlap the reserved low 64KiB.
+ *
+ * PARAMETERS:
+ *     Entry - Memory descriptor to inspect.
+ *
+ * RETURN VALUE:
+ *     Number of low pages in the descriptor.
+ *-----------------------------------------------------------------------------------------------*/
+static uint64_t GetLowReservedPages(MiMemoryDescriptor *Entry) {
+    if (Entry->BasePage >= 0x10) {
+        return 0;
+    }
+
+    uint64_t EndPage = Entry->BasePage + Entry->PageCount;
+    if (EndPage > 0x10) {
+        EndPage = 0x10;
+    }
+
+    return EndPage - Entry->BasePage;
+}
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -48,13 +73,19 @@ uint64_t MiAllocateEarlyPages(uint32_t Pages) {
     for (RtDList *ListHeader = LoaderDescriptors->Next; ListHeader != LoaderDescriptors;
          ListHeader = ListHeader->Next) {
         MiMemoryDescriptor *Entry = CONTAINING_RECORD(ListHeader, MiMemoryDescriptor, ListHeader);
-        if (Entry->PageCount < Pages || Entry->Type != MI_DESCR_FREE) {
+        if (Entry->Type != MI_DESCR_FREE) {
             continue;
         }
 
-        uint64_t Result = Entry->BasePage << MM_PAGE_SHIFT;
-        Entry->BasePage += Pages;
-        Entry->PageCount -= Pages;
+        uint64_t EndPage = Entry->BasePage + Entry->PageCount;
+        uint64_t BasePage = Entry->BasePage < 0x10 ? 0x10 : Entry->BasePage;
+        if (BasePage > EndPage || Pages > EndPage - BasePage) {
+            continue;
+        }
+
+        uint64_t Result = BasePage << MM_PAGE_SHIFT;
+        Entry->BasePage = BasePage + Pages;
+        Entry->PageCount = EndPage - Entry->BasePage;
         MiTotalUsedPages += Pages;
         MiTotalFreePages -= Pages;
         return Result;
@@ -89,38 +120,50 @@ void MiInitializeEarlyPageAllocator(KiLoaderBlock *LoaderBlock) {
                 (void *)(Entry->BasePage << MM_PAGE_SHIFT), Entry->PageCount << MM_PAGE_SHIFT);
         }
 
-        /* We need to make sure we won't use the low 64KiB; They are reserved if the kernel needs
-         * any low memory (for initializing SMP or anything else like that). */
-        if (Entry->BasePage < 0x10) {
-            uint64_t Pages = 0x10 - Entry->BasePage;
-            if (Entry->PageCount < Pages) {
-                Pages = Entry->PageCount;
-            }
-
-            MiTotalReservedPages += Pages;
-            Entry->PageCount -= Pages;
-            Entry->BasePage = 0x10;
+        if (Entry->Type == MI_DESCR_SYSTEM_RESERVED) {
+            MiTotalUnmanagedPages += Entry->PageCount;
+            continue;
         }
 
-        /* Otherwise, just update the global page stats using the data we from this region. */
-        if (Entry->Type >= MI_DESCR_FIRMWARE_PERMANENT) {
-            MiTotalReservedPages += Entry->PageCount;
-        } else if (Entry->Type == MI_DESCR_GRAPHICS_BUFFER) {
-            MiTotalGraphicsPages += Entry->PageCount;
-            MiTotalUsedPages += Entry->PageCount;
-        } else if (Entry->Type == MI_DESCR_PAGE_MAP) {
-            MiTotalPtePages += Entry->PageCount;
-            MiTotalUsedPages += Entry->PageCount;
-        } else if (Entry->Type == MI_DESCR_LOADED_PROGRAM) {
-            MiTotalBootPages += Entry->PageCount;
-            MiTotalUsedPages += Entry->PageCount;
-        } else {
-            MiTotalFreePages += Entry->PageCount;
+        /* We just need to remember to make sure we won't use the low 64KiB; They are reserved if
+         * the kernel needs any low memory (for initializing SMP or anything else like that). */
+        uint64_t LowPages = GetLowReservedPages(Entry);
+        uint64_t RemainingPages = Entry->PageCount - LowPages;
+        MiTotalManagedPages += Entry->PageCount;
+        MiTotalReservedPages += LowPages;
+
+        switch (Entry->Type) {
+            case MI_DESCR_FREE:
+            case MI_DESCR_FIRMWARE_TEMPORARY:
+                MiTotalFreePages += RemainingPages;
+                break;
+            case MI_DESCR_PAGE_MAP:
+                MiTotalPtePages += RemainingPages;
+                MiTotalUsedPages += RemainingPages;
+                break;
+            case MI_DESCR_LOADED_PROGRAM:
+                MiTotalBootPages += RemainingPages;
+                MiTotalUsedPages += RemainingPages;
+                break;
+            case MI_DESCR_GRAPHICS_BUFFER:
+                MiTotalGraphicsPages += RemainingPages;
+                MiTotalUsedPages += RemainingPages;
+                break;
+            case MI_DESCR_OSLOADER_TEMPORARY:
+                MiTotalUsedPages += RemainingPages;
+                break;
+            case MI_DESCR_FIRMWARE_PERMANENT:
+                MiTotalReservedPages += RemainingPages;
+                break;
+            default:
+                KeFatalError(
+                    KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+                    KE_PANIC_PARAMETER_PFN_INITIALIZATION_FAILURE,
+                    Entry->Type,
+                    Entry->BasePage,
+                    Entry->PageCount);
         }
     }
-
-    /* Now calculate the total amount of pages the system has. */
-    MiTotalSystemPages = MiTotalReservedPages + MiTotalUsedPages + MiTotalFreePages;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -148,13 +191,34 @@ void MiInitializePageAllocator(void) {
         MemoryDescriptorListSize += sizeof(MiMemoryDescriptor);
 
         if (Entry->Type <= MI_DESCR_FIRMWARE_PERMANENT) {
-            MaxAddressablePage = Entry->BasePage + Entry->PageCount;
+            uint64_t EndPage = Entry->BasePage + Entry->PageCount;
+            if (EndPage > MaxAddressablePage) {
+                MaxAddressablePage = EndPage;
+            }
         }
     }
 
     /* Grab some physical memory and map it for the PFN database. This should be the last place we
      * need EarlyAllocatePages. */
+    if (!MaxAddressablePage || MaxAddressablePage > UINT64_MAX / sizeof(MiPageEntry)) {
+        KeFatalError(
+            KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+            KE_PANIC_PARAMETER_PFN_INITIALIZATION_FAILURE,
+            2,
+            MaxAddressablePage,
+            0);
+    }
+
     uint64_t Size = MaxAddressablePage * sizeof(MiPageEntry);
+    if (Size > UINT64_MAX - (MM_PAGE_SIZE - 1)) {
+        KeFatalError(
+            KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+            KE_PANIC_PARAMETER_PFN_INITIALIZATION_FAILURE,
+            3,
+            Size,
+            0);
+    }
+
     uint64_t Pages = (Size + MM_PAGE_SIZE - 1) >> MM_PAGE_SHIFT;
     uint64_t PhysicalAddress = MiAllocateEarlyPages(Pages);
     if (!PhysicalAddress) {
@@ -177,9 +241,15 @@ void MiInitializePageAllocator(void) {
     }
 
     MiPageList = (void *)MI_PFN_START;
+    MiPageCount = MaxAddressablePage;
     MiTotalPfnPages = Pages;
 
     /* Setup the page allocator (marking the free pages as free). */
+    memset(MiPageList, 0, Size);
+    for (uint64_t Page = 0; Page < MaxAddressablePage; Page++) {
+        MiPageList[Page].Used = 1;
+    }
+
     for (RtDList *ListHeader = LoaderDescriptors->Next; ListHeader != LoaderDescriptors;
          ListHeader = ListHeader->Next) {
         MiMemoryDescriptor *Entry = CONTAINING_RECORD(ListHeader, MiMemoryDescriptor, ListHeader);
@@ -187,21 +257,15 @@ void MiInitializePageAllocator(void) {
             continue;
         }
 
-        MiPageEntry *Group = &MiPageList[Entry->BasePage];
-
         if (Entry->Type != MI_DESCR_FREE && Entry->Type != MI_DESCR_FIRMWARE_TEMPORARY) {
-            for (uint32_t i = 0; i < Entry->PageCount; i++) {
-                Group[i].Used = 1;
-                Group[i].PoolItem = 0;
-                Group[i].PoolBase = 0;
-            }
-        } else {
-            for (uint32_t i = 0; i < Entry->PageCount; i++) {
-                Group[i].Used = 0;
-                Group[i].PoolItem = 0;
-                Group[i].PoolBase = 0;
-                RtPushSList(&MiFreePageListHead, &Group[i].ListHeader);
-            }
+            continue;
+        }
+
+        uint64_t StartPage = Entry->BasePage < 0x10 ? 0x10 : Entry->BasePage;
+        uint64_t EndPage = Entry->BasePage + Entry->PageCount;
+        for (uint64_t Page = StartPage; Page < EndPage; Page++) {
+            MiPageList[Page].Used = 0;
+            RtPushSList(&MiFreePageListHead, &MiPageList[Page].ListHeader);
         }
     }
 
@@ -255,13 +319,22 @@ void MiReleaseBootRegions(void) {
             continue;
         }
 
-        MiPageEntry *Group = &MiPageList[Entry->BasePage];
-        for (uint64_t i = 0; i < (uint64_t)Entry->PageCount; i++) {
-            Group[i].Used = 0;
-            Group[i].PoolItem = 0;
-            Group[i].PoolBase = 0;
-            RtPushSList(&MiFreePageListHead, &Group[i].ListHeader);
+        uint64_t StartPage = Entry->BasePage < 0x10 ? 0x10 : Entry->BasePage;
+        uint64_t EndPage = Entry->BasePage + Entry->PageCount;
+        for (uint64_t Page = StartPage; Page < EndPage; Page++) {
+            MiPageEntry *PageEntry = &MiPageList[Page];
+            if (!PageEntry->Used || PageEntry->PoolItem || PageEntry->PoolBase) {
+                KeFatalError(
+                    KE_PANIC_BAD_PFN_HEADER, Page << MM_PAGE_SHIFT, PageEntry->Flags, 0, 0);
+            }
+
+            PageEntry->Used = 0;
+            RtPushSList(&MiFreePageListHead, &PageEntry->ListHeader);
         }
+
+        uint64_t ReleasedPages = EndPage - StartPage;
+        MiTotalUsedPages -= ReleasedPages;
+        MiTotalFreePages += ReleasedPages;
 
         HalpUnmapPages(
             (void *)(Entry->BasePage << MM_PAGE_SHIFT), Entry->PageCount << MM_PAGE_SHIFT);

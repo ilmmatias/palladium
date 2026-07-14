@@ -5,6 +5,7 @@
 #define _LOADER_H_
 
 #include <rt/list.h>
+#include <stdint.h>
 
 typedef struct {
     const char *Name;

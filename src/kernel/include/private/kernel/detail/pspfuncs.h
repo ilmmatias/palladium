@@ -39,6 +39,7 @@ void PspSwitchThreads(
 RtAvlCompareResult PspCompareWaitThreads(RtAvlNode *FirstStruct, RtAvlNode *SecondStruct);
 
 void PspProcessAlertQueue(void);
+void PspDeletePoolAlerts(PsThread *Thread);
 
 #ifdef __cplusplus
 }

@@ -66,7 +66,7 @@ bool OslFindFile(const char *Path) {
     CHAR16 Path16[strlen(Path) + 1];
     Path16[PathSize] = 0;
     for (size_t i = 0; i < PathSize; i++) {
-        Path16[i] = Path[i];
+        Path16[i] = (CHAR16)Path[i];
     }
 
     EFI_FILE_HANDLE Handle = NULL;
@@ -103,7 +103,7 @@ void *OslReadFile(const char *Path, uint64_t *Size) {
     CHAR16 Path16[strlen(Path) + 1];
     Path16[PathSize] = 0;
     for (size_t i = 0; i < PathSize; i++) {
-        Path16[i] = Path[i];
+        Path16[i] = (CHAR16)Path[i];
     }
 
     EFI_FILE_HANDLE Handle = NULL;
@@ -137,7 +137,7 @@ void *OslReadFile(const char *Path, uint64_t *Size) {
         }
     }
 
-    if (Status != EFI_SUCCESS) {
+    if (Status != EFI_SUCCESS || !FileInfo || FileInfoSize < sizeof(EFI_FILE_INFO)) {
         if (FileInfo) {
             gBS->FreePool(FileInfo);
         }

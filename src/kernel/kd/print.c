@@ -93,8 +93,9 @@ void KdPrintVariadic(int Type, const char *Message, va_list Arguments) {
     }
 
     /* Lock any other processors from messing with our buffer while we do it. */
-    KeIrql OldIrql;
-    if (UseLock) {
+    bool Locked = UseLock;
+    KeIrql OldIrql = 0;
+    if (Locked) {
         OldIrql = KeAcquireSpinLockAndRaiseIrql(&Lock, KE_IRQL_DISPATCH);
     }
 
@@ -148,12 +149,21 @@ void KdPrintVariadic(int Type, const char *Message, va_list Arguments) {
 
     int Offset = sizeof(KdpDebugPacket);
     if (ColorPrefix && Prefix) {
-        Offset += snprintf(
+        int PrefixSize = snprintf(
             Buffer + Offset, sizeof(Buffer) - Offset, "%s%s" KDP_ANSI_RESET, ColorPrefix, Prefix);
+        if (PrefixSize > 0) {
+            int Available = (int)(sizeof(Buffer) - Offset);
+            Offset += PrefixSize < Available ? PrefixSize : Available - 1;
+        }
     }
 
     /* And the main message on gray-white foreground + black background. */
-    int Size = vsnprintf(Buffer + Offset, sizeof(Buffer) - Offset, Message, Arguments);
+    int FormattedSize = vsnprintf(Buffer + Offset, sizeof(Buffer) - Offset, Message, Arguments);
+    int Size = 0;
+    if (FormattedSize > 0) {
+        int Available = (int)(sizeof(Buffer) - Offset);
+        Size = FormattedSize < Available ? FormattedSize : Available - 1;
+    }
 
     if (KdpDebugEchoEnabled) {
         /* The start of the buffer contains the header + color prefix for the debugger, but our
@@ -188,7 +198,7 @@ void KdPrintVariadic(int Type, const char *Message, va_list Arguments) {
             Offset + Size);
     }
 
-    if (UseLock) {
+    if (Locked) {
         KeReleaseSpinLockAndLowerIrql(&Lock, OldIrql);
     }
 }

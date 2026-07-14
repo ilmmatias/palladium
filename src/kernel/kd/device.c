@@ -34,6 +34,10 @@ static size_t InitializeBar(
     uint32_t Function,
     size_t BarIndex,
     HalPciHeader *PciHeader) {
+    if (BarIndex >= 6) {
+        return 1;
+    }
+
     /* All zeroes means this BAR isn't valid (and we can ignore it). */
     KdpDebugDeviceAddress *BaseAddress = &KdpDebugDevice.BaseAddress[BarIndex];
     uint32_t BarOffset = offsetof(HalPciHeader, Type0.BarAddress[BarIndex]);
@@ -55,6 +59,11 @@ static size_t InitializeBar(
         BaseAddress->Type = KDP_RESOURCE_MEMORY;
         Address = BarAddress & ~0x0F;
         if ((BarAddress & 0x06) == 0x04) {
+            if (BarIndex + 1 >= 6) {
+                BaseAddress->Valid = false;
+                return 1;
+            }
+
             BaseAddress->BitWidth = 64;
             Address |= (uint64_t)PciHeader->Type0.BarAddress[BarIndex + 1] << 32;
             BarSize++;

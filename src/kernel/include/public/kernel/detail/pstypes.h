@@ -24,6 +24,7 @@ typedef struct PsThread {
         bool Signaled;
     } EventHeader;
     RtDList ListHeader;
+    RtDList OwnedMutexList;
     RtDList WaitListHeader;
     RtAvlNode WaitTreeNode;
     KeSpinLock AlertLock;
@@ -33,6 +34,9 @@ typedef struct PsThread {
     uint64_t ExpirationTicks;
     uint64_t WaitTicks;
     void *WaitObject;
+    uint8_t WaitCompletion;
+    bool WaitListLinked;
+    bool WaitTreeLinked;
     void *Processor;
     char *Stack;
     char *StackLimit;

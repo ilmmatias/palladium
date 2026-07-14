@@ -21,7 +21,8 @@ extern "C" {
 #endif /* __cplusplus */
 
 extern MiPageEntry *MiPageList;
-extern uint64_t MiTotalSystemPages;
+extern uint64_t MiTotalManagedPages;
+extern uint64_t MiTotalUnmanagedPages;
 extern uint64_t MiTotalReservedPages;
 extern uint64_t MiTotalCachedPages;
 extern uint64_t MiTotalUsedPages;

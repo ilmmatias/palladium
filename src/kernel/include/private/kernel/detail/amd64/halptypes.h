@@ -7,6 +7,7 @@
 #define _KERNEL_DETAIL_AMD64_HALPTYPES_H_
 
 #include <rt/list.h>
+#include <stdint.h>
 
 typedef union {
     struct __attribute__((packed)) {

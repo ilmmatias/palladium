@@ -12,6 +12,38 @@
 #include <stdint.h>
 #include <string.h>
 
+static KeSpinLock TreeLock = {0};
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function checks whether inserting a directory below another directory would create an
+ *     ancestor cycle. The directory tree lock must already be held.
+ *
+ * PARAMETERS:
+ *     Ancestor - Directory proposed as the child object.
+ *     Directory - Proposed parent directory.
+ *
+ * RETURN VALUE:
+ *     true if Ancestor is Directory or already appears above it in the directory tree.
+ *-----------------------------------------------------------------------------------------------*/
+static bool IsAncestorDirectory(ObDirectory *Ancestor, ObDirectory *Directory) {
+    ObDirectory *Current = Directory;
+    while (Current) {
+        if (Current == Ancestor) {
+            return true;
+        }
+
+        if (Current == &ObRootDirectory) {
+            break;
+        }
+
+        ObpObject *CurrentHeader = (ObpObject *)Current - 1;
+        Current = CurrentHeader->Parent ? CurrentHeader->Parent->Parent : NULL;
+    }
+
+    return false;
+}
+
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
  *     This function cleans up a directory object after all references to it have been removed.
@@ -24,32 +56,41 @@
  *-----------------------------------------------------------------------------------------------*/
 static void DeleteRoutine(void *Object) {
     ObDirectory *Directory = Object;
-    KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Directory->Lock, KE_IRQL_DISPATCH);
+    RtDList DetachedEntries;
+    RtInitializeDList(&DetachedEntries);
+
+    KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&TreeLock, KE_IRQL_DISPATCH);
+    KeAcquireSpinLockAtCurrentIrql(&Directory->Lock);
 
     for (size_t Head = 0; Head < 32; Head++) {
         while (Directory->HashHeads[Head].Next != &Directory->HashHeads[Head]) {
             RtDList *ListHeader = RtPopDList(&Directory->HashHeads[Head]);
             ObpDirectoryEntry *Entry = CONTAINING_RECORD(ListHeader, ObpDirectoryEntry, HashHeader);
-
-            /* Take caution if someone is deleting a directory an object is contained at the same
-             * time someone else is trying to unlink said object. */
             ObpObject *ObjectHeader = (ObpObject *)Entry->Object - 1;
-            ObpDirectoryEntry *ExpectedParent = Entry;
-            if (__atomic_compare_exchange_n(
-                    &ObjectHeader->Parent,
-                    &ExpectedParent,
-                    NULL,
-                    0,
-                    __ATOMIC_RELEASE,
-                    __ATOMIC_ACQUIRE)) {
-                ObDereferenceObject(Entry->Object);
-                MmFreePool(Entry->Name, MM_POOL_TAG_OBJECT);
-                MmFreePool(Entry, MM_POOL_TAG_OBJECT);
+            if (ObjectHeader->Parent != Entry) {
+                KeFatalError(
+                    KE_PANIC_BAD_OBJECT_REFERENCE_COUNT,
+                    (uint64_t)Entry->Object,
+                    (uint64_t)ObjectHeader->Parent,
+                    (uint64_t)Entry,
+                    2);
             }
+
+            ObjectHeader->Parent = NULL;
+            RtAppendDList(&DetachedEntries, &Entry->HashHeader);
         }
     }
 
-    KeReleaseSpinLockAndLowerIrql(&Directory->Lock, OldIrql);
+    KeReleaseSpinLockAtCurrentIrql(&Directory->Lock);
+    KeReleaseSpinLockAndLowerIrql(&TreeLock, OldIrql);
+
+    while (DetachedEntries.Next != &DetachedEntries) {
+        ObpDirectoryEntry *Entry =
+            CONTAINING_RECORD(RtPopDList(&DetachedEntries), ObpDirectoryEntry, HashHeader);
+        ObDereferenceObject(Entry->Object);
+        MmFreePool(Entry->Name, MM_POOL_TAG_OBJECT);
+        MmFreePool(Entry, MM_POOL_TAG_OBJECT);
+    }
 }
 
 ObType ObpDirectoryType = {
@@ -111,19 +152,18 @@ ObDirectory *ObCreateDirectory(void) {
  *     true if the insertion was successful, false otherwise.
  *-----------------------------------------------------------------------------------------------*/
 bool ObInsertIntoDirectory(ObDirectory *Directory, const char *Name, void *Object) {
-    /* Don't even bother with anything if this object is already linked to something else. */
     ObpObject *ObjectHeader = (ObpObject *)Object - 1;
-    if (ObjectHeader->Parent) {
-        return false;
-    }
-
-    /* Otherwise, allocate all memory we need for the dir entry+its name. */
     ObpDirectoryEntry *Entry = MmAllocatePool(sizeof(ObpDirectoryEntry), MM_POOL_TAG_OBJECT);
     if (!Entry) {
         return false;
     }
 
     size_t NameSize = strlen(Name);
+    if (NameSize == (size_t)-1) {
+        MmFreePool(Entry, MM_POOL_TAG_OBJECT);
+        return false;
+    }
+
     Entry->Name = MmAllocatePool(NameSize + 1, MM_POOL_TAG_OBJECT);
     if (!Entry->Name) {
         MmFreePool(Entry, MM_POOL_TAG_OBJECT);
@@ -137,25 +177,41 @@ bool ObInsertIntoDirectory(ObDirectory *Directory, const char *Name, void *Objec
     Entry->Name[NameSize] = 0;
     RtInitializeDList(&Entry->HashHeader);
 
-    /* And block anyone from accidentally competing with us. */
-    ObReferenceObject(Object);
+    /* Let's try locking up the head we need so that no one competes with us... */
+    uint32_t Hash = RtGetHash(Name, NameSize);
+    RtDList *Bucket = &Directory->HashHeads[Hash & 0x1F];
+    bool Inserted = false;
+    KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&TreeLock, KE_IRQL_DISPATCH);
+    KeAcquireSpinLockAtCurrentIrql(&Directory->Lock);
 
-    /* Hopefully this will succeed, otherwise, free up everything and bail out. */
-    ObpDirectoryEntry *ExpectedParent = NULL;
-    if (!__atomic_compare_exchange_n(
-            &ObjectHeader->Parent, &ExpectedParent, Entry, 0, __ATOMIC_RELEASE, __ATOMIC_ACQUIRE)) {
-        ObDereferenceObject(Object);
-        MmFreePool(Entry->Name, MM_POOL_TAG_OBJECT);
-        MmFreePool(Entry, MM_POOL_TAG_OBJECT);
-        return false;
+    /* Then validate sanity (no duplicates + no cycles), and we can insert. */
+    bool Duplicate = false;
+    for (RtDList *ListHeader = Bucket->Next; ListHeader != Bucket; ListHeader = ListHeader->Next) {
+        ObpDirectoryEntry *OtherEntry =
+            CONTAINING_RECORD(ListHeader, ObpDirectoryEntry, HashHeader);
+        if (!strcmp(OtherEntry->Name, Name)) {
+            Duplicate = true;
+            break;
+        }
     }
 
-    /* And append to the directory. With this, we should be done. */
-    uint32_t Hash = RtGetHash(Name, NameSize);
-    KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Directory->Lock, KE_IRQL_DISPATCH);
-    RtAppendDList(&Directory->HashHeads[Hash & 0x1F], &Entry->HashHeader);
-    KeReleaseSpinLockAndLowerIrql(&Directory->Lock, OldIrql);
-    return true;
+    bool Cycle = ObjectHeader->Type == &ObpDirectoryType &&
+                 IsAncestorDirectory((ObDirectory *)Object, Directory);
+    if (!ObjectHeader->Parent && !Duplicate && !Cycle) {
+        ObReferenceObject(Object);
+        ObjectHeader->Parent = Entry;
+        RtAppendDList(Bucket, &Entry->HashHeader);
+        Inserted = true;
+    }
+
+    KeReleaseSpinLockAtCurrentIrql(&Directory->Lock);
+    KeReleaseSpinLockAndLowerIrql(&TreeLock, OldIrql);
+    if (!Inserted) {
+        MmFreePool(Entry->Name, MM_POOL_TAG_OBJECT);
+        MmFreePool(Entry, MM_POOL_TAG_OBJECT);
+    }
+
+    return Inserted;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -163,35 +219,37 @@ bool ObInsertIntoDirectory(ObDirectory *Directory, const char *Name, void *Objec
  *     This function removes the specified object from its current directory.
  *
  * PARAMETERS:
- *     Object - Which object to be removed from its parent.
+ *     Directory - Referenced parent directory.
+ *     Object - Referenced object to remove from Directory.
  *
  * RETURN VALUE:
- *     None.
+ *     true if the object was removed, false if it was not a member of Directory.
  *-----------------------------------------------------------------------------------------------*/
-void ObRemoveFromDirectory(void *Object) {
+bool ObRemoveFromDirectory(ObDirectory *Directory, void *Object) {
     ObpObject *ObjectHeader = (ObpObject *)Object - 1;
     ObpDirectoryEntry *DirectoryEntry = ObjectHeader->Parent;
+
+    /* Just make sure we're not freeing any object that isn't properly part of the specified
+     * directory. */
+    KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&TreeLock, KE_IRQL_DISPATCH);
+    KeAcquireSpinLockAtCurrentIrql(&Directory->Lock);
+    if (ObjectHeader->Parent && ObjectHeader->Parent->Parent == Directory) {
+        DirectoryEntry = ObjectHeader->Parent;
+        ObjectHeader->Parent = NULL;
+        RtUnlinkDList(&DirectoryEntry->HashHeader);
+    }
+
+    KeReleaseSpinLockAtCurrentIrql(&Directory->Lock);
+    KeReleaseSpinLockAndLowerIrql(&TreeLock, OldIrql);
     if (!DirectoryEntry) {
-        return;
+        return false;
     }
-
-    /* As long as we do an interlocked xchg, this should work... */
-    ObpDirectoryEntry *ExpectedParent = DirectoryEntry;
-    if (!__atomic_compare_exchange_n(
-            &ObjectHeader->Parent, &ExpectedParent, NULL, 0, __ATOMIC_RELEASE, __ATOMIC_ACQUIRE)) {
-        return;
-    }
-
-    /* Lock the parent and unlink from it. */
-    ObDirectory *Directory = DirectoryEntry->Parent;
-    KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Directory->Lock, KE_IRQL_DISPATCH);
-    RtUnlinkDList(&DirectoryEntry->HashHeader);
-    KeReleaseSpinLockAndLowerIrql(&Directory->Lock, OldIrql);
 
     /* Now just cleanup everything before returning. */
     ObDereferenceObject(DirectoryEntry->Object);
     MmFreePool(DirectoryEntry->Name, MM_POOL_TAG_OBJECT);
     MmFreePool(DirectoryEntry, MM_POOL_TAG_OBJECT);
+    return true;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -214,6 +272,7 @@ void *ObLookupDirectoryEntryByName(ObDirectory *Directory, const char *Name) {
     for (RtDList *ListHeader = Bucket->Next; ListHeader != Bucket; ListHeader = ListHeader->Next) {
         ObpDirectoryEntry *Entry = CONTAINING_RECORD(ListHeader, ObpDirectoryEntry, HashHeader);
         if (!strcmp(Entry->Name, Name)) {
+            ObReferenceObject(Entry->Object);
             KeReleaseSpinLockAndLowerIrql(&Directory->Lock, OldIrql);
             return Entry->Object;
         }
@@ -231,13 +290,29 @@ void *ObLookupDirectoryEntryByName(ObDirectory *Directory, const char *Name) {
  * PARAMETERS:
  *     Directory - Target directory for the search.
  *     Index - Which index to look for.
- *     Name - A pointer to store the name of the entry into, or NULL if the name shouldn't
- *            be saved.
+ *     Name - Caller-supplied name buffer (NULL if you don't want to save the name).
+ *     NameSize - Size of Name in bytes.
+ *     NameCapacity - Where to return the required name size (when we don't have enough space in
+ *                    NameSize).
  *
  * RETURN VALUE:
- *     Either a pointer to the object if found, or NULL otherwise.
+ *     Either a pointer to the object if found, or NULL on failure.
  *-----------------------------------------------------------------------------------------------*/
-void *ObLookupDirectoryEntryByIndex(ObDirectory *Directory, size_t Index, char **Name) {
+void *ObLookupDirectoryEntryByIndex(
+    ObDirectory *Directory,
+    size_t Index,
+    char *Name,
+    size_t NameSize,
+    size_t *NameCapacity) {
+    /* Don't even bother if we can't write the NameCapacity (when the Name was requested). */
+    if (Name && !NameCapacity) {
+        return NULL;
+    }
+
+    if (NameCapacity) {
+        *NameCapacity = 0;
+    }
+
     KeIrql OldIrql = KeAcquireSpinLockAndRaiseIrql(&Directory->Lock, KE_IRQL_DISPATCH);
 
     /* Here we don't know which bucket the index is gonna fall, so we gotta iterate
@@ -252,11 +327,19 @@ void *ObLookupDirectoryEntryByIndex(ObDirectory *Directory, size_t Index, char *
                 continue;
             }
 
-            /* Only save the name if we were requested to do so. */
+            /* Make sure we return the proper combo (NULL alongside *NameCapacity != 0) if we found it but don't have enough space to save the name. */
             if (Name) {
-                *Name = Entry->Name;
+                size_t EntryNameSize = strlen(Entry->Name) + 1;
+                *NameCapacity = EntryNameSize;
+                if (NameSize < EntryNameSize) {
+                    KeReleaseSpinLockAndLowerIrql(&Directory->Lock, OldIrql);
+                    return NULL;
+                }
+
+                memcpy(Name, Entry->Name, EntryNameSize);
             }
 
+            ObReferenceObject(Entry->Object);
             KeReleaseSpinLockAndLowerIrql(&Directory->Lock, OldIrql);
             return Entry->Object;
         }

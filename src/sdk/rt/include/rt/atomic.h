@@ -5,6 +5,7 @@
 #define _RT_ATOMIC_H_
 
 #include <rt/list.h>
+#include <stdint.h>
 
 #if UINTPTR_MAX == UINT64_MAX
 typedef struct __attribute__((aligned(16))) RtAtomicSList {

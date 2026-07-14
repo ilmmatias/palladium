@@ -2393,7 +2393,7 @@ typedef struct {
 //
 // Pointers to the EFI services.
 //
-extern EFI_HANDLE              *gIH;
+extern EFI_HANDLE               gIH;
 extern EFI_SYSTEM_TABLE        *gST;
 extern EFI_BOOT_SERVICES       *gBS;
 extern EFI_RUNTIME_SERVICES    *gRT;

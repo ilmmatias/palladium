@@ -6,6 +6,7 @@
 
 #include <efi/spec.h>
 #include <rt/list.h>
+#include <stdint.h>
 
 #if defined(ARCH_amd64)
 #define VIRTUAL_BASE 0xFFFF900000000000

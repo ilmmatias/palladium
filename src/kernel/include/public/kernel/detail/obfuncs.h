@@ -26,9 +26,14 @@ void ObDereferenceObject(void *Body);
 
 ObDirectory *ObCreateDirectory(void);
 bool ObInsertIntoDirectory(ObDirectory *Directory, const char *Name, void *Object);
-void ObRemoveFromDirectory(void *Object);
+bool ObRemoveFromDirectory(ObDirectory *Directory, void *Object);
 void *ObLookupDirectoryEntryByName(ObDirectory *Directory, const char *Name);
-void *ObLookupDirectoryEntryByIndex(ObDirectory *Directory, size_t Index, char **Name);
+void *ObLookupDirectoryEntryByIndex(
+    ObDirectory *Directory,
+    size_t Index,
+    char *Name,
+    size_t NameSize,
+    size_t *NameCapacity);
 
 #ifdef __cplusplus
 }

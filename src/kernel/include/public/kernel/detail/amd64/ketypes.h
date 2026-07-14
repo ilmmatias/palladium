@@ -6,6 +6,8 @@
 #ifndef _KERNEL_DETAIL_AMD64_KETYPES_H_
 #define _KERNEL_DETAIL_AMD64_KETYPES_H_
 
+#include <stdint.h>
+
 /* We need to define these beforehand (because pstypes.h uses them). */
 typedef uint64_t KeIrql;
 typedef volatile uint64_t KeSpinLock;

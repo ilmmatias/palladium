@@ -19,6 +19,7 @@ extern "C" {
 #endif /* __cplusplus */
 
 PsThread *PsCreateThread(uint64_t Flags, void (*EntryPoint)(void *), void *Parameter);
+bool PsResumeThread(PsThread *Thread);
 [[noreturn]] void PsTerminateThread(void);
 void PsYieldThread(void);
 void PsDelayThread(uint64_t Time);
