@@ -12,7 +12,7 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
 
     steps:
     - name: Install basic packages
@@ -23,18 +23,18 @@ jobs:
     - name: Install LLVM
       run: |
         wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
-        sudo add-apt-repository -y "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-21 main"
-        sudo apt-get install -y clang-21 lld-21 llvm-21 libclang-21-dev
+        sudo add-apt-repository -y "deb http://apt.llvm.org/resolute/ llvm-toolchain-resolute-22 main"
+        sudo apt-get install -y clang-22 lld-22 llvm-22 libclang-22-dev
 
     - name: Checkout llvm-project
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         repository: llvm/llvm-project
-        ref: llvmorg-21.1.0
+        ref: llvmorg-22.1.0
         path: llvm-project
 
     - name: Checkout palladium
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         path: palladium
 
@@ -43,7 +43,7 @@ jobs:
         PALLADIUM_PATH=${{github.workspace}}/palladium \
         COMPILER_RT_PATH=${{github.workspace}}/llvm-project/compiler-rt \
         COMPILER_RT_TARGET=x86_64 \
-        LLVM_SUFFIX=-21 \
+        LLVM_SUFFIX=-22 \
         palladium/build-compiler-rt.sh
 
     - name: Configure Target
@@ -54,7 +54,7 @@ jobs:
           -G Ninja \
           -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
           -DARCH=amd64 \
-          -DLLVM_SUFFIX=-21
+          -DLLVM_SUFFIX=-22
 
     - name: Build Target
       run: cmake --build build.target --config ${{env.BUILD_TYPE}}
