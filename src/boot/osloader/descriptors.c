@@ -1,4 +1,4 @@
-/* SPDX-FileCopyrightText: (C) 2025 ilmmatias
+/* SPDX-FileCopyrightText: (C) 2025-2026 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <console.h>
@@ -335,8 +335,8 @@ bool OslpUpdateMemoryDescriptors(
             if (Entry->BasePage + Entry->PageCount == BasePage) {
                 Entry->PageCount += PageCount;
                 break;
-            } 
-            
+            }
+
             if (BasePage + PageCount == Entry->BasePage) {
                 Entry->BasePage = BasePage;
                 Entry->PageCount += PageCount;

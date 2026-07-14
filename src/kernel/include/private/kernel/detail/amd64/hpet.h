@@ -1,4 +1,4 @@
-/* SPDX-FileCopyrightText: (C) 2023-2025 ilmmatias
+/* SPDX-FileCopyrightText: (C) 2023-2026 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #ifndef _KERNEL_DETAIL_AMD64_HPET_H_
