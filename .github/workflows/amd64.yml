@@ -2,35 +2,40 @@ name: amd64 (Release)
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
   workflow_dispatch:
 
 env:
   BUILD_TYPE: Release
+  LLVM_VERSION: 22
 
 jobs:
   build:
     runs-on: ubuntu-26.04
 
     steps:
-    - name: Install basic packages
+    - name: Install build dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential cmake lld ninja-build mkisofs mtools
-
-    - name: Install LLVM
-      run: |
-        wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
-        sudo add-apt-repository -y "deb http://apt.llvm.org/resolute/ llvm-toolchain-resolute-22 main"
-        sudo apt-get install -y clang-22 lld-22 llvm-22 libclang-22-dev
+        sudo apt-get install -y \
+          build-essential \
+          clang-${{ env.LLVM_VERSION }} \
+          cmake \
+          genisoimage \
+          libclang-${{ env.LLVM_VERSION }}-dev \
+          lld \
+          lld-${{ env.LLVM_VERSION }} \
+          llvm-${{ env.LLVM_VERSION }} \
+          mtools \
+          ninja-build
 
     - name: Checkout llvm-project
       uses: actions/checkout@v4
       with:
         repository: llvm/llvm-project
-        ref: llvmorg-22.1.0
+        ref: release/${{ env.LLVM_VERSION }}.x
         path: llvm-project
 
     - name: Checkout palladium
@@ -38,15 +43,15 @@ jobs:
       with:
         path: palladium
 
-    - name: Configure, build, and install compiler-rt for Target
+    - name: Build and install compiler-rt
       run: |
         PALLADIUM_PATH=${{github.workspace}}/palladium \
         COMPILER_RT_PATH=${{github.workspace}}/llvm-project/compiler-rt \
         COMPILER_RT_TARGET=x86_64 \
-        LLVM_SUFFIX=-22 \
-        palladium/build-compiler-rt.sh
+        LLVM_SUFFIX=-${{ env.LLVM_VERSION }} \
+        palladium/tools/build-compiler-rt.sh
 
-    - name: Configure Target
+    - name: Configure palladium
       run: |
         cmake \
           -S palladium/src \
@@ -54,37 +59,22 @@ jobs:
           -G Ninja \
           -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
           -DARCH=amd64 \
-          -DLLVM_SUFFIX=-22
+          -DLLVM_SUFFIX=-${{ env.LLVM_VERSION }}
 
-    - name: Build Target
+    - name: Build palladium
       run: cmake --build build.target --config ${{env.BUILD_TYPE}}
 
-    - name: Build EFI image
+    - name: Build images
       run: |
-        dd if=/dev/zero of=build.target/fat.img bs=1k count=184320
-        mformat -F -i build.target/fat.img
-        mmd -i build.target/fat.img ::/EFI
-        mmd -i build.target/fat.img ::/EFI/BOOT
-        mmd -i build.target/fat.img ::/EFI/PALLADIUM
-        mcopy -i build.target/fat.img build.target/boot/osloader/osloader.exe ::/EFI/BOOT/BOOTX64.EFI
-        mcopy -i build.target/fat.img build.target/kernel/kernel.exe ::/EFI/PALLADIUM/KERNEL.EXE
-        mcopy -i build.target/fat.img build.target/drivers/acpi/acpi.sys ::/EFI/PALLADIUM/ACPI.SYS
-        echo "Kernel=KERNEL.EXE" > build.target/boot.cfg
-        echo "BootDriver=ACPI.SYS" >> build.target/boot.cfg
-        mcopy -i build.target/fat.img build.target/boot.cfg ::/EFI/PALLADIUM/BOOT.CFG
+        palladium/tools/build-image.sh \
+          --build-dir build.target \
+          --output-dir build.images
 
-    - name: Build ISO image
-      run: |
-        mkdir -p _root
-        cp build.target/fat.img _root/fat.img
-        mkisofs -R -f -eltorito-boot fat.img -no-emul-boot -o build.target/iso9660.iso _root
-
-    - uses: actions/upload-artifact@v4
+    - name: Upload images
+      uses: actions/upload-artifact@v4
       with:
-        name: fat.img
-        path: build.target/fat.img
-
-    - uses: actions/upload-artifact@v4
-      with:
-        name: iso9660.iso
-        path: build.target/iso9660.iso
+        name: palladium-amd64-release
+        path: |
+          build.images/fat.img
+          build.images/iso9660.iso
+        if-no-files-found: error
