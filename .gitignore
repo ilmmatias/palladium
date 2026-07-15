@@ -2,3 +2,4 @@
 _root
 build.*
 __pycache__
+llvm-project
