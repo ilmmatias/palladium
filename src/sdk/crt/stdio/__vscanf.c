@@ -525,7 +525,8 @@ int __vscanf(
                             *va_arg(vlist, unsigned long *) = (unsigned long)unsigned_value;
                             break;
                         case MOD_ll:
-                            *va_arg(vlist, unsigned long long *) = (unsigned long long)unsigned_value;
+                            *va_arg(vlist, unsigned long long *) =
+                                (unsigned long long)unsigned_value;
                             break;
                         case MOD_j:
                             *va_arg(vlist, uintmax_t *) = unsigned_value;

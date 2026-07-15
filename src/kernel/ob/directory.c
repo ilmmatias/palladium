@@ -327,7 +327,8 @@ void *ObLookupDirectoryEntryByIndex(
                 continue;
             }
 
-            /* Make sure we return the proper combo (NULL alongside *NameCapacity != 0) if we found it but don't have enough space to save the name. */
+            /* Make sure we return the proper combo (NULL alongside *NameCapacity != 0) if we found
+             * it but don't have enough space to save the name. */
             if (Name) {
                 size_t EntryNameSize = strlen(Entry->Name) + 1;
                 *NameCapacity = EntryNameSize;

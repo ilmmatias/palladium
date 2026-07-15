@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <string.h>
 
-KdpExtensibilityExports KdpDebugExports = {};
+KdExtensibilityExports KdpDebugExports = {};
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -20,7 +20,7 @@ KdpExtensibilityExports KdpDebugExports = {};
  *     NTSTATUS values describing the result of the operation (anything but STATUS_SUCCESS is to
  *     be considered an error).
  *-----------------------------------------------------------------------------------------------*/
-uint32_t KdpInitializeController(KdpExtensibilityData *KdNet) {
+uint32_t KdpInitializeController(KdExtensibilityData *KdNet) {
     return KdpDebugExports.InitializeController(KdNet);
 }
 
@@ -163,7 +163,7 @@ uint32_t KdpGetPacketLength(void *Adapter, uint32_t Handle) {
  * RETURN VALUE:
  *     Size of the structure in bytes.
  *-----------------------------------------------------------------------------------------------*/
-uint32_t KdpGetHardwareContextSize(KdpDebugDeviceDescriptor *Device) {
+uint32_t KdpGetHardwareContextSize(KdDebugDeviceDescriptor *Device) {
     return KdpDebugExports.GetHardwareContextSize(Device);
 }
 
@@ -241,7 +241,7 @@ uint32_t KdpWriteSerialByte(void *Adapter, uint8_t Byte) {
  *      NTSTATUS values describing the result of the operation (anything but STATUS_SUCCESS is to
  *      be considered an error).
  *-----------------------------------------------------------------------------------------------*/
-uint32_t KdpSerialOutputInit(KdpDebugDeviceDescriptor *Device, KdpPhysicalAddress *Address) {
+uint32_t KdpSerialOutputInit(KdDebugDeviceDescriptor *Device, KdPhysicalAddress *Address) {
     return KdpDebugExports.SerialOutputInit(Device, Address);
 }
 
@@ -274,6 +274,6 @@ void KdpSerialOutputByte(uint8_t Byte) {
 void KdpInitializeExports(void) {
     /* KdInitializeLibrary inside the extensibility module will fill up this structure, so we only
      * have to initialize the function count (which is used to check the host OS version). */
-    memset(&KdpDebugExports, 0, sizeof(KdpExtensibilityExports));
-    KdpDebugExports.FunctionCount = KDP_EXTENSIBILITY_EXPORT_COUNT;
+    memset(&KdpDebugExports, 0, sizeof(KdExtensibilityExports));
+    KdpDebugExports.FunctionCount = KD_EXTENSIBILITY_EXPORT_COUNT;
 }

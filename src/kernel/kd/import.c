@@ -14,11 +14,11 @@
 #include <stdint.h>
 #include <string.h>
 
-extern KdpExtensibilityExports KdpDebugExports;
+extern KdExtensibilityExports KdpDebugExports;
 
 static bool BlockRecursion = false;
 
-KdpExtensibilityImports KdpDebugImports = {};
+KdExtensibilityImports KdpDebugImports = {};
 uint32_t KdpDebugErrorStatus = 0;
 uint16_t *KdpDebugErrorString = NULL;
 uint32_t KdpDebugHardwareId = 0;
@@ -84,8 +84,8 @@ static uint32_t SetPciDataByOffset(
  *     Physical address (directly written to .QuadPart), or 0 on failure (also written to
  *    .QuadPart).
  *-----------------------------------------------------------------------------------------------*/
-static KdpPhysicalAddress GetPhysicalAddress(void *Va) {
-    return (KdpPhysicalAddress){.QuadPart = HalpGetPhysicalAddress(Va)};
+static KdPhysicalAddress GetPhysicalAddress(void *Va) {
+    return (KdPhysicalAddress){.QuadPart = HalpGetPhysicalAddress(Va)};
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -415,7 +415,7 @@ static void BugCheckEx(
  *     Either a pointer mapped to the physical region, or NULL on failure.
  *-----------------------------------------------------------------------------------------------*/
 static void *
-MapPhysicalMemory(KdpPhysicalAddress PhysicalAddress, uint32_t NumberPages, bool FlushCurrentTlb) {
+MapPhysicalMemory(KdPhysicalAddress PhysicalAddress, uint32_t NumberPages, bool FlushCurrentTlb) {
     (void)FlushCurrentTlb;
     return HalpMapEarlyMemory(PhysicalAddress.QuadPart, NumberPages << MM_PAGE_SHIFT, MI_MAP_WRITE);
 }
@@ -547,8 +547,8 @@ static uint64_t GetHypervisorVendorId(void) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void KdpInitializeImports(void) {
-    memset(&KdpDebugImports, 0, sizeof(KdpExtensibilityImports));
-    KdpDebugImports.FunctionCount = KDP_EXTENSIBILITY_IMPORT_COUNT;
+    memset(&KdpDebugImports, 0, sizeof(KdExtensibilityImports));
+    KdpDebugImports.FunctionCount = KD_EXTENSIBILITY_IMPORT_COUNT;
     KdpDebugImports.Exports = &KdpDebugExports;
     KdpDebugImports.GetPciDataByOffset = GetPciDataByOffset;
     KdpDebugImports.SetPciDataByOffset = SetPciDataByOffset;
@@ -578,7 +578,7 @@ void KdpInitializeImports(void) {
     KdpDebugImports.Printf = Printf;
     KdpDebugImports.VmbusInitialize = VmbusInitialize;
     KdpDebugImports.GetHypervisorVendorId = GetHypervisorVendorId;
-    KdpDebugImports.ExecutionEnvironment = KDP_ENVIRONMENT_KERNEL;
+    KdpDebugImports.ExecutionEnvironment = KD_ENVIRONMENT_KERNEL;
     KdpDebugImports.ErrorStatus = &KdpDebugErrorStatus;
     KdpDebugImports.ErrorString = &KdpDebugErrorString;
     KdpDebugImports.HardwareId = &KdpDebugHardwareId;

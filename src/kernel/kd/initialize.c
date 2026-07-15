@@ -12,8 +12,8 @@
 #include <stdint.h>
 #include <string.h>
 
-extern KdpDebugDeviceDescriptor KdpDebugDevice;
-extern KdpExtensibilityImports KdpDebugImports;
+extern KdDebugDeviceDescriptor KdpDebugDevice;
+extern KdExtensibilityImports KdpDebugImports;
 extern uint32_t KdpDebugErrorStatus;
 extern uint16_t *KdpDebugErrorString;
 extern uint32_t KdpDebugHardwareId;
@@ -22,7 +22,7 @@ bool KdpDebugEnabled = false;
 bool KdpDebugEchoEnabled = true;
 bool KdpDebugConnected = false;
 void *KdpDebugAdapter = NULL;
-KdpExtensibilityData KdpDebugData = {};
+KdExtensibilityData KdpDebugData = {};
 
 uint8_t KdpDebuggeeHardwareAddress[6] = {0};
 uint8_t KdpDebuggeeProtocolAddress[4] = {0};
@@ -150,7 +150,7 @@ void KdpInitializeDebugger(KiLoaderBlock *LoaderBlock) {
     /* Attempt to initialize the extensibility module; They don't have any direct imports (via
      * OSLOADER), but they take in some simple kernel functions via the first parameter (and also
      * output some functions we can use via it). */
-    uint32_t Status = ((KdpInitializeLibraryFn)LoaderBlock->Debug.Initializer)(
+    uint32_t Status = ((KdInitializeLibraryFn)LoaderBlock->Debug.Initializer)(
         &KdpDebugImports, NULL, &KdpDebugDevice);
     if (Status) {
         DumpErrorString();
@@ -163,7 +163,7 @@ void KdpInitializeDebugger(KiLoaderBlock *LoaderBlock) {
     }
 
     /* Start filling in the shared data structure. */
-    memset(&KdpDebugData, 0, sizeof(KdpExtensibilityData));
+    memset(&KdpDebugData, 0, sizeof(KdExtensibilityData));
     memset(&KdpDebuggeeHardwareAddress, 0, sizeof(KdpDebuggeeHardwareAddress));
     KdpDebugData.Device = &KdpDebugDevice;
     KdpDebugData.TargetMacAddress = KdpDebuggeeHardwareAddress;
@@ -194,13 +194,13 @@ void KdpInitializeDebugger(KiLoaderBlock *LoaderBlock) {
                 0);
         }
 
-        KdpDebugDevice.Memory.Start = (KdpPhysicalAddress){.QuadPart = PhysicalAddress};
+        KdpDebugDevice.Memory.Start = (KdPhysicalAddress){.QuadPart = PhysicalAddress};
         KdpDebugDevice.Memory.VirtualAddress = VirtualAddress;
         KdpDebugDevice.Memory.Length = Size;
         KdpDebugDevice.Memory.Cached = true;
         KdpDebugDevice.Memory.Aligned = true;
         KdpDebugDevice.TransportData.HwContextSize = Size;
-        KdpDebugDevice.Flags |= KDP_DEVICE_FLAGS_HAL_SCRATCH_ALLOCATED;
+        KdpDebugDevice.Flags |= KD_DEVICE_FLAGS_HAL_SCRATCH_ALLOCATED;
         KdpDebugData.Hardware = VirtualAddress;
         KdpDebugAdapter = VirtualAddress;
     }

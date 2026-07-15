@@ -11,7 +11,7 @@
 #include <stdint.h>
 #include <string.h>
 
-KdpDebugDeviceDescriptor KdpDebugDevice = {};
+KdDebugDeviceDescriptor KdpDebugDevice = {};
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -39,7 +39,7 @@ static size_t InitializeBar(
     }
 
     /* All zeroes means this BAR isn't valid (and we can ignore it). */
-    KdpDebugDeviceAddress *BaseAddress = &KdpDebugDevice.BaseAddress[BarIndex];
+    KdDebugDeviceAddress *BaseAddress = &KdpDebugDevice.BaseAddress[BarIndex];
     uint32_t BarOffset = offsetof(HalPciHeader, Type0.BarAddress[BarIndex]);
     uint32_t BarAddress = PciHeader->Type0.BarAddress[BarIndex];
     size_t BarSize = 1;
@@ -53,10 +53,10 @@ static size_t InitializeBar(
 
     uint64_t Address;
     if (BarAddress & 0x01) {
-        BaseAddress->Type = KDP_RESOURCE_PORT;
+        BaseAddress->Type = KD_RESOURCE_PORT;
         Address = BarAddress & ~0x03;
     } else {
-        BaseAddress->Type = KDP_RESOURCE_MEMORY;
+        BaseAddress->Type = KD_RESOURCE_MEMORY;
         Address = BarAddress & ~0x0F;
         if ((BarAddress & 0x06) == 0x04) {
             if (BarIndex + 1 >= 6) {
@@ -156,7 +156,7 @@ void KdpInitializeDeviceDescriptor(KiLoaderBlock *LoaderBlock) {
     HalReadPciConfigurationSpace(Bus, Device, Function, 0, &PciHeader, sizeof(HalPciHeader));
 
     /* Most of the data from the descriptor can already be filled in, so let's do just that. */
-    memset(&KdpDebugDevice, 0, sizeof(KdpDebugDeviceDescriptor));
+    memset(&KdpDebugDevice, 0, sizeof(KdDebugDeviceDescriptor));
     KdpDebugDevice.Bus = Bus;
     KdpDebugDevice.Slot = (Device & 0x1F) | ((Function & 0x07) << 5);
     KdpDebugDevice.Segment = Segment;
@@ -173,6 +173,6 @@ void KdpInitializeDeviceDescriptor(KiLoaderBlock *LoaderBlock) {
         BarIndex += InitializeBar(Bus, Device, Function, BarIndex, &PciHeader);
     }
 
-    KdpDebugDevice.Flags = KDP_DEVICE_FLAGS_BARS_MAPPED;
+    KdpDebugDevice.Flags = KD_DEVICE_FLAGS_BARS_MAPPED;
     KdpDebugDevice.Configured = true;
 }

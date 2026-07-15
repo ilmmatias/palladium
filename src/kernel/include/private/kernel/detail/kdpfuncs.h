@@ -9,6 +9,7 @@
 #include <kernel/detail/kdfuncs.h>
 #include <kernel/detail/kdptypes.h>
 #include <kernel/detail/kitypes.h>
+#include <os/kdext.h>
 
 /* clang-format off */
 #if __has_include(ARCH_MAKE_INCLUDE_PATH(kernel/detail, kdpfuncs.h))
@@ -67,7 +68,7 @@ void KdpParseDebugPacket(
     KdpDebugPacket *Packet,
     uint32_t Length);
 
-uint32_t KdpInitializeController(KdpExtensibilityData *KdNet);
+uint32_t KdpInitializeController(KdExtensibilityData *KdNet);
 void KdpShutdownController(void *Adapter);
 void KdpSetHibernateRange(void);
 uint32_t KdpGetRxPacket(void *Adapter, uint32_t *Handle, void **Packet, uint32_t *Length);
@@ -76,7 +77,7 @@ uint32_t KdpGetTxPacket(void *Adapter, uint32_t *Handle);
 uint32_t KdpSendTxPacket(void *Adapter, uint32_t Handle, uint32_t Length);
 void *KdpGetPacketAddress(void *Adapter, uint32_t Handle);
 uint32_t KdpGetPacketLength(void *Adapter, uint32_t Handle);
-uint32_t KdpGetHardwareContextSize(KdpDebugDeviceDescriptor *Device);
+uint32_t KdpGetHardwareContextSize(KdDebugDeviceDescriptor *Device);
 uint32_t KdpDeviceControl(
     void *Adapter,
     uint32_t RequestCode,
@@ -86,7 +87,7 @@ uint32_t KdpDeviceControl(
     uint32_t OutputBufferLength);
 uint32_t KdpReadSerialByte(void *Adapter, uint8_t *Byte);
 uint32_t KdpWriteSerialByte(void *Adapter, uint8_t Byte);
-uint32_t KdpSerialOutputInit(KdpDebugDeviceDescriptor *Device, KdpPhysicalAddress *Address);
+uint32_t KdpSerialOutputInit(KdDebugDeviceDescriptor *Device, KdPhysicalAddress *Address);
 void KdpSerialOutputByte(uint8_t Byte);
 
 #ifdef __cplusplus
