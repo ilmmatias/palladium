@@ -25,7 +25,7 @@ double __strtod_hex(const char *str, double sign) {
 
     /* We combine handling the digits before and after the dot. */
     while (isxdigit(*str) || (!dot && *str == '.')) {
-        int digit = *(str++);
+        int digit = (int)*(str++);
 
         if (digit == '.') {
             dot = true;
@@ -94,7 +94,7 @@ double __strtod_dec(const char *str, double sign) {
 
     /* We combine handling the digits before and after the dot. */
     while (isdigit(*str) || (!dot && *str == '.')) {
-        int digit = *(str++);
+        int digit = (int)*(str++);
 
         if (digit == '.') {
             dot = true;

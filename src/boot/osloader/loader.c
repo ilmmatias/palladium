@@ -152,7 +152,7 @@ OslpLoadedProgram *OslLoadExecutable(const char *ImageName, const char *ImagePat
     }
 
     ThisProgram->Name = ImageName;
-    ThisProgram->ImageSize = (uint64_t)(ImagePages * EFI_PAGE_SIZE);
+    ThisProgram->ImageSize = (uint64_t)ImagePages * EFI_PAGE_SIZE;
 
     Status = gBS->AllocatePool(
         EfiLoaderData, ImagePages * sizeof(int), (VOID **)&ThisProgram->PageFlags);

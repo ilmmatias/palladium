@@ -90,6 +90,8 @@ uint32_t KdpWriteSerialByte(void *Adapter, uint8_t Byte);
 uint32_t KdpSerialOutputInit(KdDebugDeviceDescriptor *Device, KdPhysicalAddress *Address);
 void KdpSerialOutputByte(uint8_t Byte);
 
+uint32_t KdpValidateExports(void);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

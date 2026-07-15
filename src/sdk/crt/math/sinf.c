@@ -60,9 +60,11 @@ float sinf(float x) {
     uint32_t xi_abs = xi & ~0x80000000;
     if (xi_abs >= 0x7f800000) {
         if (!(xi & 0x7fffff)) {
+            /* NOLINTNEXTLINE(misc-redundant-expression) */
             __raise_errnof(0.0F / 0.0F, EDOM);
         }
 
+        /* NOLINTNEXTLINE(misc-redundant-expression) */
         return x - x;
     }
 
@@ -75,7 +77,7 @@ float sinf(float x) {
     /* The core approx function works on the range [-pi/4;pi/4], if we're inside it, no need
      * to reduce the argument. */
     if (xi_abs < 0x3f490fdb) {
-        return __sinf(x);
+        return (float)__sinf(x);
     }
 
     /* Otherwise, reduce and use the quadrant to choose the right operation to execute. */
@@ -83,13 +85,13 @@ float sinf(float x) {
     double res = __rem_pio2f(x, &q);
     switch (q & 3) {
         case 0:
-            return __sinf(res);
+            return (float)__sinf(res);
         case 1:
-            return __cosf(res);
+            return (float)__cosf(res);
         case 2:
-            return -__sinf(res);
+            return (float)-__sinf(res);
         case 3:
-            return -__cosf(res);
+            return (float)-__cosf(res);
         default:
             unreachable();
     }

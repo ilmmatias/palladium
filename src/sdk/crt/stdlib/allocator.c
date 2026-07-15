@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <crt_impl/os.h>
+#include <stdckdint.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -17,6 +18,22 @@ static allocator_entry_t *head = NULL, *tail = NULL;
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
+ *     This function checks whether two allocator entries describe adjacent regions.
+ *
+ * PARAMETERS:
+ *     left - Entry expected immediately before right.
+ *     right - Entry expected immediately after left.
+ *
+ * RETURN VALUE:
+ *     true if the entries are adjacent, false otherwise.
+ *-----------------------------------------------------------------------------------------------*/
+static bool is_contiguous(allocator_entry_t *left, allocator_entry_t *right) {
+    uintptr_t base = (uintptr_t)(left + 1);
+    return left->size <= UINTPTR_MAX - base && base + left->size == (uintptr_t)right;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
  *     This function splits a block of memory into two blocks, one of the required size for the
  *     allocation and one of the remaining size.
  *
@@ -27,19 +44,22 @@ static allocator_entry_t *head = NULL, *tail = NULL;
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 static void split_entry(allocator_entry_t *entry, size_t size) {
-    if (entry->size <= size + sizeof(allocator_entry_t)) {
+    if (entry->size < size || entry->size - size <= sizeof(allocator_entry_t)) {
         return;
     }
 
-    allocator_entry_t *new_entry =
-        (allocator_entry_t *)((uintptr_t)entry + sizeof(allocator_entry_t) + size);
+    allocator_entry_t *new_entry = (allocator_entry_t *)((uint8_t *)(entry + 1) + size);
 
     new_entry->used = false;
-    new_entry->size = entry->size - (size + sizeof(allocator_entry_t));
+    new_entry->size = entry->size - size - sizeof(allocator_entry_t);
     new_entry->prev = entry;
-    new_entry->next = NULL;
+    new_entry->next = entry->next;
 
-    tail = new_entry;
+    if (new_entry->next) {
+        new_entry->next->prev = new_entry;
+    } else {
+        tail = new_entry;
+    }
 
     entry->size = size;
     entry->next = new_entry;
@@ -57,11 +77,17 @@ static void split_entry(allocator_entry_t *entry, size_t size) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 static void merge_forward(allocator_entry_t *base) {
-    while (base->next &&
-           (uintptr_t)base + base->size + sizeof(allocator_entry_t) == (uintptr_t)base->next &&
-           !base->next->used) {
-        base->size += base->next->size;
-        base->next = base->next->next;
+    while (base->next && is_contiguous(base, base->next) && !base->next->used) {
+        allocator_entry_t *next = base->next;
+        size_t extra_size;
+        size_t merged_size;
+        if (ckd_add(&extra_size, sizeof(allocator_entry_t), next->size) ||
+            ckd_add(&merged_size, base->size, extra_size)) {
+            break;
+        }
+
+        base->size = merged_size;
+        base->next = next->next;
 
         if (base->next) {
             base->next->prev = base;
@@ -85,18 +111,23 @@ static void merge_forward(allocator_entry_t *base) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 static void merge_backward(allocator_entry_t *base) {
-    while (base->prev &&
-           (uintptr_t)base->prev + base->prev->size + sizeof(allocator_entry_t) ==
-               (uintptr_t)base &&
-           !base->prev->used) {
-        base->prev->size += base->size;
-        base->prev->next = base->next;
-
-        if (base->next) {
-            base->next->prev = base->prev;
+    while (base->prev && is_contiguous(base->prev, base) && !base->prev->used) {
+        allocator_entry_t *prev = base->prev;
+        size_t extra_size;
+        size_t merged_size;
+        if (ckd_add(&extra_size, sizeof(allocator_entry_t), base->size) ||
+            ckd_add(&merged_size, prev->size, extra_size)) {
+            break;
         }
 
-        base = base->prev;
+        prev->size = merged_size;
+        prev->next = base->next;
+
+        if (base->next) {
+            base->next->prev = prev;
+        }
+
+        base = prev;
     }
 
     if (!base->prev) {
@@ -133,15 +164,20 @@ static allocator_entry_t *find_free(size_t size) {
         entry = entry->next;
     }
 
-    entry = __allocate_pages((size + sizeof(allocator_entry_t) + mask) >> __PAGE_SHIFT);
+    size_t full_size;
+    if (ckd_add(&full_size, size, sizeof(allocator_entry_t)) ||
+        ckd_add(&full_size, full_size, mask)) {
+        return NULL;
+    }
+
+    size_t allocation_size = full_size & ~mask;
+    entry = __allocate_pages(allocation_size >> __PAGE_SHIFT);
     if (!entry) {
         return NULL;
     }
 
-    size = ((size + sizeof(allocator_entry_t) + mask) & ~mask) - sizeof(allocator_entry_t);
-
     entry->used = true;
-    entry->size = size;
+    entry->size = allocation_size - sizeof(allocator_entry_t);
     entry->prev = tail;
     entry->next = NULL;
 
@@ -168,11 +204,16 @@ static allocator_entry_t *find_free(size_t size) {
  *     a new page failed.
  *-----------------------------------------------------------------------------------------------*/
 void *malloc(size_t size) {
-    size = (size + 15) & ~0x0F;
-    allocator_entry_t *entry = find_free(size);
+    size_t aligned_size;
+    if (ckd_add(&aligned_size, size, 15)) {
+        return NULL;
+    }
+
+    aligned_size &= ~((size_t)0x0F);
+    allocator_entry_t *entry = find_free(aligned_size);
 
     if (entry) {
-        split_entry(entry, size);
+        split_entry(entry, aligned_size);
         return entry + 1;
     }
 
@@ -193,11 +234,15 @@ void *malloc(size_t size) {
  *     a new page failed.
  *-----------------------------------------------------------------------------------------------*/
 void *calloc(size_t nmemb, size_t size) {
-    size *= nmemb;
-    void *base = malloc(size);
+    size_t full_size;
+    if (ckd_mul(&full_size, nmemb, size)) {
+        return NULL;
+    }
+
+    void *base = malloc(full_size);
 
     if (base) {
-        memset(base, 0, size);
+        memset(base, 0, full_size);
     }
 
     return base;
@@ -214,6 +259,10 @@ void *calloc(size_t nmemb, size_t size) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void free(void *ptr) {
+    if (!ptr) {
+        return;
+    }
+
     allocator_entry_t *entry = (allocator_entry_t *)ptr - 1;
     entry->used = false;
     merge_forward(entry);

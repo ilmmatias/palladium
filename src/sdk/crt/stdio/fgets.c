@@ -47,7 +47,7 @@ char *fgets_unlocked(char *CRT_RESTRICT s, int count, FILE *CRT_RESTRICT stream)
             break;
         }
 
-        *(dest++) = ch;
+        *(dest++) = (char)ch;
         count--;
 
         if (ch == '\n') {

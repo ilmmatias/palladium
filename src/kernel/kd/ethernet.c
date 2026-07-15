@@ -39,5 +39,7 @@ void KdpParseEthernetFrame(int State, KdpEthernetHeader *EthFrame, uint32_t Leng
             }
 
             break;
+        default:
+            break;
     }
 }

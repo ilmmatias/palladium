@@ -98,9 +98,11 @@ float tanf(float x) {
     uint32_t xi_abs = xi & ~0x80000000;
     if (xi_abs >= 0x7f800000) {
         if (!(xi & 0x7fffff)) {
+            /* NOLINTNEXTLINE(misc-redundant-expression) */
             __raise_errnof(0.0F / 0.0F, EDOM);
         }
 
+        /* NOLINTNEXTLINE(misc-redundant-expression) */
         return x - x;
     }
 
@@ -113,7 +115,7 @@ float tanf(float x) {
     /* The core approx function works on the range [-pi/4;pi/4], if we're inside it, no need
      * to reduce the argument. */
     if (xi_abs < 0x3f490fdb) {
-        return __tanf(x);
+        return (float)__tanf(x);
     }
 
     /* Otherwise, reduce and use the quadrant to choose the right operation to execute. */
@@ -121,9 +123,9 @@ float tanf(float x) {
     double res = __rem_pio2f(x, &q);
     switch (q & 1) {
         case 0:
-            return __tanf(res);
+            return (float)__tanf(res);
         case 1:
-            return -__cotf(res);
+            return (float)-__cotf(res);
         default:
             unreachable();
     }

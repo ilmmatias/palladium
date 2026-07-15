@@ -67,4 +67,5 @@ static const WORD RoundConstants[ROUNDS] = {
     0x4CC5D4BECB3E42B6, 0x597F299CFC657E2A, 0x5FCB6FAB3AD6FAEC, 0x6C44198C4A475817,
 };
 
+/* NOLINTNEXTLINE(bugprone-suspicious-include) */
 #include "sha2.c"

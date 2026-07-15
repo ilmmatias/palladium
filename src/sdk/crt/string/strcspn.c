@@ -8,7 +8,7 @@
  *     This function implements generic code to find how many characters not in the `s2` set
  *     does the `s1` string start with.
  *
- * PARAMETERS:
+ * PARAMETERS:xxxxxxxxxx
  *     s1 - Which string to analyze.
  *     s2 - Search set.
  *
@@ -18,7 +18,13 @@
 size_t strcspn(const char *s1, const char *s2) {
     size_t Count = 0;
 
-    while (*s1 && !strchr(s2, *(s1++))) {
+    while (*s1) {
+        s1++;
+
+        if (strchr(s2, *s1)) {
+            break;
+        }
+
         Count++;
     }
 

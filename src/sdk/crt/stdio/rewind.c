@@ -31,5 +31,5 @@ void rewind_unlocked(FILE *stream) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 void rewind(FILE *stream) {
-    fseek(stream, 0, SEEK_SET);
+    (void)fseek(stream, 0, SEEK_SET);
 }

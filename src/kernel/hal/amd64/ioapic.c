@@ -10,8 +10,8 @@
 #include <rt/list.h>
 #include <stdint.h>
 
-static RtSList IoapicListHead = {};
-static RtSList IoapicOverrideListHead = {};
+static RtSList IoapicListHead = {0};
+static RtSList IoapicOverrideListHead = {0};
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -139,6 +139,10 @@ void HalpInitializeIoapic(void) {
                     Entry->Irq,
                     Entry->Gsi);
 
+                break;
+            }
+
+            default: {
                 break;
             }
         }

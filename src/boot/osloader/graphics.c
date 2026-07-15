@@ -65,7 +65,6 @@ EFI_STATUS OslpInitializeGraphics(
         if (Info->HorizontalResolution == PreferredWidth &&
             Info->VerticalResolution == PreferredHeight &&
             Info->PixelFormat == PixelBlueGreenRedReserved8BitPerColor) {
-            BestResolution = Info->HorizontalResolution * Info->VerticalResolution;
             BestMode = i;
             break;
         }
@@ -97,7 +96,7 @@ EFI_STATUS OslpInitializeGraphics(
     *FramebufferHeight = Gop->Mode->Info->VerticalResolution;
     *FramebufferPitch = Gop->Mode->Info->PixelsPerScanLine * 4;
 
-    uint64_t FrameBufferSize = (uint64_t)(*FramebufferHeight * *FramebufferPitch);
+    uint64_t FrameBufferSize = (uint64_t)*FramebufferHeight * *FramebufferPitch;
     uint64_t FrontBufferSize = (FrameBufferSize + SIZE_2MB - 1) & ~(SIZE_2MB - 1);
     *FrontBufferPhys = OslAllocatePages(FrontBufferSize, SIZE_2MB);
     if (!*FrontBufferPhys) {

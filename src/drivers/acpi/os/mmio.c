@@ -16,8 +16,8 @@
  * RETURN VALUE:
  *     Data from the address space.
  *-----------------------------------------------------------------------------------------------*/
-uint64_t AcpipReadMmioSpace(uint64_t Address, int Size) {
-    AcpipShowTraceMessage("read from MMIO space, address 0x%llX, size %u\n", Address, Size);
+uint64_t AcpipReadMmioSpace(uint64_t Address, uint64_t Size) {
+    AcpipShowTraceMessage("read from MMIO space, address 0x%llX, size %llu\n", Address, Size);
 
     void *VirtualAddress = MmMapSpace(MM_SPACE_NORMAL, Address, Size);
     if (!VirtualAddress) {
@@ -56,9 +56,9 @@ uint64_t AcpipReadMmioSpace(uint64_t Address, int Size) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void AcpipWriteMmioSpace(uint64_t Address, int Size, uint64_t Data) {
+void AcpipWriteMmioSpace(uint64_t Address, uint64_t Size, uint64_t Data) {
     AcpipShowTraceMessage(
-        "write into MMIO space, address 0x%llX, size %u, data 0x%llX\n", Address, Size, Data);
+        "write into MMIO space, address 0x%llX, size %llu, data 0x%llX\n", Address, Size, Data);
 
     void *VirtualAddress = MmMapSpace(MM_SPACE_NORMAL, Address, Size);
     if (!VirtualAddress) {

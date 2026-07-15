@@ -69,29 +69,8 @@ bool AcpiExecuteMethod(AcpiObject *Object, int ArgCount, AcpiValue *Arguments, A
     State.Scope = &Scope;
     State.Opcode = NULL;
 
-    if (ArgCount) {
-        memcpy(State.Arguments, Arguments, ArgCount * sizeof(AcpiValue));
-
-        for (int i = 0; i < ArgCount; i++) {
-            AcpiValue *Arg = &State.Arguments[i];
-            switch (Arg->Type) {
-                case ACPI_STRING:
-                    Arg->String->References++;
-                    break;
-                case ACPI_BUFFER:
-                    Arg->Buffer->References++;
-                    break;
-                case ACPI_PACKAGE:
-                    Arg->Package->References++;
-                    break;
-                case ACPI_MUTEX:
-                    Arg->Mutex->References++;
-                    break;
-                case ACPI_EVENT:
-                    Arg->Event->References++;
-                    break;
-            }
-        }
+    for (int i = 0; i < ArgCount; i++) {
+        AcpiCreateReference(&Arguments[i], &State.Arguments[i]);
     }
 
     bool Status = AcpipExecuteTermList(&State);
@@ -214,6 +193,9 @@ bool AcpiCopyValue(AcpiValue *Source, AcpiValue *Target) {
         case ACPI_BUFFER_FIELD:
         case ACPI_INDEX:
             Source->BufferField.Source->References++;
+            break;
+
+        default:
             break;
     }
 
@@ -352,6 +334,8 @@ void AcpiCreateReference(AcpiValue *Source, AcpiValue *Target) {
         case ACPI_SCOPE:
             Target->Children->References++;
             break;
+        default:
+            break;
     }
 }
 
@@ -414,6 +398,7 @@ void AcpiRemoveReference(AcpiValue *Value, bool CleanupPointer) {
 
         case ACPI_MUTEX: {
             if (NeedsCleanup && --Value->Mutex->References <= 0) {
+                AcpipDeleteMutex(Value->Mutex->Handle);
                 AcpipFreeBlock(Value->Mutex);
             }
 
@@ -422,6 +407,7 @@ void AcpiRemoveReference(AcpiValue *Value, bool CleanupPointer) {
 
         case ACPI_EVENT: {
             if (NeedsCleanup && --Value->Event->References <= 0) {
+                AcpipDeleteEvent(Value->Event->Handle);
                 AcpipFreeBlock(Value->Event);
             }
 
@@ -434,6 +420,9 @@ void AcpiRemoveReference(AcpiValue *Value, bool CleanupPointer) {
                 AcpiRemoveReference(Value->BufferField.Source, true);
             }
 
+            break;
+
+        default:
             break;
     }
 

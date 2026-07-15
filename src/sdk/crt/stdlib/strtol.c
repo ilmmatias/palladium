@@ -53,7 +53,7 @@ long strtol(const char *CRT_RESTRICT nptr, char **CRT_RESTRICT endptr, int base)
 
     while (true) {
         long last = value;
-        int digit = *nptr;
+        int digit = (int)*nptr;
 
         /* First two cases are aA-fF, offset by +0x0A. */
         if (islower(digit)) {

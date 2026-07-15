@@ -172,7 +172,7 @@ int AcpipExecuteFieldOpcode(AcpipState *State, uint16_t Opcode) {
             Value.References = 1;
             Value.BufferField.Source = Buffer;
             Value.BufferField.Index = ByteIndex;
-            Value.BufferField.Size = FieldSize;
+            Value.BufferField.Size = (int)FieldSize;
 
             if (!AcpipCreateObject(Name, &Value)) {
                 AcpiRemoveReference(SourceBuff, false);

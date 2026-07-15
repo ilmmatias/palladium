@@ -227,7 +227,7 @@ bool ObInsertIntoDirectory(ObDirectory *Directory, const char *Name, void *Objec
  *-----------------------------------------------------------------------------------------------*/
 bool ObRemoveFromDirectory(ObDirectory *Directory, void *Object) {
     ObpObject *ObjectHeader = (ObpObject *)Object - 1;
-    ObpDirectoryEntry *DirectoryEntry = ObjectHeader->Parent;
+    ObpDirectoryEntry *DirectoryEntry = NULL;
 
     /* Just make sure we're not freeing any object that isn't properly part of the specified
      * directory. */

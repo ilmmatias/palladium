@@ -18,9 +18,9 @@
  * RETURN VALUE:
  *     Data from the address space.
  *-----------------------------------------------------------------------------------------------*/
-uint64_t AcpipReadPciConfigSpace(AcpiValue *Source, int Offset, int Size) {
+uint64_t AcpipReadPciConfigSpace(AcpiValue *Source, uint64_t Offset, uint64_t Size) {
     AcpipShowTraceMessage(
-        "read from PCI config space, %X/%X/%X/%X, offset 0x%X, size %u\n",
+        "read from PCI config space, %X/%X/%X/%X, offset 0x%llX, size %llu\n",
         Source->Region.PciSegment,
         Source->Region.PciBus,
         Source->Region.PciDevice,
@@ -54,9 +54,9 @@ uint64_t AcpipReadPciConfigSpace(AcpiValue *Source, int Offset, int Size) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-void AcpipWritePciConfigSpace(AcpiValue *Source, int Offset, int Size, uint64_t Data) {
+void AcpipWritePciConfigSpace(AcpiValue *Source, uint64_t Offset, uint64_t Size, uint64_t Data) {
     AcpipShowTraceMessage(
-        "write into PCI config space, %X/%X/%X/%X, offset 0x%X, size %u, data 0x%llX\n",
+        "write into PCI config space, %X/%X/%X/%X, offset 0x%llX, size %llu, data 0x%llX\n",
         Source->Region.PciSegment,
         Source->Region.PciBus,
         Source->Region.PciDevice,

@@ -62,7 +62,6 @@ void CryptInitializeHmac(
     uint8_t KeyData[CRYPT_HASH_MAX_BUFFER_SIZE] = {0};
     if (KeySize > Context->HashBufferSize) {
         CryptGetHash(Handle, Key, KeySize, KeyData);
-        KeySize = Context->HashDigestSize;
     } else {
         memcpy(KeyData, Key, KeySize);
     }

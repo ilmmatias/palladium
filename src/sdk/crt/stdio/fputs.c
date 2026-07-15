@@ -18,7 +18,7 @@
  *-----------------------------------------------------------------------------------------------*/
 int fputs_unlocked(const char *CRT_RESTRICT s, FILE *CRT_RESTRICT stream) {
     size_t count = strlen(s);
-    return fwrite_unlocked((void *)s, 1, count, stream) == count ? count : EOF;
+    return fwrite_unlocked((void *)s, 1, count, stream) == count ? (int)count : EOF;
 }
 
 /*-------------------------------------------------------------------------------------------------

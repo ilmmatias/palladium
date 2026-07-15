@@ -20,11 +20,12 @@ extern uint8_t KdpDebuggeeProtocolAddress[4];
  *     Checksum value, in the host byte ordering.
  *-----------------------------------------------------------------------------------------------*/
 uint16_t KdpCalculateIpChecksum(KdpIpHeader *Header) {
-    uint16_t *HeaderData = (uint16_t *)Header;
+    uint8_t *HeaderData = (uint8_t *)Header;
+    size_t HeaderLength = (size_t)(HeaderData[0] & 0x0F) * sizeof(uint32_t);
     uint32_t Sum = 0;
 
-    for (size_t i = 0; i < (size_t)(Header->Length * 2); i++) {
-        Sum += KdpSwapNetworkOrder16(HeaderData[i]);
+    for (size_t i = 0; i < HeaderLength; i += sizeof(uint16_t)) {
+        Sum += ((uint16_t)HeaderData[i] << 8) | HeaderData[i + 1];
     }
 
     while (Sum >> 16) {
@@ -57,15 +58,35 @@ void KdpParseIpFrame(
         return;
     }
 
-    if (IpFrame->Version != 4) {
+    uint8_t *IpData = (uint8_t *)IpFrame;
+    uint8_t Version = IpData[0] >> 4;
+    uint8_t HeaderLengthWords = IpData[0] & 0x0F;
+    if (Version != 4 || HeaderLengthWords < sizeof(KdpIpHeader) / sizeof(uint32_t)) {
+        KdPrint(KD_TYPE_TRACE, "ignoring IP packet with an invalid header\n");
+        return;
+    }
+
+    uint32_t HeaderLength = (uint32_t)HeaderLengthWords * sizeof(uint32_t);
+    if (HeaderLength > Length) {
+        KdPrint(KD_TYPE_TRACE, "ignoring truncated IP header\n");
+        return;
+    }
+
+    uint32_t TotalLength = ((uint32_t)IpData[2] << 8) | IpData[3];
+    if (TotalLength < HeaderLength || TotalLength > Length) {
+        KdPrint(KD_TYPE_TRACE, "ignoring IP packet with an invalid total length\n");
+        return;
+    }
+
+    uint16_t FragmentField = ((uint16_t)IpData[6] << 8) | IpData[7];
+    if (FragmentField & 0xBFFF) {
+        KdPrint(KD_TYPE_TRACE, "ignoring fragmented IP packet\n");
         return;
     }
 
     /* Reject any packets without a proper checksum (as the IPv4 checksum is required, unlike the
      * UDP checksum). */
-    uint16_t HeaderChecksum = KdpSwapNetworkOrder16(IpFrame->HeaderChecksum);
-    IpFrame->HeaderChecksum = 0;
-    if (HeaderChecksum != KdpCalculateIpChecksum(IpFrame)) {
+    if (KdpCalculateIpChecksum(IpFrame) != 0) {
         KdPrint(KD_TYPE_TRACE, "ignoring IP packet without a valid checksum\n");
         return;
     }
@@ -82,6 +103,6 @@ void KdpParseIpFrame(
         State,
         SourceHardwareAddress,
         IpFrame->SourceAddress,
-        (void *)(IpFrame + 1),
-        Length - sizeof(KdpUdpHeader));
+        (void *)(IpData + HeaderLength),
+        TotalLength - HeaderLength);
 }

@@ -35,10 +35,23 @@ uint32_t KdpSendUdpPacket(
     uint16_t DestinationPort,
     void *Buffer,
     size_t Size) {
+    if (!Buffer || Size > UINT16_MAX - sizeof(KdpIpHeader) - sizeof(KdpUdpHeader)) {
+        return 0xC000000D;
+    }
+
+    uint32_t IpPacketLength = sizeof(KdpIpHeader) + sizeof(KdpUdpHeader) + Size;
+    uint32_t UdpPacketLength = sizeof(KdpUdpHeader) + Size;
+    uint32_t EthernetPacketLength = sizeof(KdpEthernetHeader) + IpPacketLength;
+
     uint32_t Handle = 0;
     uint32_t Status = KdpGetTxPacket(KdpDebugAdapter, &Handle);
     if (Status) {
         return Status;
+    }
+
+    if (KdpGetPacketLength(KdpDebugAdapter, Handle) < EthernetPacketLength) {
+        KdpSendTxPacket(KdpDebugAdapter, Handle, 0);
+        return 0xC0000023;
     }
 
     KdpEthernetHeader *EthFrame = KdpGetPacketAddress(KdpDebugAdapter, Handle);
@@ -57,7 +70,7 @@ uint32_t KdpSendUdpPacket(
     IpFrame->Version = 4;
     IpFrame->Length = sizeof(KdpIpHeader) / sizeof(uint32_t);
     IpFrame->TypeOfService = 0;
-    IpFrame->TotalLength = KdpSwapNetworkOrder16(sizeof(KdpIpHeader) + sizeof(KdpUdpHeader) + Size);
+    IpFrame->TotalLength = KdpSwapNetworkOrder16(IpPacketLength);
     IpFrame->Identifier = 0;
     IpFrame->Flags = 0;
     IpFrame->FragmentOffset = 0;
@@ -72,14 +85,11 @@ uint32_t KdpSendUdpPacket(
     KdpUdpHeader *UdpFrame = (void *)(IpFrame + 1);
     UdpFrame->SourcePort = KdpSwapNetworkOrder16(SourcePort);
     UdpFrame->DestinationPort = KdpSwapNetworkOrder16(DestinationPort);
-    UdpFrame->Length = KdpSwapNetworkOrder16(sizeof(KdpUdpHeader) + Size);
+    UdpFrame->Length = KdpSwapNetworkOrder16(UdpPacketLength);
     UdpFrame->Checksum = 0;
     memcpy(UdpFrame + 1, Buffer, Size);
 
-    return KdpSendTxPacket(
-        KdpDebugAdapter,
-        Handle,
-        sizeof(KdpEthernetHeader) + sizeof(KdpIpHeader) + sizeof(KdpUdpHeader) + Size);
+    return KdpSendTxPacket(KdpDebugAdapter, Handle, EthernetPacketLength);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -107,6 +117,12 @@ void KdpParseUdpFrame(
         return;
     }
 
+    uint32_t UdpLength = KdpSwapNetworkOrder16(UdpFrame->Length);
+    if (UdpLength < sizeof(KdpUdpHeader) || UdpLength > Length) {
+        KdPrint(KD_TYPE_TRACE, "ignoring UDP packet with an invalid length\n");
+        return;
+    }
+
     /* Check for incoming connections on the debug port, and pass them along to the debug packet
      * handler. */
     if (KdpSwapNetworkOrder16(UdpFrame->DestinationPort) != KdpDebuggeePort) {
@@ -119,5 +135,5 @@ void KdpParseUdpFrame(
         SourceProtocolAddress,
         KdpSwapNetworkOrder16(UdpFrame->SourcePort),
         (void *)(UdpFrame + 1),
-        Length - sizeof(KdpUdpHeader));
+        UdpLength - sizeof(KdpUdpHeader));
 }

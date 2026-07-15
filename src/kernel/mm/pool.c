@@ -18,13 +18,13 @@ typedef struct {
     uint32_t Head;
 } BlockHeader;
 
-static RtSList FreeBlockList[MM_POOL_BLOCK_COUNT] = {};
-static KeSpinLock FreeBlockLock[MM_POOL_BLOCK_COUNT] = {};
+static RtSList FreeBlockList[MM_POOL_BLOCK_COUNT] = {0};
+static KeSpinLock FreeBlockLock[MM_POOL_BLOCK_COUNT] = {0};
 
 uint64_t *MiPoolBitmapBuffer = NULL;
-RtBitmap MiPoolBitmap = {};
+RtBitmap MiPoolBitmap = {0};
 uint64_t MiPoolBitmapHint = 0;
-RtSList MiPoolTagListHead[256] = {};
+RtSList MiPoolTagListHead[256] = {0};
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:

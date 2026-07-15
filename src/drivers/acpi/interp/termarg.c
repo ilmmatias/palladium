@@ -222,12 +222,13 @@ bool AcpipCastToString(AcpiValue *Value, bool ImplicitCast, bool Decimal) {
         /* For everything else, we'll just be converting their type into a string, and returning
            that. */
         default: {
-            String = AcpipAllocateBlock(sizeof(AcpiString) + strlen(Types[Value->Type]) + 1);
+            size_t Size = strlen(Types[Value->Type]) + 1;
+            String = AcpipAllocateBlock(sizeof(AcpiString) + Size);
             if (!String) {
                 return false;
             }
 
-            strcpy(String->Data, Types[Value->Type]);
+            memcpy(String->Data, Types[Value->Type], Size);
             break;
         }
     }
@@ -283,7 +284,7 @@ bool AcpipCastToBuffer(AcpiValue *Value) {
             }
 
             if (BufferSize) {
-                strcpy((char *)Buffer->Data, Value->String->Data);
+                memcpy(Buffer->Data, Value->String->Data, BufferSize);
             }
 
             break;

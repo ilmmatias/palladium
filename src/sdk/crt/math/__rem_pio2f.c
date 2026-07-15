@@ -38,7 +38,7 @@ static double rem_pio2f_fast(float x, int *q) {
     ipart -= ROUND_FACTOR;
     double res = x - ipart * PIO2_HIGH;
     res -= ipart * PIO2_LOW;
-    *q = ipart;
+    *q = (int)ipart;
     return res;
 }
 
@@ -56,8 +56,8 @@ static double rem_pio2f_fast(float x, int *q) {
 static double rem_pio2f_slow(uint32_t xi, int *q) {
     /* Extract the exponent, using the low bits to calculate how we should adjust the mantissa, and
      * the high bits to calculate the entry point into the 2/pi table. */
-    int index = (xi >> 26) & 15;
-    int shift = (xi >> 23) & 7;
+    int index = (int)((xi >> 26) & 15);
+    int shift = (int)((xi >> 23) & 7);
 
     /* Extract the mantissa (+its implicit 23rd bit), and adjust it according to the exponent. */
     uint32_t mant = ((xi & 0x7fffff) | 0x800000) << shift;
@@ -74,12 +74,12 @@ static double rem_pio2f_slow(uint32_t xi, int *q) {
     uint64_t prod = (prod_high << 32) + prod_mid + (prod_low >> 32);
 
     /* Round to nearest. */
-    int ipart = (prod + 0x2000000000000000) >> 62;
+    int ipart = (int)((prod + 0x2000000000000000) >> 62);
     uint64_t fpart = prod - ((uint64_t)ipart << 62);
 
     /* Finally, convert the fraction to an integer, and scale it back by pi/2. */
-    double res = (int64_t)fpart * PIO2_SCALED;
-    int sign = 1 - 2 * (xi >> 31);
+    double res = (double)(int64_t)fpart * PIO2_SCALED;
+    int sign = 1 - 2 * (int)(xi >> 31);
     res *= sign;
     *q = ipart * sign;
     return res;

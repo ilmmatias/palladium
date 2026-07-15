@@ -1,4 +1,4 @@
-/* SPDX-FileCopyrightText: (C) 2025 ilmmatias
+/* SPDX-FileCopyrightText: (C) 2025-2026 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <kernel/ev.h>
@@ -9,6 +9,7 @@
 #include <os/containing_record.h>
 #include <rt/avltree.h>
 #include <rt/list.h>
+#include <stddef.h>
 #include <stdint.h>
 
 extern KeAffinity KiIdleProcessors;

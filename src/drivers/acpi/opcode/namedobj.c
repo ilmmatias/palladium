@@ -74,6 +74,7 @@ int AcpipExecuteNamedObjOpcode(AcpipState *State, uint16_t Opcode) {
             }
 
             if (!AcpipCreateObject(&State->Opcode->FixedArguments[0].Name, &Value)) {
+                AcpipDeleteEvent(Value.Event->Handle);
                 AcpipFreeBlock(Value.Event);
                 return 0;
             }

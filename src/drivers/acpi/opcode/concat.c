@@ -95,19 +95,19 @@ int AcpipExecuteConcatOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Valu
                         return 0;
                     }
 
+                    size_t LeftSize = strlen(Left->String->Data);
+                    size_t RightSize = strlen(Right->String->Data) + 1;
                     Value->Type = ACPI_STRING;
                     Value->References = 1;
-                    Value->String = AcpipAllocateBlock(
-                        sizeof(AcpiString) + strlen(Left->String->Data) +
-                        strlen(Right->String->Data) + 1);
+                    Value->String = AcpipAllocateBlock(sizeof(AcpiString) + LeftSize + RightSize);
                     if (!Value->String) {
                         AcpiRemoveReference(&State->Opcode->FixedArguments[2].TermArg, false);
                         return 0;
                     }
 
                     Value->String->References = 1;
-                    strcpy(Value->String->Data, Left->String->Data);
-                    strcat(Value->String->Data, Right->String->Data);
+                    memcpy(Value->String->Data, Left->String->Data, LeftSize);
+                    memcpy(Value->String->Data + LeftSize, Right->String->Data, RightSize + 1);
 
                     break;
                 }

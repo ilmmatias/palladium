@@ -40,11 +40,13 @@ void AcpipDelayThread(uint64_t Milliseconds);
 void AcpipStallExecution(uint64_t Microseconds);
 
 void *AcpipCreateEvent(void);
+void AcpipDeleteEvent(void *Event);
 bool AcpipWaitEvent(void *Event, uint64_t Timeout);
 void AcpipSignalEvent(void *Event);
 void AcpipResetEvent(void *Event);
 
 void *AcpipCreateMutex(void);
+void AcpipDeleteMutex(void *Mutex);
 bool AcpipAcquireMutex(void *Mutex, uint64_t Timeout);
 void AcpipReleaseMutex(void *Mutex);
 
@@ -76,12 +78,12 @@ bool AcpipReadName(AcpipState *State, AcpiName *Name);
 bool AcpipReadField(AcpiValue *Source, AcpiValue *Target);
 bool AcpipWriteField(AcpiValue *Target, AcpiValue *Data);
 
-uint64_t AcpipReadMmioSpace(uint64_t Address, int Size);
-void AcpipWriteMmioSpace(uint64_t Address, int Size, uint64_t Data);
-uint64_t AcpipReadPciConfigSpace(AcpiValue *Source, int Offset, int Size);
-void AcpipWritePciConfigSpace(AcpiValue *Source, int Offset, int Size, uint64_t Data);
-uint64_t AcpipReadIoSpace(int Offset, int Size);
-void AcpipWriteIoSpace(int Offset, int Size, uint64_t Data);
+uint64_t AcpipReadMmioSpace(uint64_t Address, uint64_t Size);
+void AcpipWriteMmioSpace(uint64_t Address, uint64_t Size, uint64_t Data);
+uint64_t AcpipReadPciConfigSpace(AcpiValue *Source, uint64_t Offset, uint64_t Size);
+void AcpipWritePciConfigSpace(AcpiValue *Source, uint64_t Offset, uint64_t Size, uint64_t Data);
+uint64_t AcpipReadIoSpace(uint64_t Offset, uint64_t Size);
+void AcpipWriteIoSpace(uint64_t Offset, uint64_t Size, uint64_t Data);
 
 bool AcpipPrepareExecuteOpcode(AcpipState *State);
 bool AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result);

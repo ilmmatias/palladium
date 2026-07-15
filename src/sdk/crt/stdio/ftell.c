@@ -27,7 +27,7 @@ long ftell_unlocked(FILE *stream) {
         return -1;
     }
 
-    return offset + stream->buffer_pos - stream->buffer_read - stream->unget_size;
+    return (long)(offset + stream->buffer_pos - stream->buffer_read - stream->unget_size);
 }
 
 /*-------------------------------------------------------------------------------------------------

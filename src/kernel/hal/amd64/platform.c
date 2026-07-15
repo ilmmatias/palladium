@@ -22,10 +22,10 @@
 
 /* This is pretty important to be here, as we need it before the memory manager initialization
  * to switch out of the bootloader stack. */
-static KeProcessor BootProcessor __attribute__((aligned(4096))) = {};
+static KeProcessor BootProcessor __attribute__((aligned(4096))) = {0};
 
-char HalpPlatformManufacturerString[12] = {};
-char HalpPlatformProcessorBrandString[48] = {};
+char HalpPlatformManufacturerString[12] = {0};
+char HalpPlatformProcessorBrandString[48] = {0};
 uint32_t HalpPlatformMaxLeaf = 0;
 uint32_t HalpPlatformMaxExtendedLeaf = 0;
 uint64_t HalpPlatformFeatures = 0;

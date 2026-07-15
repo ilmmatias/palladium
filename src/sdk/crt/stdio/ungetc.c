@@ -23,7 +23,7 @@ int ungetc_unlocked(int ch, FILE *stream) {
     }
 
     ch = (unsigned char)ch;
-    stream->unget_buffer[stream->unget_size++] = ch;
+    stream->unget_buffer[stream->unget_size++] = (char)ch;
     stream->flags &= ~__STDIO_FLAGS_EOF;
 
     return ch;

@@ -1,6 +1,7 @@
 /* SPDX-FileCopyrightText: (C) 2023-2026 ilmmatias
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -20,11 +21,14 @@ char *strndup(const char *s, size_t n) {
     /* The source string is allowed to not end with a null terminator, so we can't use
        strlen(). */
 
-    const char *Source = s;
     size_t CopySize = 0;
 
-    while (*(Source++) && n--) {
+    while (CopySize < n && s[CopySize]) {
         CopySize++;
+    }
+
+    if (CopySize == (size_t)-1) {
+        return NULL;
     }
 
     char *Copy = malloc(CopySize + 1);

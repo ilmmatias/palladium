@@ -4,6 +4,7 @@
 #include <acpi.h>
 #include <acpip.h>
 #include <ctype.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -377,6 +378,8 @@ bool AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
                                 case 5: /* MGT */
                                     Match1 = PkgValue > Operand1;
                                     break;
+                                default:
+                                    unreachable();
                             }
 
                             switch (MatchOp2) {
@@ -398,6 +401,8 @@ bool AcpipExecuteOpcode(AcpipState *State, AcpiValue *Result) {
                                 case 5: /* MGT */
                                     Match2 = PkgValue > Operand2;
                                     break;
+                                default:
+                                    unreachable();
                             }
 
                             if (Match1 && Match2) {

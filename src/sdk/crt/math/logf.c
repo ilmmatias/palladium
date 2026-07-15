@@ -296,6 +296,7 @@ float logf(float x) {
         }
 
         if (xi_abs <= 0x7f800000 && xi & 0x80000000) {
+            /* NOLINTNEXTLINE(misc-redundant-expression) */
             __raise_errnof(0.0F / 0.0F, EDOM);
             return -NAN;
         }
@@ -334,5 +335,5 @@ float logf(float x) {
     res = res * mant_low - 0x1p-1;
     res = res * mant_low + 0x1p0;
     res = res * mant_low + adj;
-    return res;
+    return (float)res;
 }

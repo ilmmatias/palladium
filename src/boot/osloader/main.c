@@ -204,8 +204,8 @@ EFI_STATUS OslMain(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
             if (KdnetDll->ExportTableSize != 1 ||
                 strcmp(KdnetDll->ExportTable[0].Name, "KdInitializeLibrary") != 0 ||
                 ExecHeader->DataDirectories.ImportTable.Size) {
-                OslPrint("Failed to load the KDNET module.\r\n");
-                OslPrint("The extensibility module %s is not valid.\r\n", KdnetDllPath);
+                OslPrint("Failed to load the KDNET module in %s.\r\n", KdnetDllPath);
+                OslPrint("The export or import tables do not match the expected format.\r\n");
                 OslPrint("The boot process cannot continue.\r\n");
                 break;
             }
@@ -215,7 +215,7 @@ EFI_STATUS OslMain(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
             KdnetDllInitializer = (void *)KdnetDll->ExportTable[0].Address;
             KdnetDll->EntryPoint = NULL;
             RtAppendDList(&LoadedPrograms, &KdnetDll->ListHeader);
-            gBS->FreePool((void *)Devices);
+            gBS->FreePool(Devices);
         }
 
         /* The boot drivers do need some extra work for both the full path (just like the kernel)
@@ -286,7 +286,7 @@ EFI_STATUS OslMain(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
         /* Let's try to build the memory descriptors now (we still have some allocations left
          * to do, but let's guess it's safe to do it now).*/
         RtDList *MemoryDescriptorListHead = NULL;
-        RtDList MemoryDescriptorStack = {};
+        RtDList MemoryDescriptorStack = {0};
         UINTN MemoryMapSize = 0;
         EFI_MEMORY_DESCRIPTOR *MemoryMap = NULL;
         UINTN DescriptorSize = 0;
@@ -365,7 +365,7 @@ EFI_STATUS OslMain(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable) {
 
         OslpTransferExecution(
             BootBlock,
-            (void *)((char *)BootStack + SIZE_8KB),
+            (char *)BootStack + SIZE_8KB,
             PageMap,
             MemoryMapSize,
             MemoryMap,

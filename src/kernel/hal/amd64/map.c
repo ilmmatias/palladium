@@ -15,8 +15,8 @@ extern bool HalpSmpInitializationComplete;
 
 static KeSpinLock Lock = {0};
 
-static uint64_t EarlyMapBitmapBuffer[((HALP_EARLY_MAP_PAGES + 63) >> 6) << 3] = {};
-static RtBitmap EarlyMapBitmap = {};
+static uint64_t EarlyMapBitmapBuffer[((HALP_EARLY_MAP_PAGES + 63) >> 6) << 3] = {0};
+static RtBitmap EarlyMapBitmap = {0};
 static uint64_t EarlyMapHint = 2;
 
 typedef struct {

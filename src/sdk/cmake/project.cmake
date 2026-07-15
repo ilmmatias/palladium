@@ -56,8 +56,7 @@ function(add_executable target type has_lib)
         -mno-stack-arg-probe
         -fexceptions
         -fseh-exceptions
-        -fms-extensions
-        -include ${CMAKE_SOURCE_DIR}/sdk/include/os/intellisense.h)
+        -fms-extensions)
 
     target_link_options(
     	${target}
@@ -131,8 +130,7 @@ function(add_library target type)
         -mno-stack-arg-probe
         -fexceptions
         -fseh-exceptions
-        -fms-extensions
-        -include ${CMAKE_SOURCE_DIR}/sdk/include/os/intellisense.h)
+        -fms-extensions)
 
     target_link_options(
         	${target}

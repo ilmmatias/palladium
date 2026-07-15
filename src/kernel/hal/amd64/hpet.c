@@ -17,7 +17,7 @@ static void *HpetAddress = NULL;
 static uint64_t Frequency = 1;
 static int Width = 64;
 
-static HpetOverflowHelper OverflowHelper = {};
+static HpetOverflowHelper OverflowHelper = {0};
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:

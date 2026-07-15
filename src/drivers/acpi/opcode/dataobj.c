@@ -60,9 +60,6 @@ int AcpipExecuteDataObjOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Val
 
         /* DefBuffer := BufferOp PkgLength BufferSize ByteList */
         case 0x11: {
-            Value->Type = ACPI_BUFFER;
-            Value->References = 1;
-
             uint32_t PkgLength = State->Opcode->PkgLength;
             uint64_t BufferSize = State->Opcode->FixedArguments[0].TermArg.Integer;
             uint32_t LengthSoFar = Start - State->Scope->RemainingLength;
@@ -72,11 +69,14 @@ int AcpipExecuteDataObjOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Val
                 return 0;
             }
 
-            Value->Buffer = AcpipAllocateZeroBlock(1, sizeof(AcpiBuffer) + BufferSize);
-            if (!Value->Buffer) {
+            void *Buffer = AcpipAllocateZeroBlock(1, sizeof(AcpiBuffer) + BufferSize);
+            if (!Buffer) {
                 return 0;
             }
 
+            Value->Type = ACPI_BUFFER;
+            Value->References = 1;
+            Value->Buffer = Buffer;
             Value->Buffer->References = 1;
             Value->Buffer->Size = BufferSize;
 
@@ -92,9 +92,6 @@ int AcpipExecuteDataObjOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Val
            DefVarPackage := VarPackageOp PkgLength VarNumElements PackageElementList */
         case 0x12:
         case 0x13: {
-            Value->Type = ACPI_PACKAGE;
-            Value->References = 1;
-
             /* The difference between DefPackage and DefVarPackage is NumElements vs
                VarNumElements; NumElements is always an 8-bit constant, which VarNumElements
                is a term arg. */
@@ -109,18 +106,20 @@ int AcpipExecuteDataObjOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Val
             }
 
             PkgLength -= LengthSoFar;
-            Value->Package =
+            void *Package =
                 AcpipAllocateZeroBlock(1, sizeof(AcpiPackage) + Size * sizeof(AcpiValue));
-            if (!Value->Package) {
+            if (!Package) {
                 return 0;
             }
 
+            Value->Type = ACPI_PACKAGE;
+            Value->References = 1;
+            Value->Package = Package;
+            Value->Package->References = 1;
+            Value->Package->Size = Size;
             for (uint64_t i = 0; i < Size; i++) {
                 Value->Package->Data[i].Type = 1;
             }
-
-            Value->Package->References = 1;
-            Value->Package->Size = Size;
 
             uint64_t i = 0;
             while (PkgLength) {

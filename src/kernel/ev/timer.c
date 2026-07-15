@@ -47,8 +47,8 @@ void EvpHandleTimer(HalInterruptFrame *InterruptFrame) {
 
     /* Update the quantum (if required). */
     PsThread *CurrentThread = Processor->CurrentThread;
-    if (CurrentThread && CurrentThread->ExpirationTicks && !--CurrentThread->ExpirationTicks) {
-        NotifyProcessor = true;
+    if (CurrentThread && CurrentThread->ExpirationTicks) {
+        NotifyProcessor = NotifyProcessor || --CurrentThread->ExpirationTicks == 0;
     }
 
     /* And finally, if any of the conditions above were true, notify the current processor to run

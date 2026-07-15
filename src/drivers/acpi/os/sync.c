@@ -3,6 +3,7 @@
 
 #include <acpip.h>
 #include <kernel/ev.h>
+#include <kernel/ob.h>
 #include <stdint.h>
 
 /*-------------------------------------------------------------------------------------------------
@@ -21,17 +22,31 @@ void *AcpipCreateMutex(void) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
+ *     This function deletes the kernel mutex object previously used as an ACPI Mutex.
+ *
+ * PARAMETERS:
+ *     Mutex - Pointer to the kernel mutex object.
+ *
+ * RETURN VALUE:
+ *     NULL.
+ *-----------------------------------------------------------------------------------------------*/
+void AcpipDeleteMutex(void *Mutex) {
+    ObDereferenceObject(Mutex);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
  *     This function acquires an ACPI Mutex with an optional timeout.
  *
  * PARAMETERS:
  *     Mutex - Pointer to the kernel mutex object.
- *     Timeout - Timeout in milliseconds; 0xFFFF means wait indefinitely.
+ *     Timeout - Timeout in milliseconds; 0xFFFF (or greater) means wait indefinitely.
  *
  * RETURN VALUE:
  *     0 on success (mutex acquired), non-zero on timeout.
  *-----------------------------------------------------------------------------------------------*/
 bool AcpipAcquireMutex(void *Mutex, uint64_t Timeout) {
-    return EvAcquireMutex(Mutex, Timeout == 0xFFFF ? EV_TIMEOUT_UNLIMITED : Timeout * EV_MILLISECS);
+    return EvAcquireMutex(Mutex, Timeout >= 0xFFFF ? EV_TIMEOUT_UNLIMITED : Timeout * EV_MILLISECS);
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -64,18 +79,32 @@ void *AcpipCreateEvent(void) {
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
+ *     This function deletes the kernel signal object previously used as an ACPI Event.
+ *
+ * PARAMETERS:
+ *     Mutex - Pointer to the kernel signal object.
+ *
+ * RETURN VALUE:
+ *     NULL.
+ *-----------------------------------------------------------------------------------------------*/
+void AcpipDeleteEvent(void *Event) {
+    ObDereferenceObject(Event);
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
  *     This function waits for an ACPI Event to be signaled, with an optional timeout.
  *
  * PARAMETERS:
  *     Event - Pointer to the kernel signal object.
- *     Timeout - Timeout in milliseconds; 0xFFFF means wait indefinitely.
+ *     Timeout - Timeout in milliseconds; 0xFFFF (or greater) means wait indefinitely.
  *
  * RETURN VALUE:
  *     0 on success (event signaled), non-zero on timeout.
  *-----------------------------------------------------------------------------------------------*/
 bool AcpipWaitEvent(void *Event, uint64_t Timeout) {
     return EvWaitForObject(
-        Event, Timeout == 0xFFFF ? EV_TIMEOUT_UNLIMITED : Timeout * EV_MILLISECS);
+        Event, Timeout >= 0xFFFF ? EV_TIMEOUT_UNLIMITED : Timeout * EV_MILLISECS);
 }
 
 /*-------------------------------------------------------------------------------------------------

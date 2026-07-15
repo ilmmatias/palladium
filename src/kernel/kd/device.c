@@ -7,11 +7,12 @@
 #include <kernel/ke.h>
 #include <kernel/ki.h>
 #include <kernel/mi.h>
+#include <os/kdext.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 
-KdDebugDeviceDescriptor KdpDebugDevice = {};
+KdDebugDeviceDescriptor KdpDebugDevice = {0};
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:

@@ -34,7 +34,9 @@ Checks:
   - 'misc-include-cleaner'
 
   # Too noisy or poorly suited to low-level/freestanding code.
+  - '-bugprone-casting-through-void'
   - '-bugprone-easily-swappable-parameters'
+  - '-bugprone-multi-level-implicit-pointer-conversion'
   - '-bugprone-reserved-identifier'
   - '-cert-dcl37-c'
   - '-cert-dcl51-cpp'

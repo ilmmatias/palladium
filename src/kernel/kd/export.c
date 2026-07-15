@@ -2,10 +2,11 @@
  * SPDX-License-Identifier: GPL-3.0-or-later */
 
 #include <kernel/kdp.h>
+#include <os/kdext.h>
 #include <stdint.h>
 #include <string.h>
 
-KdExtensibilityExports KdpDebugExports = {};
+KdExtensibilityExports KdpDebugExports = {0};
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -276,4 +277,47 @@ void KdpInitializeExports(void) {
      * have to initialize the function count (which is used to check the host OS version). */
     memset(&KdpDebugExports, 0, sizeof(KdExtensibilityExports));
     KdpDebugExports.FunctionCount = KD_EXTENSIBILITY_EXPORT_COUNT;
+}
+
+/*-------------------------------------------------------------------------------------------------
+ * PURPOSE:
+ *     This function checks if the exports from the extensibility module seem sane, or, if
+ *     something's fishy.
+ *
+ * PARAMETERS:
+ *     None.
+ *
+ * RETURN VALUE:
+ *     NTSTATUS values describing the result of the operation (anything but STATUS_SUCCESS is to
+ *     be considered an error).
+ *-----------------------------------------------------------------------------------------------*/
+uint32_t KdpValidateExports(void) {
+    uint32_t Status = 0xC000000D;
+
+    do {
+        /* Check if the driver is actually compatible with our API. */
+        if (KdpDebugExports.FunctionCount < KD_EXTENSIBILITY_EXPORT_COUNT) {
+            break;
+        }
+
+        /* And if it properly setup the basic init functions. */
+        if (!KdpDebugExports.InitializeController || !KdpDebugExports.GetHardwareContextSize) {
+            break;
+        }
+
+        /* Alongside the I/O ethernet packet functions. */
+        if (!KdpDebugExports.GetRxPacket || !KdpDebugExports.ReleaseRxPacket ||
+            !KdpDebugExports.GetTxPacket || !KdpDebugExports.SendTxPacket) {
+            break;
+        }
+
+        /* And then the remaining packet functions. */
+        if (!KdpDebugExports.GetPacketAddress || !KdpDebugExports.GetPacketLength) {
+            break;
+        }
+
+        Status = 0;
+    } while (false);
+
+    return Status;
 }

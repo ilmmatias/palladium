@@ -152,6 +152,9 @@ static bool ProcessUnwindOps(
                 ContextRecord->Rip = *(uint64_t *)ContextRecord->Rsp;
                 ContextRecord->Rsp = *(uint64_t *)(ContextRecord->Rsp + 24);
                 return true;
+
+            default:
+                unreachable();
         }
     }
 
@@ -333,6 +336,8 @@ RtExceptionRoutine RtVirtualUnwind(
                     LocalContext.Rsp += *(int32_t *)(InstrPtr + 3);
                     InstrPtr += 7;
                     break;
+                default:
+                    unreachable();
             }
         }
 

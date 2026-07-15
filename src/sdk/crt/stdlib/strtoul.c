@@ -51,7 +51,7 @@ unsigned long strtoul(const char *CRT_RESTRICT nptr, char **CRT_RESTRICT endptr,
 
     while (true) {
         unsigned long last = value;
-        int digit = *nptr;
+        int digit = (int)*nptr;
 
         /* First two cases are aA-fF, offset by +0x0A. */
         if (islower(digit)) {

@@ -9,6 +9,7 @@
 #include <kernel/mi.h>
 #include <kernel/mm.h>
 #include <os/intrin.h>
+#include <os/kdext.h>
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -18,7 +19,7 @@ extern KdExtensibilityExports KdpDebugExports;
 
 static bool BlockRecursion = false;
 
-KdExtensibilityImports KdpDebugImports = {};
+KdExtensibilityImports KdpDebugImports = {0};
 uint32_t KdpDebugErrorStatus = 0;
 uint16_t *KdpDebugErrorString = NULL;
 uint32_t KdpDebugHardwareId = 0;

@@ -122,7 +122,7 @@ void *OslReadFile(const char *Path, uint64_t *Size) {
     EFI_FILE_INFO *FileInfo = NULL;
 
     while (true) {
-        Status = Handle->GetInfo(Handle, &gEfiFileInfoGuid, &FileInfoSize, (VOID *)FileInfo);
+        Status = Handle->GetInfo(Handle, &gEfiFileInfoGuid, &FileInfoSize, FileInfo);
         if (Status != EFI_BUFFER_TOO_SMALL) {
             break;
         }

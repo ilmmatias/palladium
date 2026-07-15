@@ -11,7 +11,7 @@
 #include <stdint.h>
 #include <string.h>
 
-static RtSList FreeList = {};
+static RtSList FreeList = {0};
 static KeSpinLock FreeListLock = {0};
 static KeSpinLock TagListLock[256] = {0};
 static MiPoolTrackerHeader *PoolTracker = NULL;

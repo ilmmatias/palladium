@@ -6,6 +6,7 @@
 #include <kernel/ob.h>
 #include <kernel/obp.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <string.h>
 
 /*-------------------------------------------------------------------------------------------------

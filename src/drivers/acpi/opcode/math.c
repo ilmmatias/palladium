@@ -3,6 +3,7 @@
 
 #include <acpi.h>
 #include <acpip.h>
+#include <stddef.h>
 #include <stdint.h>
 
 /*-------------------------------------------------------------------------------------------------
@@ -74,6 +75,8 @@ int AcpipExecuteMathOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
                 case 0x85:
                     Value->Integer = Left % Right;
                     break;
+                default:
+                    unreachable();
             }
 
             if (!AcpipStoreTarget(State, Target, Value)) {
@@ -154,6 +157,8 @@ int AcpipExecuteMathOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
                 case 0x76:
                     Value->Integer = TargetInteger - 1;
                     break;
+                default:
+                    unreachable();
             }
 
             if (!AcpipStoreTarget(State, Target, Value)) {
@@ -185,6 +190,8 @@ int AcpipExecuteMathOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
                 case 0x82:
                     Value->Integer = Operand == 0 ? 0 : __builtin_clzll(Operand) + 1;
                     break;
+                default:
+                    unreachable();
             }
 
             if (!AcpipStoreTarget(State, Target, Value)) {
@@ -223,6 +230,8 @@ int AcpipExecuteMathOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
                 case 0x95:
                     Value->Integer = Left < Right;
                     break;
+                default:
+                    unreachable();
             }
 
             Value->Integer = Value->Integer ? UINT64_MAX : 0;

@@ -21,7 +21,7 @@ int fsetpos_unlocked(FILE *stream, const fpos_t *pos) {
     }
 
     /* I'm not sure if this is the actual right way to implement this? */
-    return fseek_unlocked(stream, *pos, SEEK_SET);
+    return fseek_unlocked(stream, (long)*pos, SEEK_SET);
 }
 
 /*-------------------------------------------------------------------------------------------------

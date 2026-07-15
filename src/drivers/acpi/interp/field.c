@@ -194,7 +194,7 @@ static bool SetupEcRegion(AcpiObject *Object) {
  * RETURN VALUE:
  *     Requested data.
  *-----------------------------------------------------------------------------------------------*/
-static uint64_t ReadRegion(AcpiValue *Source, int Offset, int Size) {
+static uint64_t ReadRegion(AcpiValue *Source, size_t Offset, size_t Size) {
     switch (Source->Region.RegionSpace) {
         case ACPI_SPACE_SYSTEM_MEMORY: {
             return AcpipReadMmioSpace(Source->Region.RegionOffset + Offset, Size);
@@ -210,7 +210,7 @@ static uint64_t ReadRegion(AcpiValue *Source, int Offset, int Size) {
 
         case ACPI_SPACE_EMBEDDED_CONTROL: {
             uint64_t Value = 0;
-            for (int i = 0; i < Size; i++) {
+            for (size_t i = 0; i < Size; i++) {
                 Value |= AcpipReadEcSpace(
                              Source->Region.EcCmdPort,
                              Source->Region.EcDataPort,
@@ -223,7 +223,7 @@ static uint64_t ReadRegion(AcpiValue *Source, int Offset, int Size) {
 
         case ACPI_SPACE_SYSTEM_CMOS: {
             uint64_t Value = 0;
-            for (int i = 0; i < Size; i++) {
+            for (size_t i = 0; i < Size; i++) {
                 Value |= AcpipReadCmosSpace(Source->Region.RegionOffset + Offset + i) << (i * 8);
             }
 
@@ -258,7 +258,7 @@ static uint64_t ReadRegion(AcpiValue *Source, int Offset, int Size) {
  * RETURN VALUE:
  *     None.
  *-----------------------------------------------------------------------------------------------*/
-static void WriteRegion(AcpiValue *Source, int Offset, int Size, uint64_t Data) {
+static void WriteRegion(AcpiValue *Source, size_t Offset, size_t Size, uint64_t Data) {
     switch (Source->Region.RegionSpace) {
         case ACPI_SPACE_SYSTEM_MEMORY: {
             AcpipWriteMmioSpace(Source->Region.RegionOffset + Offset, Size, Data);
@@ -276,7 +276,7 @@ static void WriteRegion(AcpiValue *Source, int Offset, int Size, uint64_t Data) 
         }
 
         case ACPI_SPACE_EMBEDDED_CONTROL: {
-            for (int i = 0; i < Size; i++) {
+            for (size_t i = 0; i < Size; i++) {
                 AcpipWriteEcSpace(
                     Source->Region.EcCmdPort,
                     Source->Region.EcDataPort,
@@ -288,7 +288,7 @@ static void WriteRegion(AcpiValue *Source, int Offset, int Size, uint64_t Data) 
         }
 
         case ACPI_SPACE_SYSTEM_CMOS: {
-            for (int i = 0; i < Size; i++) {
+            for (size_t i = 0; i < Size; i++) {
                 AcpipWriteCmosSpace(
                     Source->Region.RegionOffset + Offset + i, (Data >> (i * 8)) & UINT8_MAX);
             }
@@ -321,7 +321,7 @@ static void WriteRegion(AcpiValue *Source, int Offset, int Size, uint64_t Data) 
  * RETURN VALUE:
  *     Requested data.
  *-----------------------------------------------------------------------------------------------*/
-static uint64_t ReadField(AcpiValue *Source, int Offset, int AccessWidth) {
+static uint64_t ReadField(AcpiValue *Source, size_t Offset, size_t AccessWidth) {
     switch (Source->FieldUnit.FieldType) {
         case ACPI_FIELD: {
             return ReadRegion(&Source->FieldUnit.Region->Value, Offset, AccessWidth / 8);
@@ -357,6 +357,9 @@ static uint64_t ReadField(AcpiValue *Source, int Offset, int AccessWidth) {
             AcpiRemoveReference(&Target, false);
             return Result;
         }
+
+        default:
+            unreachable();
     }
 
     return 0;
@@ -379,7 +382,7 @@ static uint64_t ReadField(AcpiValue *Source, int Offset, int AccessWidth) {
  *     None.
  *-----------------------------------------------------------------------------------------------*/
 static void
-WriteField(AcpiValue *Target, int Offset, int AccessWidth, uint64_t Data, uint64_t Mask) {
+WriteField(AcpiValue *Target, size_t Offset, size_t AccessWidth, uint64_t Data, uint64_t Mask) {
     uint64_t Base;
     switch ((Target->FieldUnit.AccessType >> 5) & 0x0F) {
         /* Preserve
@@ -436,6 +439,9 @@ WriteField(AcpiValue *Target, int Offset, int AccessWidth, uint64_t Data, uint64
 
             break;
         }
+
+        default:
+            unreachable();
     }
 }
 
@@ -454,13 +460,13 @@ WriteField(AcpiValue *Target, int Offset, int AccessWidth, uint64_t Data, uint64
  *     Data from the buffer.
  *-----------------------------------------------------------------------------------------------*/
 static uint64_t
-SafeBufferRead(const uint8_t *Buffer, uint64_t Offset, int BufferWidth, int AccessWidth) {
-    int RemainingBits = BufferWidth - Offset * 8;
+SafeBufferRead(const uint8_t *Buffer, uint64_t Offset, size_t BufferWidth, size_t AccessWidth) {
+    size_t RemainingBits = BufferWidth - Offset * 8;
     Buffer += Offset;
 
     /* This should be guaranteed to be a multiple of 8 (and limited between 0-64). */
     uint64_t Value = 0;
-    int ByteCount = (RemainingBits > AccessWidth ? AccessWidth : RemainingBits) / 8;
+    size_t ByteCount = (RemainingBits > AccessWidth ? AccessWidth : RemainingBits) / 8;
     if (ByteCount > 0) {
         memcpy(&Value, Buffer, ByteCount);
     }
@@ -499,6 +505,8 @@ bool AcpipReadField(AcpiValue *Source, AcpiValue *Target) {
         case 4:
             AccessWidth = 64;
             break;
+        default:
+            break;
     }
 
     /* We need some extra work for PCI Config and EC regions, but we'll be caching it afterwards. */
@@ -518,7 +526,7 @@ bool AcpipReadField(AcpiValue *Source, AcpiValue *Target) {
        any extra memory. */
     uint8_t *Buffer;
     if (Source->FieldUnit.Length > 64) {
-        int BufferSize = (Source->FieldUnit.Length + AccessWidth - 1) / 8;
+        size_t BufferSize = (Source->FieldUnit.Length + AccessWidth - 1) / 8;
 
         Target->Type = ACPI_BUFFER;
         Target->Buffer = AcpipAllocateBlock(sizeof(AcpiBuffer) + BufferSize);
@@ -547,17 +555,17 @@ bool AcpipReadField(AcpiValue *Source, AcpiValue *Target) {
        The buffer might start unaligned, and as such, we might need to read two entries before
        writing into the buffer. We'll just assume we always need to do that. */
 
-    int AlignedItemCount = (Source->FieldUnit.Length + AccessWidth - 1) / AccessWidth;
+    size_t AlignedItemCount = (Source->FieldUnit.Length + AccessWidth - 1) / AccessWidth;
 
-    int UnalignedOffset = Source->FieldUnit.Offset & (AccessWidth - 1);
-    int UnalignedLength = Source->FieldUnit.Length & (AccessWidth - 1);
-    int UnalignedItemCount =
+    size_t UnalignedOffset = Source->FieldUnit.Offset & (AccessWidth - 1);
+    size_t UnalignedLength = Source->FieldUnit.Length & (AccessWidth - 1);
+    size_t UnalignedItemCount =
         (Source->FieldUnit.Length + UnalignedOffset + AccessWidth - 1) / AccessWidth;
 
     uint64_t Item = ReadField(Source, Source->FieldUnit.Offset / 8, AccessWidth) >> UnalignedOffset;
 
-    for (int i = 1; i < UnalignedItemCount; i++) {
-        int Offset = (Source->FieldUnit.Offset / 8) + (AccessWidth / 8) * i;
+    for (size_t i = 1; i < UnalignedItemCount; i++) {
+        size_t Offset = (Source->FieldUnit.Offset / 8) + (AccessWidth / 8) * i;
         uint64_t Value = ReadField(Source, Offset, AccessWidth);
 
         /* Unaligned start, merge with previous item. */
@@ -621,6 +629,8 @@ bool AcpipWriteField(AcpiValue *Target, AcpiValue *Data) {
         case 4:
             AccessWidth = 64;
             break;
+        default:
+            break;
     }
 
     /* We need some extra work for PCI Config and EC regions, but we'll be caching it afterwards. */
@@ -640,7 +650,7 @@ bool AcpipWriteField(AcpiValue *Target, AcpiValue *Data) {
        conversions. */
 
     const uint8_t *Buffer;
-    int BufferWidth;
+    size_t BufferWidth;
 
     if (Data->Type == ACPI_INTEGER) {
         Buffer = (const uint8_t *)&Data->Integer;
@@ -658,21 +668,21 @@ bool AcpipWriteField(AcpiValue *Target, AcpiValue *Data) {
        The buffer might start unaligned, and as such, we might need to read two entries before
        writing into the region. We'll just assume we always need to do that. */
 
-    int AlignedItemCount = (Target->FieldUnit.Length + AccessWidth - 1) / AccessWidth;
+    size_t AlignedItemCount = (Target->FieldUnit.Length + AccessWidth - 1) / AccessWidth;
 
-    int UnalignedOffset = Target->FieldUnit.Offset & (AccessWidth - 1);
-    int UnalignedLength = Target->FieldUnit.Length & (AccessWidth - 1);
-    int UnalignedItemCount =
+    size_t UnalignedOffset = Target->FieldUnit.Offset & (AccessWidth - 1);
+    size_t UnalignedLength = Target->FieldUnit.Length & (AccessWidth - 1);
+    size_t UnalignedItemCount =
         (Target->FieldUnit.Length + UnalignedOffset + AccessWidth - 1) / AccessWidth;
 
     /* Always take caution with the buffer width when reading anything; Running over it is UB,
        and would probably access memory not belonging to us (or even unmapped).
        SafeBufferRead() should handle that for us. */
     uint64_t Item = SafeBufferRead(Buffer, 0, BufferWidth, AccessWidth) >> UnalignedOffset;
-    int FieldOffset = Target->FieldUnit.Offset / 8;
-    int BufferOffset = AccessWidth / 8;
+    size_t FieldOffset = Target->FieldUnit.Offset / 8;
+    size_t BufferOffset = AccessWidth / 8;
 
-    for (int i = 1; i < UnalignedItemCount; i++) {
+    for (size_t i = 1; i < UnalignedItemCount; i++) {
         uint64_t Value = SafeBufferRead(Buffer, BufferOffset, BufferWidth, AccessWidth);
 
         /* Unaligned start, merge with previous item. */
@@ -688,8 +698,8 @@ bool AcpipWriteField(AcpiValue *Target, AcpiValue *Data) {
 
         /* On the unaligned loop, we just need to mask off any bits higher than the remaining
            buffer size. */
-        int RunOffLength = BufferWidth - BufferOffset * 8;
-        if ((int)AccessWidth < RunOffLength) {
+        size_t RunOffLength = BufferWidth - BufferOffset * 8;
+        if (AccessWidth < RunOffLength) {
             RunOffLength = AccessWidth;
         } else if (RunOffLength < 0) {
             RunOffLength = 0;
@@ -707,12 +717,12 @@ bool AcpipWriteField(AcpiValue *Target, AcpiValue *Data) {
     BufferOffset -= AccessWidth / 8;
 
     /* This should take care of the remaining buffer size being bigger than the AccessWidth. */
-    int RunOffLength = BufferWidth - BufferOffset * 8;
+    size_t RunOffLength = BufferWidth - BufferOffset * 8;
     if (Target->FieldUnit.Length < AccessWidth) {
-        if ((int)Target->FieldUnit.Length < RunOffLength) {
+        if (Target->FieldUnit.Length < RunOffLength) {
             RunOffLength = Target->FieldUnit.Length;
         }
-    } else if ((int)(AccessWidth - UnalignedLength) < RunOffLength) {
+    } else if (AccessWidth - UnalignedLength < RunOffLength) {
         RunOffLength = AccessWidth - UnalignedLength;
     } else if (RunOffLength < 0) {
         RunOffLength = 0;

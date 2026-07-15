@@ -69,12 +69,16 @@ static bool ExecuteOs(int ArgCount, AcpiValue *Arguments, AcpiValue *Result) {
 
     AcpipShowTraceMessage("request for \\_OS\n");
 
+    const char *Name = "Microsoft Windows NT";
+    size_t Size = strlen(Name) + 1;
+
     Result->Type = ACPI_STRING;
     Result->References = 1;
-    Result->String = AcpipAllocateBlock(sizeof(AcpiString) + strlen("Microsoft Windows NT") + 1);
+    Result->String = AcpipAllocateBlock(sizeof(AcpiString) + Size);
+
     if (Result->String) {
         Result->String->References = 1;
-        strcpy(Result->String->Data, "Microsoft Windows NT");
+        memcpy(Result->String->Data, Name, Size);
     }
 
     return Result->String != NULL;

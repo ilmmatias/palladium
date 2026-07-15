@@ -125,7 +125,8 @@ static bool ExpandBootDriverCapacity(OslConfig *Config) {
         return false;
     }
 
-    memcpy(Config->BootDrivers, BootDrivers, Config->BootDriverCount * sizeof(char *));
+    memcpy(
+        Config->BootDrivers, BootDrivers, Config->BootDriverCount * sizeof(char *));
     gBS->FreePool(BootDrivers);
     Config->BootDriverCapacity = NewCapacity;
     return true;
@@ -269,11 +270,11 @@ bool OslLoadConfigFile(const char *Path, OslConfig *Config) {
 
         /* We expect uppercase everywhere, so let's handle that now. */
         for (size_t i = 0; i < NameSize; i++) {
-            Name[i] = toupper(Name[i]);
+            Name[i] = (char)toupper(Name[i]);
         }
 
         for (size_t i = 0; i < ValueSize; i++) {
-            Value[i] = toupper(Value[i]);
+            Value[i] = (char)toupper(Value[i]);
         }
 
         /* Now it should be as simple as a few strcmp()s, as we shouldn't have many command

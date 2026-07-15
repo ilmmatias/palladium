@@ -8,6 +8,7 @@
 #include <kernel/ki.h>
 #include <kernel/mi.h>
 #include <kernel/mm.h>
+#include <os/kdext.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
@@ -22,7 +23,7 @@ bool KdpDebugEnabled = false;
 bool KdpDebugEchoEnabled = true;
 bool KdpDebugConnected = false;
 void *KdpDebugAdapter = NULL;
-KdExtensibilityData KdpDebugData = {};
+KdExtensibilityData KdpDebugData = {0};
 
 uint8_t KdpDebuggeeHardwareAddress[6] = {0};
 uint8_t KdpDebuggeeProtocolAddress[4] = {0};
@@ -210,6 +211,17 @@ void KdpInitializeDebugger(KiLoaderBlock *LoaderBlock) {
      * for us, disable debugging in the config file in this case). */
     KdPrint(KD_TYPE_DEBUG, "initializing the debug device controller\n");
     Status = KdpInitializeController(&KdpDebugData);
+    if (Status) {
+        DumpErrorString();
+        KeFatalError(
+            KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
+            KE_PANIC_PARAMETER_DEBUGGER_INITIALIZATION_FAILURE,
+            (uint64_t)Status,
+            (uint64_t)KdpDebugErrorStatus,
+            (uint64_t)KdpDebugHardwareId);
+    }
+
+    Status = KdpValidateExports();
     if (Status) {
         DumpErrorString();
         KeFatalError(

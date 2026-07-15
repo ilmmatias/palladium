@@ -13,7 +13,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-RtSList HalpLapicListHead = {};
+RtSList HalpLapicListHead = {0};
 
 static void *LapicAddress = NULL;
 static bool X2ApicEnabled = false;
@@ -178,6 +178,9 @@ void HalpCollectApics(void) {
                 HalpProcessorCount++;
                 break;
             }
+
+            default:
+                break;
         }
 
         Position += Record->Length;

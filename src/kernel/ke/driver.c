@@ -14,7 +14,7 @@
 #include <stdint.h>
 #include <string.h>
 
-RtDList KiModuleListHead = {};
+RtDList KiModuleListHead = {0};
 
 /*-------------------------------------------------------------------------------------------------
  * PURPOSE:
@@ -43,8 +43,8 @@ void KiSaveBootStartDrivers(KiLoaderBlock *LoaderBlock) {
                 0);
         }
 
-        char *TargetImageName =
-            MmAllocatePool(strlen(SourceModule->ImageName) + 1, MM_POOL_TAG_LDR);
+        size_t TargetImageNameSize = strlen(SourceModule->ImageName) + 1;
+        char *TargetImageName = MmAllocatePool(TargetImageNameSize, MM_POOL_TAG_LDR);
         if (!TargetImageName) {
             KeFatalError(
                 KE_PANIC_KERNEL_INITIALIZATION_FAILURE,
@@ -55,7 +55,7 @@ void KiSaveBootStartDrivers(KiLoaderBlock *LoaderBlock) {
         }
 
         memcpy(TargetModule, SourceModule, sizeof(KeModule));
-        strcpy(TargetImageName, SourceModule->ImageName);
+        memcpy(TargetImageName, SourceModule->ImageName, TargetImageNameSize);
         TargetModule->ImageName = TargetImageName;
         RtAppendDList(&KiModuleListHead, &TargetModule->ListHeader);
     }

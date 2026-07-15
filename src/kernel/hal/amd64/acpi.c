@@ -10,7 +10,7 @@
 #include <stdint.h>
 #include <string.h>
 
-static int Version = 0;
+static uint32_t Version = 0;
 static HalpSdtHeader *RootTable = NULL;
 
 /*-------------------------------------------------------------------------------------------------

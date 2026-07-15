@@ -38,7 +38,7 @@ void OslPutString(const char *String) {
     CHAR16 WideString[Size + 1];
 
     for (size_t i = 0; i < Size; i++) {
-        WideString[i] = String[i];
+        WideString[i] = (CHAR16)String[i];
     }
 
     WideString[Size] = 0;
@@ -63,7 +63,7 @@ static void PutBuffer(const void *Buffer, int Size, void *) {
     CHAR16 WideString[Size + 1];
 
     for (int i = 0; i < Size; i++) {
-        WideString[i] = *(String++);
+        WideString[i] = (CHAR16)(*(String++));
     }
 
     WideString[Size] = 0;

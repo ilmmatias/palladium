@@ -40,6 +40,7 @@ int AcpipExecuteLockOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
             }
 
             if (!AcpipCreateObject(&State->Opcode->FixedArguments[0].Name, &MutexValue)) {
+                AcpipDeleteMutex(MutexValue.Mutex->Handle);
                 AcpipFreeBlock(MutexValue.Mutex);
                 return 0;
             }
@@ -59,7 +60,7 @@ int AcpipExecuteLockOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
             if (Value) {
                 Value->Type = ACPI_INTEGER;
                 Value->References = 1;
-                Value->Integer = Result ? UINT64_MAX : 0;
+                Value->Integer = Result ? 0 : UINT64_MAX;
             }
 
             AcpiRemoveReference(&State->Opcode->FixedArguments[0].TermArg, false);
@@ -74,7 +75,6 @@ int AcpipExecuteLockOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
             }
 
             AcpipReleaseMutex(MutexObject.Mutex->Handle);
-
             AcpiRemoveReference(&State->Opcode->FixedArguments[0].TermArg, false);
             break;
         }
@@ -91,7 +91,7 @@ int AcpipExecuteLockOpcode(AcpipState *State, uint16_t Opcode, AcpiValue *Value)
             if (Value) {
                 Value->Type = ACPI_INTEGER;
                 Value->References = 1;
-                Value->Integer = Result ? UINT64_MAX : 0;
+                Value->Integer = Result ? 0 : UINT64_MAX;
             }
 
             AcpiRemoveReference(&State->Opcode->FixedArguments[0].TermArg, false);

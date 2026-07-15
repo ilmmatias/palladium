@@ -45,7 +45,7 @@ char *gets_unlocked(char *str) {
             break;
         }
 
-        *(dest++) = ch;
+        *(dest++) = (char)ch;
     }
 
     *dest = 0;

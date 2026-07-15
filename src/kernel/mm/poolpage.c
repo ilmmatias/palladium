@@ -13,7 +13,7 @@
 extern RtBitmap MiPoolBitmap;
 extern uint64_t MiPoolBitmapHint;
 
-static RtSList FreeLists[4] = {};
+static RtSList FreeLists[4] = {0};
 static KeSpinLock FreeListLock[4] = {0};
 static KeSpinLock BitmapLock = {0};
 
