@@ -9,9 +9,11 @@ state_dir=
 ovmf_code_source=
 ovmf_vars_source=
 qemu_binary=qemu-system-x86_64
+machine=q35
+cpu_count=$(nproc)
 
 debug_enabled=false
-debug_port=
+debug_port=50005
 debug_device=e1000
 debug_capture=
 kvm_enabled=true
@@ -50,6 +52,8 @@ Options:
   --ovmf-code FILE      Initialize code.bin from this OVMF code image
   --ovmf-vars FILE      Initialize vars.bin from this OVMF variables image
   --qemu BINARY         Use an explicit QEMU binary
+  --machine MACHINE     Specify what machine QEMU should emulate
+  --cpus COUNT          Specify the amount of virtual CPUs
   --no-kvm              Do not enable KVM acceleration
   --debug-enabled       Enable the debugger network interface
   --debug-port PORT     Forward this UDP port and enable debugger networking
@@ -68,6 +72,7 @@ parse_args() {
             --ovmf-code) ovmf_code_source=$(require_value "$@"); shift 2 ;;
             --ovmf-vars) ovmf_vars_source=$(require_value "$@"); shift 2 ;;
             --qemu) qemu_binary=$(require_value "$@"); shift 2 ;;
+            --cpus) cpu_count=$(require_value "$@"); shift 2 ;;
             --no-kvm) kvm_enabled=false; shift ;;
             --debug-enabled) debug_enabled=true; shift ;;
             --debug-port) debug_port=$(require_value "$@"); shift 2 ;;
@@ -98,21 +103,27 @@ check_paths() {
 
     if [[ -z $debug_capture ]]; then
         debug_capture=$state_dir/net0.pcap
-    elif [[ $capture != /* ]]; then
+    elif [[ $debug_capture != /* ]]; then
         debug_capture=$state_dir/$debug_capture
     fi
 }
 
 # Validate the debugger network configuration
 check_debug() {
-    if [[ -n $debug_port ]]; then
-        if [[ ! $debug_port =~ ^[0-9]+$ ]] ||
-           ((${#debug_port} > 5)) || ((10#$debug_port < 1 || 10#$debug_port > 65535)); then
-            usage_error "debug port must be between 1 and 65535"
-        fi
+    if [[ ! $debug_port =~ ^[0-9]+$ ]] ||
+        ((${#debug_port} > 5)) || ((10#$debug_port < 1 || 10#$debug_port > 65535)); then
+        usage_error "debug port must be between 1 and 65535"
     fi
 
     [[ $debug_device != *,* ]] || usage_error "debug device must not contain commas"
+}
+
+# Validate the virtual processor count
+check_cpus() {
+    if [[ ! $cpu_count =~ ^[0-9]+$ ]] ||
+       ((${#cpu_count} > 5)) || ((10#$cpu_count < 1 || 10#$cpu_count > 65535)); then
+        usage_error "CPU count must be between 1 and 65535"
+    fi
 }
 
 # Copy the OVMF code and variable templates when persistent state is absent
@@ -137,17 +148,21 @@ prepare_ovmf() {
 run_qemu() {
     local code=$state_dir/code.bin
     local vars=$state_dir/vars.bin
+    local cpu
     local network
     local -a args=()
 
     if [[ $kvm_enabled == true ]]; then
         args+=(-enable-kvm)
+        cpu=host,+invtsc
+    else
+        cpu=max
     fi
 
     args+=(
-        -machine q35
-        -cpu host,+invtsc
-        -smp "$(nproc)"
+        -machine "$machine"
+        -cpu "$cpu"
+        -smp "$cpu_count"
         -drive "if=pflash,format=raw,unit=0,file=$code,readonly=on"
         -drive "if=pflash,format=raw,unit=1,file=$vars"
         -cdrom "$iso"
@@ -156,14 +171,8 @@ run_qemu() {
     )
 
     if [[ $debug_enabled == true ]]; then
-        if [[ -n $debug_port ]]; then
-            network="user,id=net0,hostfwd=udp::$debug_port-:$debug_port"
-        else
-            network=user,id=net0,hostfwd=tcp::50005-:50005
-        fi
-
         args+=(
-            -netdev "$network"
+            -netdev "user,id=net0,hostfwd=udp::$debug_port-:$debug_port"
             -device "$debug_device,netdev=net0"
             -object "filter-dump,id=f0,netdev=net0,file=$debug_capture"
         )
@@ -182,6 +191,7 @@ main() {
     command -v "$qemu_binary" >/dev/null || die "QEMU binary not found: $qemu_binary"
 
     check_paths
+    check_cpus
     check_debug
     prepare_ovmf
     run_qemu

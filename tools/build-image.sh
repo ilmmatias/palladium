@@ -71,7 +71,7 @@ parse_args() {
             --debug-echo-enabled) debug_echo_enabled=true; shift ;;
             --debug-address) debug_address=$(require_value "$@"); shift 2 ;;
             --debug-port) debug_port=$(require_value "$@"); shift 2 ;;
-            --debug-module) debug_modules+=("require_value "$@""); shift 2 ;;
+            --debug-module) debug_modules+=("$(require_value "$@")"); shift 2 ;;
             --help) usage; exit 0 ;;
             *) usage_error "unknown argument: $1" ;;
         esac
@@ -199,7 +199,11 @@ setup_debug() {
     local module module_name
     local -A seen=()
 
-    [[ $debug_enabled == false ]] || printf 'DebugEnabled=true\n' >>"$config"
+    if [[ $debug_enabled == false ]]; then
+        return
+    fi
+
+    printf 'DebugEnabled=true\n' >>"$config"
     [[ $debug_echo_enabled == false ]] || printf 'DebugEchoEnabled=true\n' >>"$config"
     [[ -z $debug_address ]] || printf 'DebugAddress=%s\n' "$debug_address" >>"$config"
 
